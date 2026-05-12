@@ -14,6 +14,8 @@
 
 - **名称**: Stock Master — 料理レシピ・食材管理アプリ
 - **形式**: 単一HTMLファイルをGeminiCanvasアプリとしてプレビュー
+- **バックエンド**: Google Apps Script（GAS）。`GAS_URL` に設定された既存デプロイ済みエンドポイントへ通信する
+- **開発・テストフロー**: コード変更後、`app.html` の内容をGemini Canvasに貼り付けてプレビューし、実際のGAS通信とGoogle Spreadsheetへの書き込みを確認する。GAS側のスクリプトデプロイ作業は不要
 - **現状**: Phase 1（DB構築＋モードA）実装中
 
 ## 正本ファイル

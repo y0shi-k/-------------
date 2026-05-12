@@ -7,7 +7,7 @@ related_specs:
 owner_role: ai-implementer
 required_evals:
   - ui_component_addition
-status: implementation_ready
+status: completed
 ---
 
 ## 目的

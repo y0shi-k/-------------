@@ -398,6 +398,15 @@
           var s1 = ss.getSheetByName('食材在庫');
           s1.appendRow(['ID', '分類', '品名', '数量', '単位', '購入日', '開封日', '表示期限', '実質期限', '保存場所', '状態メモ']);
           s1.setFrozenRows(1);
+          var s2 = ss.getSheetByName('レシピ集');
+          s2.appendRow(['レシピID', 'レシピ名', '材料JSON', '手順JSON', '出典', '調理回数', '調理日履歴']);
+          s2.setFrozenRows(1);
+          var s3 = ss.getSheetByName('献立スケジュール');
+          s3.appendRow(['予定日', '食事区分', 'レシピID', 'レシピ名', 'ステータス']);
+          s3.setFrozenRows(1);
+          var s4 = ss.getSheetByName('料理履歴');
+          s4.appendRow(['履歴ID', '調理日時', 'レシピID', 'レシピ名', '感想', '写真URL', '評価']);
+          s4.setFrozenRows(1);
           var s5 = ss.getSheetByName('買い物リスト');
           s5.appendRow(['リストID', '品名', '必要数量', '単位', 'ステータス', '紐づくレシピ名']);
           s5.setFrozenRows(1);
