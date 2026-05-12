@@ -1,0 +1,44 @@
+{
+  "evals": [
+    {
+      "id": "example_eval",
+      "change_scope": "その案件で重要な代表変更",
+      "match_paths": [
+        "{{SOURCE_OF_TRUTH_PATHS}}"
+      ],
+      "match_rules": {
+        "paths_any": [
+          "{{SOURCE_OF_TRUTH_PATHS}}"
+        ],
+        "diff_regex_any": [
+          "{{STACK_SPECIFIC_EVALS}}"
+        ]
+      },
+      "required_verify": [
+        "build",
+        "syntax",
+        "marker"
+      ],
+      "required_manual_smokes": [
+        "example_manual_smoke"
+      ],
+      "phase_gate_tags": [
+        "verify_passed",
+        "manual_smokes_done",
+        "review_ready",
+        "report_ready"
+      ],
+      "artifact_requirements": [
+        "verify_summary",
+        "manual_smoke_report",
+        "review_record",
+        "user_report_draft"
+      ],
+      "review_focus": [
+        "共通コアと案件差替え層の混在がないか",
+        "正本と生成物の境界が守られているか"
+      ],
+      "notes": "この雛形は starter なので、実案件の eval へ差し替える。"
+    }
+  ]
+}

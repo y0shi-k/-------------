@@ -1,0 +1,44 @@
+{
+  "project_name": "Stock Master（料理レシピ・食材管理アプリ）",
+  "source_of_truth_paths": [
+    "app.html",
+    "要件定義書.md",
+    "AGENTS.md",
+    ".agents/",
+    "harness/*.json"
+  ],
+  "generated_files": [
+    "GASデプロイ後のWebアプリ",
+    "Google Spreadsheet 内のデータ",
+    "Google Drive へ保存された画像ファイル"
+  ],
+  "verify_command": "python3 -c \"import html.parser; html.parser.HTMLParser().feed(open('app.html').read())\" && grep -q 'executeGAS' app.html && grep -q 'GAS_URL' app.html && echo 'VERIFY_PASSED'",
+  "optional_audit_command": "未定（Phase2以降で必要に応じて設定）",
+  "build_markers": [
+    "HTML構文パース成功",
+    "executeGAS関数存在",
+    "GAS_URL定数存在"
+  ],
+  "manual_smokes": [
+    {
+      "id": "html_syntax_check",
+      "label": "HTML構文チェック",
+      "summary": "app.html が正しいHTML構文であり、ブラウザで開ける状態であること"
+    },
+    {
+      "id": "gas_communication_pattern",
+      "label": "GAS通信パターン確認",
+      "summary": "executeGAS() と setStatus() が存在し、二重送信防止が機能すること"
+    },
+    {
+      "id": "schema_integrity",
+      "label": "スキーマ整合性",
+      "summary": "5シートのヘッダー定義が要件定義書と一致していること"
+    },
+    {
+      "id": "ui_consistency",
+      "label": "UI表示整合性",
+      "summary": "新規追加したコンポーネントが既存のTailwindクラス構成と一致していること"
+    }
+  ]
+}

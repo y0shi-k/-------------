@@ -1,0 +1,191 @@
+{
+  "evals": [
+    {
+      "id": "schema_change",
+      "change_scope": "Google Spreadsheet のスキーマ変更（カラム追加・削除・リネーム）",
+      "match_paths": [
+        "app.html",
+        "要件定義書.md"
+      ],
+      "match_rules": {
+        "paths_any": [
+          "app.html",
+          "要件定義書.md"
+        ],
+        "diff_regex_any": [
+          "appendRow",
+          "getSheetByName",
+          "ID|分類|品名|数量|単位|購入日|開封日|表示期限|実質期限|保存場所|状態メモ",
+          "レシピID|レシピ名|材料JSON|手順JSON|出典|調理回数|調理日履歴",
+          "予定日|食事区分|ステータス",
+          "履歴ID|調理日時|感想|写真URL|評価",
+          "リストID|必要数量|紐づくレシピ名"
+        ]
+      },
+      "required_verify": [
+        "html_syntax",
+        "schema_marker"
+      ],
+      "required_manual_smokes": [
+        "schema_integrity"
+      ],
+      "phase_gate_tags": [
+        "verify_passed",
+        "manual_smokes_done",
+        "review_ready",
+        "report_ready"
+      ],
+      "artifact_requirements": [
+        "verify_summary",
+        "manual_smoke_report",
+        "review_record",
+        "user_report_draft"
+      ],
+      "review_focus": [
+        "スキーマ定義が変更されていないか",
+        "カラム名・順序が要件定義書と一致しているか"
+      ],
+      "notes": "スキーマ変更は絶対禁止。誤って変更を含んだ場合は即座に差し戻す。"
+    },
+    {
+      "id": "gas_pattern_change",
+      "change_scope": "GAS通信パターン（executeGAS, setStatus, フォーム送信方式）の改変",
+      "match_paths": [
+        "app.html"
+      ],
+      "match_rules": {
+        "paths_any": [
+          "app.html"
+        ],
+        "diff_regex_any": [
+          "executeGAS",
+          "setStatus",
+          "createElement.*form",
+          "callback",
+          "requestId",
+          "poll",
+          "fetch.*GAS_URL"
+        ]
+      },
+      "required_verify": [
+        "html_syntax",
+        "gas_pattern_marker"
+      ],
+      "required_manual_smokes": [
+        "gas_communication_pattern"
+      ],
+      "phase_gate_tags": [
+        "verify_passed",
+        "manual_smokes_done",
+        "review_ready",
+        "report_ready"
+      ],
+      "artifact_requirements": [
+        "verify_summary",
+        "manual_smoke_report",
+        "review_record",
+        "user_report_draft"
+      ],
+      "review_focus": [
+        "executeGAS が改変されていないか",
+        "二重送信防止機構が残っているか",
+        "タイムアウト処理が残っているか"
+      ],
+      "notes": "GAS通信方式はプロジェクトの根幹。改変は厳重にレビューする。"
+    },
+    {
+      "id": "ui_component_addition",
+      "change_scope": "新規UIコンポーネント（モーダル、タブ、リスト、ボタン等）の追加",
+      "match_paths": [
+        "app.html"
+      ],
+      "match_rules": {
+        "paths_any": [
+          "app.html"
+        ],
+        "diff_regex_any": [
+          "insertAdjacentHTML",
+          "classList\\.add",
+          "getElementById",
+          "querySelector",
+          "rounded-\\[|shadow-|bg-|text-",
+          "hidden|opacity-0|transition"
+        ]
+      },
+      "required_verify": [
+        "html_syntax",
+        "ui_consistency_marker"
+      ],
+      "required_manual_smokes": [
+        "ui_consistency"
+      ],
+      "phase_gate_tags": [
+        "verify_passed",
+        "manual_smokes_done",
+        "review_ready"
+      ],
+      "artifact_requirements": [
+        "verify_summary",
+        "manual_smoke_report",
+        "review_record"
+      ],
+      "review_focus": [
+        "Tailwindクラスが既存パターンと一致しているか",
+        "アクセシビリティ（disabled 制御）が機能しているか"
+      ],
+      "notes": "UI追加は既存のカード・ボタン・バッジのクラス構成を踏襲すること。"
+    },
+    {
+      "id": "phase_transition",
+      "change_scope": "Phase1→2、Phase2→3 等のフェーズ移行（大規模機能追加）",
+      "match_paths": [
+        "app.html",
+        "要件定義書.md",
+        "AGENTS.md"
+      ],
+      "match_rules": {
+        "paths_any": [
+          "app.html",
+          "要件定義書.md",
+          "AGENTS.md"
+        ],
+        "diff_regex_any": [
+          "Phase [23]",
+          "モードB|モードC",
+          "献立|レシピ集|クッキング|料理履歴"
+        ]
+      },
+      "required_verify": [
+        "html_syntax",
+        "schema_marker",
+        "gas_pattern_marker"
+      ],
+      "required_manual_smokes": [
+        "html_syntax_check",
+        "gas_communication_pattern",
+        "schema_integrity",
+        "ui_consistency"
+      ],
+      "phase_gate_tags": [
+        "spec_ready",
+        "implementation_ready",
+        "verify_passed",
+        "manual_smokes_done",
+        "review_ready",
+        "report_ready"
+      ],
+      "artifact_requirements": [
+        "verify_summary",
+        "manual_smoke_report",
+        "review_record",
+        "user_report_draft"
+      ],
+      "review_focus": [
+        "Phase移行の条件を満たしているか",
+        "新規スキーマ定義が既存と整合しているか",
+        "1ファイル制約を守っているか"
+      ],
+      "notes": "フェーズ移行は複数ファイルにまたがる大規模変更の可能性がある。全 gate を開けるまで完了としない。"
+    }
+  ]
+}

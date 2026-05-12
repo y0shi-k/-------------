@@ -1,0 +1,17 @@
+{
+  "project_name": "{{PROJECT_NAME}}",
+  "source_of_truth_paths": "{{SOURCE_OF_TRUTH_PATHS}}",
+  "generated_files": "{{GENERATED_FILES}}",
+  "verify_command": "{{VERIFY_COMMAND}}",
+  "optional_audit_command": "{{OPTIONAL_AUDIT_COMMAND}}",
+  "build_markers": [
+    "{{STACK_SPECIFIC_EVALS}}"
+  ],
+  "manual_smokes": [
+    {
+      "id": "example_manual_smoke",
+      "label": "代表操作",
+      "summary": "{{MANUAL_SMOKE_ITEMS}}"
+    }
+  ]
+}

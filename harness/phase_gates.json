@@ -1,0 +1,105 @@
+{
+  "gates": [
+    {
+      "id": "spec_ready",
+      "description": "関連 spec が存在し、最低限の acceptance が定義されている。",
+      "source": "ticket_and_specs",
+      "required_ticket_fields": [
+        "related_specs"
+      ],
+      "required_spec_fields": [
+        "acceptance"
+      ]
+    },
+    {
+      "id": "implementation_ready",
+      "description": "ticket に owner_role と required_evals が定義されている。",
+      "source": "ticket",
+      "required_ticket_fields": [
+        "owner_role",
+        "required_evals"
+      ]
+    },
+    {
+      "id": "verify_passed",
+      "description": "verify artifact が保存されている。",
+      "source": "current_verify",
+      "artifact": "verify.json"
+    },
+    {
+      "id": "audit_checked",
+      "description": "必要な変更で監査 artifact が保存されている。",
+      "source": "artifact_json",
+      "artifact": "audit.json",
+      "required_fields": [
+        "ticket_id",
+        "status"
+      ],
+      "allowed_statuses": [
+        "passed",
+        "skipped"
+      ]
+    },
+    {
+      "id": "manual_smokes_done",
+      "description": "manual smoke の結果が artifact に残っている。",
+      "source": "artifact_markdown_front_matter",
+      "artifact": "manual-smokes.md",
+      "required_front_matter": [
+        "ticket_id",
+        "status",
+        "target_evals"
+      ],
+      "required_sections": [
+        "executed_checks",
+        "skipped_checks",
+        "open_risks"
+      ],
+      "allowed_statuses": [
+        "passed"
+      ]
+    },
+    {
+      "id": "review_ready",
+      "description": "reviewer の判定結果が artifact に残っている。",
+      "source": "artifact_markdown_front_matter",
+      "artifact": "review.md",
+      "required_front_matter": [
+        "ticket_id",
+        "status",
+        "review_scope"
+      ],
+      "required_sections": [
+        "checked_diff_paths",
+        "checked_artifacts",
+        "findings",
+        "open_risks",
+        "verdict"
+      ],
+      "allowed_statuses": [
+        "passed",
+        "failed"
+      ]
+    },
+    {
+      "id": "report_ready",
+      "description": "非エンジニア向け報告ドラフトが artifact に残っている。",
+      "source": "artifact_markdown_front_matter",
+      "artifact": "report.md",
+      "required_front_matter": [
+        "ticket_id",
+        "status"
+      ],
+      "required_sections": [
+        "変更目的",
+        "今回追加した安全装置",
+        "実施した確認",
+        "残リスク",
+        "次の依頼や人判断"
+      ],
+      "allowed_statuses": [
+        "ready"
+      ]
+    }
+  ]
+}
