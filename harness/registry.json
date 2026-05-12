@@ -39,6 +39,21 @@
       "id": "ui_consistency",
       "label": "UI表示整合性",
       "summary": "新規追加したコンポーネントが既存のTailwindクラス構成と一致していること"
+    },
+    {
+      "id": "canvas_notification",
+      "label": "Canvas通知制約の遵守",
+      "summary": "alert/confirm/prompt がなく、DOMベース通知（showToast）が使用されていること"
+    },
+    {
+      "id": "gemini_api_key_handling",
+      "label": "Gemini APIキー自動提供の尊重",
+      "summary": "GEMINI_API_KEY = \"\" のままで、空チェックによるバリデーションがないこと"
+    },
+    {
+      "id": "code_bloat_check",
+      "label": "コード肥大化抑制",
+      "summary": "新規機能の追加行数が最小限であり、既存パターンの再利用が徹底されていること"
     }
   ]
 }

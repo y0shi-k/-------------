@@ -186,6 +186,50 @@
         "1ファイル制約を守っているか"
       ],
       "notes": "フェーズ移行は複数ファイルにまたがる大規模変更の可能性がある。全 gate を開けるまで完了としない。"
+    },
+    {
+      "id": "canvas_constraint",
+      "change_scope": "GeminiCanvas環境特有の制約（alert/confirm/prompt禁止、APIキー自動提供、FileReader非同期）",
+      "match_paths": [
+        "app.html"
+      ],
+      "match_rules": {
+        "paths_any": [
+          "app.html"
+        ],
+        "diff_regex_any": [
+          "alert\\(",
+          "confirm\\(",
+          "prompt\\(",
+          "FileReader",
+          "GEMINI_API_KEY"
+        ]
+      },
+      "required_verify": [
+        "html_syntax",
+        "canvas_constraint_marker"
+      ],
+      "required_manual_smokes": [
+        "canvas_notification",
+        "gemini_api_key_handling"
+      ],
+      "phase_gate_tags": [
+        "verify_passed",
+        "manual_smokes_done",
+        "review_ready"
+      ],
+      "artifact_requirements": [
+        "verify_summary",
+        "manual_smoke_report",
+        "review_record"
+      ],
+      "review_focus": [
+        "alert/confirm/prompt が追加・残存していないか",
+        "GEMINI_API_KEY の空チェックでエラーにしていないか",
+        "FileReader が Promiseラップされているか",
+        "コード行数が無闇に肥大化していないか（既存パターンの再利用確認）"
+      ],
+      "notes": "Canvasのsandbox制約はフリーズの直接原因になる。コード肥大化も単一ファイル維持の観点から厳密にレビューする。"
     }
   ]
 }

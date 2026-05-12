@@ -26,6 +26,12 @@
 python3 -c "import html.parser; html.parser.HTMLParser().feed(open('app.html').read())" && grep -q 'executeGAS' app.html && grep -q 'GAS_URL' app.html && echo 'VERIFY_PASSED'
 ```
 
+**Canvas環境追加チェック（手動）**:
+- `alert(` / `confirm(` / `prompt(` が残存していないか
+- `showToast` 関数が存在するか
+- `GEMINI_API_KEY` の空チェックバリデーションがないか
+- 新規追加コードが既存パターンを再利用して肥大化していないか
+
 ## 詳細はこちら
 
 - AI運用ルール: `.agents/index.md`

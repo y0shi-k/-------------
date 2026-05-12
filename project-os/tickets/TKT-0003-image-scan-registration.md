@@ -3,13 +3,11 @@
 ---
 ticket_id: TKT-0003
 related_specs:
-  - 未定（本チケット作成時に必要に応じてSPECを追加する）
+  - SPEC-0003-image-scan-registration.md
 owner_role: ai-implementer
 required_evals:
   - ui_component_addition
-  - gas_pattern_change
-  - security_review
-status: pending
+status: implementation_ready
 ---
 
 ## 目的
@@ -18,14 +16,14 @@ status: pending
 
 ## タスク
 
-- [ ] 画像ファイル選択用の `<input type="file" accept="image/*">` を登録待ちフローに追加
-- [ ] 選択された画像をBase64エンコードする処理を実装
-- [ ] Gemini API（マルチモーダル: `generateContent` with inlineData）へ画像＋テキストプロンプトを送信する処理を実装
-- [ ] AIからのレスポンスをパースし、食材名・数量・単位・期限などを抽出する
-- [ ] 抽出結果をStagingリストへ一括追加する
-- [ ] APIキー管理に関するセキュリティ確認（フロントエンド露出のリスク評価）
-- [ ] verify コマンド実行
-- [ ] artifacts を `project-os/artifacts/TKT-0003/` に作成
+- [x] 画像ファイル選択用の `<input type="file" accept="image/*">` を登録待ちフローに追加
+- [x] 選択された画像をBase64エンコードする処理を実装
+- [x] Gemini API（マルチモーダル: `generateContent` with inlineData）へ画像＋テキストプロンプトを送信する処理を実装
+- [x] AIからのレスポンスをパースし、食材名・数量・単位・期限などを抽出する
+- [x] 抽出結果をStagingリストへ一括追加する
+- [x] APIキー管理に関するセキュリティ確認（フロントエンド露出のリスク評価）
+- [x] verify コマンド実行
+- [x] artifacts を `project-os/artifacts/TKT-0003/` に作成
 
 ## Acceptance
 
