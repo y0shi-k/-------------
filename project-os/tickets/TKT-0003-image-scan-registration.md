@@ -38,3 +38,4 @@ status: implementation_ready
 
 - Gemini APIキーは現状 `batchPredictAI` 内で空文字のままである。本機能実装時には、GAS側でプロキシする方式への移行を検討すること。
 - 画像のプライバシーに配慮し、不要な個人情報（店舗名・住所・電話番号など）をAI送信時に除去する仕組みが望ましい。
+- **保留**: 編集モーダル（`openInventoryEditor`）内で開封日を変更した際の「実質期限自動推測」機能は、別途フェーズ1.5またはPhase2で実装予定。現状は登録待ち（Staging）タブでの `batchPredictAI` のみ対応。

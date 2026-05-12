@@ -504,9 +504,10 @@
         return;
       }
 
-      controls.classList.add('hidden');
       if (state.currentLoc === '買い物リスト') {
+        controls.classList.add('hidden');
         stagingActions.classList.add('hidden');
+        inventoryActions.classList.add('hidden');
         shoppingActions.classList.remove('hidden');
         const list = (state.shopping || []).filter(i => i.status === '未購入');
         if (list.length === 0) {
@@ -533,8 +534,12 @@
       filtered = sortInventory(filtered);
       if (filtered.length === 0) {
         container.innerHTML = '<div class="py-20 text-center text-slate-300 font-bold">在庫はありません。</div>';
+        controls.classList.add('hidden');
+        inventoryActions.classList.add('hidden');
         return;
       }
+      controls.classList.remove('hidden');
+      inventoryActions.classList.remove('hidden');
       const today = new Date(); today.setHours(0,0,0,0);
       filtered.forEach(item => {
         let rowClass = 'border-slate-100';
@@ -556,6 +561,7 @@
         const delta = (item.unit === 'g' || item.unit === 'ml') ? 50 : 1;
         container.insertAdjacentHTML('beforeend', `
           <div class="bg-white p-3 rounded-xl shadow-sm border ${rowClass} flex items-center gap-3 transition-colors">
+            <input type="checkbox" class="inv-cb w-5 h-5 rounded border-slate-300 text-rose-500 focus:ring-rose-400 shrink-0" data-id="${item.id}">
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2 mb-0.5">
                 <span class="font-bold text-slate-800 text-sm truncate">${item.name}</span>
@@ -576,10 +582,12 @@
     }
 
     function toggleSelectAll(checkbox) {
-      document.querySelectorAll('.staging-cb').forEach(cb => {
+      document.querySelectorAll('.staging-cb, .inv-cb').forEach(cb => {
         cb.checked = checkbox.checked;
-        const idx = parseInt(cb.dataset.idx);
-        if (state.staging[idx]) state.staging[idx]._selected = checkbox.checked;
+        if (cb.classList.contains('staging-cb')) {
+          const idx = parseInt(cb.dataset.idx);
+          if (state.staging[idx]) state.staging[idx]._selected = checkbox.checked;
+        }
       });
     }
 
@@ -820,25 +828,80 @@
       showToast('リストから削除しました', 'info');
     }
 
-    async function bulkPurchase() {
-      const checked = Array.from(document.querySelectorAll('.shop-cb:checked')).map(el => el.dataset.id);
-      if (checked.length === 0) return;
+    function showPurchaseConfirm(items, duplicates) {
+      const existing = document.getElementById('purchaseConfirmOverlay');
+      if (existing) existing.remove();
+      const overlay = document.createElement('div');
+      overlay.id = 'purchaseConfirmOverlay';
+      overlay.className = 'fixed inset-0 z-[75] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4';
+      overlay.innerHTML = `
+        <div class="bg-white w-full max-w-sm rounded-[2rem] p-6 shadow-2xl border border-slate-100">
+          <h3 class="text-lg font-black text-slate-800 mb-2">同名の在庫が見つかりました</h3>
+          <p class="text-sm text-slate-500 mb-4">${duplicates.map(d => d.name).join('、')} は既に在庫にあります。</p>
+          <div class="space-y-2">
+            <button id="btnMergePurchase" class="w-full bg-indigo-600 text-white font-black py-3 rounded-xl hover:bg-indigo-700 active:scale-95 transition-all">数量を加算する</button>
+            <button id="btnNewPurchase" class="w-full bg-slate-100 text-slate-600 font-black py-3 rounded-xl hover:bg-slate-200 active:scale-95 transition-all">すべて新規登録する</button>
+            <button id="btnCancelPurchase" class="w-full text-slate-400 font-bold py-2 text-sm">キャンセル</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+      state.pendingPurchase = { items, duplicates };
+      document.getElementById('btnMergePurchase').onclick = () => executePurchaseDecision('merge');
+      document.getElementById('btnNewPurchase').onclick = () => executePurchaseDecision('new');
+      document.getElementById('btnCancelPurchase').onclick = closePurchaseConfirm;
+    }
+
+    function closePurchaseConfirm() {
+      const overlay = document.getElementById('purchaseConfirmOverlay');
+      if (overlay) overlay.remove();
+      delete state.pendingPurchase;
+    }
+
+    async function executePurchaseDecision(decision) {
+      const { items } = state.pendingPurchase;
+      closePurchaseConfirm();
+      await executeBulkPurchase(items, decision);
+    }
+
+    async function executeBulkPurchase(items, decision) {
+      const ids = items.map(i => i.id);
       const payload = `(function(){
-        var ids = ${JSON.stringify(checked)};
+        var ids = ${JSON.stringify(ids)};
+        var decision = ${JSON.stringify(decision)};
         var ss = SpreadsheetApp.openById(PropertiesService.getUserProperties().getProperty('SS_ID_RECIPE_APP'));
         var sShop = ss.getSheetByName('買い物リスト');
         var sStock = ss.getSheetByName('食材在庫');
         var today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
         var shopData = sShop.getDataRange().getValues();
+        var stockData = sStock.getDataRange().getValues();
+        var mergeNames = [];
+        var newNames = [];
         for(var i=1; i<shopData.length; i++) {
           if(ids.indexOf(String(shopData[i][0])) !== -1) {
             sShop.getRange(i+1, 5).setValue('購入済');
-            var row = [Utilities.getUuid(), '食材', shopData[i][1], shopData[i][2], shopData[i][3], today, '', '', '', '冷蔵庫', '買い物より移行'];
-            sStock.appendRow(row);
+            var found = false;
+            if(decision === 'merge') {
+              for(var j=1; j<stockData.length; j++) {
+                if(String(stockData[j][2]) === String(shopData[i][1]) && String(stockData[j][4]) === String(shopData[i][3])) {
+                  var currentQty = Number(stockData[j][3]) || 0;
+                  var addQty = Number(shopData[i][2]) || 0;
+                  sStock.getRange(j+1, 4).setValue(currentQty + addQty);
+                  sStock.getRange(j+1, 6).setValue(today);
+                  mergeNames.push(String(shopData[i][1]) + ' (' + currentQty + '+' + addQty + ')');
+                  found = true;
+                  break;
+                }
+              }
+            }
+            if(!found) {
+              var row = [Utilities.getUuid(), '食材', shopData[i][1], shopData[i][2], shopData[i][3], today, '', '', '', '冷蔵庫', '買い物より移行'];
+              sStock.appendRow(row);
+              newNames.push(String(shopData[i][1]));
+            }
           }
         }
-        
-        function f(v) { 
+        function f(v) {
           if(!v && v !== 0) return "";
           if(v instanceof Date) return Utilities.formatDate(v, Session.getScriptTimeZone(), "yyyy-MM-dd");
           return String(v).trim();
@@ -853,20 +916,41 @@
             buy: f(r[5]), open: f(r[6]), limit1: f(r[7]), limit2: f(r[8]), loc: f(r[9]), memo: f(r[10])
           });
         }
-        return { display: '購入処理完了', detail: { inventory: fullList, purchasedIds: ids } };
+        return { display: '購入処理完了', detail: { inventory: fullList, purchasedIds: ids, mergeNames: mergeNames, newNames: newNames } };
       })()`;
       const res = await executeGAS(payload, 'データベースに反映中...');
       if (res && res.detail) {
         state.shopping = (state.shopping || []).filter(i => !res.detail.purchasedIds.includes(i.id));
         state.inventory = res.detail.inventory || [];
         filterByLocation('すべて');
+        if (res.detail.mergeNames.length > 0) showToast('加算: ' + res.detail.mergeNames.join('、'), 'info');
+        if (res.detail.newNames.length > 0) showToast('新規: ' + res.detail.newNames.join('、'), 'success');
       }
+    }
+
+    async function bulkPurchase() {
+      const checked = Array.from(document.querySelectorAll('.shop-cb:checked')).map(el => el.dataset.id);
+      if (checked.length === 0) { showToast('購入済にする項目を選択してください。', 'error'); return; }
+      const items = checked.map(id => state.shopping.find(i => i.id === id)).filter(Boolean);
+      const duplicates = items.filter(item => state.inventory.some(inv => inv.name === item.name && inv.unit === item.unit));
+      if (duplicates.length > 0) {
+        showPurchaseConfirm(items, duplicates);
+        return;
+      }
+      await executeBulkPurchase(items, 'merge');
     }
 
     async function adjustInventoryQty(id, delta) {
       const item = state.inventory.find(i => i.id === id);
       if (!item) return;
       const newQty = Math.max(0, item.qty + delta);
+
+      if (newQty === 0) {
+        await deleteInventoryItem(id);
+        showToast(`${item.name} の数量が0になったため削除しました`, 'info');
+        return;
+      }
+
       const payload = `(function(){
         var id = ${JSON.stringify(id)};
         var newQty = ${newQty};
@@ -982,6 +1066,44 @@
       if (res && res.detail) {
         state.inventory = res.detail.inventory || [];
         renderList();
+      }
+    }
+
+    async function batchDeleteInventory() {
+      const checked = Array.from(document.querySelectorAll('.inv-cb:checked')).map(el => el.dataset.id);
+      if (checked.length === 0) { showToast('削除する項目を選択してください。', 'error'); return; }
+      const payload = `(function(){
+        var ids = ${JSON.stringify(checked)};
+        var ss = SpreadsheetApp.openById(PropertiesService.getUserProperties().getProperty('SS_ID_RECIPE_APP'));
+        var s = ss.getSheetByName('食材在庫');
+        var data = s.getDataRange().getValues();
+        for(var i=data.length-1; i>=1; i--) {
+          if(ids.indexOf(String(data[i][0])) !== -1) {
+            s.deleteRow(i+1);
+          }
+        }
+        function f(v) {
+          if(!v && v !== 0) return "";
+          if(v instanceof Date) return Utilities.formatDate(v, Session.getScriptTimeZone(), "yyyy-MM-dd");
+          return String(v).trim();
+        }
+        var inv = s.getDataRange().getValues();
+        var fullList = [];
+        for(var i=1; i<inv.length; i++) {
+          var r = inv[i];
+          if(!r[2]) continue;
+          fullList.push({
+            id: f(r[0]), type: f(r[1]), name: f(r[2]), qty: Number(r[3])||0, unit: f(r[4]),
+            buy: f(r[5]), open: f(r[6]), limit1: f(r[7]), limit2: f(r[8]), loc: f(r[9]), memo: f(r[10])
+          });
+        }
+        return { display: '一括削除完了', detail: { inventory: fullList, deletedCount: ids.length } };
+      })()`;
+      const res = await executeGAS(payload, `${checked.length} 件を在庫から一括削除中...`);
+      if (res && res.detail) {
+        state.inventory = res.detail.inventory || [];
+        renderList();
+        showToast(`${res.detail.deletedCount} 件の食材を削除しました。`, 'success');
       }
     }
 
