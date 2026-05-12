@@ -36,7 +36,7 @@
     </div>
   </div>
 
-  <main id="app" class="pb-32">
+  <main id="app" class="pb-24">
     <!-- 初期承認画面 -->
     <div id="initView" class="flex flex-col items-center justify-center min-h-screen p-6 text-center">
       <div class="w-20 h-20 bg-indigo-100 rounded-3xl flex items-center justify-center mb-8 shadow-inner">
@@ -60,8 +60,10 @@
       </div>
     </div>
 
-    <!-- メインインベントリ画面 -->
-    <div id="inventoryView" class="hidden p-4 max-w-2xl mx-auto">
+    <!-- モードA: 在庫管理 -->
+    <div id="modeAView" class="hidden">
+      <!-- メインインベントリ画面 -->
+      <div id="inventoryView" class="p-4 max-w-2xl mx-auto">
       <header class="flex justify-between items-end mb-6 pt-4">
         <div>
           <h2 class="text-3xl font-black tracking-tight text-slate-800">在庫管理</h2>
@@ -83,6 +85,14 @@
           <span id="stagingBadge" class="absolute -top-1 -right-1 bg-amber-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full hidden">0</span>
         </button>
         <button onclick="filterByLocation('買い物リスト')" class="location-tab bg-emerald-50 text-emerald-600 border border-emerald-100 px-5 py-2.5 rounded-xl text-sm font-black whitespace-nowrap snap-start transition-all" data-loc="買い物リスト">🛒 買い物リスト</button>
+      </div>
+
+      <!-- ソートコントロール -->
+      <div class="flex gap-2 mb-3 px-1 items-center">
+        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">並び</span>
+        <button onclick="setSort('limit2')" class="sort-btn text-[10px] font-bold px-3 py-1 rounded-full transition-all bg-indigo-100 text-indigo-700" data-sort="limit2">期限順</button>
+        <button onclick="setSort('name')" class="sort-btn text-[10px] font-bold px-3 py-1 rounded-full transition-all bg-slate-100 text-slate-500" data-sort="name">名前順</button>
+        <button onclick="setSort('buy')" class="sort-btn text-[10px] font-bold px-3 py-1 rounded-full transition-all bg-slate-100 text-slate-500" data-sort="buy">購入日順</button>
       </div>
 
       <!-- 一括選択コントロール -->
@@ -126,11 +136,52 @@
         </button>
       </div>
     </div>
+    </div>
+
+    <!-- モードB: 献立・レシピ -->
+    <div id="modeBView" class="hidden">
+      <div class="flex flex-col items-center justify-center min-h-[60vh] p-6 text-center">
+        <div class="w-20 h-20 bg-amber-100 rounded-3xl flex items-center justify-center mb-6">
+          <span class="text-4xl">📅</span>
+        </div>
+        <h2 class="text-2xl font-black text-slate-700 mb-2">献立・レシピ</h2>
+        <p class="text-sm text-slate-400">Phase 2 で実装予定</p>
+      </div>
+    </div>
+
+    <!-- モードC: 料理・記録 -->
+    <div id="modeCView" class="hidden">
+      <div class="flex flex-col items-center justify-center min-h-[60vh] p-6 text-center">
+        <div class="w-20 h-20 bg-emerald-100 rounded-3xl flex items-center justify-center mb-6">
+          <span class="text-4xl">🍽️</span>
+        </div>
+        <h2 class="text-2xl font-black text-slate-700 mb-2">料理・記録</h2>
+        <p class="text-sm text-slate-400">Phase 3 で実装予定</p>
+      </div>
+    </div>
   </main>
 
+  <!-- ボトムナビゲーションバー -->
+  <nav id="bottomNav" class="fixed bottom-0 left-0 w-full z-50 glass-nav pb-[env(safe-area-inset-bottom)] hidden">
+    <div class="max-w-2xl mx-auto flex">
+      <button onclick="switchMode('A')" class="flex-1 py-3 flex flex-col items-center gap-0.5 text-indigo-600" data-mode="A">
+        <span class="text-xl">🍳</span>
+        <span class="text-[10px] font-black">食材管理</span>
+      </button>
+      <button onclick="switchMode('B')" class="flex-1 py-3 flex flex-col items-center gap-0.5 text-slate-400" data-mode="B">
+        <span class="text-xl">📅</span>
+        <span class="text-[10px] font-bold">献立・レシピ</span>
+      </button>
+      <button onclick="switchMode('C')" class="flex-1 py-3 flex flex-col items-center gap-0.5 text-slate-400" data-mode="C">
+        <span class="text-xl">🍽️</span>
+        <span class="text-[10px] font-bold">料理・記録</span>
+      </button>
+    </div>
+  </nav>
+
   <!-- モーダル: 食材の追加/編集 -->
-  <div id="itemModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
-    <div class="bg-white w-full max-w-md rounded-[2.5rem] p-8 shadow-2xl transform scale-95 transition-transform duration-300 border border-slate-100" id="modalContent">
+  <div id="itemModal" onclick="if(event.target===this) closeModal()" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
+    <div onclick="event.stopPropagation()" class="bg-white w-full max-w-md rounded-[2.5rem] p-8 shadow-2xl transform scale-95 transition-transform duration-300 border border-slate-100" id="modalContent">
       <div class="flex justify-between items-center mb-6">
         <h3 id="modalTitle" class="text-2xl font-black text-slate-800 tracking-tight">リストに追加</h3>
         <button onclick="closeModal()" class="text-slate-300 hover:text-slate-600 bg-slate-100 p-2 rounded-full"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg></button>
@@ -138,6 +189,7 @@
       
       <form id="itemForm" onsubmit="handleStagingSave(event)" class="space-y-5">
         <input type="hidden" id="f-staging-idx" value="-1">
+        <input type="hidden" id="f-inventory-id" value="">
         <div class="space-y-4">
           <div>
             <label class="block text-[11px] font-black text-slate-400 uppercase mb-1.5 ml-1">品名</label>
@@ -145,19 +197,34 @@
           </div>
           <div class="grid grid-cols-2 gap-4">
             <div>
+              <label class="block text-[11px] font-black text-slate-400 uppercase mb-1.5 ml-1">分類</label>
+              <select id="f-type" class="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-4 py-4 text-sm font-bold outline-none focus:border-indigo-500 appearance-none cursor-pointer">
+                <option value="食材">食材</option>
+                <option value="調味料">調味料</option>
+              </select>
+            </div>
+            <div>
               <label class="block text-[11px] font-black text-slate-400 uppercase mb-1.5 ml-1">保存場所</label>
               <select id="f-loc" class="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-4 py-4 text-sm font-bold outline-none focus:border-indigo-500 appearance-none cursor-pointer">
                 <option value="冷蔵庫">冷蔵庫</option>
                 <option value="冷凍庫">冷凍庫</option>
                 <option value="パントリー">パントリー</option>
+                <option value="ベランダ">ベランダ</option>
+                <option value="その他">その他</option>
               </select>
             </div>
+          </div>
+          <div class="grid grid-cols-2 gap-4">
             <div>
               <label class="block text-[11px] font-black text-slate-400 uppercase mb-1.5 ml-1">数量・単位</label>
               <div class="flex">
                 <input type="number" id="f-qty" step="0.1" required class="w-full bg-slate-50 border-2 border-slate-100 rounded-l-2xl px-4 py-4 text-sm font-bold outline-none focus:border-indigo-500 border-r-0">
                 <input type="text" id="f-unit" required class="w-20 bg-slate-50 border-2 border-slate-100 rounded-r-2xl px-2 py-4 text-sm font-bold outline-none focus:border-indigo-500" placeholder="個">
               </div>
+            </div>
+            <div>
+              <label class="block text-[11px] font-black text-slate-400 uppercase mb-1.5 ml-1">表示期限</label>
+              <input type="date" id="f-limit1" class="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-4 py-4 text-sm font-bold outline-none focus:border-indigo-500">
             </div>
           </div>
           <div class="grid grid-cols-2 gap-4">
@@ -169,6 +236,10 @@
               <label class="block text-[11px] font-black text-indigo-400 uppercase mb-1.5 ml-1">開封日 (推測用)</label>
               <input type="date" id="f-date2" class="w-full bg-indigo-50 border-2 border-indigo-100 rounded-2xl px-4 py-4 text-sm font-bold outline-none focus:border-indigo-500">
             </div>
+          </div>
+          <div>
+            <label class="block text-[11px] font-black text-slate-400 uppercase mb-1.5 ml-1">メモ</label>
+            <textarea id="f-memo" rows="2" class="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:border-indigo-500 resize-none"></textarea>
           </div>
           <div id="aiResultArea" class="hidden">
             <div class="bg-indigo-50/50 p-5 rounded-[2rem] border-2 border-indigo-100 relative">
@@ -199,7 +270,11 @@
       shopping: [],
       staging: [],
       currentLoc: 'すべて',
-      isProcessing: false
+      currentMode: 'A',
+      isProcessing: false,
+      sortBy: 'limit2',
+      editMode: null,
+      editId: null
     };
 
     /* --- Core --- */
@@ -326,9 +401,9 @@
         state.inventory = Array.isArray(inv) ? inv : [];
         state.shopping = Array.isArray(shop) ? shop : [];
         document.getElementById('initView').classList.add('hidden');
-        document.getElementById('inventoryView').classList.remove('hidden');
+        document.getElementById('bottomNav').classList.remove('hidden');
+        switchMode('A');
         console.log('Loaded inventory count:', state.inventory.length, 'shopping count:', state.shopping.length);
-        renderList();
       } else {
         alert('データの読み込みに失敗しました。GASの実行権限を確認してください。');
       }
@@ -412,22 +487,47 @@
 
       stagingActions.classList.add('hidden');
       shoppingActions.classList.add('hidden');
-      const filtered = state.currentLoc === 'すべて' ? state.inventory : state.inventory.filter(i => i.loc === state.currentLoc);
+      let filtered = state.currentLoc === 'すべて' ? state.inventory : state.inventory.filter(i => i.loc === state.currentLoc);
+      filtered = sortInventory(filtered);
       if (filtered.length === 0) {
         container.innerHTML = '<div class="py-20 text-center text-slate-300 font-bold">在庫はありません。</div>';
         return;
       }
+      const today = new Date(); today.setHours(0,0,0,0);
       filtered.forEach(item => {
+        let rowClass = 'border-slate-100';
+        let badge = '';
+        if (item.limit2) {
+          const limit = new Date(item.limit2); limit.setHours(0,0,0,0);
+          const diff = Math.ceil((limit - today) / 86400000);
+          const dStr = `${limit.getMonth()+1}/${limit.getDate()}`;
+          if (diff <= 0) {
+            rowClass = 'border-rose-200 bg-rose-50';
+            badge = `<span class="text-[9px] font-black px-1.5 py-0.5 bg-rose-600 text-white rounded-full">${dStr} 期限切</span>`;
+          } else if (diff <= 3) {
+            rowClass = 'border-amber-200 bg-amber-50';
+            badge = `<span class="text-[9px] font-black px-1.5 py-0.5 bg-amber-500 text-white rounded-full">あと${diff}日 ${dStr}</span>`;
+          } else {
+            badge = `<span class="text-[9px] font-black px-1.5 py-0.5 bg-slate-200 text-slate-600 rounded-full">${dStr}</span>`;
+          }
+        }
+        const delta = (item.unit === 'g' || item.unit === 'ml') ? 50 : 1;
         container.insertAdjacentHTML('beforeend', `
-          <div class="p-6 bg-white rounded-[2.5rem] shadow-sm border border-slate-100 flex items-center justify-between">
-            <div class="flex-1">
-              <div class="flex items-center gap-2 mb-1">
-                <span class="text-[9px] font-black uppercase tracking-wider text-slate-400 bg-slate-50 px-2 py-0.5 rounded-full">${item.loc}</span>
+          <div class="bg-white p-3 rounded-xl shadow-sm border ${rowClass} flex items-center gap-3 transition-colors">
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 mb-0.5">
+                <span class="font-bold text-slate-800 text-sm truncate">${item.name}</span>
+                ${badge}
               </div>
-              <h4 class="text-xl font-black text-slate-800">${item.name}</h4>
-              <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">${item.memo || '在庫あり'}</p>
+              <div class="text-[10px] text-slate-400 font-bold">${item.loc} · 購入 ${item.buy || '—'}</div>
             </div>
-            <div class="text-3xl font-black text-indigo-600">${item.qty}<span class="text-xs ml-1 font-bold">${item.unit}</span></div>
+            <div class="flex items-center gap-1 shrink-0">
+              <button onclick="adjustInventoryQty('${item.id}', ${-delta})" class="w-7 h-7 bg-slate-100 rounded-lg text-slate-600 font-bold flex items-center justify-center active:scale-90 transition-all">-</button>
+              <span class="text-sm font-bold w-12 text-center">${item.qty}<span class="text-[10px]">${item.unit}</span></span>
+              <button onclick="adjustInventoryQty('${item.id}', ${delta})" class="w-7 h-7 bg-slate-100 rounded-lg text-slate-600 font-bold flex items-center justify-center active:scale-90 transition-all">+</button>
+            </div>
+            <button onclick="openInventoryEditor('${item.id}')" class="p-2 text-slate-400 hover:text-indigo-600 transition-colors text-lg leading-none">✎</button>
+            <button onclick="deleteInventoryItem('${item.id}')" class="p-2 text-slate-400 hover:text-rose-500 transition-colors text-lg leading-none">🗑</button>
           </div>
         `);
       });
@@ -451,6 +551,45 @@
         if (isActive && loc === '登録待ち') btn.classList.add('bg-amber-50', 'text-amber-600', 'border-amber-100');
       });
       renderList();
+    }
+
+    function setSort(key) {
+      state.sortBy = key;
+      document.querySelectorAll('.sort-btn').forEach(btn => {
+        const isActive = btn.dataset.sort === key;
+        btn.className = `sort-btn text-[10px] font-bold px-3 py-1 rounded-full transition-all ${isActive ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-500'}`;
+      });
+      renderList();
+    }
+
+    function switchMode(mode) {
+      state.currentMode = mode;
+      document.getElementById('modeAView').classList.add('hidden');
+      document.getElementById('modeBView').classList.add('hidden');
+      document.getElementById('modeCView').classList.add('hidden');
+      document.getElementById('mode' + mode + 'View').classList.remove('hidden');
+      document.querySelectorAll('#bottomNav button').forEach(btn => {
+        const isActive = btn.dataset.mode === mode;
+        btn.className = `flex-1 py-3 flex flex-col items-center gap-0.5 transition-all ${isActive ? 'text-indigo-600' : 'text-slate-400'}`;
+        btn.querySelector('span:last-child').className = `text-[10px] ${isActive ? 'font-black' : 'font-bold'}`;
+      });
+      if (mode === 'A') renderList();
+    }
+
+    function sortInventory(list) {
+      return [...list].sort((a, b) => {
+        if (state.sortBy === 'name') return a.name.localeCompare(b.name, 'ja');
+        if (state.sortBy === 'buy') {
+          if (!a.buy && !b.buy) return 0;
+          if (!a.buy) return 1;
+          if (!b.buy) return -1;
+          return a.buy.localeCompare(b.buy);
+        }
+        if (!a.limit2 && !b.limit2) return 0;
+        if (!a.limit2) return 1;
+        if (!b.limit2) return -1;
+        return a.limit2.localeCompare(b.limit2);
+      });
     }
 
     /* --- Processing --- */
@@ -550,32 +689,50 @@
       const m = document.getElementById('itemModal');
       const f = document.getElementById('itemForm');
       f.reset();
+      state.editMode = mode;
+      state.editId = null;
       document.getElementById('f-staging-idx').value = "-1";
+      document.getElementById('f-inventory-id').value = "";
       document.getElementById('f-date1').value = new Date().toISOString().split('T')[0];
-      document.getElementById('modalTitle').textContent = "食材をリストへ";
+      document.getElementById('modalTitle').textContent = mode === 'add' ? "食材をリストへ" : "項目の編集";
       document.getElementById('aiResultArea').classList.add('hidden');
-      document.getElementById('btnSubmit').textContent = "リストに追加";
+      document.getElementById('btnSubmit').textContent = mode === 'add' ? "リストに追加" : "内容を更新する";
       m.classList.remove('hidden');
       setTimeout(() => m.classList.remove('opacity-0'), 10);
+    }
+
+    function populateModal(item) {
+      document.getElementById('f-name').value = item.name || '';
+      document.getElementById('f-type').value = item.type || '食材';
+      document.getElementById('f-loc').value = item.loc || '冷蔵庫';
+      document.getElementById('f-qty').value = item.qty || 0;
+      document.getElementById('f-unit').value = item.unit || '';
+      document.getElementById('f-limit1').value = item.limit1 || '';
+      document.getElementById('f-date1').value = item.buy || '';
+      document.getElementById('f-date2').value = item.open || '';
+      document.getElementById('f-limit2').value = item.limit2 || '';
+      document.getElementById('f-memo').value = item.memo || '';
     }
 
     function openStagingEditor(idx) {
       const item = state.staging[idx];
       if (!item) return;
-      showModal('edit');
-      document.getElementById('modalTitle').textContent = "項目の編集";
+      showModal('edit-staging');
       document.getElementById('f-staging-idx').value = idx;
-      document.getElementById('f-name').value = item.name;
-      document.getElementById('f-loc').value = item.loc;
-      document.getElementById('f-qty').value = item.qty;
-      document.getElementById('f-unit').value = item.unit;
-      document.getElementById('f-date1').value = item.buy || '';
-      document.getElementById('f-date2').value = item.open || '';
+      populateModal(item);
       if (item.limit2) {
         document.getElementById('aiResultArea').classList.remove('hidden');
-        document.getElementById('f-limit2').value = item.limit2;
       }
-      document.getElementById('btnSubmit').textContent = "内容を更新する";
+    }
+
+    function openInventoryEditor(id) {
+      const item = state.inventory.find(i => i.id === id);
+      if (!item) return;
+      showModal('edit-inventory');
+      state.editId = id;
+      document.getElementById('f-inventory-id').value = id;
+      populateModal(item);
+      document.getElementById('aiResultArea').classList.remove('hidden');
     }
 
     function closeModal() {
@@ -584,21 +741,28 @@
       setTimeout(() => m.classList.add('hidden'), 300);
     }
 
-    function handleStagingSave(e) {
+    async function handleStagingSave(e) {
       e.preventDefault();
-      const idx = parseInt(document.getElementById('f-staging-idx').value);
       const item = {
         name: document.getElementById('f-name').value,
-        type: '食材',
+        type: document.getElementById('f-type').value,
         loc: document.getElementById('f-loc').value,
         qty: parseFloat(document.getElementById('f-qty').value),
         unit: document.getElementById('f-unit').value,
         buy: document.getElementById('f-date1').value,
         open: document.getElementById('f-date2').value,
-        limit1: document.getElementById('f-date1').value,
-        limit2: document.getElementById('f-limit2').value || null
+        limit1: document.getElementById('f-limit1').value,
+        limit2: document.getElementById('f-limit2').value || null,
+        memo: document.getElementById('f-memo').value
       };
 
+      if (state.editMode === 'edit-inventory' && state.editId) {
+        await updateInventoryItem(state.editId, item);
+        closeModal();
+        return;
+      }
+
+      const idx = parseInt(document.getElementById('f-staging-idx').value);
       if (idx >= 0) {
         state.staging[idx] = item;
       } else {
@@ -655,6 +819,129 @@
         state.shopping = (state.shopping || []).filter(i => !res.detail.purchasedIds.includes(i.id));
         state.inventory = res.detail.inventory || [];
         filterByLocation('すべて');
+      }
+    }
+
+    async function adjustInventoryQty(id, delta) {
+      const item = state.inventory.find(i => i.id === id);
+      if (!item) return;
+      const newQty = Math.max(0, item.qty + delta);
+      const payload = `(function(){
+        var id = ${JSON.stringify(id)};
+        var newQty = ${newQty};
+        var ss = SpreadsheetApp.openById(PropertiesService.getUserProperties().getProperty('SS_ID_RECIPE_APP'));
+        var s = ss.getSheetByName('食材在庫');
+        var data = s.getDataRange().getValues();
+        for(var i=1; i<data.length; i++) {
+          if(String(data[i][0]) === id) {
+            s.getRange(i+1, 4).setValue(newQty);
+            break;
+          }
+        }
+        function f(v) { 
+          if(!v && v !== 0) return "";
+          if(v instanceof Date) return Utilities.formatDate(v, Session.getScriptTimeZone(), "yyyy-MM-dd");
+          return String(v).trim();
+        }
+        var inv = s.getDataRange().getValues();
+        var fullList = [];
+        for(var i=1; i<inv.length; i++) {
+          var r = inv[i];
+          if(!r[2]) continue;
+          fullList.push({
+            id: f(r[0]), type: f(r[1]), name: f(r[2]), qty: Number(r[3])||0, unit: f(r[4]),
+            buy: f(r[5]), open: f(r[6]), limit1: f(r[7]), limit2: f(r[8]), loc: f(r[9]), memo: f(r[10])
+          });
+        }
+        return { display: '数量更新完了', detail: { inventory: fullList } };
+      })()`;
+      const res = await executeGAS(payload, '数量を更新中...');
+      if (res && res.detail) {
+        state.inventory = res.detail.inventory || [];
+        renderList();
+      }
+    }
+
+    async function updateInventoryItem(id, item) {
+      const payload = `(function(){
+        var id = ${JSON.stringify(id)};
+        var updates = ${JSON.stringify(item)};
+        var ss = SpreadsheetApp.openById(PropertiesService.getUserProperties().getProperty('SS_ID_RECIPE_APP'));
+        var s = ss.getSheetByName('食材在庫');
+        var data = s.getDataRange().getValues();
+        for(var i=1; i<data.length; i++) {
+          if(String(data[i][0]) === id) {
+            s.getRange(i+1, 2).setValue(updates.type || '食材');
+            s.getRange(i+1, 3).setValue(updates.name);
+            s.getRange(i+1, 4).setValue(updates.qty);
+            s.getRange(i+1, 5).setValue(updates.unit);
+            s.getRange(i+1, 6).setValue(updates.buy || '');
+            s.getRange(i+1, 7).setValue(updates.open || '');
+            s.getRange(i+1, 8).setValue(updates.limit1 || '');
+            s.getRange(i+1, 9).setValue(updates.limit2 || '');
+            s.getRange(i+1, 10).setValue(updates.loc);
+            s.getRange(i+1, 11).setValue(updates.memo || '');
+            break;
+          }
+        }
+        function f(v) { 
+          if(!v && v !== 0) return "";
+          if(v instanceof Date) return Utilities.formatDate(v, Session.getScriptTimeZone(), "yyyy-MM-dd");
+          return String(v).trim();
+        }
+        var inv = s.getDataRange().getValues();
+        var fullList = [];
+        for(var i=1; i<inv.length; i++) {
+          var r = inv[i];
+          if(!r[2]) continue;
+          fullList.push({
+            id: f(r[0]), type: f(r[1]), name: f(r[2]), qty: Number(r[3])||0, unit: f(r[4]),
+            buy: f(r[5]), open: f(r[6]), limit1: f(r[7]), limit2: f(r[8]), loc: f(r[9]), memo: f(r[10])
+          });
+        }
+        return { display: '更新完了', detail: { inventory: fullList } };
+      })()`;
+      const res = await executeGAS(payload, '在庫情報を更新中...');
+      if (res && res.detail) {
+        state.inventory = res.detail.inventory || [];
+        renderList();
+      }
+    }
+
+    async function deleteInventoryItem(id) {
+      if (!confirm('この食材を在庫から削除しますか？')) return;
+      const payload = `(function(){
+        var id = ${JSON.stringify(id)};
+        var ss = SpreadsheetApp.openById(PropertiesService.getUserProperties().getProperty('SS_ID_RECIPE_APP'));
+        var s = ss.getSheetByName('食材在庫');
+        var data = s.getDataRange().getValues();
+        for(var i=1; i<data.length; i++) {
+          if(String(data[i][0]) === id) {
+            s.deleteRow(i+1);
+            break;
+          }
+        }
+        function f(v) { 
+          if(!v && v !== 0) return "";
+          if(v instanceof Date) return Utilities.formatDate(v, Session.getScriptTimeZone(), "yyyy-MM-dd");
+          return String(v).trim();
+        }
+        var inv = s.getDataRange().getValues();
+        var fullList = [];
+        for(var i=1; i<inv.length; i++) {
+          var r = inv[i];
+          if(!r[2]) continue;
+          fullList.push({
+            id: f(r[0]), type: f(r[1]), name: f(r[2]), qty: Number(r[3])||0, unit: f(r[4]),
+            buy: f(r[5]), open: f(r[6]), limit1: f(r[7]), limit2: f(r[8]), loc: f(r[9]), memo: f(r[10])
+          });
+        }
+        return { display: '削除完了', detail: { inventory: fullList } };
+      })()`;
+      const res = await executeGAS(payload, '在庫から削除中...');
+      if (res && res.detail) {
+        state.inventory = res.detail.inventory || [];
+        renderList();
       }
     }
 
