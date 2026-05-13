@@ -1,0 +1,26 @@
+{
+  "ticket_id": "TKT-0008",
+  "status": "passed",
+  "commands": [
+    {
+      "command": "python3 -c \"import html.parser; html.parser.HTMLParser().feed(open('app.html').read())\" && grep -q 'executeGAS' app.html && grep -q 'GAS_URL' app.html && echo 'VERIFY_PASSED'",
+      "status": "passed",
+      "output": "VERIFY_PASSED"
+    },
+    {
+      "command": "node --check /tmp/stock-master-app-script.js",
+      "status": "passed",
+      "output": ""
+    },
+    {
+      "command": "node --check /tmp/handle-init-gas.js",
+      "status": "passed",
+      "output": ""
+    },
+    {
+      "command": "rg -n 'alert\\(|confirm\\(|prompt\\(|localStorage|executeGAS\\(payload' app.html",
+      "status": "passed",
+      "output_summary": "executeGAS(payload) は syncPendingChanges と handleInit の2箇所のみ。alert/confirm/prompt/localStorage は検出なし。"
+    }
+  ]
+}

@@ -94,6 +94,60 @@
       "notes": "GAS通信方式はプロジェクトの根幹。改変は厳重にレビューする。"
     },
     {
+      "id": "manual_bulk_sync_policy",
+      "change_scope": "Google Spreadsheet への追加・更新・削除を伴う機能変更",
+      "match_paths": [
+        "app.html"
+      ],
+      "match_rules": {
+        "paths_any": [
+          "app.html"
+        ],
+        "diff_regex_any": [
+          "SpreadsheetApp",
+          "appendRow",
+          "deleteRow",
+          "setValue",
+          "setValues",
+          "executeGAS\\(payload",
+          "state\\.pendingSync",
+          "syncPendingChanges",
+          "inventoryCreates|inventoryUpdates|inventoryDeletes",
+          "recipeCreates|recipeUpdates|recipeDeletes",
+          "shoppingPurchases"
+        ]
+      },
+      "required_verify": [
+        "html_syntax",
+        "gas_pattern_marker",
+        "manual_bulk_sync_marker"
+      ],
+      "required_manual_smokes": [
+        "gas_communication_pattern",
+        "manual_bulk_sync"
+      ],
+      "phase_gate_tags": [
+        "verify_passed",
+        "manual_smokes_done",
+        "review_ready",
+        "report_ready"
+      ],
+      "artifact_requirements": [
+        "verify_summary",
+        "manual_smoke_report",
+        "review_record",
+        "user_report_draft"
+      ],
+      "review_focus": [
+        "初期読込/承認/`syncPendingChanges()` 以外で個別 `executeGAS(payload...)` が増えていないか",
+        "スプシ書き込み系の操作が `state.pendingSync` に積まれるか",
+        "未同期件数、行バッジ、破棄、同期ボタンなど状態表示があるか",
+        "同期失敗時に `state.pendingSync` を消していないか",
+        "同期成功時にGASから返った最新一覧で画面状態を置き換えているか"
+      ],
+      "notes": "スプレッドシート変更は必ず手動一括同期に載せる。操作ごとの即時GAS通信は待ち時間と二重反映の原因になるため禁止。"
+    },
+    {
       "id": "ui_component_addition",
       "change_scope": "新規UIコンポーネント（モーダル、タブ、リスト、ボタン等）の追加",
       "match_paths": [

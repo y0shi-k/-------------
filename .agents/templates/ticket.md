@@ -27,6 +27,7 @@ related_artifacts:
 owner_role: implementer
 owner_notes:
   - verify は `python3 -c "import html.parser; html.parser.HTMLParser().feed(open('app.html').read())" && grep -q 'executeGAS' app.html && grep -q 'GAS_URL' app.html && echo 'VERIFY_PASSED'`
+  - Google Spreadsheet への追加・更新・削除を含む場合、required_evals に `manual_bulk_sync_policy` を含める
   - 任意監査は現時点では未定
 ---
 
@@ -39,6 +40,7 @@ owner_notes:
 - プロジェクト名: Stock Master（料理レシピ・食材管理アプリ）
 - 正本: `app.html`, `要件定義書.md`, `AGENTS.md`
 - 生成物: GASデプロイ後のWebアプリ、Spreadsheet内データ、Drive保存画像
-- stack 固有 eval: スキーマ変更、GAS通信パターン改変、UIコンポーネント追加、フェーズ移行
+- stack 固有 eval: スキーマ変更、GAS通信パターン改変、スプシ手動一括同期、UIコンポーネント追加、フェーズ移行
+- スプシ変更を含む場合は、操作時に `state.pendingSync` へ積むこと、未同期状態を表示すること、`syncPendingChanges()` 以外で個別書き込み通信しないことを実装メモに残す
 
 ## 残リスク

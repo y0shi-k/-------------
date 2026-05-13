@@ -40,6 +40,17 @@
     </div>
   </div>
 
+  <div id="syncBar" class="hidden fixed left-3 right-3 bottom-24 z-[60] max-w-2xl mx-auto bg-slate-900 text-white rounded-2xl shadow-2xl border border-slate-700 p-3">
+    <div class="flex items-center gap-3">
+      <div class="flex-1 min-w-0">
+        <p id="syncSummary" class="text-sm font-black truncate">未同期 0 件</p>
+        <p id="syncDetail" class="text-[10px] text-slate-300 font-bold truncate">変更はまだスプレッドシートへ反映されていません</p>
+      </div>
+      <button onclick="discardPendingChanges()" class="px-3 py-2 rounded-xl bg-slate-700 text-slate-100 text-xs font-black hover:bg-slate-600 active:scale-95 transition-all">破棄</button>
+      <button onclick="syncPendingChanges()" class="px-4 py-2 rounded-xl bg-emerald-500 text-white text-xs font-black hover:bg-emerald-600 active:scale-95 transition-all">同期する</button>
+    </div>
+  </div>
+
   <main id="app" class="pb-24">
     <!-- 初期承認画面 -->
     <div id="initView" class="flex flex-col items-center justify-center min-h-screen p-6 text-center">
@@ -128,13 +139,13 @@
           </button>
           <button onclick="batchRegisterDB()" class="bg-slate-700 text-white font-black py-4 rounded-2xl shadow-lg hover:bg-slate-800 active:scale-95 transition-all flex flex-col items-center justify-center gap-1 border-b-4 border-slate-900">
             <span class="text-lg">💾</span>
-            <span class="text-[10px] uppercase">DB一括登録</span>
+            <span class="text-[10px] uppercase">在庫へ追加</span>
           </button>
         </div>
         <button onclick="batchCompleteFlow()" class="w-full bg-slate-900 text-white font-black py-5 rounded-2xl shadow-xl hover:bg-black active:scale-95 transition-all flex items-center justify-center gap-4 border-b-4 border-indigo-900">
           <span class="text-2xl">⚡</span>
           <span class="flex flex-col items-start text-left">
-            <span class="text-base leading-none">まとめてAI解析してDB登録</span>
+            <span class="text-base leading-none">まとめてAI解析して在庫へ追加</span>
             <span class="text-[10px] opacity-60 uppercase tracking-tighter mt-1">Smart Auto-Register Flow</span>
           </span>
         </button>
@@ -158,12 +169,58 @@
 
     <!-- モードB: 献立・レシピ -->
     <div id="modeBView" class="hidden">
-      <div class="flex flex-col items-center justify-center min-h-[60vh] p-6 text-center">
-        <div class="w-20 h-20 bg-amber-100 rounded-3xl flex items-center justify-center mb-6">
-          <span class="text-4xl">📅</span>
+      <div class="p-4 max-w-2xl mx-auto">
+        <header class="flex justify-between items-end mb-6 pt-4">
+          <div>
+            <h2 class="text-3xl font-black tracking-tight text-slate-800">献立・レシピ</h2>
+            <p class="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">RECIPE & MEAL PLAN</p>
+          </div>
+        </header>
+
+        <!-- サブタブ -->
+        <div class="flex gap-2 overflow-x-auto no-scrollbar pb-4 mb-2 snap-x">
+          <button onclick="switchBTab('recipes')" class="b-tab active bg-white text-indigo-600 shadow-sm border border-indigo-100 px-5 py-2.5 rounded-xl text-sm font-black whitespace-nowrap snap-start transition-all" data-tab="recipes">📖 レシピ集</button>
+          <button onclick="switchBTab('ai')" class="b-tab bg-slate-100 text-slate-500 px-5 py-2.5 rounded-xl text-sm font-bold whitespace-nowrap snap-start transition-all" data-tab="ai">🧠 AI考案</button>
+          <button onclick="switchBTab('schedule')" class="b-tab bg-slate-100 text-slate-500 px-5 py-2.5 rounded-xl text-sm font-bold whitespace-nowrap snap-start transition-all" data-tab="schedule">📅 献立スケジュール</button>
         </div>
-        <h2 class="text-2xl font-black text-slate-700 mb-2">献立・レシピ</h2>
-        <p class="text-sm text-slate-400">Phase 2 で実装予定</p>
+
+        <!-- レシピ集タブ -->
+        <div id="bTabRecipes" class="space-y-4">
+          <div class="flex gap-3">
+            <button onclick="openRecipeEditor()" class="flex-1 bg-slate-800 text-white font-black py-4 rounded-2xl shadow-lg hover:bg-slate-900 active:scale-95 transition-all flex items-center justify-center gap-2">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+              新規レシピ
+            </button>
+            <button onclick="openRecipeTextModal()" class="flex-1 bg-amber-500 text-white font-black py-4 rounded-2xl shadow-lg hover:bg-amber-600 active:scale-95 transition-all flex items-center justify-center gap-2">
+              <span>📋</span> テキストから追加
+            </button>
+          </div>
+          <div id="recipeListContainer" class="space-y-3">
+            <!-- JSで動的に挿入 -->
+          </div>
+        </div>
+
+        <!-- AI考案タブ -->
+        <div id="bTabAi" class="hidden">
+          <div class="flex flex-col items-center justify-center min-h-[40vh] p-6 text-center">
+            <div class="w-16 h-16 bg-indigo-100 rounded-3xl flex items-center justify-center mb-4">
+              <span class="text-3xl">🧠</span>
+            </div>
+            <h3 class="text-xl font-black text-slate-700 mb-2">AIレシピ考案</h3>
+            <p class="text-sm text-slate-400">TKT-0005 で実装予定</p>
+          </div>
+        </div>
+
+        <!-- 献立スケジュールタブ -->
+        <div id="bTabSchedule" class="hidden">
+          <div class="flex flex-col items-center justify-center min-h-[40vh] p-6 text-center">
+            <div class="w-16 h-16 bg-amber-100 rounded-3xl flex items-center justify-center mb-4">
+              <span class="text-3xl">📅</span>
+            </div>
+            <h3 class="text-xl font-black text-slate-700 mb-2">献立スケジュール</h3>
+            <p class="text-sm text-slate-400">TKT-0006 で実装予定</p>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -274,6 +331,74 @@
     </div>
   </div>
 
+  <!-- モーダル: レシピの追加/編集 -->
+  <div id="recipeModal" onclick="if(event.target===this) closeRecipeModal()" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
+    <div onclick="event.stopPropagation()" class="bg-white w-full max-w-lg rounded-[2.5rem] p-6 shadow-2xl transform scale-95 transition-transform duration-300 border border-slate-100 max-h-[90vh] overflow-y-auto">
+      <div class="flex justify-between items-center mb-5">
+        <h3 id="recipeModalTitle" class="text-2xl font-black text-slate-800 tracking-tight">レシピを追加</h3>
+        <button onclick="closeRecipeModal()" class="text-slate-300 hover:text-slate-600 bg-slate-100 p-2 rounded-full"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+      </div>
+
+      <form id="recipeForm" onsubmit="handleRecipeSave(event)" class="space-y-5">
+        <input type="hidden" id="r-id" value="">
+        <div>
+          <label class="block text-[11px] font-black text-slate-400 uppercase mb-1.5 ml-1">レシピ名</label>
+          <input type="text" id="r-name" required class="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 text-base focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none font-bold transition-all" placeholder="例: カレーライス">
+        </div>
+        <div>
+          <label class="block text-[11px] font-black text-slate-400 uppercase mb-1.5 ml-1">出典</label>
+          <input type="text" id="r-source" class="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 text-sm focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none font-bold transition-all" placeholder="例: https://... または本の名前">
+        </div>
+
+        <!-- 材料セクション -->
+        <div>
+          <div class="flex justify-between items-center mb-2">
+            <label class="block text-[11px] font-black text-slate-400 uppercase ml-1">材料</label>
+            <button type="button" onclick="addIngredientRow()" class="text-[11px] font-black text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-full hover:bg-indigo-100 transition-all">＋ 材料を追加</button>
+          </div>
+          <div id="ingredientList" class="space-y-2">
+            <!-- JSで動的に挿入 -->
+          </div>
+        </div>
+
+        <!-- 手順セクション -->
+        <div>
+          <div class="flex justify-between items-center mb-2">
+            <label class="block text-[11px] font-black text-slate-400 uppercase ml-1">手順</label>
+            <button type="button" onclick="addStepRow()" class="text-[11px] font-black text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-full hover:bg-indigo-100 transition-all">＋ 手順を追加</button>
+          </div>
+          <div id="stepList" class="space-y-2">
+            <!-- JSで動的に挿入 -->
+          </div>
+        </div>
+
+        <div class="pt-2 flex gap-3">
+          <button type="button" onclick="closeRecipeModal()" class="flex-1 bg-slate-100 text-slate-600 font-black py-4 rounded-2xl hover:bg-slate-200 transition-all">キャンセル</button>
+          <button type="submit" id="btnRecipeSubmit" class="flex-[2] bg-slate-900 text-white font-black py-4 rounded-2xl hover:bg-black transition-all shadow-xl">保存</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- モーダル: テキストからレシピ構造化 -->
+  <div id="recipeTextModal" onclick="if(event.target===this) closeRecipeTextModal()" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
+    <div onclick="event.stopPropagation()" class="bg-white w-full max-w-lg rounded-[2.5rem] p-6 shadow-2xl transform scale-95 transition-transform duration-300 border border-slate-100 max-h-[90vh] overflow-y-auto">
+      <div class="flex justify-between items-center mb-5">
+        <h3 class="text-2xl font-black text-slate-800 tracking-tight">テキストからレシピを追加</h3>
+        <button onclick="closeRecipeTextModal()" class="text-slate-300 hover:text-slate-600 bg-slate-100 p-2 rounded-full"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+      </div>
+      <div class="space-y-4">
+        <div>
+          <label class="block text-[11px] font-black text-slate-400 uppercase mb-1.5 ml-1">レシピテキスト</label>
+          <textarea id="r-text-input" rows="8" class="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:border-indigo-500 resize-none" placeholder="Webやメモからコピーしたレシピテキストをここに貼り付けてください..."></textarea>
+        </div>
+        <button onclick="parseRecipeTextWithAI()" class="w-full bg-indigo-600 text-white font-black py-4 rounded-2xl shadow-lg hover:bg-indigo-700 active:scale-95 transition-all flex items-center justify-center gap-2">
+          <span>🧠</span> AIで構造化
+        </button>
+      </div>
+    </div>
+  </div>
+
   <input type="file" accept="image/*" capture="environment" id="imageScanInput" onchange="handleImageScan(event)" hidden>
 
   <button id="geminiCopyBtn" onclick="majinCopy()" style="display:none;" class="fixed bottom-24 left-4 z-[70] bg-slate-900 text-white text-[10px] font-black py-2.5 px-5 rounded-full shadow-2xl flex items-center gap-2 hover:scale-105 transition-all border border-slate-700">
@@ -290,12 +415,17 @@
       inventory: [],
       shopping: [],
       staging: [],
+      recipes: [],
       currentLoc: 'すべて',
       currentMode: 'A',
+      currentBTab: 'recipes',
       isProcessing: false,
       sortBy: 'limit2',
       editMode: null,
-      editId: null
+      editId: null,
+      recipeEditId: null,
+      pendingSync: createEmptyPendingSync(),
+      syncedSnapshot: { inventory: [], shopping: [], recipes: [] }
     };
 
     /* --- Core --- */
@@ -338,6 +468,336 @@
         toast.classList.add('toast-out');
         setTimeout(() => toast.remove(), 300);
       }, 4000);
+    }
+
+    function createEmptyPendingSync() {
+      return {
+        inventoryCreates: [],
+        inventoryUpdates: {},
+        inventoryDeletes: [],
+        recipeCreates: [],
+        recipeUpdates: {},
+        recipeDeletes: [],
+        shoppingPurchases: []
+      };
+    }
+
+    function clonePlain(value) {
+      return JSON.parse(JSON.stringify(value || []));
+    }
+
+    function setSyncedSnapshot() {
+      state.syncedSnapshot = {
+        inventory: clonePlain(state.inventory),
+        shopping: clonePlain(state.shopping),
+        recipes: clonePlain(state.recipes)
+      };
+    }
+
+    function resetPendingSync() {
+      state.pendingSync = createEmptyPendingSync();
+      updateSyncBar();
+    }
+
+    function countObject(obj) {
+      return Object.keys(obj || {}).length;
+    }
+
+    function getPendingSyncCount() {
+      const p = state.pendingSync;
+      return p.inventoryCreates.length + countObject(p.inventoryUpdates) + p.inventoryDeletes.length
+        + p.recipeCreates.length + countObject(p.recipeUpdates) + p.recipeDeletes.length
+        + p.shoppingPurchases.length;
+    }
+
+    function updateSyncBar() {
+      const bar = document.getElementById('syncBar');
+      if (!bar) return;
+      const count = getPendingSyncCount();
+      if (count === 0) {
+        bar.classList.add('hidden');
+        return;
+      }
+      const p = state.pendingSync;
+      const parts = [];
+      const inv = p.inventoryCreates.length + countObject(p.inventoryUpdates) + p.inventoryDeletes.length;
+      const rec = p.recipeCreates.length + countObject(p.recipeUpdates) + p.recipeDeletes.length;
+      if (inv) parts.push(`在庫 ${inv}`);
+      if (rec) parts.push(`レシピ ${rec}`);
+      if (p.shoppingPurchases.length) parts.push(`購入処理 ${p.shoppingPurchases.length}`);
+      document.getElementById('syncSummary').textContent = `未同期 ${count} 件`;
+      document.getElementById('syncDetail').textContent = parts.join(' / ') + ' - 同期するまでスプシ未反映';
+      bar.classList.remove('hidden');
+    }
+
+    function rerenderCurrentViews() {
+      if (state.currentMode === 'A') renderList();
+      if (state.currentMode === 'B' && state.currentBTab === 'recipes') renderRecipeList();
+      updateSyncBar();
+    }
+
+    function createClientId(prefix) {
+      return `${prefix}_tmp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    }
+
+    function isTempId(id) {
+      return String(id || '').indexOf('_tmp_') !== -1;
+    }
+
+    function cleanInventoryItem(item) {
+      return {
+        id: item.id || '',
+        type: item.type || '食材',
+        name: item.name || '',
+        qty: Number(item.qty) || 0,
+        unit: item.unit || '',
+        buy: item.buy || '',
+        open: item.open || '',
+        limit1: item.limit1 || '',
+        limit2: item.limit2 || '',
+        loc: item.loc || '冷蔵庫',
+        memo: item.memo || ''
+      };
+    }
+
+    function cleanRecipeItem(recipe) {
+      return {
+        id: recipe.id || '',
+        name: recipe.name || '',
+        ingredients: recipe.ingredients || '[]',
+        steps: recipe.steps || '[]',
+        source: recipe.source || '',
+        count: Number(recipe.count) || 0,
+        history: recipe.history || '[]'
+      };
+    }
+
+    function queueInventoryCreate(item) {
+      item._syncStatus = 'created';
+      state.pendingSync.inventoryCreates.push(cleanInventoryItem(item));
+      updateSyncBar();
+    }
+
+    function queueInventoryUpdate(id, item) {
+      if (state.pendingSync.inventoryDeletes.includes(id)) return;
+      const created = state.pendingSync.inventoryCreates.find(i => i.id === id);
+      if (created) {
+        Object.assign(created, cleanInventoryItem({ ...item, id }));
+      } else {
+        state.pendingSync.inventoryUpdates[id] = cleanInventoryItem({ ...item, id });
+      }
+      const current = state.inventory.find(i => i.id === id);
+      if (current) current._syncStatus = isTempId(id) ? 'created' : 'updated';
+      updateSyncBar();
+    }
+
+    function queueInventoryDelete(id) {
+      const wasCreated = state.pendingSync.inventoryCreates.some(i => i.id === id);
+      state.pendingSync.inventoryCreates = state.pendingSync.inventoryCreates.filter(i => i.id !== id);
+      delete state.pendingSync.inventoryUpdates[id];
+      if (!wasCreated && !state.pendingSync.inventoryDeletes.includes(id)) {
+        state.pendingSync.inventoryDeletes.push(id);
+      }
+      state.inventory = state.inventory.filter(i => i.id !== id);
+      updateSyncBar();
+    }
+
+    function queueRecipeCreate(recipe) {
+      recipe._syncStatus = 'created';
+      state.pendingSync.recipeCreates.push(cleanRecipeItem(recipe));
+      updateSyncBar();
+    }
+
+    function queueRecipeUpdate(id, recipe) {
+      if (state.pendingSync.recipeDeletes.includes(id)) return;
+      const created = state.pendingSync.recipeCreates.find(r => r.id === id);
+      if (created) {
+        Object.assign(created, cleanRecipeItem({ ...recipe, id }));
+      } else {
+        state.pendingSync.recipeUpdates[id] = cleanRecipeItem({ ...recipe, id });
+      }
+      const current = state.recipes.find(r => r.id === id);
+      if (current) current._syncStatus = isTempId(id) ? 'created' : 'updated';
+      updateSyncBar();
+    }
+
+    function queueRecipeDelete(id) {
+      const wasCreated = state.pendingSync.recipeCreates.some(r => r.id === id);
+      state.pendingSync.recipeCreates = state.pendingSync.recipeCreates.filter(r => r.id !== id);
+      delete state.pendingSync.recipeUpdates[id];
+      if (!wasCreated && !state.pendingSync.recipeDeletes.includes(id)) {
+        state.pendingSync.recipeDeletes.push(id);
+      }
+      state.recipes = state.recipes.filter(r => r.id !== id);
+      updateSyncBar();
+    }
+
+    function getInventorySyncBadge(item) {
+      if (!item || !item._syncStatus) return '';
+      const label = item._syncStatus === 'created' ? '未同期' : '変更あり';
+      const cls = item._syncStatus === 'created' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700';
+      return `<span class="text-[9px] font-black px-1.5 py-0.5 ${cls} rounded-full">${label}</span>`;
+    }
+
+    function getRecipeSyncBadge(recipe) {
+      if (!recipe || !recipe._syncStatus) return '';
+      const label = recipe._syncStatus === 'created' ? '未同期' : '変更あり';
+      const cls = recipe._syncStatus === 'created' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700';
+      return `<span class="text-[9px] font-black px-2 py-0.5 ${cls} rounded-full">${label}</span>`;
+    }
+
+    function discardPendingChanges() {
+      state.inventory = clonePlain(state.syncedSnapshot.inventory);
+      state.shopping = clonePlain(state.syncedSnapshot.shopping);
+      state.recipes = clonePlain(state.syncedSnapshot.recipes);
+      resetPendingSync();
+      rerenderCurrentViews();
+      showToast('未同期の変更を破棄しました。', 'info');
+    }
+
+    async function syncPendingChanges() {
+      if (getPendingSyncCount() === 0) {
+        showToast('同期する変更はありません。', 'info');
+        return;
+      }
+      const pending = JSON.parse(JSON.stringify(state.pendingSync));
+      const payload = `(function(){
+        var pending = ${JSON.stringify(pending)};
+        var ss = SpreadsheetApp.openById(PropertiesService.getUserProperties().getProperty('SS_ID_RECIPE_APP'));
+        var sStock = ss.getSheetByName('食材在庫');
+        var sRecipes = ss.getSheetByName('レシピ集');
+        var sShop = ss.getSheetByName('買い物リスト');
+
+        function f(v) {
+          if(!v && v !== 0) return "";
+          if(v instanceof Date) return Utilities.formatDate(v, Session.getScriptTimeZone(), "yyyy-MM-dd");
+          return String(v).trim();
+        }
+        function readInventory() {
+          var inv = sStock.getDataRange().getValues();
+          var list = [];
+          for(var i=1; i<inv.length; i++) {
+            var r = inv[i];
+            if(!r[2]) continue;
+            list.push({
+              id: f(r[0]), type: f(r[1]), name: f(r[2]), qty: Number(r[3])||0, unit: f(r[4]),
+              buy: f(r[5]), open: f(r[6]), limit1: f(r[7]), limit2: f(r[8]), loc: f(r[9]), memo: f(r[10])
+            });
+          }
+          return list;
+        }
+        function readShopping() {
+          var shop = sShop.getDataRange().getValues();
+          var list = [];
+          for(var i=1; i<shop.length; i++) {
+            var r = shop[i];
+            if(!r[1]) continue;
+            list.push({ id: f(r[0]), name: f(r[1]), qty: Number(r[2])||0, unit: f(r[3]), status: f(r[4]) });
+          }
+          return list;
+        }
+        function readRecipes() {
+          var rec = sRecipes.getDataRange().getValues();
+          var list = [];
+          for(var i=1; i<rec.length; i++) {
+            var r = rec[i];
+            if(!r[1]) continue;
+            list.push({ id:f(r[0]), name:f(r[1]), ingredients:f(r[2]), steps:f(r[3]), source:f(r[4]), count:Number(r[5])||0, history:f(r[6]) });
+          }
+          return list;
+        }
+
+        var invDeletes = pending.inventoryDeletes || [];
+        var stockData = sStock.getDataRange().getValues();
+        for(var i=stockData.length-1; i>=1; i--) {
+          if(invDeletes.indexOf(String(stockData[i][0])) !== -1) sStock.deleteRow(i+1);
+        }
+
+        var recipeDeletes = pending.recipeDeletes || [];
+        var recipeData = sRecipes.getDataRange().getValues();
+        for(var rdi=recipeData.length-1; rdi>=1; rdi--) {
+          if(recipeDeletes.indexOf(String(recipeData[rdi][0])) !== -1) sRecipes.deleteRow(rdi+1);
+        }
+
+        var invUpdates = pending.inventoryUpdates || {};
+        var invUpdateIds = Object.keys(invUpdates);
+        if(invUpdateIds.length) {
+          stockData = sStock.getDataRange().getValues();
+          for(var ui=1; ui<stockData.length; ui++) {
+            var iid = String(stockData[ui][0]);
+            if(invUpdates[iid]) {
+              var d = invUpdates[iid];
+              sStock.getRange(ui+1, 2, 1, 10).setValues([[d.type || '食材', d.name, d.qty, d.unit, d.buy || '', d.open || '', d.limit1 || '', d.limit2 || '', d.loc || '冷蔵庫', d.memo || '']]);
+            }
+          }
+        }
+
+        var recipeUpdates = pending.recipeUpdates || {};
+        var recipeUpdateIds = Object.keys(recipeUpdates);
+        if(recipeUpdateIds.length) {
+          recipeData = sRecipes.getDataRange().getValues();
+          for(var ru=1; ru<recipeData.length; ru++) {
+            var rid = String(recipeData[ru][0]);
+            if(recipeUpdates[rid]) {
+              var rd = recipeUpdates[rid];
+              sRecipes.getRange(ru+1, 2, 1, 4).setValues([[rd.name, rd.ingredients, rd.steps, rd.source || '']]);
+            }
+          }
+        }
+
+        (pending.inventoryCreates || []).forEach(function(d) {
+          sStock.appendRow([Utilities.getUuid(), d.type || '食材', d.name, d.qty, d.unit, d.buy || '', d.open || '', d.limit1 || '', d.limit2 || '', d.loc || '冷蔵庫', d.memo || '']);
+        });
+
+        (pending.recipeCreates || []).forEach(function(d) {
+          sRecipes.appendRow([Utilities.getUuid(), d.name, d.ingredients || '[]', d.steps || '[]', d.source || '', Number(d.count)||0, d.history || '[]']);
+        });
+
+        var purchases = pending.shoppingPurchases || [];
+        purchases.forEach(function(op) {
+          var ids = op.ids || [];
+          var decision = op.decision || 'merge';
+          var today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+          var shopData = sShop.getDataRange().getValues();
+          var stockRows = sStock.getDataRange().getValues();
+          for(var pi=1; pi<shopData.length; pi++) {
+            if(ids.indexOf(String(shopData[pi][0])) === -1) continue;
+            sShop.getRange(pi+1, 5).setValue('購入済');
+            var found = false;
+            if(decision === 'merge') {
+              for(var sj=1; sj<stockRows.length; sj++) {
+                if(String(stockRows[sj][2]) === String(shopData[pi][1]) && String(stockRows[sj][4]) === String(shopData[pi][3])) {
+                  var currentQty = Number(stockRows[sj][3]) || 0;
+                  var addQty = Number(shopData[pi][2]) || 0;
+                  sStock.getRange(sj+1, 4).setValue(currentQty + addQty);
+                  sStock.getRange(sj+1, 6).setValue(today);
+                  found = true;
+                  break;
+                }
+              }
+            }
+            if(!found) {
+              sStock.appendRow([Utilities.getUuid(), '食材', shopData[pi][1], shopData[pi][2], shopData[pi][3], today, '', '', '', '冷蔵庫', '買い物より移行']);
+            }
+          }
+        });
+
+        return { display: '一括同期完了', detail: { inventory: readInventory(), shopping: readShopping(), recipes: readRecipes() } };
+      })()`;
+
+      const res = await executeGAS(payload, `未同期 ${getPendingSyncCount()} 件をスプレッドシートへ一括同期中...`);
+      if (res && res.detail) {
+        state.inventory = Array.isArray(res.detail.inventory) ? res.detail.inventory : [];
+        state.shopping = Array.isArray(res.detail.shopping) ? res.detail.shopping : [];
+        state.recipes = Array.isArray(res.detail.recipes) ? res.detail.recipes : [];
+        resetPendingSync();
+        setSyncedSnapshot();
+        rerenderCurrentViews();
+        showToast('未同期の変更をスプレッドシートへ反映しました。', 'success');
+      } else {
+        updateSyncBar();
+        showToast('同期に失敗しました。未同期の変更は保持されています。', 'error');
+      }
     }
 
     async function executeGAS(payloadCode, label) {
@@ -393,24 +853,22 @@
         if (!ss) {
           ss = SpreadsheetApp.create('料理レシピ・食材管理DB');
           props.setProperty('SS_ID_RECIPE_APP', ss.getId());
-          var names = ['食材在庫','レシピ集','献立スケジュール','料理履歴','買い物リスト'];
-          names.forEach(function(n){ if(!ss.getSheetByName(n)) ss.insertSheet(n); });
-          var s1 = ss.getSheetByName('食材在庫');
-          s1.appendRow(['ID', '分類', '品名', '数量', '単位', '購入日', '開封日', '表示期限', '実質期限', '保存場所', '状態メモ']);
-          s1.setFrozenRows(1);
-          var s2 = ss.getSheetByName('レシピ集');
-          s2.appendRow(['レシピID', 'レシピ名', '材料JSON', '手順JSON', '出典', '調理回数', '調理日履歴']);
-          s2.setFrozenRows(1);
-          var s3 = ss.getSheetByName('献立スケジュール');
-          s3.appendRow(['予定日', '食事区分', 'レシピID', 'レシピ名', 'ステータス']);
-          s3.setFrozenRows(1);
-          var s4 = ss.getSheetByName('料理履歴');
-          s4.appendRow(['履歴ID', '調理日時', 'レシピID', 'レシピ名', '感想', '写真URL', '評価']);
-          s4.setFrozenRows(1);
-          var s5 = ss.getSheetByName('買い物リスト');
-          s5.appendRow(['リストID', '品名', '必要数量', '単位', 'ステータス', '紐づくレシピ名']);
-          s5.setFrozenRows(1);
         }
+        var names = ['食材在庫','レシピ集','献立スケジュール','料理履歴','買い物リスト'];
+        names.forEach(function(n){ if(!ss.getSheetByName(n)) ss.insertSheet(n); });
+        function ensureHeader(sheetName, header, firstCell) {
+          var sheet = ss.getSheetByName(sheetName);
+          var current = sheet.getRange(1, 1, 1, header.length).getValues()[0];
+          if(!current[0] || current[0] !== firstCell) {
+            sheet.appendRow(header);
+          }
+          sheet.setFrozenRows(1);
+        }
+        ensureHeader('食材在庫', ['ID', '分類', '品名', '数量', '単位', '購入日', '開封日', '表示期限', '実質期限', '保存場所', '状態メモ'], 'ID');
+        ensureHeader('レシピ集', ['レシピID', 'レシピ名', '材料JSON', '手順JSON', '出典', '調理回数', '調理日履歴'], 'レシピID');
+        ensureHeader('献立スケジュール', ['予定日', '食事区分', 'レシピID', 'レシピ名', 'ステータス'], '予定日');
+        ensureHeader('料理履歴', ['履歴ID', '調理日時', 'レシピID', 'レシピ名', '感想', '写真URL', '評価'], '履歴ID');
+        ensureHeader('買い物リスト', ['リストID', '品名', '必要数量', '単位', 'ステータス', '紐づくレシピ名'], 'リストID');
         
         function f(v) { 
           if(!v && v !== 0) return "";
@@ -442,19 +900,36 @@
           }
         }
 
-        return { display: '在庫データ読み込み完了', detail: { inventory: inventory, shopping: shopping } };
+        var rec = ss.getSheetByName('レシピ集').getDataRange().getValues();
+        var recipes = [];
+        if (rec.length > 1) {
+          for(var k=1; k<rec.length; k++) {
+            var rr = rec[k];
+            if(!rr[1]) continue;
+            recipes.push({
+              id: f(rr[0]), name: f(rr[1]), ingredients: f(rr[2]), steps: f(rr[3]),
+              source: f(rr[4]), count: Number(rr[5])||0, history: f(rr[6])
+            });
+          }
+        }
+
+        return { display: '在庫データ読み込み完了', detail: { inventory: inventory, shopping: shopping, recipes: recipes } };
       })()`;
       const res = await executeGAS(payload, 'データベースと同期中...');
       console.log('Init GAS Response:', res);
       if (res && res.status !== 'error') {
         const inv = (res.detail && res.detail.inventory) ? res.detail.inventory : (res.inventory || []);
         const shop = (res.detail && res.detail.shopping) ? res.detail.shopping : (res.shopping || []);
+        const rec = (res.detail && res.detail.recipes) ? res.detail.recipes : (res.recipes || []);
         state.inventory = Array.isArray(inv) ? inv : [];
         state.shopping = Array.isArray(shop) ? shop : [];
+        state.recipes = Array.isArray(rec) ? rec : [];
+        resetPendingSync();
+        setSyncedSnapshot();
         document.getElementById('initView').classList.add('hidden');
         document.getElementById('bottomNav').classList.remove('hidden');
         switchMode('A');
-        console.log('Loaded inventory count:', state.inventory.length, 'shopping count:', state.shopping.length);
+        console.log('Loaded inventory count:', state.inventory.length, 'shopping count:', state.shopping.length, 'recipes count:', state.recipes.length);
       } else {
         showToast('データの読み込みに失敗しました。GASの実行権限を確認してください。', 'error');
       }
@@ -553,6 +1028,7 @@
       filtered.forEach(item => {
         let rowClass = 'border-slate-100';
         let badge = '';
+        const syncBadge = getInventorySyncBadge(item);
         if (item.limit2) {
           const limit = new Date(item.limit2); limit.setHours(0,0,0,0);
           const diff = Math.ceil((limit - today) / 86400000);
@@ -575,6 +1051,7 @@
               <div class="flex items-center gap-2 mb-0.5">
                 <span class="font-bold text-slate-800 text-sm truncate">${item.name}</span>
                 ${badge}
+                ${syncBadge}
               </div>
               <div class="text-[10px] text-slate-400 font-bold">${item.loc} · 購入 ${item.buy || '—'}</div>
             </div>
@@ -633,6 +1110,67 @@
         btn.querySelector('span:last-child').className = `text-[10px] ${isActive ? 'font-black' : 'font-bold'}`;
       });
       if (mode === 'A') renderList();
+      if (mode === 'B') renderRecipeList();
+    }
+
+    function switchBTab(tab) {
+      state.currentBTab = tab;
+      document.getElementById('bTabRecipes').classList.add('hidden');
+      document.getElementById('bTabAi').classList.add('hidden');
+      document.getElementById('bTabSchedule').classList.add('hidden');
+      document.getElementById('bTab' + tab.charAt(0).toUpperCase() + tab.slice(1)).classList.remove('hidden');
+      document.querySelectorAll('.b-tab').forEach(btn => {
+        const isActive = btn.dataset.tab === tab;
+        btn.className = `b-tab ${isActive ? 'active bg-white text-indigo-600 shadow-sm border border-indigo-100' : 'bg-slate-100 text-slate-500'} px-5 py-2.5 rounded-xl text-sm font-black whitespace-nowrap snap-start transition-all`;
+      });
+      if (tab === 'recipes') renderRecipeList();
+    }
+
+    /* --- Recipe Rendering --- */
+    function renderRecipeList() {
+      const container = document.getElementById('recipeListContainer');
+      if (!container) return;
+      container.innerHTML = '';
+      if (state.recipes.length === 0) {
+        container.innerHTML = '<div class="py-20 text-center text-slate-300 font-bold">レシピが登録されていません。<br>「新規レシピ」または「テキストから追加」で登録してください。</div>';
+        return;
+      }
+      state.recipes.forEach((recipe, idx) => {
+        let ingCount = 0;
+        const syncBadge = getRecipeSyncBadge(recipe);
+        try {
+          const ing = JSON.parse(recipe.ingredients || '[]');
+          ingCount = Array.isArray(ing) ? ing.length : 0;
+        } catch(e) { ingCount = 0; }
+        container.insertAdjacentHTML('beforeend', `
+          <div class="bg-white p-5 rounded-[2rem] shadow-sm border border-slate-100 flex items-center gap-4 group cursor-pointer" onclick="openRecipeEditor('${recipe.id}')">
+            <div class="w-12 h-12 bg-indigo-100 rounded-2xl flex items-center justify-center flex-shrink-0">
+              <span class="text-xl">🍳</span>
+            </div>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2">
+                <h4 class="font-black text-slate-800 text-lg truncate">${escapeHtml(recipe.name)}</h4>
+                ${syncBadge}
+              </div>
+              <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">材料 ${ingCount} 品目 | 調理回数 ${recipe.count || 0}</p>
+            </div>
+            <div class="flex items-center gap-1">
+              <button onclick="event.stopPropagation(); openRecipeEditor('${recipe.id}')" class="w-10 h-10 rounded-xl bg-slate-50 text-slate-500 hover:bg-indigo-50 hover:text-indigo-600 flex items-center justify-center transition-all">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+              </button>
+              <button onclick="event.stopPropagation(); deleteRecipe('${recipe.id}')" class="w-10 h-10 rounded-xl bg-slate-50 text-slate-500 hover:bg-rose-50 hover:text-rose-600 flex items-center justify-center transition-all">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+              </button>
+            </div>
+          </div>
+        `);
+      });
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
     }
 
     function sortInventory(list) {
@@ -697,43 +1235,18 @@
 
     async function batchRegisterDB() {
       if (state.staging.length === 0) return;
-      
-      const payload = `(function(){
-        var items = ${JSON.stringify(state.staging)};
-        var ss = SpreadsheetApp.openById(PropertiesService.getUserProperties().getProperty('SS_ID_RECIPE_APP'));
-        var s = ss.getSheetByName('食材在庫');
-        
-        items.forEach(function(d){
-          var newId = Utilities.getUuid();
-          var row = [newId, d.type || '食材', d.name, d.qty, d.unit, d.buy, d.open, d.limit1, d.limit2, d.loc, ''];
-          s.appendRow(row);
-        });
-
-        function f(v) { 
-          if(!v && v !== 0) return "";
-          if(v instanceof Date) return Utilities.formatDate(v, Session.getScriptTimeZone(), "yyyy-MM-dd");
-          return String(v).trim();
-        }
-        var inv = s.getDataRange().getValues();
-        var fullList = [];
-        for(var i=1; i<inv.length; i++) {
-          var r = inv[i];
-          if(!r[2]) continue;
-          fullList.push({
-            id: f(r[0]), type: f(r[1]), name: f(r[2]), qty: Number(r[3])||0, unit: f(r[4]),
-            buy: f(r[5]), open: f(r[6]), limit1: f(r[7]), limit2: f(r[8]), loc: f(r[9]), memo: f(r[10])
-          });
-        }
-        return { display: '在庫登録完了', detail: { inventory: fullList, count: items.length } };
-      })()`;
-
-      const res = await executeGAS(payload, `データベースに ${state.staging.length} 件を一括登録中...`);
-      if (res && res.detail) {
-        state.inventory = res.detail.inventory || [];
-        state.staging = [];
-        showToast(`${res.detail.count} 件の食材を在庫に登録し、同期しました。`, 'success');
-        filterByLocation('すべて');
-      }
+      const items = state.staging.map(item => ({
+        ...item,
+        id: createClientId('inv'),
+        memo: item.memo || ''
+      }));
+      items.forEach(item => {
+        state.inventory.push(item);
+        queueInventoryCreate(item);
+      });
+      state.staging = [];
+      showToast(`${items.length} 件の食材を在庫に追加しました。同期するまでスプシ未反映です。`, 'success');
+      filterByLocation('すべて');
     }
 
     async function batchCompleteFlow() {
@@ -798,6 +1311,207 @@
       const m = document.getElementById('itemModal');
       m.classList.add('opacity-0');
       setTimeout(() => m.classList.add('hidden'), 300);
+    }
+
+    /* --- Recipe Modal --- */
+    function openRecipeEditor(recipeId) {
+      const m = document.getElementById('recipeModal');
+      m.classList.remove('hidden');
+      setTimeout(() => m.classList.remove('opacity-0'), 10);
+      document.getElementById('recipeModalTitle').textContent = recipeId ? 'レシピを編集' : 'レシピを追加';
+      document.getElementById('btnRecipeSubmit').textContent = recipeId ? '更新' : '保存';
+      document.getElementById('r-id').value = recipeId || '';
+      if (recipeId) {
+        const recipe = state.recipes.find(r => r.id === recipeId);
+        if (recipe) {
+          document.getElementById('r-name').value = recipe.name || '';
+          document.getElementById('r-source').value = recipe.source || '';
+          renderIngredientInputs(recipe.ingredients);
+          renderStepInputs(recipe.steps);
+          state.recipeEditId = recipeId;
+          return;
+        }
+      }
+      document.getElementById('r-name').value = '';
+      document.getElementById('r-source').value = '';
+      renderIngredientInputs();
+      renderStepInputs();
+      state.recipeEditId = null;
+    }
+
+    function closeRecipeModal() {
+      const m = document.getElementById('recipeModal');
+      m.classList.add('opacity-0');
+      setTimeout(() => m.classList.add('hidden'), 300);
+    }
+
+    function renderIngredientInputs(ingredientsJson) {
+      const container = document.getElementById('ingredientList');
+      container.innerHTML = '';
+      let items = [];
+      try { items = JSON.parse(ingredientsJson || '[]'); } catch(e) { items = []; }
+      if (!Array.isArray(items) || items.length === 0) items = [{ name: '', amount: '', unit: '' }];
+      items.forEach((item, idx) => {
+        container.insertAdjacentHTML('beforeend', `
+          <div class="flex gap-2 items-center ingredient-row">
+            <input type="text" placeholder="品名" class="r-ing-name flex-1 bg-slate-50 border-2 border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-indigo-500" value="${escapeHtml(item.name || '')}">
+            <input type="text" placeholder="数量" class="r-ing-amount w-16 bg-slate-50 border-2 border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-indigo-500" value="${escapeHtml(String(item.amount || ''))}">
+            <input type="text" placeholder="単位" class="r-ing-unit w-16 bg-slate-50 border-2 border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-indigo-500" value="${escapeHtml(item.unit || '')}">
+            <button type="button" onclick="this.closest('.ingredient-row').remove()" class="w-9 h-9 rounded-xl bg-rose-50 text-rose-500 hover:bg-rose-100 flex items-center justify-center flex-shrink-0">×</button>
+          </div>
+        `);
+      });
+    }
+
+    function addIngredientRow() {
+      const container = document.getElementById('ingredientList');
+      container.insertAdjacentHTML('beforeend', `
+        <div class="flex gap-2 items-center ingredient-row">
+          <input type="text" placeholder="品名" class="r-ing-name flex-1 bg-slate-50 border-2 border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-indigo-500">
+          <input type="text" placeholder="数量" class="r-ing-amount w-16 bg-slate-50 border-2 border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-indigo-500">
+          <input type="text" placeholder="単位" class="r-ing-unit w-16 bg-slate-50 border-2 border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-indigo-500">
+          <button type="button" onclick="this.closest('.ingredient-row').remove()" class="w-9 h-9 rounded-xl bg-rose-50 text-rose-500 hover:bg-rose-100 flex items-center justify-center flex-shrink-0">×</button>
+        </div>
+      `);
+    }
+
+    function renderStepInputs(stepsJson) {
+      const container = document.getElementById('stepList');
+      container.innerHTML = '';
+      let items = [];
+      try { items = JSON.parse(stepsJson || '[]'); } catch(e) { items = []; }
+      if (!Array.isArray(items) || items.length === 0) items = [''];
+      items.forEach((step, idx) => {
+        container.insertAdjacentHTML('beforeend', `
+          <div class="flex gap-2 items-start step-row">
+            <span class="w-7 h-7 bg-indigo-100 text-indigo-600 rounded-lg flex items-center justify-center text-xs font-black flex-shrink-0 mt-1">${idx + 1}</span>
+            <textarea placeholder="手順を入力" class="r-step flex-1 bg-slate-50 border-2 border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-indigo-500 resize-none" rows="2">${escapeHtml(String(step || ''))}</textarea>
+            <button type="button" onclick="this.closest('.step-row').remove(); renumberSteps();" class="w-9 h-9 rounded-xl bg-rose-50 text-rose-500 hover:bg-rose-100 flex items-center justify-center flex-shrink-0 mt-1">×</button>
+          </div>
+        `);
+      });
+    }
+
+    function addStepRow() {
+      const container = document.getElementById('stepList');
+      const num = container.querySelectorAll('.step-row').length + 1;
+      container.insertAdjacentHTML('beforeend', `
+        <div class="flex gap-2 items-start step-row">
+          <span class="step-num w-7 h-7 bg-indigo-100 text-indigo-600 rounded-lg flex items-center justify-center text-xs font-black flex-shrink-0 mt-1">${num}</span>
+          <textarea placeholder="手順を入力" class="r-step flex-1 bg-slate-50 border-2 border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-indigo-500 resize-none" rows="2"></textarea>
+          <button type="button" onclick="this.closest('.step-row').remove(); renumberSteps();" class="w-9 h-9 rounded-xl bg-rose-50 text-rose-500 hover:bg-rose-100 flex items-center justify-center flex-shrink-0 mt-1">×</button>
+        </div>
+      `);
+    }
+
+    function renumberSteps() {
+      document.querySelectorAll('#stepList .step-num').forEach((el, i) => {
+        el.textContent = i + 1;
+      });
+    }
+
+    function getRecipeFormData() {
+      const name = document.getElementById('r-name').value.trim();
+      const source = document.getElementById('r-source').value.trim();
+      const ingredients = [];
+      document.querySelectorAll('#ingredientList .ingredient-row').forEach(row => {
+        const n = row.querySelector('.r-ing-name').value.trim();
+        const a = row.querySelector('.r-ing-amount').value.trim();
+        const u = row.querySelector('.r-ing-unit').value.trim();
+        if (n) ingredients.push({ name: n, amount: a || '', unit: u || '' });
+      });
+      const steps = [];
+      document.querySelectorAll('#stepList .r-step').forEach(ta => {
+        const s = ta.value.trim();
+        if (s) steps.push(s);
+      });
+      return { name, source, ingredients: JSON.stringify(ingredients), steps: JSON.stringify(steps) };
+    }
+
+    async function handleRecipeSave(e) {
+      e.preventDefault();
+      const data = getRecipeFormData();
+      if (!data.name) { showToast('レシピ名を入力してください。', 'error'); return; }
+      const recipeId = document.getElementById('r-id').value;
+      if (recipeId) {
+        await updateRecipe(recipeId, data);
+      } else {
+        await saveRecipe(data);
+      }
+      closeRecipeModal();
+    }
+
+    /* --- Recipe Text Modal --- */
+    function openRecipeTextModal() {
+      const m = document.getElementById('recipeTextModal');
+      m.classList.remove('hidden');
+      setTimeout(() => m.classList.remove('opacity-0'), 10);
+      document.getElementById('r-text-input').value = '';
+    }
+
+    function closeRecipeTextModal() {
+      const m = document.getElementById('recipeTextModal');
+      m.classList.add('opacity-0');
+      setTimeout(() => m.classList.add('hidden'), 300);
+    }
+
+    async function parseRecipeTextWithAI() {
+      const text = document.getElementById('r-text-input').value.trim();
+      if (!text) { showToast('テキストを入力してください。', 'error'); return; }
+      setStatus(true, 'AIがレシピを解析中...<br><span class="text-[10px] font-bold opacity-50 uppercase tracking-widest">Recipe Structuring</span>');
+      const prompt = `あなたはレシピ構造化アシスタントです。以下のレシピテキストから、レシピ名・材料一覧・手順リストを抽出し、以下の厳密なJSON形式で出力してください。
+
+出力形式:
+{
+  "name": "レシピ名",
+  "ingredients": [
+    {"name": "材料名", "amount": "数量", "unit": "単位"},
+    ...
+  ],
+  "steps": [
+    "手順1",
+    "手順2",
+    ...
+  ]
+}
+
+注意事項:
+- amount は文字列として出力（数値と単位が混在する場合があるため）
+- 材料がない場合は空配列、手順がない場合は空配列
+- JSON以外の説明文は一切出力しないでください
+- レシピ名が不明確な場合は「不明なレシピ」とする
+
+テキスト:
+${text}`;
+      try {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { responseMimeType: 'application/json' }
+          })
+        });
+        if (!res.ok) {
+          let errMsg = `APIエラー: ${res.status}`;
+          try { const errData = await res.json(); if(errData.error&&errData.error.message) errMsg += '\n'+errData.error.message; } catch(e){}
+          throw new Error(errMsg);
+        }
+        const data = await res.json();
+        const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        const parsed = JSON.parse(raw);
+        closeRecipeTextModal();
+        openRecipeEditor();
+        document.getElementById('r-name').value = parsed.name || '';
+        renderIngredientInputs(JSON.stringify(parsed.ingredients || []));
+        renderStepInputs(JSON.stringify(parsed.steps || []));
+        setStatus(false);
+        showToast('レシピを構造化しました。内容を確認・修正してください。', 'success');
+      } catch (err) {
+        console.error('[RecipeAI] error:', err);
+        setStatus(false);
+        showToast('レシピの解析中にエラーが発生しました。' + (err.message || ''), 'error');
+      }
     }
 
     async function handleStagingSave(e) {
@@ -875,66 +1589,46 @@
 
     async function executeBulkPurchase(items, decision) {
       const ids = items.map(i => i.id);
-      const payload = `(function(){
-        var ids = ${JSON.stringify(ids)};
-        var decision = ${JSON.stringify(decision)};
-        var ss = SpreadsheetApp.openById(PropertiesService.getUserProperties().getProperty('SS_ID_RECIPE_APP'));
-        var sShop = ss.getSheetByName('買い物リスト');
-        var sStock = ss.getSheetByName('食材在庫');
-        var today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
-        var shopData = sShop.getDataRange().getValues();
-        var stockData = sStock.getDataRange().getValues();
-        var mergeNames = [];
-        var newNames = [];
-        for(var i=1; i<shopData.length; i++) {
-          if(ids.indexOf(String(shopData[i][0])) !== -1) {
-            sShop.getRange(i+1, 5).setValue('購入済');
-            var found = false;
-            if(decision === 'merge') {
-              for(var j=1; j<stockData.length; j++) {
-                if(String(stockData[j][2]) === String(shopData[i][1]) && String(stockData[j][4]) === String(shopData[i][3])) {
-                  var currentQty = Number(stockData[j][3]) || 0;
-                  var addQty = Number(shopData[i][2]) || 0;
-                  sStock.getRange(j+1, 4).setValue(currentQty + addQty);
-                  sStock.getRange(j+1, 6).setValue(today);
-                  mergeNames.push(String(shopData[i][1]) + ' (' + currentQty + '+' + addQty + ')');
-                  found = true;
-                  break;
-                }
-              }
-            }
-            if(!found) {
-              var row = [Utilities.getUuid(), '食材', shopData[i][1], shopData[i][2], shopData[i][3], today, '', '', '', '冷蔵庫', '買い物より移行'];
-              sStock.appendRow(row);
-              newNames.push(String(shopData[i][1]));
-            }
-          }
+      const today = new Date().toISOString().split('T')[0];
+      const mergeNames = [];
+      const newNames = [];
+      items.forEach(item => {
+        let found = null;
+        if (decision === 'merge') {
+          found = state.inventory.find(inv => inv.name === item.name && inv.unit === item.unit);
         }
-        function f(v) {
-          if(!v && v !== 0) return "";
-          if(v instanceof Date) return Utilities.formatDate(v, Session.getScriptTimeZone(), "yyyy-MM-dd");
-          return String(v).trim();
+        if (found) {
+          const currentQty = Number(found.qty) || 0;
+          const addQty = Number(item.qty) || 0;
+          found.qty = currentQty + addQty;
+          found.buy = today;
+          found._syncStatus = found._syncStatus || 'updated';
+          mergeNames.push(`${item.name} (${currentQty}+${addQty})`);
+        } else {
+          const created = {
+            id: createClientId('inv'),
+            type: '食材',
+            name: item.name,
+            qty: Number(item.qty) || 0,
+            unit: item.unit || '',
+            buy: today,
+            open: '',
+            limit1: '',
+            limit2: '',
+            loc: '冷蔵庫',
+            memo: '買い物より移行',
+            _syncStatus: 'created'
+          };
+          state.inventory.push(created);
+          newNames.push(item.name);
         }
-        var inv = sStock.getDataRange().getValues();
-        var fullList = [];
-        for(var i=1; i<inv.length; i++) {
-          var r = inv[i];
-          if(!r[2]) continue;
-          fullList.push({
-            id: f(r[0]), type: f(r[1]), name: f(r[2]), qty: Number(r[3])||0, unit: f(r[4]),
-            buy: f(r[5]), open: f(r[6]), limit1: f(r[7]), limit2: f(r[8]), loc: f(r[9]), memo: f(r[10])
-          });
-        }
-        return { display: '購入処理完了', detail: { inventory: fullList, purchasedIds: ids, mergeNames: mergeNames, newNames: newNames } };
-      })()`;
-      const res = await executeGAS(payload, 'データベースに反映中...');
-      if (res && res.detail) {
-        state.shopping = (state.shopping || []).filter(i => !res.detail.purchasedIds.includes(i.id));
-        state.inventory = res.detail.inventory || [];
-        filterByLocation('すべて');
-        if (res.detail.mergeNames.length > 0) showToast('加算: ' + res.detail.mergeNames.join('、'), 'info');
-        if (res.detail.newNames.length > 0) showToast('新規: ' + res.detail.newNames.join('、'), 'success');
-      }
+      });
+      state.shopping = (state.shopping || []).filter(i => !ids.includes(i.id));
+      state.pendingSync.shoppingPurchases.push({ ids, decision });
+      updateSyncBar();
+      filterByLocation('すべて');
+      if (mergeNames.length > 0) showToast('加算予定: ' + mergeNames.join('、'), 'info');
+      if (newNames.length > 0) showToast('新規追加予定: ' + newNames.join('、'), 'success');
     }
 
     async function bulkPurchase() {
@@ -959,161 +1653,32 @@
         showToast(`${item.name} の数量が0になったため削除しました`, 'info');
         return;
       }
-
-      const payload = `(function(){
-        var id = ${JSON.stringify(id)};
-        var newQty = ${newQty};
-        var ss = SpreadsheetApp.openById(PropertiesService.getUserProperties().getProperty('SS_ID_RECIPE_APP'));
-        var s = ss.getSheetByName('食材在庫');
-        var data = s.getDataRange().getValues();
-        for(var i=1; i<data.length; i++) {
-          if(String(data[i][0]) === id) {
-            s.getRange(i+1, 4).setValue(newQty);
-            break;
-          }
-        }
-        function f(v) { 
-          if(!v && v !== 0) return "";
-          if(v instanceof Date) return Utilities.formatDate(v, Session.getScriptTimeZone(), "yyyy-MM-dd");
-          return String(v).trim();
-        }
-        var inv = s.getDataRange().getValues();
-        var fullList = [];
-        for(var i=1; i<inv.length; i++) {
-          var r = inv[i];
-          if(!r[2]) continue;
-          fullList.push({
-            id: f(r[0]), type: f(r[1]), name: f(r[2]), qty: Number(r[3])||0, unit: f(r[4]),
-            buy: f(r[5]), open: f(r[6]), limit1: f(r[7]), limit2: f(r[8]), loc: f(r[9]), memo: f(r[10])
-          });
-        }
-        return { display: '数量更新完了', detail: { inventory: fullList } };
-      })()`;
-      const res = await executeGAS(payload, '数量を更新中...');
-      if (res && res.detail) {
-        state.inventory = res.detail.inventory || [];
-        renderList();
-      }
+      item.qty = newQty;
+      queueInventoryUpdate(id, item);
+      renderList();
     }
 
     async function updateInventoryItem(id, item) {
-      const payload = `(function(){
-        var id = ${JSON.stringify(id)};
-        var updates = ${JSON.stringify(item)};
-        var ss = SpreadsheetApp.openById(PropertiesService.getUserProperties().getProperty('SS_ID_RECIPE_APP'));
-        var s = ss.getSheetByName('食材在庫');
-        var data = s.getDataRange().getValues();
-        for(var i=1; i<data.length; i++) {
-          if(String(data[i][0]) === id) {
-            s.getRange(i+1, 2).setValue(updates.type || '食材');
-            s.getRange(i+1, 3).setValue(updates.name);
-            s.getRange(i+1, 4).setValue(updates.qty);
-            s.getRange(i+1, 5).setValue(updates.unit);
-            s.getRange(i+1, 6).setValue(updates.buy || '');
-            s.getRange(i+1, 7).setValue(updates.open || '');
-            s.getRange(i+1, 8).setValue(updates.limit1 || '');
-            s.getRange(i+1, 9).setValue(updates.limit2 || '');
-            s.getRange(i+1, 10).setValue(updates.loc);
-            s.getRange(i+1, 11).setValue(updates.memo || '');
-            break;
-          }
-        }
-        function f(v) { 
-          if(!v && v !== 0) return "";
-          if(v instanceof Date) return Utilities.formatDate(v, Session.getScriptTimeZone(), "yyyy-MM-dd");
-          return String(v).trim();
-        }
-        var inv = s.getDataRange().getValues();
-        var fullList = [];
-        for(var i=1; i<inv.length; i++) {
-          var r = inv[i];
-          if(!r[2]) continue;
-          fullList.push({
-            id: f(r[0]), type: f(r[1]), name: f(r[2]), qty: Number(r[3])||0, unit: f(r[4]),
-            buy: f(r[5]), open: f(r[6]), limit1: f(r[7]), limit2: f(r[8]), loc: f(r[9]), memo: f(r[10])
-          });
-        }
-        return { display: '更新完了', detail: { inventory: fullList } };
-      })()`;
-      const res = await executeGAS(payload, '在庫情報を更新中...');
-      if (res && res.detail) {
-        state.inventory = res.detail.inventory || [];
-        renderList();
-      }
+      const current = state.inventory.find(i => i.id === id);
+      if (!current) return;
+      Object.assign(current, item);
+      queueInventoryUpdate(id, current);
+      renderList();
+      showToast('在庫の変更を保留しました。同期するまでスプシ未反映です。', 'info');
     }
 
     async function deleteInventoryItem(id) {
-      const payload = `(function(){
-        var id = ${JSON.stringify(id)};
-        var ss = SpreadsheetApp.openById(PropertiesService.getUserProperties().getProperty('SS_ID_RECIPE_APP'));
-        var s = ss.getSheetByName('食材在庫');
-        var data = s.getDataRange().getValues();
-        for(var i=1; i<data.length; i++) {
-          if(String(data[i][0]) === id) {
-            s.deleteRow(i+1);
-            break;
-          }
-        }
-        function f(v) { 
-          if(!v && v !== 0) return "";
-          if(v instanceof Date) return Utilities.formatDate(v, Session.getScriptTimeZone(), "yyyy-MM-dd");
-          return String(v).trim();
-        }
-        var inv = s.getDataRange().getValues();
-        var fullList = [];
-        for(var i=1; i<inv.length; i++) {
-          var r = inv[i];
-          if(!r[2]) continue;
-          fullList.push({
-            id: f(r[0]), type: f(r[1]), name: f(r[2]), qty: Number(r[3])||0, unit: f(r[4]),
-            buy: f(r[5]), open: f(r[6]), limit1: f(r[7]), limit2: f(r[8]), loc: f(r[9]), memo: f(r[10])
-          });
-        }
-        return { display: '削除完了', detail: { inventory: fullList } };
-      })()`;
-      const res = await executeGAS(payload, '在庫から削除中...');
-      if (res && res.detail) {
-        state.inventory = res.detail.inventory || [];
-        renderList();
-      }
+      queueInventoryDelete(id);
+      renderList();
+      showToast('在庫削除を保留しました。同期するまでスプシ未反映です。', 'info');
     }
 
     async function batchDeleteInventory() {
       const checked = Array.from(document.querySelectorAll('.inv-cb:checked')).map(el => el.dataset.id);
       if (checked.length === 0) { showToast('削除する項目を選択してください。', 'error'); return; }
-      const payload = `(function(){
-        var ids = ${JSON.stringify(checked)};
-        var ss = SpreadsheetApp.openById(PropertiesService.getUserProperties().getProperty('SS_ID_RECIPE_APP'));
-        var s = ss.getSheetByName('食材在庫');
-        var data = s.getDataRange().getValues();
-        for(var i=data.length-1; i>=1; i--) {
-          if(ids.indexOf(String(data[i][0])) !== -1) {
-            s.deleteRow(i+1);
-          }
-        }
-        function f(v) {
-          if(!v && v !== 0) return "";
-          if(v instanceof Date) return Utilities.formatDate(v, Session.getScriptTimeZone(), "yyyy-MM-dd");
-          return String(v).trim();
-        }
-        var inv = s.getDataRange().getValues();
-        var fullList = [];
-        for(var i=1; i<inv.length; i++) {
-          var r = inv[i];
-          if(!r[2]) continue;
-          fullList.push({
-            id: f(r[0]), type: f(r[1]), name: f(r[2]), qty: Number(r[3])||0, unit: f(r[4]),
-            buy: f(r[5]), open: f(r[6]), limit1: f(r[7]), limit2: f(r[8]), loc: f(r[9]), memo: f(r[10])
-          });
-        }
-        return { display: '一括削除完了', detail: { inventory: fullList, deletedCount: ids.length } };
-      })()`;
-      const res = await executeGAS(payload, `${checked.length} 件を在庫から一括削除中...`);
-      if (res && res.detail) {
-        state.inventory = res.detail.inventory || [];
-        renderList();
-        showToast(`${res.detail.deletedCount} 件の食材を削除しました。`, 'success');
-      }
+      checked.forEach(id => queueInventoryDelete(id));
+      renderList();
+      showToast(`${checked.length} 件の削除を保留しました。同期するまでスプシ未反映です。`, 'success');
     }
 
     async function handleImageScan(e) {
@@ -1243,8 +1808,40 @@
       }
     }
 
+    /* --- Recipe GAS Operations --- */
+    async function saveRecipe(data) {
+      const recipe = {
+        id: createClientId('recipe'),
+        name: data.name,
+        ingredients: data.ingredients,
+        steps: data.steps,
+        source: data.source,
+        count: 0,
+        history: '[]'
+      };
+      state.recipes.push(recipe);
+      queueRecipeCreate(recipe);
+      renderRecipeList();
+      showToast('レシピ保存を保留しました。同期するまでスプシ未反映です。', 'success');
+    }
+
+    async function updateRecipe(id, data) {
+      const recipe = state.recipes.find(r => r.id === id);
+      if (!recipe) return;
+      Object.assign(recipe, data);
+      queueRecipeUpdate(id, recipe);
+      renderRecipeList();
+      showToast('レシピ更新を保留しました。同期するまでスプシ未反映です。', 'info');
+    }
+
+    async function deleteRecipe(id) {
+      queueRecipeDelete(id);
+      renderRecipeList();
+      showToast('レシピ削除を保留しました。同期するまでスプシ未反映です。', 'info');
+    }
+
     function majinCopy() {
-      const data = { inventory: state.inventory, staging: state.staging };
+      const data = { inventory: state.inventory, staging: state.staging, recipes: state.recipes, pendingSync: state.pendingSync };
       const t = document.createElement('textarea');
       t.value = "【Majin Agent 実行結果】\nID: " + convId + "\n---\n" + JSON.stringify(data, null, 2) + "\n---";
       document.body.append(t); t.select(); document.execCommand('copy'); t.remove();

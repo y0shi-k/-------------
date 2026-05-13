@@ -8,6 +8,7 @@
 
 - 既存機能を壊さない。正本と生成物の境界を守る。
 - 実装前は `project-os/tickets/TKT-*` を確認し、`spec_ready` + `implementation_ready` が揃うまで実装に入らない。
+- スプレッドシートへの書き込み・更新・削除は、初期化を除き必ず `state.pendingSync` + `syncPendingChanges()` の手動一括同期に載せる。操作ごとの即時GAS通信は禁止。
 - 変更後は verify を実行する。完了報告は `project-os/artifacts/TKT-xxxx/` に残す。
 
 ## プロジェクト概要
@@ -32,6 +33,7 @@ python3 -c "import html.parser; html.parser.HTMLParser().feed(open('app.html').r
 - `alert(` / `confirm(` / `prompt(` が残存していないか
 - `showToast` 関数が存在するか
 - `GEMINI_API_KEY` の空チェックバリデーションがないか
+- スプシ書き込み系の新規コードが `syncPendingChanges()` 以外で個別 `executeGAS(payload...)` していないか
 - 新規追加コードが既存パターンを再利用して肥大化していないか
 
 ## 詳細はこちら

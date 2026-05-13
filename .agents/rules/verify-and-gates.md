@@ -15,6 +15,8 @@
 - 生成物 drift の未解消
 - HTML構文エラー
 - `executeGAS` または `GAS_URL` の消失
+- 初期読込/承認/`syncPendingChanges()` 以外で、スプシ書き込み・更新・削除を個別 `executeGAS(payload...)` している
+- スプシ書き込み系の新規UIに未同期状態表示または手動同期導線がない
 - 必須 policy check 失敗
 - 監査が必要な変更で監査未実施または失敗
 
@@ -34,3 +36,9 @@
 - `manual_smokes_done` は `project-os/artifacts/TKT-xxxx/manual-smokes.md` が存在し、status と必須 section を満たすまで閉じない
 - `review_ready` は `project-os/artifacts/TKT-xxxx/review.md` が存在し、`checked_diff_paths` が ticket.changed_paths と対応するまで閉じない
 - `report_ready` は `project-os/artifacts/TKT-xxxx/report.md` が存在し、status が `ready` になるまで閉じない
+
+## スプシ同期 policy check
+- Google Spreadsheet の追加・更新・削除を含む変更では、`required_evals` に `manual_bulk_sync_policy` を含める
+- `rg -n 'executeGAS\\(payload' app.html` で、書き込み系の個別通信が増えていないことを確認する
+- `rg -n 'appendRow|deleteRow|setValue|setValues|SpreadsheetApp' app.html` で、書き込みGASが `handleInit()` または `syncPendingChanges()` に収まっていることを確認する
+- manual smoke では `manual_bulk_sync` を実施し、操作直後はスプシ未反映、同期ボタン後に反映されることを確認する
