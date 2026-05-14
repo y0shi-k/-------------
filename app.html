@@ -202,12 +202,38 @@
 
         <!-- AI考案タブ -->
         <div id="bTabAi" class="hidden">
-          <div class="flex flex-col items-center justify-center min-h-[40vh] p-6 text-center">
-            <div class="w-16 h-16 bg-indigo-100 rounded-3xl flex items-center justify-center mb-4">
-              <span class="text-3xl">🧠</span>
+          <div class="space-y-4">
+            <!-- 選択済み食材タグエリア -->
+            <div id="aiSelectedTags" class="hidden">
+              <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
+                <div class="flex justify-between items-center mb-2">
+                  <p class="text-[11px] font-black text-slate-400 uppercase tracking-widest">選択した食材</p>
+                  <button onclick="clearAiSelection()" class="text-[11px] font-black text-rose-500 hover:text-rose-600">すべて解除</button>
+                </div>
+                <div id="aiSelectedTagsList" class="flex flex-wrap gap-2">
+                  <!-- JSで動的に挿入 -->
+                </div>
+              </div>
             </div>
-            <h3 class="text-xl font-black text-slate-700 mb-2">AIレシピ考案</h3>
-            <p class="text-sm text-slate-400">TKT-0005 で実装予定</p>
+
+            <div class="flex gap-3">
+              <button onclick="generatePriorityRecipe()" class="flex-1 bg-rose-500 text-white font-black py-4 rounded-2xl shadow-lg hover:bg-rose-600 active:scale-95 transition-all flex items-center justify-center gap-2">
+                <span>🚨</span> 優先消費レシピ
+              </button>
+              <button onclick="openAiIngredientSelector()" class="flex-1 bg-indigo-600 text-white font-black py-4 rounded-2xl shadow-lg hover:bg-indigo-700 active:scale-95 transition-all flex items-center justify-center gap-2">
+                <span>🎯</span> 指定食材から
+              </button>
+            </div>
+
+            <!-- 期限が近い食材プレビュー -->
+            <div id="aiPriorityPreview" class="hidden">
+              <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
+                <p class="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">期限が近い食材（3日以内）</p>
+                <div id="aiPriorityPreviewList" class="space-y-2">
+                  <!-- JSで動的に挿入 -->
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -395,6 +421,108 @@
         <button onclick="parseRecipeTextWithAI()" class="w-full bg-indigo-600 text-white font-black py-4 rounded-2xl shadow-lg hover:bg-indigo-700 active:scale-95 transition-all flex items-center justify-center gap-2">
           <span>🧠</span> AIで構造化
         </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- モーダル: AIレシピ相談 -->
+  <div id="aiRequestModal" onclick="if(event.target===this) closeAiRequestModal()" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
+    <div onclick="event.stopPropagation()" class="bg-white w-full max-w-lg rounded-[2.5rem] p-6 shadow-2xl transform scale-95 transition-transform duration-300 border border-slate-100 max-h-[90vh] overflow-y-auto">
+      <div class="flex justify-between items-center mb-5">
+        <h3 id="aiRequestTitle" class="text-2xl font-black text-slate-800 tracking-tight">レシピのリクエスト</h3>
+        <button onclick="closeAiRequestModal()" class="text-slate-300 hover:text-slate-600 bg-slate-100 p-2 rounded-full"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+      </div>
+
+      <!-- 画面A: 要望入力 -->
+      <div id="aiRequestInputView" class="space-y-4">
+        <div>
+          <p class="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">使う食材</p>
+          <div id="aiRequestItems" class="flex flex-wrap gap-2">
+            <!-- JSで動的に挿入 -->
+          </div>
+        </div>
+        <div>
+          <div class="flex justify-between items-center mb-1.5">
+            <label class="text-[11px] font-black text-slate-400 uppercase ml-1">AI提案プロンプト（編集できます）</label>
+            <button onclick="resetAiPromptToDefault()" class="text-[10px] font-black text-indigo-600 hover:text-indigo-700">提案に戻す</button>
+          </div>
+          <textarea id="aiPromptEdit" rows="10" class="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-4 py-3 text-xs font-bold outline-none focus:border-indigo-500 resize-none font-mono leading-relaxed" placeholder="プロンプトが表示されます..."></textarea>
+          <p class="text-[10px] text-slate-400 font-bold mt-1 ml-1">※このプロンプトを直接編集するか、下に追加の要望を書いてください。</p>
+        </div>
+        <div class="border-t border-slate-100 pt-4">
+          <label class="block text-[11px] font-black text-slate-400 uppercase mb-1.5 ml-1">追加の要望（任意）</label>
+          <textarea id="aiRequestTextarea" rows="3" class="w-full bg-white border-2 border-slate-200 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:border-indigo-500 resize-none" placeholder="例: 子供向けに、卵は半熟で、パスタにしてほしい..."></textarea>
+          <p class="text-[10px] text-slate-400 font-bold mt-1 ml-1">※ここに書いた内容は、上のプロンプトに追加されます。</p>
+        </div>
+        <button onclick="consultAiRecipe()" class="w-full bg-indigo-600 text-white font-black py-4 rounded-2xl shadow-lg hover:bg-indigo-700 active:scale-95 transition-all flex items-center justify-center gap-2">
+          <span>🧠</span> AIに相談する
+        </button>
+      </div>
+
+      <!-- 画面B: 方針確認 -->
+      <div id="aiRequestConfirmView" class="hidden space-y-5">
+        <div class="bg-indigo-50 rounded-2xl p-5 border border-indigo-100">
+          <p class="text-[11px] font-black text-indigo-400 uppercase tracking-widest mb-2">AIの提案方針</p>
+          <p id="aiRequestPlanText" class="text-sm font-bold text-slate-700 leading-relaxed"></p>
+        </div>
+        <div class="flex gap-3">
+          <button onclick="backToAiRequestInput()" class="flex-1 bg-slate-100 text-slate-600 font-black py-4 rounded-2xl hover:bg-slate-200 transition-all">要望を変える</button>
+          <button onclick="generateAiRecipeFromPlan()" class="flex-[2] bg-indigo-600 text-white font-black py-4 rounded-2xl hover:bg-indigo-700 transition-all shadow-xl">この方針でレシピを生成</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- モーダル: AI食材選択 -->
+  <div id="aiIngredientSelectModal" onclick="if(event.target===this) closeAiIngredientModal()" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
+    <div onclick="event.stopPropagation()" class="bg-white w-full max-w-lg rounded-[2.5rem] p-6 shadow-2xl transform scale-95 transition-transform duration-300 border border-slate-100 max-h-[85vh] overflow-y-auto">
+      <div class="flex justify-between items-center mb-5">
+        <h3 class="text-2xl font-black text-slate-800 tracking-tight">食材を選択</h3>
+        <button onclick="closeAiIngredientModal()" class="text-slate-300 hover:text-slate-600 bg-slate-100 p-2 rounded-full"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+      </div>
+      <div id="aiIngredientList" class="space-y-2 max-h-[50vh] overflow-y-auto">
+        <!-- JSで動的に挿入 -->
+      </div>
+      <div class="pt-4 flex gap-3 mt-2 border-t border-slate-100">
+        <button onclick="closeAiIngredientModal()" class="flex-1 bg-slate-100 text-slate-600 font-black py-4 rounded-2xl hover:bg-slate-200 transition-all">キャンセル</button>
+        <button onclick="generateSelectedRecipe()" class="flex-[2] bg-indigo-600 text-white font-black py-4 rounded-2xl hover:bg-indigo-700 transition-all shadow-xl">レシピを考案</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- モーダル: AIレシピプレビュー -->
+  <div id="aiRecipePreviewModal" onclick="if(event.target===this) closeAiPreviewModal()" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
+    <div onclick="event.stopPropagation()" class="bg-white w-full max-w-lg rounded-[2.5rem] p-6 shadow-2xl transform scale-95 transition-transform duration-300 border border-slate-100 max-h-[90vh] overflow-y-auto">
+      <div class="flex justify-between items-center mb-5">
+        <h3 class="text-2xl font-black text-slate-800 tracking-tight">生成されたレシピ</h3>
+        <button onclick="closeAiPreviewModal()" class="text-slate-300 hover:text-slate-600 bg-slate-100 p-2 rounded-full"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+      </div>
+      <div class="space-y-5">
+        <div>
+          <p class="text-[11px] font-black text-slate-400 uppercase mb-1.5 ml-1">レシピ名</p>
+          <h4 id="aiPreviewName" class="text-xl font-black text-slate-800"></h4>
+        </div>
+        <div>
+          <div class="flex justify-between items-center mb-2">
+            <p class="text-[11px] font-black text-slate-400 uppercase ml-1">材料</p>
+          </div>
+          <ul id="aiPreviewIngredients" class="space-y-2 bg-slate-50 rounded-2xl p-4">
+            <!-- JSで動的に挿入 -->
+          </ul>
+        </div>
+        <div>
+          <div class="flex justify-between items-center mb-2">
+            <p class="text-[11px] font-black text-slate-400 uppercase ml-1">手順</p>
+          </div>
+          <ol id="aiPreviewSteps" class="space-y-3 bg-slate-50 rounded-2xl p-4 list-decimal list-inside">
+            <!-- JSで動的に挿入 -->
+          </ol>
+        </div>
+      </div>
+      <div class="pt-4 flex gap-3 mt-2 border-t border-slate-100">
+        <button onclick="closeAiPreviewModal()" class="flex-1 bg-slate-100 text-slate-600 font-black py-4 rounded-2xl hover:bg-slate-200 transition-all">キャンセル</button>
+        <button onclick="regenerateAiRecipe()" class="flex-1 bg-indigo-100 text-indigo-700 font-black py-4 rounded-2xl hover:bg-indigo-200 transition-all">再生成</button>
+        <button onclick="saveAiRecipeToCollection()" class="flex-[2] bg-emerald-500 text-white font-black py-4 rounded-2xl hover:bg-emerald-600 transition-all shadow-xl">レシピ集に保存</button>
       </div>
     </div>
   </div>
@@ -1124,6 +1252,375 @@
         btn.className = `b-tab ${isActive ? 'active bg-white text-indigo-600 shadow-sm border border-indigo-100' : 'bg-slate-100 text-slate-500'} px-5 py-2.5 rounded-xl text-sm font-black whitespace-nowrap snap-start transition-all`;
       });
       if (tab === 'recipes') renderRecipeList();
+      if (tab === 'ai') renderAiTab();
+    }
+
+    /* --- AI Recipe Suggestion --- */
+    function getExpiringItems() {
+      const today = new Date();
+      today.setHours(0,0,0,0);
+      return state.inventory.filter(item => {
+        const limit = item.limit2 || item.limit1;
+        if (!limit) return false;
+        const limitDate = new Date(limit);
+        limitDate.setHours(0,0,0,0);
+        const diff = (limitDate - today) / (1000 * 60 * 60 * 24);
+        return diff <= 3;
+      });
+    }
+
+    function renderAiTab() {
+      const expiring = getExpiringItems();
+      const previewContainer = document.getElementById('aiPriorityPreview');
+      const previewList = document.getElementById('aiPriorityPreviewList');
+      if (expiring.length > 0) {
+        previewContainer.classList.remove('hidden');
+        previewList.innerHTML = '';
+        expiring.forEach(item => {
+          const limit = item.limit2 || item.limit1;
+          let badge = '';
+          if (limit) {
+            const today = new Date(); today.setHours(0,0,0,0);
+            const ld = new Date(limit); ld.setHours(0,0,0,0);
+            const diff = (ld - today) / (1000*60*60*24);
+            if (diff < 0) badge = '<span class="text-[10px] font-black text-rose-500 bg-rose-100 px-2 py-0.5 rounded-full">期限切れ</span>';
+            else if (diff <= 3) badge = `<span class="text-[10px] font-black text-amber-600 bg-amber-100 px-2 py-0.5 rounded-full">あと${diff}日</span>`;
+          }
+          previewList.insertAdjacentHTML('beforeend', `
+            <div class="flex items-center justify-between bg-slate-50 rounded-xl p-2">
+              <div class="flex items-center gap-2">
+                <span class="font-bold text-sm text-slate-700">${escapeHtml(item.name)}</span>
+                <span class="text-[10px] text-slate-400 font-bold">${item.qty}${item.unit}</span>
+              </div>
+              ${badge}
+            </div>
+          `);
+        });
+      } else {
+        previewContainer.classList.add('hidden');
+      }
+    }
+
+    async function generatePriorityRecipe() {
+      const items = getExpiringItems();
+      if (items.length === 0) {
+        showToast('期限が近い食材がありません。', 'info');
+        return;
+      }
+      openAiRequestModal(items, 'priority');
+    }
+
+    function openAiIngredientSelector() {
+      const m = document.getElementById('aiIngredientSelectModal');
+      m.classList.remove('hidden');
+      setTimeout(() => m.classList.remove('opacity-0'), 10);
+      renderAiIngredientList();
+    }
+
+    function closeAiIngredientModal() {
+      const m = document.getElementById('aiIngredientSelectModal');
+      m.classList.add('opacity-0');
+      setTimeout(() => m.classList.add('hidden'), 300);
+    }
+
+    function renderAiIngredientList() {
+      const container = document.getElementById('aiIngredientList');
+      if (!container) return;
+      container.innerHTML = '';
+      if (state.inventory.length === 0) {
+        container.innerHTML = '<div class="py-10 text-center text-slate-300 font-bold">在庫がありません。</div>';
+        return;
+      }
+      const sorted = [...state.inventory].sort((a, b) => {
+        const la = (a.limit2 || a.limit1) || '';
+        const lb = (b.limit2 || b.limit1) || '';
+        return la.localeCompare(lb);
+      });
+      sorted.forEach(item => {
+        const limit = item.limit2 || item.limit1;
+        let limitText = limit ? `期限: ${limit}` : '期限: 未設定';
+        let rowClass = 'border-slate-100';
+        if (limit) {
+          const today = new Date(); today.setHours(0,0,0,0);
+          const ld = new Date(limit); ld.setHours(0,0,0,0);
+          const diff = (ld - today) / (1000*60*60*24);
+          if (diff < 0) { rowClass = 'border-rose-200 bg-rose-50'; limitText += ' (期限切れ)'; }
+          else if (diff <= 3) { rowClass = 'border-amber-200 bg-amber-50'; limitText += ' (あと' + diff + '日)'; }
+        }
+        container.insertAdjacentHTML('beforeend', `
+          <div class="bg-white p-3 rounded-xl shadow-sm border ${rowClass} flex items-center gap-3 cursor-pointer" onclick="this.querySelector('.ai-ing-cb').click()">
+            <input type="checkbox" class="ai-ing-cb w-5 h-5 rounded border-slate-300 text-indigo-500 focus:ring-indigo-400 shrink-0" data-id="${item.id}" onclick="event.stopPropagation()" onchange="updateAiSelectedTags()">
+            <div class="flex-1 min-w-0">
+              <div class="font-bold text-slate-800 text-sm truncate">${escapeHtml(item.name)}</div>
+              <div class="text-[10px] text-slate-400 font-bold">${item.qty}${item.unit} · ${escapeHtml(item.loc)} · ${limitText}</div>
+            </div>
+          </div>
+        `);
+      });
+    }
+
+    async function generateSelectedRecipe() {
+      const selectedIds = Array.from(document.querySelectorAll('.ai-ing-cb:checked')).map(cb => cb.dataset.id);
+      if (selectedIds.length === 0) {
+        showToast('食材を1つ以上選択してください。', 'error');
+        return;
+      }
+      const items = state.inventory.filter(i => selectedIds.indexOf(i.id) !== -1);
+      closeAiIngredientModal();
+      openAiRequestModal(items, 'selected');
+    }
+
+    function buildAiPrompt(mode, items) {
+      const names = items.map(i => i.name);
+      const header = mode === 'priority'
+        ? '以下の食材を優先的に使うレシピを1つ提案してください。'
+        : '以下の食材を必須材料として含むレシピを1つ提案してください。';
+      const listLabel = mode === 'priority' ? '期限が近い食材' : '指定食材';
+      return `${header}
+${listLabel}:
+${names.map(n => `- ${n}`).join('\n')}
+
+※調理に必要な分量だけ使ってください。在庫をすべて使い切る必要はありません。
+
+他に必要な材料も含めて、以下の厳密なJSON形式で出力してください。
+{
+  "name": "レシピ名",
+  "ingredients": [
+    {"name": "材料名", "amount": "数量", "unit": "単位"},
+    ...
+  ],
+  "steps": [
+    "手順1",
+    "手順2",
+    ...
+  ]
+}
+注意:
+- amount は文字列として出力（数値と単位が混在する場合があるため）
+- 材料がない場合は空配列、手順がない場合は空配列
+- JSON以外の説明文は一切出力しないでください`;
+    }
+
+    function openAiRequestModal(items, mode) {
+      const m = document.getElementById('aiRequestModal');
+      m.classList.remove('hidden');
+      setTimeout(() => m.classList.remove('opacity-0'), 10);
+      document.getElementById('aiRequestTitle').textContent = mode === 'priority' ? '優先消費レシピのリクエスト' : '指定食材レシピのリクエスト';
+      const itemsContainer = document.getElementById('aiRequestItems');
+      itemsContainer.innerHTML = '';
+      items.forEach(item => {
+        itemsContainer.insertAdjacentHTML('beforeend', `
+          <span class="inline-flex items-center bg-white border border-slate-200 text-slate-700 text-xs font-bold px-3 py-2 rounded-full shadow-sm">
+            ${escapeHtml(item.name)}
+          </span>
+        `);
+      });
+      const defaultPrompt = buildAiPrompt(mode, items);
+      document.getElementById('aiPromptEdit').value = defaultPrompt;
+      document.getElementById('aiRequestTextarea').value = '';
+      document.getElementById('aiRequestInputView').classList.remove('hidden');
+      document.getElementById('aiRequestConfirmView').classList.add('hidden');
+      state._aiPendingItems = items;
+      state._aiPendingMode = mode;
+      state._aiPendingPlan = '';
+      state._aiDefaultPrompt = defaultPrompt;
+    }
+
+    function resetAiPromptToDefault() {
+      if (state._aiDefaultPrompt) {
+        document.getElementById('aiPromptEdit').value = state._aiDefaultPrompt;
+      }
+    }
+
+    function closeAiRequestModal() {
+      const m = document.getElementById('aiRequestModal');
+      m.classList.add('opacity-0');
+      setTimeout(() => m.classList.add('hidden'), 300);
+    }
+
+    async function consultAiRecipe() {
+      const items = state._aiPendingItems || [];
+      const mode = state._aiPendingMode || 'selected';
+      const promptText = document.getElementById('aiPromptEdit').value.trim();
+      const request = document.getElementById('aiRequestTextarea').value.trim();
+      if (!promptText) {
+        showToast('プロンプトが空です。', 'error');
+        return;
+      }
+      const consultPrompt = `${promptText}
+${request ? '\nユーザーの追加要望: ' + request : ''}
+
+上記の指示と要望に基づいて、どんなレシピを提案するか、200文字以内で自然な日本語で説明してください。具体的な料理名や使い方を含めてください。JSONは不要です。`;
+
+      setStatus(true, 'AIに相談中...<br><span class="text-[10px] font-bold opacity-50 uppercase tracking-widest">Consulting</span>');
+      try {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ contents: [{ parts: [{ text: consultPrompt }] }] })
+        });
+        if (!res.ok) {
+          let errMsg = `APIエラー: ${res.status}`;
+          try { const errData = await res.json(); if(errData.error&&errData.error.message) errMsg += '\n'+errData.error.message; } catch(e){}
+          throw new Error(errMsg);
+        }
+        const data = await res.json();
+        const plan = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        state._aiPendingPlan = plan;
+        state._aiPendingPrompt = promptText;
+        state._aiPendingRequest = request;
+        document.getElementById('aiRequestPlanText').textContent = plan;
+        document.getElementById('aiRequestInputView').classList.add('hidden');
+        document.getElementById('aiRequestConfirmView').classList.remove('hidden');
+        setStatus(false);
+      } catch (err) {
+        console.error('[AI Consult] error:', err);
+        setStatus(false);
+        showToast('相談中にエラーが発生しました。' + (err.message || ''), 'error');
+      }
+    }
+
+    function backToAiRequestInput() {
+      document.getElementById('aiRequestInputView').classList.remove('hidden');
+      document.getElementById('aiRequestConfirmView').classList.add('hidden');
+    }
+
+    async function generateAiRecipeFromPlan() {
+      const items = state._aiPendingItems || [];
+      const mode = state._aiPendingMode || 'selected';
+      const promptText = state._aiPendingPrompt || '';
+      const request = state._aiPendingRequest || '';
+      const plan = state._aiPendingPlan || '';
+      const finalPrompt = `${promptText}
+${request ? '\nユーザーの追加要望: ' + request : ''}
+${plan ? '\n提案方針: ' + plan : ''}
+
+上記に基づいて、JSON形式でレシピを出力してください。`;
+
+      closeAiRequestModal();
+      setStatus(true, 'AIがレシピを考案中...<br><span class="text-[10px] font-bold opacity-50 uppercase tracking-widest">Recipe Generation</span>');
+      try {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: finalPrompt }] }],
+            generationConfig: { responseMimeType: 'application/json' }
+          })
+        });
+        if (!res.ok) {
+          let errMsg = `APIエラー: ${res.status}`;
+          try { const errData = await res.json(); if(errData.error&&errData.error.message) errMsg += '\n'+errData.error.message; } catch(e){}
+          throw new Error(errMsg);
+        }
+        const data = await res.json();
+        const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        const parsed = JSON.parse(raw);
+        state._aiGeneratedRecipe = parsed;
+        state._aiGeneratedMode = mode;
+        state._aiGeneratedItems = items;
+        setStatus(false);
+        openAiRecipePreview(parsed);
+      } catch (err) {
+        console.error('[AI Recipe] error:', err);
+        setStatus(false);
+        showToast('レシピの生成中にエラーが発生しました。' + (err.message || ''), 'error');
+      }
+    }
+
+    function openAiRecipePreview(data) {
+      const m = document.getElementById('aiRecipePreviewModal');
+      m.classList.remove('hidden');
+      setTimeout(() => m.classList.remove('opacity-0'), 10);
+      document.getElementById('aiPreviewName').textContent = data.name || '（名称未設定）';
+      const ingContainer = document.getElementById('aiPreviewIngredients');
+      ingContainer.innerHTML = '';
+      const ingredients = Array.isArray(data.ingredients) ? data.ingredients : [];
+      if (ingredients.length === 0) {
+        ingContainer.innerHTML = '<li class="text-sm text-slate-400 font-bold">材料が設定されていません</li>';
+      } else {
+        ingredients.forEach(ing => {
+          ingContainer.insertAdjacentHTML('beforeend', `
+            <li class="text-sm font-bold text-slate-700 flex items-center gap-2">
+              <span class="w-2 h-2 bg-indigo-400 rounded-full"></span>
+              ${escapeHtml(ing.name || '')} ${escapeHtml(String(ing.amount || ''))}${escapeHtml(ing.unit || '')}
+            </li>
+          `);
+        });
+      }
+      const stepContainer = document.getElementById('aiPreviewSteps');
+      stepContainer.innerHTML = '';
+      const steps = Array.isArray(data.steps) ? data.steps : [];
+      if (steps.length === 0) {
+        stepContainer.innerHTML = '<li class="text-sm text-slate-400 font-bold">手順が設定されていません</li>';
+      } else {
+        steps.forEach(step => {
+          stepContainer.insertAdjacentHTML('beforeend', `
+            <li class="text-sm font-bold text-slate-700 pl-1">${escapeHtml(String(step))}</li>
+          `);
+        });
+      }
+    }
+
+    function closeAiPreviewModal() {
+      const m = document.getElementById('aiRecipePreviewModal');
+      m.classList.add('opacity-0');
+      setTimeout(() => m.classList.add('hidden'), 300);
+    }
+
+    async function regenerateAiRecipe() {
+      if (!state._aiGeneratedItems || !state._aiGeneratedMode) return;
+      await generateAiRecipe(state._aiGeneratedMode, state._aiGeneratedItems);
+    }
+
+    async function saveAiRecipeToCollection() {
+      const data = state._aiGeneratedRecipe;
+      if (!data) {
+        showToast('保存するレシピデータがありません。', 'error');
+        return;
+      }
+      const recipe = {
+        id: createClientId('recipe'),
+        name: data.name || '（名称未設定）',
+        ingredients: JSON.stringify(data.ingredients || []),
+        steps: JSON.stringify(data.steps || []),
+        source: 'AI生成',
+        count: 0,
+        history: '[]'
+      };
+      state.recipes.push(recipe);
+      queueRecipeCreate(recipe);
+      closeAiPreviewModal();
+      renderRecipeList();
+      showToast('レシピを保存しました。同期するまでスプシ未反映です。', 'success');
+      switchBTab('recipes');
+    }
+
+    function clearAiSelection() {
+      document.querySelectorAll('.ai-ing-cb').forEach(cb => cb.checked = false);
+      updateAiSelectedTags();
+    }
+
+    function updateAiSelectedTags() {
+      const selectedIds = Array.from(document.querySelectorAll('.ai-ing-cb:checked')).map(cb => cb.dataset.id);
+      const tagsContainer = document.getElementById('aiSelectedTags');
+      const tagsList = document.getElementById('aiSelectedTagsList');
+      if (selectedIds.length === 0) {
+        tagsContainer.classList.add('hidden');
+        return;
+      }
+      tagsContainer.classList.remove('hidden');
+      tagsList.innerHTML = '';
+      selectedIds.forEach(id => {
+        const item = state.inventory.find(i => i.id === id);
+        if (!item) return;
+        tagsList.insertAdjacentHTML('beforeend', `
+          <span class="inline-flex items-center gap-1 bg-indigo-50 text-indigo-700 text-xs font-bold px-3 py-1.5 rounded-full">
+            ${escapeHtml(item.name)}
+            <button onclick="document.querySelector('.ai-ing-cb[data-id=\\'${item.id}\\']')?.click()" class="w-4 h-4 rounded-full bg-indigo-100 hover:bg-indigo-200 flex items-center justify-center text-indigo-600 leading-none">×</button>
+          </span>
+        `);
+      });
     }
 
     /* --- Recipe Rendering --- */

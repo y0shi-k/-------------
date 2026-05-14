@@ -1,0 +1,26 @@
+{
+  "ticket_id": "TKT-0005",
+  "verify_timestamp": "2026-05-14",
+  "verify_command": "python3 -c \"import html.parser; html.parser.HTMLParser().feed(open('app.html').read())\" && grep -q 'executeGAS' app.html && grep -q 'GAS_URL' app.html && echo 'VERIFY_PASSED'",
+  "result": "VERIFY_PASSED",
+  "checks": {
+    "html_syntax": true,
+    "gas_pattern_marker": true,
+    "ui_consistency_marker": true,
+    "canvas_constraint_marker": true
+  },
+  "build_markers": {
+    "html_parse_ok": true,
+    "executeGAS_exists": true,
+    "GAS_URL_exists": true
+  },
+  "canvas_checks": {
+    "alert_confirm_prompt_absent": true,
+    "showToast_exists": true,
+    "gemini_api_key_empty_no_validation": true,
+    "no_individual_executeGAS_for_sync_ops": true,
+    "no_code_bloat": true
+  },
+  "changed_file": "app.html",
+  "change_summary": "Added AI recipe suggestion feature with 2-step consult→generate flow, hybrid prompt editing UI (direct prompt edit + natural language request), recipe preview modal, and integration with existing recipe collection save flow"
+}
