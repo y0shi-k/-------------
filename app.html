@@ -21,6 +21,8 @@
     .toast-out { animation: toastSlideOut 0.3s ease forwards; }
     @keyframes toastSlideIn { from { opacity: 0; transform: translateX(-50%) translateY(-20px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
     @keyframes toastSlideOut { from { opacity: 1; transform: translateX(-50%) translateY(0); } to { opacity: 0; transform: translateX(-50%) translateY(-20px); } }
+    .sync-bar-hidden { transform: translateY(-100%); }
+    .sync-bar-visible { transform: translateY(0); }
   </style>
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen w-full overflow-x-hidden box-border font-sans relative">
@@ -40,8 +42,8 @@
     </div>
   </div>
 
-  <div id="syncBar" class="hidden fixed left-3 right-3 bottom-24 z-[60] max-w-2xl mx-auto bg-slate-900 text-white rounded-2xl shadow-2xl border border-slate-700 p-3">
-    <div class="flex items-center gap-3">
+  <div id="syncBar" class="sync-bar-hidden fixed top-0 left-0 right-0 z-[70] bg-slate-900 text-white shadow-2xl border-b border-slate-700 p-2 transition-transform duration-300">
+    <div class="flex items-center gap-3 max-w-2xl mx-auto px-3">
       <div class="flex-1 min-w-0">
         <p id="syncSummary" class="text-sm font-black truncate">未同期 0 件</p>
         <p id="syncDetail" class="text-[10px] text-slate-300 font-bold truncate">変更はまだスプレッドシートへ反映されていません</p>
@@ -51,7 +53,7 @@
     </div>
   </div>
 
-  <main id="app" class="pb-24">
+  <main id="app" class="pt-14 pb-24">
     <!-- 初期承認画面 -->
     <div id="initView" class="flex flex-col items-center justify-center min-h-screen p-6 text-center">
       <div class="w-20 h-20 bg-indigo-100 rounded-3xl flex items-center justify-center mb-8 shadow-inner">
@@ -703,7 +705,8 @@
       if (!bar) return;
       const count = getPendingSyncCount();
       if (count === 0) {
-        bar.classList.add('hidden');
+        bar.classList.add('sync-bar-hidden');
+        bar.classList.remove('sync-bar-visible');
         return;
       }
       const p = state.pendingSync;
@@ -719,7 +722,8 @@
       if (p.shoppingPurchases.length) parts.push(`購入処理 ${p.shoppingPurchases.length}`);
       document.getElementById('syncSummary').textContent = `未同期 ${count} 件`;
       document.getElementById('syncDetail').textContent = parts.join(' / ') + ' - 同期するまでスプシ未反映';
-      bar.classList.remove('hidden');
+      bar.classList.remove('sync-bar-hidden');
+      bar.classList.add('sync-bar-visible');
     }
 
     function rerenderCurrentViews() {
@@ -1631,6 +1635,8 @@
     }
 
     function openAiIngredientSelector() {
+      document.getElementById('syncBar').classList.add('sync-bar-hidden');
+      document.getElementById('syncBar').classList.remove('sync-bar-visible');
       const m = document.getElementById('aiIngredientSelectModal');
       m.classList.remove('hidden');
       setTimeout(() => m.classList.remove('opacity-0'), 10);
@@ -1641,6 +1647,7 @@
       const m = document.getElementById('aiIngredientSelectModal');
       m.classList.add('opacity-0');
       setTimeout(() => m.classList.add('hidden'), 300);
+      updateSyncBar();
     }
 
     function renderAiIngredientList() {
@@ -1722,6 +1729,8 @@ ${names.map(n => `- ${n}`).join('\n')}
     }
 
     function openAiRequestModal(items, mode) {
+      document.getElementById('syncBar').classList.add('sync-bar-hidden');
+      document.getElementById('syncBar').classList.remove('sync-bar-visible');
       const m = document.getElementById('aiRequestModal');
       m.classList.remove('hidden');
       setTimeout(() => m.classList.remove('opacity-0'), 10);
@@ -1756,6 +1765,7 @@ ${names.map(n => `- ${n}`).join('\n')}
       const m = document.getElementById('aiRequestModal');
       m.classList.add('opacity-0');
       setTimeout(() => m.classList.add('hidden'), 300);
+      updateSyncBar();
     }
 
     async function consultAiRecipe() {
@@ -1849,6 +1859,8 @@ ${plan ? '\n提案方針: ' + plan : ''}
     }
 
     function openAiRecipePreview(data) {
+      document.getElementById('syncBar').classList.add('sync-bar-hidden');
+      document.getElementById('syncBar').classList.remove('sync-bar-visible');
       const m = document.getElementById('aiRecipePreviewModal');
       m.classList.remove('hidden');
       setTimeout(() => m.classList.remove('opacity-0'), 10);
@@ -1886,6 +1898,7 @@ ${plan ? '\n提案方針: ' + plan : ''}
       const m = document.getElementById('aiRecipePreviewModal');
       m.classList.add('opacity-0');
       setTimeout(() => m.classList.add('hidden'), 300);
+      updateSyncBar();
     }
 
     async function regenerateAiRecipe() {
@@ -1927,6 +1940,8 @@ ${plan ? '\n提案方針: ' + plan : ''}
     let _schedulePendingChange = false;
 
     function openScheduleRecipePicker(date, meal) {
+      document.getElementById('syncBar').classList.add('sync-bar-hidden');
+      document.getElementById('syncBar').classList.remove('sync-bar-visible');
       _schedulePendingDate = date;
       _schedulePendingMeal = meal;
       _schedulePendingChange = false;
@@ -1941,6 +1956,7 @@ ${plan ? '\n提案方針: ' + plan : ''}
       const m = document.getElementById('scheduleRecipeModal');
       m.classList.add('opacity-0');
       setTimeout(() => m.classList.add('hidden'), 300);
+      updateSyncBar();
     }
 
     function renderScheduleRecipePickerList() {
@@ -1995,6 +2011,8 @@ ${plan ? '\n提案方針: ' + plan : ''}
     }
 
     function openScheduleSlotMenu(date, meal) {
+      document.getElementById('syncBar').classList.add('sync-bar-hidden');
+      document.getElementById('syncBar').classList.remove('sync-bar-visible');
       _schedulePendingDate = date;
       _schedulePendingMeal = meal;
       const assigned = state.schedule.find(s => s.date === date && s.meal === meal);
@@ -2009,6 +2027,7 @@ ${plan ? '\n提案方針: ' + plan : ''}
       const m = document.getElementById('scheduleSlotMenu');
       m.classList.add('opacity-0');
       setTimeout(() => m.classList.add('hidden'), 300);
+      updateSyncBar();
     }
 
     function changeScheduleSlotRecipe() {
@@ -2185,6 +2204,8 @@ ${plan ? '\n提案方針: ' + plan : ''}
 
     /* --- Modal & Staging --- */
     function showModal(mode) {
+      document.getElementById('syncBar').classList.add('sync-bar-hidden');
+      document.getElementById('syncBar').classList.remove('sync-bar-visible');
       const m = document.getElementById('itemModal');
       const f = document.getElementById('itemForm');
       f.reset();
@@ -2238,10 +2259,13 @@ ${plan ? '\n提案方針: ' + plan : ''}
       const m = document.getElementById('itemModal');
       m.classList.add('opacity-0');
       setTimeout(() => m.classList.add('hidden'), 300);
+      updateSyncBar();
     }
 
     /* --- Recipe Modal --- */
     function openRecipeEditor(recipeId) {
+      document.getElementById('syncBar').classList.add('sync-bar-hidden');
+      document.getElementById('syncBar').classList.remove('sync-bar-visible');
       const m = document.getElementById('recipeModal');
       m.classList.remove('hidden');
       setTimeout(() => m.classList.remove('opacity-0'), 10);
@@ -2270,6 +2294,7 @@ ${plan ? '\n提案方針: ' + plan : ''}
       const m = document.getElementById('recipeModal');
       m.classList.add('opacity-0');
       setTimeout(() => m.classList.add('hidden'), 300);
+      updateSyncBar();
     }
 
     function renderIngredientInputs(ingredientsJson) {
@@ -2386,6 +2411,8 @@ ${plan ? '\n提案方針: ' + plan : ''}
 
     /* --- Recipe Text Modal --- */
     function openRecipeTextModal() {
+      document.getElementById('syncBar').classList.add('sync-bar-hidden');
+      document.getElementById('syncBar').classList.remove('sync-bar-visible');
       const m = document.getElementById('recipeTextModal');
       m.classList.remove('hidden');
       setTimeout(() => m.classList.remove('opacity-0'), 10);
@@ -2396,6 +2423,7 @@ ${plan ? '\n提案方針: ' + plan : ''}
       const m = document.getElementById('recipeTextModal');
       m.classList.add('opacity-0');
       setTimeout(() => m.classList.add('hidden'), 300);
+      updateSyncBar();
     }
 
     async function parseRecipeTextWithAI() {

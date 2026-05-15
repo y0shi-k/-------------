@@ -1,0 +1,11 @@
+{
+  "ticket_id": "TKT-0010",
+  "spec_id": "SPEC-0010",
+  "verify_command": "python3 -c \"import html.parser; html.parser.HTMLParser().feed(open('app.html').read())\" && grep -q 'executeGAS' app.html && grep -q 'GAS_URL' app.html && echo 'VERIFY_PASSED'",
+  "result": "VERIFY_PASSED",
+  "checked_at": "2026-05-15",
+  "changed_paths": ["app.html"],
+  "html_syntax_valid": true,
+  "executeGAS_present": true,
+  "GAS_URL_present": true
+}
