@@ -1,0 +1,14 @@
+{
+  "ticket_id": "TKT-0014-schedule-cache-and-recipe-preview",
+  "status": "passed",
+  "commands": [
+    {
+      "command": "python3 -c \"import html.parser; html.parser.HTMLParser().feed(open('app.html').read())\" && grep -q 'executeGAS' app.html && grep -q 'GAS_URL' app.html && echo 'VERIFY_PASSED'",
+      "result": "VERIFY_PASSED"
+    },
+    {
+      "command": "rg -n \"if \\\\(tab === 'schedule'\\\\)|executeGAS\\\\(payload|献立スケジュールを読み込み中|onclick=\\\\\\\"assignScheduleRecipe|献立に追加\" app.html",
+      "result": "schedule tab calls renderSchedule(); executeGAS(payload...) remains in syncPendingChanges, handleInit, and the non-tab-triggered loadSchedule function; recipe assignment is behind the 献立に追加 button"
+    }
+  ]
+}

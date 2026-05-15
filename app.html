@@ -408,7 +408,7 @@
   </div>
 
   <!-- モーダル: レシピの追加/編集 -->
-  <div id="recipeModal" onclick="if(event.target===this) closeRecipeModal()" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
+  <div id="recipeModal" onclick="if(event.target===this) closeRecipeModal()" class="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
     <div onclick="event.stopPropagation()" class="bg-white w-full max-w-lg rounded-[2.5rem] p-6 shadow-2xl transform scale-95 transition-transform duration-300 border border-slate-100 max-h-[90vh] overflow-y-auto">
       <div class="flex justify-between items-center mb-5">
         <h3 id="recipeModalTitle" class="text-2xl font-black text-slate-800 tracking-tight">レシピを追加</h3>
@@ -1429,7 +1429,17 @@
           }
         }
 
-        return { display: '在庫データ読み込み完了', detail: { inventory: inventory, shopping: shopping, recipes: recipes } };
+        var sch = ss.getSheetByName('献立スケジュール').getDataRange().getValues();
+        var schedule = [];
+        if (sch.length > 1) {
+          for(var si=1; si<sch.length; si++) {
+            var sr = sch[si];
+            if(!sr[0] || !sr[1]) continue;
+            schedule.push({ date: f(sr[0]), meal: f(sr[1]), recipeId: f(sr[2]), recipeName: f(sr[3]), status: f(sr[4]) || '未完了' });
+          }
+        }
+
+        return { display: '在庫データ読み込み完了', detail: { inventory: inventory, shopping: shopping, recipes: recipes, schedule: schedule } };
       })()`;
       const res = await executeGAS(payload, 'データベースと同期中...');
       console.log('Init GAS Response:', res);
@@ -1437,15 +1447,17 @@
         const inv = (res.detail && res.detail.inventory) ? res.detail.inventory : (res.inventory || []);
         const shop = (res.detail && res.detail.shopping) ? res.detail.shopping : (res.shopping || []);
         const rec = (res.detail && res.detail.recipes) ? res.detail.recipes : (res.recipes || []);
+        const sch = (res.detail && res.detail.schedule) ? res.detail.schedule : (res.schedule || []);
         state.inventory = Array.isArray(inv) ? inv : [];
         state.shopping = Array.isArray(shop) ? shop : [];
         state.recipes = Array.isArray(rec) ? rec : [];
+        state.schedule = Array.isArray(sch) ? sch : [];
         resetPendingSync();
         setSyncedSnapshot();
         document.getElementById('initView').classList.add('hidden');
         document.getElementById('bottomNav').classList.remove('hidden');
         switchMode('A');
-        console.log('Loaded inventory count:', state.inventory.length, 'shopping count:', state.shopping.length, 'recipes count:', state.recipes.length);
+        console.log('Loaded inventory count:', state.inventory.length, 'shopping count:', state.shopping.length, 'recipes count:', state.recipes.length, 'schedule count:', state.schedule.length);
       } else {
         showToast('データの読み込みに失敗しました。GASの実行権限を確認してください。', 'error');
       }
@@ -1693,7 +1705,7 @@
       });
       if (tab === 'recipes') renderRecipeList();
       if (tab === 'ai') renderAiTab();
-      if (tab === 'schedule') { loadSchedule(); }
+      if (tab === 'schedule') renderSchedule();
     }
 
     /* --- Schedule Rendering --- */
@@ -2206,13 +2218,14 @@ ${plan ? '\n提案方針: ' + plan : ''}
       }
       list.forEach(recipe => {
         container.insertAdjacentHTML('beforeend', `
-          <div class="bg-white p-3 rounded-xl shadow-sm border border-slate-100 flex items-center gap-3 cursor-pointer hover:bg-indigo-50 transition-all" onclick="assignScheduleRecipe('${recipe.id}', '${escapeHtml(recipe.name).replace(/'/g, "\\'")}')">
+          <div class="bg-white p-3 rounded-xl shadow-sm border border-slate-100 flex items-center gap-3 cursor-pointer hover:bg-indigo-50 transition-all" onclick="openRecipeEditor('${recipe.id}')">
             <div class="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center flex-shrink-0">
               <span class="text-lg">🍳</span>
             </div>
             <div class="flex-1 min-w-0">
               <p class="font-bold text-slate-800 text-sm truncate">${escapeHtml(recipe.name)}</p>
             </div>
+            <button onclick="event.stopPropagation(); assignScheduleRecipe('${recipe.id}', '${escapeHtml(recipe.name).replace(/'/g, "\\'")}')" class="px-3 py-2 rounded-xl bg-indigo-600 text-white text-xs font-black hover:bg-indigo-700 active:scale-95 transition-all flex-shrink-0">献立に追加</button>
           </div>
         `);
       });
