@@ -81,61 +81,55 @@
     <div id="modeAView" class="hidden">
       <!-- メインインベントリ画面 -->
       <div id="inventoryView" class="p-4 max-w-2xl mx-auto">
-      <header class="flex justify-between items-end mb-6 pt-4">
-        <div>
-          <h2 class="text-3xl font-black tracking-tight text-slate-800">在庫管理</h2>
-          <p class="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1" id="locationLabel">ALL STORAGE</p>
-        </div>
-        <button onclick="showModal('add')" class="bg-slate-800 text-white w-12 h-12 rounded-2xl shadow-lg flex items-center justify-center hover:bg-slate-900 active:scale-90 transition-all">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-        </button>
-      </header>
-
-      <!-- カテゴリタブ -->
-      <div class="flex gap-2 overflow-x-auto no-scrollbar pb-4 mb-2 snap-x">
-        <button onclick="filterByLocation('すべて')" class="location-tab active bg-white text-indigo-600 shadow-sm border border-indigo-100 px-5 py-2.5 rounded-xl text-sm font-black whitespace-nowrap snap-start transition-all" data-loc="すべて">すべて</button>
-        <button onclick="filterByLocation('冷蔵庫')" class="location-tab bg-slate-100 text-slate-500 px-5 py-2.5 rounded-xl text-sm font-bold whitespace-nowrap snap-start transition-all" data-loc="冷蔵庫">冷蔵庫</button>
-        <button onclick="filterByLocation('冷凍庫')" class="location-tab bg-slate-100 text-slate-500 px-5 py-2.5 rounded-xl text-sm font-bold whitespace-nowrap snap-start transition-all" data-loc="冷凍庫">冷凍庫</button>
-        <button onclick="filterByLocation('パントリー')" class="location-tab bg-slate-100 text-slate-500 px-5 py-2.5 rounded-xl text-sm font-bold whitespace-nowrap snap-start transition-all" data-loc="パントリー">パントリー</button>
-        <button onclick="filterByLocation('登録待ち')" class="location-tab bg-amber-50 text-amber-600 border border-amber-100 px-5 py-2.5 rounded-xl text-sm font-black whitespace-nowrap snap-start transition-all relative" data-loc="登録待ち">
-          📝 登録待ち
-          <span id="stagingBadge" class="absolute -top-1 -right-1 bg-amber-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full hidden">0</span>
-        </button>
-        <button onclick="filterByLocation('買い物リスト')" class="location-tab bg-emerald-50 text-emerald-600 border border-emerald-100 px-5 py-2.5 rounded-xl text-sm font-black whitespace-nowrap snap-start transition-all" data-loc="買い物リスト">🛒 買い物リスト</button>
-      </div>
-
-      <!-- ソートコントロール -->
-      <div class="flex gap-2 mb-3 px-1 items-center">
-        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">並び</span>
-        <button onclick="setSort('limit2')" class="sort-btn text-[10px] font-bold px-3 py-1 rounded-full transition-all bg-indigo-100 text-indigo-700" data-sort="limit2">期限順 ▲</button>
-        <button onclick="setSort('name')" class="sort-btn text-[10px] font-bold px-3 py-1 rounded-full transition-all bg-slate-100 text-slate-500" data-sort="name">名前順</button>
-        <button onclick="setSort('buy')" class="sort-btn text-[10px] font-bold px-3 py-1 rounded-full transition-all bg-slate-100 text-slate-500" data-sort="buy">購入日順</button>
-      </div>
-
-      <!-- 一括選択コントロール -->
-      <div id="listControls" class="hidden mb-3 px-2 flex items-center justify-between">
-        <div class="flex items-center gap-2">
-          <input type="checkbox" id="selectAllStaging" onchange="toggleSelectAll(this)" class="w-5 h-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
-          <label for="selectAllStaging" class="text-xs font-black text-slate-500 uppercase tracking-widest cursor-pointer">すべて選択</label>
-        </div>
-      </div>
-
-      <!-- 買い物リスト表示コントロール -->
-      <div id="shoppingControls" class="hidden mb-3 px-2 space-y-3">
-        <div class="flex items-center justify-between gap-3">
-          <div class="flex items-center gap-2">
-            <input type="checkbox" id="selectAllShopping" onchange="toggleSelectAll(this)" class="w-5 h-5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500">
-            <label for="selectAllShopping" class="text-xs font-black text-slate-500 uppercase tracking-widest cursor-pointer">すべて選択</label>
+      <div id="inventoryStickyHeader" class="sticky top-0 z-40 bg-slate-50/95 backdrop-blur-md pt-4 pb-3 border-b border-slate-100">
+        <header class="flex justify-between items-end mb-6">
+          <div>
+            <h2 class="text-3xl font-black tracking-tight text-slate-800">在庫管理</h2>
+            <p class="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1" id="locationLabel">ALL STORAGE</p>
           </div>
-          <div class="bg-slate-100 rounded-xl p-1 flex gap-1">
-            <button onclick="setShoppingView('source')" class="shopping-view-btn px-3 py-1.5 rounded-lg text-[10px] font-black bg-white text-emerald-700 shadow-sm" data-view="source">出自別</button>
-            <button onclick="setShoppingView('grouped')" class="shopping-view-btn px-3 py-1.5 rounded-lg text-[10px] font-black text-slate-500" data-view="grouped">材料まとめ</button>
+          <button onclick="showModal('add')" class="bg-slate-800 text-white w-12 h-12 rounded-2xl shadow-lg flex items-center justify-center hover:bg-slate-900 active:scale-90 transition-all">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+          </button>
+        </header>
+
+        <!-- カテゴリタブ -->
+        <div id="locationTabs" class="flex flex-wrap gap-2 pb-4 mb-2">
+          <!-- JSで動的に挿入 -->
+        </div>
+
+        <!-- ソートコントロール -->
+        <div class="flex gap-2 mb-3 px-1 items-center">
+          <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">並び</span>
+          <button onclick="setSort('limit2')" class="sort-btn text-[10px] font-bold px-3 py-1 rounded-full transition-all bg-indigo-100 text-indigo-700" data-sort="limit2">期限順 ▲</button>
+          <button onclick="setSort('name')" class="sort-btn text-[10px] font-bold px-3 py-1 rounded-full transition-all bg-slate-100 text-slate-500" data-sort="name">名前順</button>
+          <button onclick="setSort('buy')" class="sort-btn text-[10px] font-bold px-3 py-1 rounded-full transition-all bg-slate-100 text-slate-500" data-sort="buy">購入日順</button>
+        </div>
+
+        <!-- 一括選択コントロール -->
+        <div id="listControls" class="hidden mb-3 px-2 flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <input type="checkbox" id="selectAllStaging" onchange="toggleSelectAll(this)" class="w-5 h-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
+            <label for="selectAllStaging" class="text-xs font-black text-slate-500 uppercase tracking-widest cursor-pointer">すべて選択</label>
+          </div>
+        </div>
+
+        <!-- 買い物リスト表示コントロール -->
+        <div id="shoppingControls" class="hidden mb-3 px-2 space-y-3">
+          <div class="flex items-center justify-between gap-3">
+            <div class="flex items-center gap-2">
+              <input type="checkbox" id="selectAllShopping" onchange="toggleSelectAll(this)" class="w-5 h-5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500">
+              <label for="selectAllShopping" class="text-xs font-black text-slate-500 uppercase tracking-widest cursor-pointer">すべて選択</label>
+            </div>
+            <div class="bg-slate-100 rounded-xl p-1 flex gap-1">
+              <button onclick="setShoppingView('source')" class="shopping-view-btn px-3 py-1.5 rounded-lg text-[10px] font-black bg-white text-emerald-700 shadow-sm" data-view="source">出自別</button>
+              <button onclick="setShoppingView('grouped')" class="shopping-view-btn px-3 py-1.5 rounded-lg text-[10px] font-black text-slate-500" data-view="grouped">材料まとめ</button>
+            </div>
           </div>
         </div>
       </div>
 
       <!-- メインリストエリア -->
-      <div id="listContainer" class="space-y-3">
+      <div id="listContainer" class="space-y-3 pt-3">
         <!-- JSで動的に挿入 -->
       </div>
 
@@ -329,13 +323,12 @@
             </div>
             <div>
               <label class="block text-[11px] font-black text-slate-400 uppercase mb-1.5 ml-1">保存場所</label>
-              <select id="f-loc" class="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-4 py-4 text-sm font-bold outline-none focus:border-indigo-500 appearance-none cursor-pointer">
-                <option value="冷蔵庫">冷蔵庫</option>
-                <option value="冷凍庫">冷凍庫</option>
-                <option value="パントリー">パントリー</option>
-                <option value="ベランダ">ベランダ</option>
-                <option value="その他">その他</option>
+              <select id="f-loc" onchange="handleLocationSelectChange()" class="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-4 py-4 text-sm font-bold outline-none focus:border-indigo-500 appearance-none cursor-pointer">
               </select>
+              <div id="newLocationFields" class="hidden mt-2 flex gap-2">
+                <input type="text" id="f-new-loc" class="min-w-0 flex-1 bg-white border-2 border-indigo-100 rounded-xl px-3 py-2 text-sm font-bold outline-none focus:border-indigo-500" placeholder="例: 野菜室">
+                <button type="button" onclick="addLocationFromForm()" class="shrink-0 bg-indigo-600 text-white text-xs font-black px-3 py-2 rounded-xl active:scale-95 transition-all">追加</button>
+              </div>
             </div>
           </div>
           <div class="grid grid-cols-2 gap-4">
@@ -377,6 +370,26 @@
           <button type="submit" id="btnSubmit" class="w-full bg-slate-900 text-white font-black py-5 rounded-[1.5rem] hover:bg-black transition-all shadow-xl text-lg flex items-center justify-center gap-2">リストに追加</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- モーダル: 保存場所管理 -->
+  <div id="locationManageModal" onclick="if(event.target===this) closeLocationManager()" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
+    <div onclick="event.stopPropagation()" class="bg-white w-full max-w-md rounded-[2rem] p-6 shadow-2xl transform scale-95 transition-transform duration-300 border border-slate-100">
+      <div class="flex justify-between items-center mb-5">
+        <div>
+          <h3 class="text-2xl font-black text-slate-800 tracking-tight">保存場所の管理</h3>
+          <p class="text-xs text-slate-400 font-bold mt-1">在庫がある場所は変更を同期待ちにします</p>
+        </div>
+        <button onclick="closeLocationManager()" class="text-slate-300 hover:text-slate-600 bg-slate-100 p-2 rounded-full"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+      </div>
+      <div id="locationManageList" class="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
+        <!-- JSで動的に挿入 -->
+      </div>
+      <div class="mt-5 flex gap-2">
+        <input type="text" id="managerNewLocation" class="min-w-0 flex-1 bg-slate-50 border-2 border-slate-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:border-indigo-500" placeholder="新しい保存場所">
+        <button onclick="addLocationFromManager()" class="bg-slate-800 text-white text-sm font-black px-4 py-3 rounded-2xl active:scale-95 transition-all">追加</button>
+      </div>
     </div>
   </div>
 
@@ -620,6 +633,8 @@
     const GAS_URL = "https://script.google.com/macros/s/AKfycbw3w7KY6dZK7w4O3qLOvHGoihRzN_eyqxod1awLCZ5klvTZCOtp9sFg1VEIUFoA1XKMLQ/exec";
     const GEMINI_API_KEY = "";
     const convId = "CONV-RECIPE-P1-FINAL-BATCH-FIX";
+    const DEFAULT_STORAGE_LOCATIONS = ['冷蔵庫', '冷凍庫', 'パントリー', 'ベランダ', 'その他'];
+    const SYSTEM_LOCATIONS = ['すべて', '登録待ち', '買い物リスト'];
     let state = {
       inventory: [],
       shopping: [],
@@ -638,6 +653,8 @@
       editMode: null,
       editId: null,
       recipeEditId: null,
+      customLocations: [],
+      hiddenLocations: [],
       pendingSync: createEmptyPendingSync(),
       syncedSnapshot: { inventory: [], shopping: [], recipes: [], schedule: [] }
     };
@@ -1072,6 +1089,249 @@
           </div>
         `;
       }).join('');
+    }
+
+    function normalizeLocationName(name) {
+      return String(name || '').trim();
+    }
+
+    function addUniqueLocation(list, name) {
+      const loc = normalizeLocationName(name);
+      if (!loc || SYSTEM_LOCATIONS.includes(loc)) return;
+      if (!list.includes(loc)) list.push(loc);
+    }
+
+    function getStorageLocations() {
+      const locations = [];
+      DEFAULT_STORAGE_LOCATIONS
+        .filter(loc => !(state.hiddenLocations || []).includes(loc))
+        .forEach(loc => addUniqueLocation(locations, loc));
+      (state.customLocations || []).forEach(loc => addUniqueLocation(locations, loc));
+      (state.inventory || []).forEach(item => addUniqueLocation(locations, item.loc));
+      (state.staging || []).forEach(item => addUniqueLocation(locations, item.loc));
+      return locations;
+    }
+
+    function ensureCustomLocation(name) {
+      const loc = normalizeLocationName(name);
+      if (!loc || SYSTEM_LOCATIONS.includes(loc)) return '';
+      state.customLocations = state.customLocations || [];
+      state.hiddenLocations = (state.hiddenLocations || []).filter(item => item !== loc);
+      if (!getStorageLocations().includes(loc)) state.customLocations.push(loc);
+      renderLocationTabs();
+      return loc;
+    }
+
+    function getLocationCounts(loc) {
+      const inventoryCount = (state.inventory || []).filter(item => normalizeLocationName(item.loc || '冷蔵庫') === loc).length;
+      const stagingCount = (state.staging || []).filter(item => normalizeLocationName(item.loc || '冷蔵庫') === loc).length;
+      return { inventoryCount, stagingCount, total: inventoryCount + stagingCount };
+    }
+
+    function getLocationTabClass(loc) {
+      const active = state.currentLoc === loc;
+      let tone = active ? 'active bg-white text-indigo-600 shadow-sm border border-indigo-100' : 'bg-slate-100 text-slate-500';
+      if (loc === '登録待ち') {
+        tone = active ? 'active bg-amber-50 text-amber-600 shadow-sm border border-amber-100' : 'bg-amber-50 text-amber-600 border border-amber-100';
+      }
+      if (loc === '買い物リスト') {
+        tone = active ? 'active bg-emerald-50 text-emerald-600 shadow-sm border border-emerald-100' : 'bg-emerald-50 text-emerald-600 border border-emerald-100';
+      }
+      return `location-tab ${tone} px-5 py-2.5 rounded-xl text-sm font-black whitespace-nowrap transition-all relative max-w-full`;
+    }
+
+    function renderLocationTabs() {
+      const tabs = document.getElementById('locationTabs');
+      if (!tabs) return;
+      const label = document.getElementById('locationLabel');
+      if (label) label.textContent = state.currentLoc === 'すべて' ? 'ALL STORAGE' : state.currentLoc.toUpperCase();
+      const storageTabs = getStorageLocations().map(loc => `
+        <button onclick="filterByLocation(this.dataset.loc)" class="${getLocationTabClass(loc)}" data-loc="${escapeHtml(loc)}">${escapeHtml(loc)}</button>
+      `).join('');
+      tabs.innerHTML = `
+        <button onclick="filterByLocation(this.dataset.loc)" class="${getLocationTabClass('すべて')}" data-loc="すべて">すべて</button>
+        ${storageTabs}
+        <button onclick="openLocationManager()" class="bg-slate-800 text-white px-4 py-2.5 rounded-xl text-sm font-black whitespace-nowrap transition-all active:scale-95 max-w-full">＋ 管理</button>
+        <button onclick="filterByLocation(this.dataset.loc)" class="${getLocationTabClass('登録待ち')}" data-loc="登録待ち">
+          📝 登録待ち
+          <span id="stagingBadge" class="absolute -top-1 -right-1 bg-amber-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full hidden">0</span>
+        </button>
+        <button onclick="filterByLocation(this.dataset.loc)" class="${getLocationTabClass('買い物リスト')}" data-loc="買い物リスト">🛒 買い物リスト</button>
+      `;
+    }
+
+    function renderLocationOptions(selected) {
+      const select = document.getElementById('f-loc');
+      if (!select) return;
+      const current = normalizeLocationName(selected || select.value || '冷蔵庫') || '冷蔵庫';
+      ensureCustomLocation(current);
+      select.innerHTML = getStorageLocations().map(loc => `<option value="${escapeHtml(loc)}">${escapeHtml(loc)}</option>`).join('')
+        + '<option value="__new__">＋ 新しい保存場所を追加</option>';
+      select.value = getStorageLocations().includes(current) ? current : '冷蔵庫';
+      toggleNewLocationFields(false);
+    }
+
+    function toggleNewLocationFields(show) {
+      const box = document.getElementById('newLocationFields');
+      if (!box) return;
+      box.classList.toggle('hidden', !show);
+      if (!show) document.getElementById('f-new-loc').value = '';
+    }
+
+    function handleLocationSelectChange() {
+      const select = document.getElementById('f-loc');
+      toggleNewLocationFields(select.value === '__new__');
+      if (select.value === '__new__') setTimeout(() => document.getElementById('f-new-loc').focus(), 0);
+    }
+
+    function addLocationFromForm() {
+      const input = document.getElementById('f-new-loc');
+      const loc = ensureCustomLocation(input.value);
+      if (!loc) {
+        showToast('保存場所名を入力してください。', 'error');
+        return;
+      }
+      renderLocationOptions(loc);
+      showToast(`${loc} を保存場所候補に追加しました。`, 'success');
+    }
+
+    function openLocationManager() {
+      renderLocationManager();
+      document.getElementById('syncBar').classList.add('sync-bar-hidden');
+      document.getElementById('syncBar').classList.remove('sync-bar-visible');
+      const m = document.getElementById('locationManageModal');
+      m.classList.remove('hidden');
+      setTimeout(() => m.classList.remove('opacity-0'), 10);
+    }
+
+    function closeLocationManager() {
+      const m = document.getElementById('locationManageModal');
+      m.classList.add('opacity-0');
+      setTimeout(() => m.classList.add('hidden'), 300);
+      updateSyncBar();
+    }
+
+    function renderLocationManager() {
+      const list = document.getElementById('locationManageList');
+      if (!list) return;
+      const locations = getStorageLocations();
+      if (locations.length === 0) {
+        list.innerHTML = '<div class="py-10 text-center text-slate-300 font-bold">保存場所はありません。</div>';
+        return;
+      }
+      list.innerHTML = locations.map(loc => {
+        const counts = getLocationCounts(loc);
+        const canDelete = counts.total === 0;
+        const mergeOptions = locations
+          .filter(other => other !== loc)
+          .map(other => `<option value="${escapeHtml(other)}">${escapeHtml(other)}</option>`)
+          .join('');
+        return `
+          <div class="bg-slate-50 border border-slate-100 rounded-2xl p-4 space-y-3">
+            <div class="flex items-start justify-between gap-3">
+              <div class="min-w-0">
+                <div class="font-black text-slate-800 truncate">${escapeHtml(loc)}</div>
+                <div class="text-[10px] font-bold text-slate-400 mt-0.5">在庫 ${counts.inventoryCount}件 / 登録待ち ${counts.stagingCount}件</div>
+              </div>
+              <button onclick="deleteEmptyLocation(this.dataset.loc)" data-loc="${escapeHtml(loc)}" class="${canDelete ? 'text-rose-500 hover:bg-rose-50' : 'text-slate-300 cursor-not-allowed'} text-xs font-black px-3 py-2 rounded-xl transition-all" ${canDelete ? '' : 'disabled'}>削除</button>
+            </div>
+            <div class="flex gap-2">
+              <input type="text" value="${escapeHtml(loc)}" class="location-rename-input min-w-0 flex-1 bg-white border-2 border-slate-100 rounded-xl px-3 py-2 text-sm font-bold outline-none focus:border-indigo-500">
+              <button onclick="renameLocation(this.dataset.loc, this.previousElementSibling.value)" data-loc="${escapeHtml(loc)}" class="bg-white text-indigo-600 border border-indigo-100 text-xs font-black px-3 py-2 rounded-xl active:scale-95 transition-all">名称変更</button>
+            </div>
+            <div class="flex gap-2">
+              <select class="location-merge-select min-w-0 flex-1 bg-white border-2 border-slate-100 rounded-xl px-3 py-2 text-sm font-bold outline-none focus:border-indigo-500 ${mergeOptions ? '' : 'hidden'}">
+                ${mergeOptions}
+              </select>
+              <button onclick="mergeLocation(this.dataset.loc, this.previousElementSibling.value)" data-loc="${escapeHtml(loc)}" class="bg-slate-700 text-white text-xs font-black px-3 py-2 rounded-xl active:scale-95 transition-all ${mergeOptions ? '' : 'hidden'}">統合</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function applyLocationChange(from, to) {
+      const oldLoc = normalizeLocationName(from);
+      const newLoc = normalizeLocationName(to);
+      if (!oldLoc || !newLoc || oldLoc === newLoc || SYSTEM_LOCATIONS.includes(newLoc)) return 0;
+      ensureCustomLocation(newLoc);
+      let changed = 0;
+      (state.inventory || []).forEach(item => {
+        if (normalizeLocationName(item.loc || '冷蔵庫') === oldLoc) {
+          item.loc = newLoc;
+          queueInventoryUpdate(item.id, item);
+          changed++;
+        }
+      });
+      (state.staging || []).forEach(item => {
+        if (normalizeLocationName(item.loc || '冷蔵庫') === oldLoc) {
+          item.loc = newLoc;
+          changed++;
+        }
+      });
+      state.customLocations = (state.customLocations || []).filter(loc => loc !== oldLoc);
+      if (DEFAULT_STORAGE_LOCATIONS.includes(oldLoc)) {
+        state.hiddenLocations = Array.from(new Set([...(state.hiddenLocations || []), oldLoc]));
+      }
+      if (state.currentLoc === oldLoc) state.currentLoc = newLoc;
+      renderLocationTabs();
+      renderList();
+      renderLocationManager();
+      return changed;
+    }
+
+    function renameLocation(from, to) {
+      const oldLoc = normalizeLocationName(from);
+      const newLoc = normalizeLocationName(to);
+      if (!newLoc) {
+        showToast('保存場所名を入力してください。', 'error');
+        return;
+      }
+      if (SYSTEM_LOCATIONS.includes(oldLoc) || SYSTEM_LOCATIONS.includes(newLoc)) {
+        showToast('この名前は保存場所として使えません。', 'error');
+        return;
+      }
+      if (oldLoc === newLoc) return;
+      applyLocationChange(oldLoc, newLoc);
+      showToast('保存場所の変更を保留しました。同期するまでスプシ未反映です。', 'info');
+    }
+
+    function mergeLocation(from, to) {
+      const oldLoc = normalizeLocationName(from);
+      const targetLoc = normalizeLocationName(to);
+      if (!targetLoc || oldLoc === targetLoc) return;
+      applyLocationChange(oldLoc, targetLoc);
+      showToast('保存場所の変更を保留しました。同期するまでスプシ未反映です。', 'info');
+    }
+
+    function deleteEmptyLocation(loc) {
+      const target = normalizeLocationName(loc);
+      const counts = getLocationCounts(target);
+      if (counts.total > 0) {
+        showToast('在庫がある保存場所は統合先を選んでください。', 'error');
+        return;
+      }
+      state.customLocations = (state.customLocations || []).filter(item => item !== target);
+      if (DEFAULT_STORAGE_LOCATIONS.includes(target)) {
+        state.hiddenLocations = Array.from(new Set([...(state.hiddenLocations || []), target]));
+      }
+      if (state.currentLoc === target) state.currentLoc = 'すべて';
+      renderLocationTabs();
+      renderLocationManager();
+      renderList();
+      showToast(`${target} を保存場所候補から削除しました。`, 'info');
+    }
+
+    function addLocationFromManager() {
+      const input = document.getElementById('managerNewLocation');
+      const loc = ensureCustomLocation(input.value);
+      if (!loc) {
+        showToast('保存場所名を入力してください。', 'error');
+        return;
+      }
+      input.value = '';
+      renderLocationManager();
+      showToast(`${loc} を保存場所候補に追加しました。`, 'success');
     }
 
     function discardPendingChanges() {
@@ -1515,6 +1775,7 @@
 
     /* --- List Rendering --- */
     function renderList() {
+      renderLocationTabs();
       const container = document.getElementById('listContainer');
       const stagingActions = document.getElementById('stagingActions');
       const shoppingActions = document.getElementById('shoppingActions');
@@ -1651,13 +1912,7 @@
 
     function filterByLocation(loc) {
       state.currentLoc = loc;
-      document.getElementById('locationLabel').textContent = loc === 'すべて' ? 'ALL STORAGE' : loc.toUpperCase();
-      document.querySelectorAll('.location-tab').forEach(btn => {
-        const isActive = btn.dataset.loc === loc;
-        btn.className = `location-tab ${isActive ? 'active bg-white text-indigo-600 shadow-sm border border-indigo-100' : 'bg-slate-100 text-slate-500'} px-5 py-2.5 rounded-xl text-sm font-black whitespace-nowrap snap-start transition-all relative`;
-        if (isActive && loc === '買い物リスト') btn.classList.add('bg-emerald-50', 'text-emerald-600', 'border-emerald-100');
-        if (isActive && loc === '登録待ち') btn.classList.add('bg-amber-50', 'text-amber-600', 'border-amber-100');
-      });
+      renderLocationTabs();
       renderList();
     }
 
@@ -2463,6 +2718,7 @@ ${plan ? '\n提案方針: ' + plan : ''}
       document.getElementById('f-staging-idx').value = "-1";
       document.getElementById('f-inventory-id').value = "";
       document.getElementById('f-date1').value = new Date().toISOString().split('T')[0];
+      renderLocationOptions(getStorageLocations()[0] || '冷蔵庫');
       document.getElementById('modalTitle').textContent = mode === 'add' ? "食材をリストへ" : "項目の編集";
       document.getElementById('aiResultArea').classList.add('hidden');
       document.getElementById('btnSubmit').textContent = mode === 'add' ? "リストに追加" : "内容を更新する";
@@ -2473,6 +2729,7 @@ ${plan ? '\n提案方針: ' + plan : ''}
     function populateModal(item) {
       document.getElementById('f-name').value = item.name || '';
       document.getElementById('f-type').value = item.type || '食材';
+      renderLocationOptions(item.loc || '冷蔵庫');
       document.getElementById('f-loc').value = item.loc || '冷蔵庫';
       document.getElementById('f-qty').value = item.qty || 0;
       document.getElementById('f-unit').value = item.unit || '';
@@ -2788,10 +3045,18 @@ ${text}`;
 
     async function handleStagingSave(e) {
       e.preventDefault();
+      let selectedLoc = document.getElementById('f-loc').value;
+      if (selectedLoc === '__new__') {
+        selectedLoc = ensureCustomLocation(document.getElementById('f-new-loc').value);
+        if (!selectedLoc) {
+          showToast('保存場所名を入力してください。', 'error');
+          return;
+        }
+      }
       const item = {
         name: document.getElementById('f-name').value,
         type: document.getElementById('f-type').value,
-        loc: document.getElementById('f-loc').value,
+        loc: selectedLoc,
         qty: parseFloat(document.getElementById('f-qty').value),
         unit: document.getElementById('f-unit').value,
         buy: document.getElementById('f-date1').value,

@@ -1,0 +1,26 @@
+{
+  "ticket": "TKT-0015-custom-storage-locations",
+  "status": "passed",
+  "checks": [
+    {
+      "name": "standard_verify",
+      "command": "python3 -c \"import html.parser; html.parser.HTMLParser().feed(open('app.html').read())\" && grep -q 'executeGAS' app.html && grep -q 'GAS_URL' app.html && echo 'VERIFY_PASSED'",
+      "result": "VERIFY_PASSED"
+    },
+    {
+      "name": "no_blocking_dialogs",
+      "command": "rg -n \"alert\\\\(|confirm\\\\(|prompt\\\\(\" app.html",
+      "result": "no matches"
+    },
+    {
+      "name": "gas_write_policy",
+      "command": "rg -n \"executeGAS\\\\(payload\" app.html",
+      "result": "only syncPendingChanges, handleInit, and loadSchedule execute payloads"
+    },
+    {
+      "name": "spreadsheet_write_scope",
+      "command": "rg -n \"appendRow|deleteRow|setValue|setValues|SpreadsheetApp\" app.html",
+      "result": "spreadsheet write calls remain inside syncPendingChanges or initialization payloads"
+    }
+  ]
+}
