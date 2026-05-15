@@ -211,6 +211,17 @@
               <span>📋</span> テキストから追加
             </button>
           </div>
+
+          <!-- 検索エリア -->
+          <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 space-y-3">
+            <div class="bg-slate-100 rounded-xl p-1 flex gap-1">
+              <button onclick="setRecipeSearchMode('name')" class="recipe-search-mode-btn flex-1 px-3 py-1.5 rounded-lg text-[10px] font-black bg-white text-indigo-700 shadow-sm" data-mode="name">レシピ名</button>
+              <button onclick="setRecipeSearchMode('ingredient')" class="recipe-search-mode-btn flex-1 px-3 py-1.5 rounded-lg text-[10px] font-black text-slate-500" data-mode="ingredient">食材</button>
+              <button onclick="setRecipeSearchMode('all')" class="recipe-search-mode-btn flex-1 px-3 py-1.5 rounded-lg text-[10px] font-black text-slate-500" data-mode="all">すべて</button>
+            </div>
+            <input type="text" id="recipeSearchInput" oninput="renderRecipeList()" class="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:border-indigo-500" placeholder="検索...">
+          </div>
+
           <div id="recipeListContainer" class="space-y-3">
             <!-- JSで動的に挿入 -->
           </div>
@@ -2825,11 +2836,38 @@ ${plan ? '\n提案方針: ' + plan : ''}
       const container = document.getElementById('recipeListContainer');
       if (!container) return;
       container.innerHTML = '';
-      if (state.recipes.length === 0) {
-        container.innerHTML = '<div class="py-20 text-center text-slate-300 font-bold">レシピが登録されていません。<br>「新規レシピ」または「テキストから追加」で登録してください。</div>';
+
+      let recipesToRender = state.recipes;
+      const activeModeBtn = document.querySelector('.recipe-search-mode-btn.bg-white');
+      const searchMode = activeModeBtn ? activeModeBtn.dataset.mode : 'all';
+      const q = (document.getElementById('recipeSearchInput')?.value || '').trim().toLowerCase();
+
+      if (q) {
+        recipesToRender = state.recipes.filter(r => {
+          const nameMatch = (r.name || '').toLowerCase().includes(q);
+          let ingMatch = false;
+          try {
+            const ingredients = JSON.parse(r.ingredients || '[]');
+            if (Array.isArray(ingredients)) {
+              ingMatch = ingredients.some(ing => (ing.name || '').toLowerCase().includes(q));
+            }
+          } catch(e) { ingMatch = false; }
+
+          if (searchMode === 'name') return nameMatch;
+          if (searchMode === 'ingredient') return ingMatch;
+          return nameMatch || ingMatch;
+        });
+      }
+
+      if (recipesToRender.length === 0) {
+        if (state.recipes.length === 0) {
+          container.innerHTML = '<div class="py-20 text-center text-slate-300 font-bold">レシピが登録されていません。<br>「新規レシピ」または「テキストから追加」で登録してください。</div>';
+        } else {
+          container.innerHTML = '<div class="py-20 text-center text-slate-300 font-bold">該当するレシピが見つかりません。</div>';
+        }
         return;
       }
-      state.recipes.forEach((recipe, idx) => {
+      recipesToRender.forEach((recipe, idx) => {
         let ingCount = 0;
         const syncBadge = getRecipeSyncBadge(recipe);
         try {
@@ -2859,6 +2897,17 @@ ${plan ? '\n提案方針: ' + plan : ''}
           </div>
         `);
       });
+    }
+
+    function setRecipeSearchMode(mode) {
+      document.querySelectorAll('.recipe-search-mode-btn').forEach(btn => {
+        if (btn.dataset.mode === mode) {
+          btn.className = 'recipe-search-mode-btn flex-1 px-3 py-1.5 rounded-lg text-[10px] font-black bg-white text-indigo-700 shadow-sm';
+        } else {
+          btn.className = 'recipe-search-mode-btn flex-1 px-3 py-1.5 rounded-lg text-[10px] font-black text-slate-500';
+        }
+      });
+      renderRecipeList();
     }
 
     function escapeHtml(text) {
