@@ -7,7 +7,7 @@ related_specs:
 owner_role: ai-implementer
 required_evals:
   - gas_pattern_change
-status: draft
+status: completed
 ---
 
 ## 目的

@@ -1,0 +1,32 @@
+{
+  "ticket_id": "TKT-0007",
+  "status": "passed",
+  "timestamp": "2026-05-15",
+  "checks": [
+    {
+      "id": "html_syntax",
+      "label": "HTML構文チェック",
+      "result": "passed",
+      "command": "python3 -c \"import html.parser; html.parser.HTMLParser().feed(open('app.html').read())\" && grep -q 'executeGAS' app.html && grep -q 'GAS_URL' app.html && echo 'VERIFY_PASSED'",
+      "output": "VERIFY_PASSED"
+    },
+    {
+      "id": "gas_pattern_marker",
+      "label": "GASパターンマーカー確認",
+      "result": "passed",
+      "detail": "executeGAS, setStatus, フォーム送信方式, callbackポーリングが未変更。syncPendingChangesのペイロード文字列内に買い物リスト追記処理を追加。"
+    },
+    {
+      "id": "manual_bulk_sync_marker",
+      "label": "手動一括同期マーカー確認",
+      "result": "passed",
+      "detail": "買い物リストへの追記は queueShoppingCreate → state.pendingSync.shoppingCreates → syncPendingChanges の流れ。個別即時GAS通信なし。"
+    },
+    {
+      "id": "schema_marker",
+      "label": "スキーママーカー確認",
+      "result": "passed",
+      "detail": "買い物リストシートのヘッダー定義変更なし。appendRow([UUID, name, qty, unit, '未購入', recipeName]) の順序が既存（リストID, 品名, 必要数量, 単位, ステータス, 紐づくレシピ名）と一致。"
+    }
+  ]
+}

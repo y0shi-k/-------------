@@ -239,12 +239,13 @@
 
         <!-- 献立スケジュールタブ -->
         <div id="bTabSchedule" class="hidden">
-          <div class="flex flex-col items-center justify-center min-h-[40vh] p-6 text-center">
-            <div class="w-16 h-16 bg-amber-100 rounded-3xl flex items-center justify-center mb-4">
-              <span class="text-3xl">📅</span>
-            </div>
-            <h3 class="text-xl font-black text-slate-700 mb-2">献立スケジュール</h3>
-            <p class="text-sm text-slate-400">TKT-0006 で実装予定</p>
+          <div class="flex items-center justify-between mb-4">
+            <button onclick="changeScheduleWeek(-1)" class="px-3 py-2 rounded-xl bg-slate-100 text-slate-600 text-sm font-black hover:bg-slate-200 transition-all">← 前の週</button>
+            <p id="scheduleWeekLabel" class="text-sm font-black text-slate-700">今週</p>
+            <button onclick="changeScheduleWeek(1)" class="px-3 py-2 rounded-xl bg-slate-100 text-slate-600 text-sm font-black hover:bg-slate-200 transition-all">次の週 →</button>
+          </div>
+          <div id="scheduleListContainer" class="space-y-3">
+            <!-- JSで動的に挿入 -->
           </div>
         </div>
       </div>
@@ -400,6 +401,7 @@
 
         <div class="pt-2 flex gap-3">
           <button type="button" onclick="closeRecipeModal()" class="flex-1 bg-slate-100 text-slate-600 font-black py-4 rounded-2xl hover:bg-slate-200 transition-all">キャンセル</button>
+          <button type="button" onclick="addCurrentRecipeToShopping()" class="flex-1 bg-emerald-100 text-emerald-700 font-black py-4 rounded-2xl hover:bg-emerald-200 transition-all flex items-center justify-center gap-1">🛒 買い物へ</button>
           <button type="submit" id="btnRecipeSubmit" class="flex-[2] bg-slate-900 text-white font-black py-4 rounded-2xl hover:bg-black transition-all shadow-xl">保存</button>
         </div>
       </form>
@@ -527,6 +529,36 @@
     </div>
   </div>
 
+  <!-- モーダル: 献立レシピ選択 -->
+  <div id="scheduleRecipeModal" onclick="if(event.target===this) closeScheduleRecipeModal()" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
+    <div onclick="event.stopPropagation()" class="bg-white w-full max-w-lg rounded-[2.5rem] p-6 shadow-2xl transform scale-95 transition-transform duration-300 border border-slate-100 max-h-[85vh] overflow-y-auto">
+      <div class="flex justify-between items-center mb-5">
+        <h3 class="text-2xl font-black text-slate-800 tracking-tight">レシピを選択</h3>
+        <button onclick="closeScheduleRecipeModal()" class="text-slate-300 hover:text-slate-600 bg-slate-100 p-2 rounded-full"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+      </div>
+      <div class="mb-4">
+        <input type="text" id="scheduleRecipeSearch" oninput="renderScheduleRecipePickerList()" class="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:border-indigo-500" placeholder="レシピ名で検索...">
+      </div>
+      <div id="scheduleRecipePickerList" class="space-y-2 max-h-[50vh] overflow-y-auto">
+        <!-- JSで動的に挿入 -->
+      </div>
+    </div>
+  </div>
+
+  <!-- モーダル: 献立スロット操作メニュー -->
+  <div id="scheduleSlotMenu" onclick="if(event.target===this) closeScheduleSlotMenu()" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
+    <div onclick="event.stopPropagation()" class="bg-white w-full max-w-sm rounded-[2.5rem] p-6 shadow-2xl transform scale-95 transition-transform duration-300 border border-slate-100">
+      <div class="flex justify-between items-center mb-5">
+        <h3 id="scheduleSlotMenuTitle" class="text-xl font-black text-slate-800 tracking-tight">献立の操作</h3>
+        <button onclick="closeScheduleSlotMenu()" class="text-slate-300 hover:text-slate-600 bg-slate-100 p-2 rounded-full"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+      </div>
+      <div class="space-y-3">
+        <button onclick="changeScheduleSlotRecipe()" class="w-full bg-indigo-600 text-white font-black py-4 rounded-2xl shadow-lg hover:bg-indigo-700 active:scale-95 transition-all">別のレシピに変更</button>
+        <button onclick="removeScheduleSlot()" class="w-full bg-rose-500 text-white font-black py-4 rounded-2xl shadow-lg hover:bg-rose-600 active:scale-95 transition-all">削除する</button>
+      </div>
+    </div>
+  </div>
+
   <input type="file" accept="image/*" capture="environment" id="imageScanInput" onchange="handleImageScan(event)" hidden>
 
   <button id="geminiCopyBtn" onclick="majinCopy()" style="display:none;" class="fixed bottom-24 left-4 z-[70] bg-slate-900 text-white text-[10px] font-black py-2.5 px-5 rounded-full shadow-2xl flex items-center gap-2 hover:scale-105 transition-all border border-slate-700">
@@ -544,6 +576,8 @@
       shopping: [],
       staging: [],
       recipes: [],
+      schedule: [],
+      scheduleWeekOffset: 0,
       currentLoc: 'すべて',
       currentMode: 'A',
       currentBTab: 'recipes',
@@ -553,7 +587,7 @@
       editId: null,
       recipeEditId: null,
       pendingSync: createEmptyPendingSync(),
-      syncedSnapshot: { inventory: [], shopping: [], recipes: [] }
+      syncedSnapshot: { inventory: [], shopping: [], recipes: [], schedule: [] }
     };
 
     /* --- Core --- */
@@ -598,6 +632,26 @@
       }, 4000);
     }
 
+    function showToastWithAction(message, actionLabel, actionFn) {
+      const existing = document.querySelector('.app-toast');
+      if (existing) existing.remove();
+      const toast = document.createElement('div');
+      toast.className = 'app-toast fixed top-6 left-1/2 z-[80] px-6 py-4 rounded-2xl shadow-2xl font-black text-sm toast-in max-w-[90%] text-center bg-slate-800 text-white';
+      toast.innerHTML = `<div class="mb-2">${message}</div><button class="px-4 py-2 rounded-xl bg-emerald-500 text-white text-xs font-black hover:bg-emerald-600 transition-all">${actionLabel}</button>`;
+      toast.querySelector('button').onclick = () => {
+        actionFn();
+        toast.classList.remove('toast-in');
+        toast.classList.add('toast-out');
+        setTimeout(() => toast.remove(), 300);
+      };
+      document.body.appendChild(toast);
+      setTimeout(() => {
+        toast.classList.remove('toast-in');
+        toast.classList.add('toast-out');
+        setTimeout(() => toast.remove(), 300);
+      }, 8000);
+    }
+
     function createEmptyPendingSync() {
       return {
         inventoryCreates: [],
@@ -606,6 +660,9 @@
         recipeCreates: [],
         recipeUpdates: {},
         recipeDeletes: [],
+        scheduleCreates: [],
+        scheduleDeletes: [],
+        shoppingCreates: [],
         shoppingPurchases: []
       };
     }
@@ -618,7 +675,8 @@
       state.syncedSnapshot = {
         inventory: clonePlain(state.inventory),
         shopping: clonePlain(state.shopping),
-        recipes: clonePlain(state.recipes)
+        recipes: clonePlain(state.recipes),
+        schedule: clonePlain(state.schedule)
       };
     }
 
@@ -635,6 +693,8 @@
       const p = state.pendingSync;
       return p.inventoryCreates.length + countObject(p.inventoryUpdates) + p.inventoryDeletes.length
         + p.recipeCreates.length + countObject(p.recipeUpdates) + p.recipeDeletes.length
+        + p.scheduleCreates.length + p.scheduleDeletes.length
+        + p.shoppingCreates.length
         + p.shoppingPurchases.length;
     }
 
@@ -652,6 +712,10 @@
       const rec = p.recipeCreates.length + countObject(p.recipeUpdates) + p.recipeDeletes.length;
       if (inv) parts.push(`在庫 ${inv}`);
       if (rec) parts.push(`レシピ ${rec}`);
+      const sch = p.scheduleCreates.length + p.scheduleDeletes.length;
+      if (sch) parts.push(`献立 ${sch}`);
+      const shop = p.shoppingCreates.length;
+      if (shop) parts.push(`買い物 ${shop}`);
       if (p.shoppingPurchases.length) parts.push(`購入処理 ${p.shoppingPurchases.length}`);
       document.getElementById('syncSummary').textContent = `未同期 ${count} 件`;
       document.getElementById('syncDetail').textContent = parts.join(' / ') + ' - 同期するまでスプシ未反映';
@@ -661,6 +725,7 @@
     function rerenderCurrentViews() {
       if (state.currentMode === 'A') renderList();
       if (state.currentMode === 'B' && state.currentBTab === 'recipes') renderRecipeList();
+      if (state.currentMode === 'B' && state.currentBTab === 'schedule') renderSchedule();
       updateSyncBar();
     }
 
@@ -730,6 +795,41 @@
       updateSyncBar();
     }
 
+    function cleanScheduleItem(item) {
+      return {
+        date: item.date || '',
+        meal: item.meal || '',
+        recipeId: item.recipeId || '',
+        recipeName: item.recipeName || '',
+        status: item.status || '未完了'
+      };
+    }
+
+    function queueScheduleCreate(item) {
+      item._syncStatus = 'created';
+      state.pendingSync.scheduleCreates.push(cleanScheduleItem(item));
+      updateSyncBar();
+    }
+
+    function queueScheduleDelete(item) {
+      if (!state.pendingSync.scheduleDeletes.some(d => d.date === item.date && d.meal === item.meal)) {
+        state.pendingSync.scheduleDeletes.push({ date: item.date, meal: item.meal });
+      }
+      state.schedule = state.schedule.filter(s => !(s.date === item.date && s.meal === item.meal));
+      updateSyncBar();
+    }
+
+    function queueShoppingCreate(item) {
+      item._syncStatus = 'created';
+      state.pendingSync.shoppingCreates.push({
+        name: item.name || '',
+        qty: Number(item.qty) || 0,
+        unit: item.unit || '',
+        recipeName: item.recipeName || ''
+      });
+      updateSyncBar();
+    }
+
     function queueRecipeCreate(recipe) {
       recipe._syncStatus = 'created';
       state.pendingSync.recipeCreates.push(cleanRecipeItem(recipe));
@@ -778,6 +878,7 @@
       state.inventory = clonePlain(state.syncedSnapshot.inventory);
       state.shopping = clonePlain(state.syncedSnapshot.shopping);
       state.recipes = clonePlain(state.syncedSnapshot.recipes);
+      state.schedule = clonePlain(state.syncedSnapshot.schedule);
       resetPendingSync();
       rerenderCurrentViews();
       showToast('未同期の変更を破棄しました。', 'info');
@@ -794,6 +895,7 @@
         var ss = SpreadsheetApp.openById(PropertiesService.getUserProperties().getProperty('SS_ID_RECIPE_APP'));
         var sStock = ss.getSheetByName('食材在庫');
         var sRecipes = ss.getSheetByName('レシピ集');
+        var sSchedule = ss.getSheetByName('献立スケジュール');
         var sShop = ss.getSheetByName('買い物リスト');
 
         function f(v) {
@@ -834,6 +936,16 @@
           }
           return list;
         }
+        function readSchedule() {
+          var sch = sSchedule.getDataRange().getValues();
+          var list = [];
+          for(var i=1; i<sch.length; i++) {
+            var r = sch[i];
+            if(!r[0] || !r[1]) continue;
+            list.push({ date: f(r[0]), meal: f(r[1]), recipeId: f(r[2]), recipeName: f(r[3]), status: f(r[4]) || '未完了' });
+          }
+          return list;
+        }
 
         var invDeletes = pending.inventoryDeletes || [];
         var stockData = sStock.getDataRange().getValues();
@@ -845,6 +957,37 @@
         var recipeData = sRecipes.getDataRange().getValues();
         for(var rdi=recipeData.length-1; rdi>=1; rdi--) {
           if(recipeDeletes.indexOf(String(recipeData[rdi][0])) !== -1) sRecipes.deleteRow(rdi+1);
+        }
+
+        var scheduleDeletes = pending.scheduleDeletes || [];
+        var scheduleData = sSchedule.getDataRange().getValues();
+        for(var sdi=scheduleData.length-1; sdi>=1; sdi--) {
+          var sdDate = f(scheduleData[sdi][0]);
+          var sdMeal = f(scheduleData[sdi][1]);
+          for(var sdk=0; sdk<scheduleDeletes.length; sdk++) {
+            if(scheduleDeletes[sdk].date === sdDate && scheduleDeletes[sdk].meal === sdMeal) {
+              sSchedule.deleteRow(sdi+1);
+              break;
+            }
+          }
+        }
+
+        var scheduleCreates = pending.scheduleCreates || [];
+        if(scheduleCreates.length) {
+          scheduleData = sSchedule.getDataRange().getValues();
+          scheduleCreates.forEach(function(d) {
+            var updated = false;
+            for(var sui=1; sui<scheduleData.length; sui++) {
+              if(f(scheduleData[sui][0]) === d.date && f(scheduleData[sui][1]) === d.meal) {
+                sSchedule.getRange(sui+1, 3, 1, 3).setValues([[d.recipeId, d.recipeName, d.status || '未完了']]);
+                updated = true;
+                break;
+              }
+            }
+            if(!updated) {
+              sSchedule.appendRow([d.date, d.meal, d.recipeId, d.recipeName, d.status || '未完了']);
+            }
+          });
         }
 
         var invUpdates = pending.inventoryUpdates || {};
@@ -910,7 +1053,26 @@
           }
         });
 
-        return { display: '一括同期完了', detail: { inventory: readInventory(), shopping: readShopping(), recipes: readRecipes() } };
+        var shoppingCreates = pending.shoppingCreates || [];
+        if(shoppingCreates.length) {
+          var shopData2 = sShop.getDataRange().getValues();
+          shoppingCreates.forEach(function(d) {
+            var merged = false;
+            for(var sci=1; sci<shopData2.length; sci++) {
+              if(String(shopData2[sci][1]) === d.name && String(shopData2[sci][4]) === '未購入' && String(shopData2[sci][3]) === d.unit) {
+                var currentShopQty = Number(shopData2[sci][2]) || 0;
+                sShop.getRange(sci+1, 3).setValue(currentShopQty + d.qty);
+                merged = true;
+                break;
+              }
+            }
+            if(!merged) {
+              sShop.appendRow([Utilities.getUuid(), d.name, d.qty, d.unit, '未購入', d.recipeName || '']);
+            }
+          });
+        }
+
+        return { display: '一括同期完了', detail: { inventory: readInventory(), shopping: readShopping(), recipes: readRecipes(), schedule: readSchedule() } };
       })()`;
 
       const res = await executeGAS(payload, `未同期 ${getPendingSyncCount()} 件をスプレッドシートへ一括同期中...`);
@@ -918,6 +1080,7 @@
         state.inventory = Array.isArray(res.detail.inventory) ? res.detail.inventory : [];
         state.shopping = Array.isArray(res.detail.shopping) ? res.detail.shopping : [];
         state.recipes = Array.isArray(res.detail.recipes) ? res.detail.recipes : [];
+        state.schedule = Array.isArray(res.detail.schedule) ? res.detail.schedule : [];
         resetPendingSync();
         setSyncedSnapshot();
         rerenderCurrentViews();
@@ -1069,6 +1232,48 @@
       const sc = document.createElement('script');
       sc.src = GAS_URL + '?action=convApproveAll&convId=' + convId + '&callback=' + fn;
       document.body.append(sc);
+    }
+
+    async function loadSchedule() {
+      const dates = getWeekDates(state.scheduleWeekOffset);
+      const startDate = dates[0];
+      const endDate = dates[6];
+      const payload = `(function(){
+        var ss = SpreadsheetApp.openById(PropertiesService.getUserProperties().getProperty('SS_ID_RECIPE_APP'));
+        var sSchedule = ss.getSheetByName('献立スケジュール');
+        function f(v) {
+          if(!v && v !== 0) return "";
+          if(v instanceof Date) return Utilities.formatDate(v, Session.getScriptTimeZone(), "yyyy-MM-dd");
+          return String(v).trim();
+        }
+        var data = sSchedule.getDataRange().getValues();
+        var list = [];
+        for(var i=1; i<data.length; i++) {
+          var r = data[i];
+          if(!r[0] || !r[1]) continue;
+          var rowDate = f(r[0]);
+          if(rowDate >= '${startDate}' && rowDate <= '${endDate}') {
+            list.push({ date: rowDate, meal: f(r[1]), recipeId: f(r[2]), recipeName: f(r[3]), status: f(r[4]) || '未完了' });
+          }
+        }
+        return { display: '献立データ読み込み完了', detail: { schedule: list } };
+      })()`;
+      const res = await executeGAS(payload, '献立スケジュールを読み込み中...');
+      if (res && res.detail && Array.isArray(res.detail.schedule)) {
+        const loaded = res.detail.schedule;
+        const existingPending = state.pendingSync.scheduleCreates || [];
+        loaded.forEach(item => {
+          const pendingIdx = existingPending.findIndex(p => p.date === item.date && p.meal === item.meal);
+          if (pendingIdx >= 0) {
+            item.recipeId = existingPending[pendingIdx].recipeId;
+            item.recipeName = existingPending[pendingIdx].recipeName;
+          }
+        });
+        state.schedule = loaded;
+        renderSchedule();
+      } else {
+        showToast('献立データの読み込みに失敗しました。', 'error');
+      }
     }
 
     /* --- List Rendering --- */
@@ -1253,6 +1458,121 @@
       });
       if (tab === 'recipes') renderRecipeList();
       if (tab === 'ai') renderAiTab();
+      if (tab === 'schedule') { loadSchedule(); }
+    }
+
+    /* --- Schedule Rendering --- */
+    function getWeekDates(offset) {
+      const today = new Date();
+      today.setHours(0,0,0,0);
+      const dayOfWeek = today.getDay();
+      const startOfWeek = new Date(today);
+      startOfWeek.setDate(today.getDate() - dayOfWeek + (offset * 7));
+      const dates = [];
+      for (let i = 0; i < 7; i++) {
+        const d = new Date(startOfWeek);
+        d.setDate(startOfWeek.getDate() + i);
+        dates.push(d.toISOString().split('T')[0]);
+      }
+      return dates;
+    }
+
+    function formatScheduleDate(dateStr) {
+      const d = new Date(dateStr);
+      const days = ['日','月','火','水','木','金','土'];
+      return `${d.getMonth()+1}/${d.getDate()} (${days[d.getDay()]})`;
+    }
+
+    function renderSchedule() {
+      const container = document.getElementById('scheduleListContainer');
+      if (!container) return;
+      container.innerHTML = '';
+      const dates = getWeekDates(state.scheduleWeekOffset);
+      const weekLabel = state.scheduleWeekOffset === 0 ? '今週' : `${state.scheduleWeekOffset > 0 ? '+' : ''}${state.scheduleWeekOffset}週`;
+      const labelEl = document.getElementById('scheduleWeekLabel');
+      if (labelEl) labelEl.textContent = weekLabel;
+
+      dates.forEach(date => {
+        const meals = ['朝','昼','晩'];
+        let slotsHtml = '';
+        meals.forEach(meal => {
+          const assigned = state.schedule.find(s => s.date === date && s.meal === meal);
+          if (assigned) {
+            slotsHtml += `
+              <div class="flex-1 bg-indigo-50 border border-indigo-100 rounded-xl p-2 text-center cursor-pointer hover:bg-indigo-100 transition-all" onclick="openScheduleSlotMenu('${date}', '${meal}')">
+                <p class="text-[10px] font-bold text-indigo-400 mb-0.5">${meal}</p>
+                <p class="text-xs font-black text-indigo-700 truncate">${escapeHtml(assigned.recipeName)}</p>
+              </div>
+            `;
+          } else {
+            slotsHtml += `
+              <div class="flex-1 bg-white border border-slate-200 rounded-xl p-2 text-center cursor-pointer hover:bg-slate-50 transition-all" onclick="openScheduleRecipePicker('${date}', '${meal}')">
+                <p class="text-[10px] font-bold text-slate-400 mb-0.5">${meal}</p>
+                <p class="text-lg text-slate-300">＋</p>
+              </div>
+            `;
+          }
+        });
+        container.insertAdjacentHTML('beforeend', `
+          <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
+            <p class="text-sm font-black text-slate-700 mb-3">${formatScheduleDate(date)}</p>
+            <div class="flex gap-2">${slotsHtml}</div>
+          </div>
+        `);
+      });
+    }
+
+    function changeScheduleWeek(delta) {
+      state.scheduleWeekOffset += delta;
+      renderSchedule();
+    }
+
+    function compareRecipeWithInventory(recipeId) {
+      const recipe = state.recipes.find(r => r.id === recipeId);
+      if (!recipe) return [];
+      let ingredients = [];
+      try {
+        ingredients = JSON.parse(recipe.ingredients || '[]');
+      } catch(e) { ingredients = []; }
+      if (!Array.isArray(ingredients) || ingredients.length === 0) return [];
+
+      const shortages = [];
+      ingredients.forEach(ing => {
+        const name = ing.name || '';
+        const amount = parseFloat(ing.amount) || 0;
+        const unit = ing.unit || '';
+        if (!name) return;
+
+        const inventoryItems = state.inventory.filter(i => i.name === name && i.unit === unit && i.qty > 0);
+        const totalStock = inventoryItems.reduce((sum, item) => sum + (Number(item.qty) || 0), 0);
+
+        if (totalStock < amount) {
+          shortages.push({
+            name: name,
+            qty: amount - totalStock,
+            unit: unit,
+            recipeName: recipe.name || ''
+          });
+        }
+      });
+      return shortages;
+    }
+
+    function addShortagesToShopping(shortages) {
+      if (!shortages || shortages.length === 0) return 0;
+      shortages.forEach(item => {
+        queueShoppingCreate(item);
+        state.shopping.push({
+          id: createClientId('shop'),
+          name: item.name,
+          qty: item.qty,
+          unit: item.unit,
+          status: '未購入',
+          recipeName: item.recipeName,
+          _syncStatus: 'created'
+        });
+      });
+      return shortages.length;
     }
 
     /* --- AI Recipe Suggestion --- */
@@ -1601,6 +1921,116 @@ ${plan ? '\n提案方針: ' + plan : ''}
       updateAiSelectedTags();
     }
 
+    /* --- Schedule Operations --- */
+    let _schedulePendingDate = '';
+    let _schedulePendingMeal = '';
+    let _schedulePendingChange = false;
+
+    function openScheduleRecipePicker(date, meal) {
+      _schedulePendingDate = date;
+      _schedulePendingMeal = meal;
+      _schedulePendingChange = false;
+      document.getElementById('scheduleRecipeSearch').value = '';
+      const m = document.getElementById('scheduleRecipeModal');
+      m.classList.remove('hidden');
+      setTimeout(() => m.classList.remove('opacity-0'), 10);
+      renderScheduleRecipePickerList();
+    }
+
+    function closeScheduleRecipeModal() {
+      const m = document.getElementById('scheduleRecipeModal');
+      m.classList.add('opacity-0');
+      setTimeout(() => m.classList.add('hidden'), 300);
+    }
+
+    function renderScheduleRecipePickerList() {
+      const container = document.getElementById('scheduleRecipePickerList');
+      if (!container) return;
+      container.innerHTML = '';
+      const q = (document.getElementById('scheduleRecipeSearch').value || '').trim().toLowerCase();
+      const list = state.recipes.filter(r => !q || (r.name || '').toLowerCase().includes(q));
+      if (list.length === 0) {
+        container.innerHTML = '<div class="py-10 text-center text-slate-300 font-bold">レシピが見つかりません。</div>';
+        return;
+      }
+      list.forEach(recipe => {
+        container.insertAdjacentHTML('beforeend', `
+          <div class="bg-white p-3 rounded-xl shadow-sm border border-slate-100 flex items-center gap-3 cursor-pointer hover:bg-indigo-50 transition-all" onclick="assignScheduleRecipe('${recipe.id}', '${escapeHtml(recipe.name).replace(/'/g, "\\'")}')">
+            <div class="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center flex-shrink-0">
+              <span class="text-lg">🍳</span>
+            </div>
+            <div class="flex-1 min-w-0">
+              <p class="font-bold text-slate-800 text-sm truncate">${escapeHtml(recipe.name)}</p>
+            </div>
+          </div>
+        `);
+      });
+    }
+
+    function assignScheduleRecipe(recipeId, recipeName) {
+      const date = _schedulePendingDate;
+      const meal = _schedulePendingMeal;
+      if (!date || !meal) return;
+      const existingIdx = state.schedule.findIndex(s => s.date === date && s.meal === meal);
+      if (existingIdx >= 0) {
+        state.schedule[existingIdx] = { date, meal, recipeId, recipeName, status: '未完了' };
+      } else {
+        state.schedule.push({ date, meal, recipeId, recipeName, status: '未完了' });
+      }
+      queueScheduleCreate({ date, meal, recipeId, recipeName, status: '未完了' });
+      closeScheduleRecipeModal();
+      renderSchedule();
+
+      const shortages = compareRecipeWithInventory(recipeId);
+      if (shortages.length > 0) {
+        addShortagesToShopping(shortages);
+        showToastWithAction(
+          `${shortages.length} 件の不足材料を買い物リストに追加しました。`,
+          '買い物リストを確認',
+          () => { switchMode('A'); filterByLocation('買い物リスト'); }
+        );
+      } else {
+        showToast(`${meal}の献立を設定しました。`, 'success');
+      }
+    }
+
+    function openScheduleSlotMenu(date, meal) {
+      _schedulePendingDate = date;
+      _schedulePendingMeal = meal;
+      const assigned = state.schedule.find(s => s.date === date && s.meal === meal);
+      const title = document.getElementById('scheduleSlotMenuTitle');
+      if (title && assigned) title.textContent = `${formatScheduleDate(date)} ${meal} · ${assigned.recipeName}`;
+      const m = document.getElementById('scheduleSlotMenu');
+      m.classList.remove('hidden');
+      setTimeout(() => m.classList.remove('opacity-0'), 10);
+    }
+
+    function closeScheduleSlotMenu() {
+      const m = document.getElementById('scheduleSlotMenu');
+      m.classList.add('opacity-0');
+      setTimeout(() => m.classList.add('hidden'), 300);
+    }
+
+    function changeScheduleSlotRecipe() {
+      closeScheduleSlotMenu();
+      _schedulePendingChange = true;
+      document.getElementById('scheduleRecipeSearch').value = '';
+      const m = document.getElementById('scheduleRecipeModal');
+      m.classList.remove('hidden');
+      setTimeout(() => m.classList.remove('opacity-0'), 10);
+      renderScheduleRecipePickerList();
+    }
+
+    function removeScheduleSlot() {
+      const date = _schedulePendingDate;
+      const meal = _schedulePendingMeal;
+      if (!date || !meal) return;
+      queueScheduleDelete({ date, meal });
+      closeScheduleSlotMenu();
+      renderSchedule();
+      showToast('献立を削除しました。同期するまでスプシ未反映です。', 'info');
+    }
+
     function updateAiSelectedTags() {
       const selectedIds = Array.from(document.querySelectorAll('.ai-ing-cb:checked')).map(cb => cb.dataset.id);
       const tagsContainer = document.getElementById('aiSelectedTags');
@@ -1936,6 +2366,22 @@ ${plan ? '\n提案方針: ' + plan : ''}
         await saveRecipe(data);
       }
       closeRecipeModal();
+    }
+
+    function addCurrentRecipeToShopping() {
+      const recipeId = document.getElementById('r-id').value;
+      if (!recipeId) { showToast('先にレシピを保存してください。', 'error'); return; }
+      const shortages = compareRecipeWithInventory(recipeId);
+      if (shortages.length === 0) {
+        showToast('在庫に十分な材料があります。', 'info');
+        return;
+      }
+      addShortagesToShopping(shortages);
+      showToastWithAction(
+        `${shortages.length} 件の不足材料を買い物リストに追加しました。`,
+        '買い物リストを確認',
+        () => { switchMode('A'); filterByLocation('買い物リスト'); }
+      );
     }
 
     /* --- Recipe Text Modal --- */

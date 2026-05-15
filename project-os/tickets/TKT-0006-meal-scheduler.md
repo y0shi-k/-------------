@@ -8,7 +8,7 @@ owner_role: ai-implementer
 required_evals:
   - ui_component_addition
   - gas_pattern_change
-status: draft
+status: completed
 ---
 
 ## 目的
