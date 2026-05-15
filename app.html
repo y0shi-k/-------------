@@ -107,7 +107,7 @@
       <!-- ソートコントロール -->
       <div class="flex gap-2 mb-3 px-1 items-center">
         <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">並び</span>
-        <button onclick="setSort('limit2')" class="sort-btn text-[10px] font-bold px-3 py-1 rounded-full transition-all bg-indigo-100 text-indigo-700" data-sort="limit2">期限順</button>
+        <button onclick="setSort('limit2')" class="sort-btn text-[10px] font-bold px-3 py-1 rounded-full transition-all bg-indigo-100 text-indigo-700" data-sort="limit2">期限順 ▲</button>
         <button onclick="setSort('name')" class="sort-btn text-[10px] font-bold px-3 py-1 rounded-full transition-all bg-slate-100 text-slate-500" data-sort="name">名前順</button>
         <button onclick="setSort('buy')" class="sort-btn text-[10px] font-bold px-3 py-1 rounded-full transition-all bg-slate-100 text-slate-500" data-sort="buy">購入日順</button>
       </div>
@@ -634,6 +634,7 @@
       currentBTab: 'recipes',
       isProcessing: false,
       sortBy: 'limit2',
+      sortOrder: 'asc',
       editMode: null,
       editId: null,
       recipeEditId: null,
@@ -1649,10 +1650,18 @@
     }
 
     function setSort(key) {
-      state.sortBy = key;
+      if (state.sortBy === key) {
+        state.sortOrder = state.sortOrder === 'asc' ? 'desc' : 'asc';
+      } else {
+        state.sortBy = key;
+        state.sortOrder = 'asc';
+      }
+      const labels = { limit2: '期限順', name: '名前順', buy: '購入日順' };
       document.querySelectorAll('.sort-btn').forEach(btn => {
-        const isActive = btn.dataset.sort === key;
+        const isActive = btn.dataset.sort === state.sortBy;
+        const arrow = isActive ? (state.sortOrder === 'asc' ? ' ▲' : ' ▼') : '';
         btn.className = `sort-btn text-[10px] font-bold px-3 py-1 rounded-full transition-all ${isActive ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-500'}`;
+        btn.textContent = labels[btn.dataset.sort] + arrow;
       });
       renderList();
     }
@@ -2346,7 +2355,7 @@ ${plan ? '\n提案方針: ' + plan : ''}
     }
 
     function sortInventory(list) {
-      return [...list].sort((a, b) => {
+      const sorted = [...list].sort((a, b) => {
         if (state.sortBy === 'name') return a.name.localeCompare(b.name, 'ja');
         if (state.sortBy === 'buy') {
           if (!a.buy && !b.buy) return 0;
@@ -2359,6 +2368,7 @@ ${plan ? '\n提案方針: ' + plan : ''}
         if (!b.limit2) return -1;
         return a.limit2.localeCompare(b.limit2);
       });
+      return state.sortOrder === 'desc' ? sorted.reverse() : sorted;
     }
 
     /* --- Processing --- */
