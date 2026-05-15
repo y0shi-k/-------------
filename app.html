@@ -318,7 +318,13 @@
               <label class="block text-[11px] font-black text-slate-400 uppercase mb-1.5 ml-1">分類</label>
               <select id="f-type" class="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-4 py-4 text-sm font-bold outline-none focus:border-indigo-500 appearance-none cursor-pointer">
                 <option value="食材">食材</option>
+                <option value="野菜">野菜</option>
+                <option value="肉">肉</option>
+                <option value="魚">魚</option>
+                <option value="乳製品">乳製品</option>
+                <option value="穀物">穀物</option>
                 <option value="調味料">調味料</option>
+                <option value="その他">その他</option>
               </select>
             </div>
             <div>
@@ -538,18 +544,53 @@
   </div>
 
   <!-- モーダル: AI食材選択 -->
-  <div id="aiIngredientSelectModal" onclick="if(event.target===this) closeAiIngredientModal()" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
+  <div id="aiIngredientSelectModal" class="fixed inset-0 z-50 flex items-start justify-center pt-12 p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
     <div onclick="event.stopPropagation()" class="bg-white w-full max-w-lg rounded-[2.5rem] p-6 shadow-2xl transform scale-95 transition-transform duration-300 border border-slate-100 max-h-[85vh] overflow-y-auto">
       <div class="flex justify-between items-center mb-5">
         <h3 class="text-2xl font-black text-slate-800 tracking-tight">食材を選択</h3>
         <button onclick="closeAiIngredientModal()" class="text-slate-300 hover:text-slate-600 bg-slate-100 p-2 rounded-full"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg></button>
       </div>
-      <div id="aiIngredientList" class="space-y-2 max-h-[50vh] overflow-y-auto">
+      <div class="mb-4 space-y-3">
+        <input type="text" id="aiIngredientSearch" oninput="renderAiIngredientList()" class="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:border-indigo-500" placeholder="食材名で検索...">
+        <div class="flex gap-2">
+          <div class="flex-1 flex bg-slate-100 rounded-xl p-1 gap-1">
+            <button type="button" onclick="setAiSort('name')" data-ai-sort="name" class="ai-sort-btn flex-1 text-xs font-black py-2 rounded-lg transition-all">名前</button>
+            <button type="button" onclick="setAiSort('buy')" data-ai-sort="buy" class="ai-sort-btn flex-1 text-xs font-black py-2 rounded-lg transition-all">購入日</button>
+            <button type="button" onclick="setAiSort('limit2')" data-ai-sort="limit2" class="ai-sort-btn flex-1 text-xs font-black py-2 rounded-lg transition-all bg-white text-indigo-600 shadow-sm">期限</button>
+          </div>
+        </div>
+        <div class="flex gap-2">
+          <select id="aiIngredientLocFilter" onchange="renderAiIngredientList()" class="flex-1 bg-slate-50 border-2 border-slate-100 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:border-indigo-500 appearance-none cursor-pointer">
+            <option value="すべて">すべての場所</option>
+          </select>
+          <select id="aiIngredientTypeFilter" onchange="renderAiIngredientList()" class="flex-1 bg-slate-50 border-2 border-slate-100 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:border-indigo-500 appearance-none cursor-pointer">
+            <option value="すべて">すべての分類</option>
+            <option value="食材">食材</option>
+            <option value="野菜">野菜</option>
+            <option value="肉">肉</option>
+            <option value="魚">魚</option>
+            <option value="乳製品">乳製品</option>
+            <option value="穀物">穀物</option>
+            <option value="調味料">調味料</option>
+            <option value="その他">その他</option>
+          </select>
+        </div>
+      </div>
+      <div id="aiIngredientList" class="space-y-2 max-h-[40vh] min-h-[40vh] overflow-y-auto">
         <!-- JSで動的に挿入 -->
+      </div>
+      <div id="aiSelectedTagsArea" class="hidden pt-3 border-t border-slate-100 mt-2">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-[11px] font-black text-slate-400 uppercase">選択済み</span>
+          <button onclick="clearAiIngredientSelection()" class="text-[11px] font-bold text-rose-500 hover:text-rose-700">すべて解除</button>
+        </div>
+        <div id="aiSelectedTags" class="flex flex-wrap gap-2">
+          <!-- JSで動的に挿入 -->
+        </div>
       </div>
       <div class="pt-4 flex gap-3 mt-2 border-t border-slate-100">
         <button onclick="closeAiIngredientModal()" class="flex-1 bg-slate-100 text-slate-600 font-black py-4 rounded-2xl hover:bg-slate-200 transition-all">キャンセル</button>
-        <button onclick="generateSelectedRecipe()" class="flex-[2] bg-indigo-600 text-white font-black py-4 rounded-2xl hover:bg-indigo-700 transition-all shadow-xl">レシピを考案</button>
+        <button id="aiGenerateBtn" onclick="generateSelectedRecipe()" class="flex-[2] bg-indigo-600 text-white font-black py-4 rounded-2xl hover:bg-indigo-700 transition-all shadow-xl">レシピを考案</button>
       </div>
     </div>
   </div>
@@ -2136,12 +2177,33 @@
       openAiRequestModal(items, 'priority');
     }
 
+    let aiIngredientSort = 'limit2';
+    let aiIngredientSortOrder = 'asc';
+    let aiIngredientSelectedIds = new Set();
+
     function openAiIngredientSelector() {
       document.getElementById('syncBar').classList.add('sync-bar-hidden');
       document.getElementById('syncBar').classList.remove('sync-bar-visible');
       const m = document.getElementById('aiIngredientSelectModal');
       m.classList.remove('hidden');
       setTimeout(() => m.classList.remove('opacity-0'), 10);
+      // 保存場所フィルタの選択肢を更新
+      const locSel = document.getElementById('aiIngredientLocFilter');
+      const currentLocVal = locSel.value;
+      let locOpts = '<option value="すべて">すべての場所</option>';
+      const locs = [];
+      (state.inventory || []).forEach(item => addUniqueLocation(locs, item.loc));
+      locs.forEach(loc => {
+        locOpts += `<option value="${escapeHtml(loc)}">${escapeHtml(loc)}</option>`;
+      });
+      locSel.innerHTML = locOpts;
+      locSel.value = currentLocVal && Array.from(locSel.options).some(o => o.value === currentLocVal) ? currentLocVal : 'すべて';
+      // 検索・フィルタリセット
+      document.getElementById('aiIngredientSearch').value = '';
+      document.getElementById('aiIngredientTypeFilter').value = 'すべて';
+      // 選択状態リセット
+      aiIngredientSelectedIds = new Set();
+      renderAiSelectedTags();
       renderAiIngredientList();
     }
 
@@ -2150,6 +2212,22 @@
       m.classList.add('opacity-0');
       setTimeout(() => m.classList.add('hidden'), 300);
       updateSyncBar();
+      // 選択状態をクリア（次回開くときにリセット）
+      aiIngredientSelectedIds = new Set();
+    }
+
+    function setAiSort(key) {
+      if (aiIngredientSort === key) {
+        aiIngredientSortOrder = aiIngredientSortOrder === 'asc' ? 'desc' : 'asc';
+      } else {
+        aiIngredientSort = key;
+        aiIngredientSortOrder = 'asc';
+      }
+      document.querySelectorAll('.ai-sort-btn').forEach(btn => {
+        const isActive = btn.dataset.aiSort === aiIngredientSort;
+        btn.className = 'ai-sort-btn flex-1 text-xs font-black py-2 rounded-lg transition-all' + (isActive ? ' bg-white text-indigo-600 shadow-sm' : ' text-slate-500 hover:text-slate-700');
+      });
+      renderAiIngredientList();
     }
 
     function renderAiIngredientList() {
@@ -2160,10 +2238,39 @@
         container.innerHTML = '<div class="py-10 text-center text-slate-300 font-bold">在庫がありません。</div>';
         return;
       }
-      const sorted = [...state.inventory].sort((a, b) => {
-        const la = (a.limit2 || a.limit1) || '';
-        const lb = (b.limit2 || b.limit1) || '';
-        return la.localeCompare(lb);
+      const searchVal = (document.getElementById('aiIngredientSearch')?.value || '').toLowerCase();
+      const locFilter = document.getElementById('aiIngredientLocFilter')?.value || 'すべて';
+      const typeFilter = document.getElementById('aiIngredientTypeFilter')?.value || 'すべて';
+      let filtered = state.inventory.filter(item => {
+        if (searchVal && !item.name.toLowerCase().includes(searchVal)) return false;
+        if (locFilter !== 'すべて' && item.loc !== locFilter) return false;
+        if (typeFilter !== 'すべて' && item.type !== typeFilter) return false;
+        return true;
+      });
+      if (filtered.length === 0) {
+        container.innerHTML = '<div class="py-10 text-center text-slate-300 font-bold">該当する食材がありません。</div>';
+        return;
+      }
+      const sorted = [...filtered].sort((a, b) => {
+        const aSel = aiIngredientSelectedIds.has(a.id) ? 1 : 0;
+        const bSel = aiIngredientSelectedIds.has(b.id) ? 1 : 0;
+        if (aSel !== bSel) return bSel - aSel; // 選択済みを常に先頭に
+        let cmp = 0;
+        if (aiIngredientSort === 'name') cmp = a.name.localeCompare(b.name, 'ja');
+        else if (aiIngredientSort === 'buy') {
+          if (!a.buy && !b.buy) cmp = 0;
+          else if (!a.buy) cmp = 1;
+          else if (!b.buy) cmp = -1;
+          else cmp = a.buy.localeCompare(b.buy);
+        } else {
+          const la = (a.limit2 || a.limit1) || '';
+          const lb = (b.limit2 || b.limit1) || '';
+          if (!la && !lb) cmp = 0;
+          else if (!la) cmp = 1;
+          else if (!lb) cmp = -1;
+          else cmp = la.localeCompare(lb);
+        }
+        return aiIngredientSortOrder === 'desc' ? -cmp : cmp;
       });
       sorted.forEach(item => {
         const limit = item.limit2 || item.limit1;
@@ -2176,24 +2283,70 @@
           if (diff < 0) { rowClass = 'border-rose-200 bg-rose-50'; limitText += ' (期限切れ)'; }
           else if (diff <= 3) { rowClass = 'border-amber-200 bg-amber-50'; limitText += ' (あと' + diff + '日)'; }
         }
+        const typeLabel = item.type ? ` · ${escapeHtml(item.type)}` : '';
+        const isSelected = aiIngredientSelectedIds.has(item.id);
+        const selectedClass = isSelected ? 'bg-indigo-50 border-indigo-200 ring-1 ring-indigo-100' : 'bg-white';
         container.insertAdjacentHTML('beforeend', `
-          <div class="bg-white p-3 rounded-xl shadow-sm border ${rowClass} flex items-center gap-3 cursor-pointer" onclick="this.querySelector('.ai-ing-cb').click()">
-            <input type="checkbox" class="ai-ing-cb w-5 h-5 rounded border-slate-300 text-indigo-500 focus:ring-indigo-400 shrink-0" data-id="${item.id}" onclick="event.stopPropagation()" onchange="updateAiSelectedTags()">
+          <div class="${selectedClass} p-3 rounded-xl shadow-sm border ${rowClass} flex items-center gap-3 cursor-pointer" onclick="toggleAiIngredientSelection('${item.id}')">
+            <input type="checkbox" class="ai-ing-cb w-5 h-5 rounded border-slate-300 text-indigo-500 focus:ring-indigo-400 shrink-0" data-id="${item.id}" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation()" onchange="toggleAiIngredientSelection('${item.id}')">
             <div class="flex-1 min-w-0">
               <div class="font-bold text-slate-800 text-sm truncate">${escapeHtml(item.name)}</div>
-              <div class="text-[10px] text-slate-400 font-bold">${item.qty}${item.unit} · ${escapeHtml(item.loc)} · ${limitText}</div>
+              <div class="text-[10px] text-slate-400 font-bold">${item.qty}${item.unit} · ${escapeHtml(item.loc)}${typeLabel} · ${limitText}</div>
             </div>
           </div>
         `);
       });
     }
 
+    function toggleAiIngredientSelection(id) {
+      if (aiIngredientSelectedIds.has(id)) {
+        aiIngredientSelectedIds.delete(id);
+      } else {
+        aiIngredientSelectedIds.add(id);
+      }
+      renderAiIngredientList();
+      renderAiSelectedTags();
+    }
+
+    function renderAiSelectedTags() {
+      const area = document.getElementById('aiSelectedTagsArea');
+      const container = document.getElementById('aiSelectedTags');
+      const btn = document.getElementById('aiGenerateBtn');
+      if (!area || !container || !btn) return;
+      const count = aiIngredientSelectedIds.size;
+      if (count === 0) {
+        area.classList.add('hidden');
+        btn.textContent = 'レシピを考案';
+        return;
+      }
+      area.classList.remove('hidden');
+      btn.textContent = `レシピを考案 (${count})`;
+      container.innerHTML = '';
+      aiIngredientSelectedIds.forEach(id => {
+        const item = state.inventory.find(i => i.id === id);
+        if (!item) return;
+        container.insertAdjacentHTML('beforeend', `
+          <span class="inline-flex items-center gap-1 bg-indigo-50 border border-indigo-100 text-indigo-700 text-xs font-bold px-2.5 py-1.5 rounded-full">
+            ${escapeHtml(item.name)}
+            <button onclick="event.stopPropagation(); toggleAiIngredientSelection('${item.id}')" class="w-4 h-4 flex items-center justify-center rounded-full hover:bg-indigo-200 text-indigo-500 transition-colors">×</button>
+          </span>
+        `);
+      });
+    }
+
+    function clearAiIngredientSelection() {
+      aiIngredientSelectedIds = new Set();
+      // 全チェックボックスを更新
+      document.querySelectorAll('.ai-ing-cb').forEach(cb => { cb.checked = false; });
+      renderAiSelectedTags();
+    }
+
     async function generateSelectedRecipe() {
-      const selectedIds = Array.from(document.querySelectorAll('.ai-ing-cb:checked')).map(cb => cb.dataset.id);
-      if (selectedIds.length === 0) {
+      if (aiIngredientSelectedIds.size === 0) {
         showToast('食材を1つ以上選択してください。', 'error');
         return;
       }
+      const selectedIds = Array.from(aiIngredientSelectedIds);
       const items = state.inventory.filter(i => selectedIds.indexOf(i.id) !== -1);
       closeAiIngredientModal();
       openAiRequestModal(items, 'selected');
