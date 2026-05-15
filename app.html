@@ -120,6 +120,20 @@
         </div>
       </div>
 
+      <!-- 買い物リスト表示コントロール -->
+      <div id="shoppingControls" class="hidden mb-3 px-2 space-y-3">
+        <div class="flex items-center justify-between gap-3">
+          <div class="flex items-center gap-2">
+            <input type="checkbox" id="selectAllShopping" onchange="toggleSelectAll(this)" class="w-5 h-5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500">
+            <label for="selectAllShopping" class="text-xs font-black text-slate-500 uppercase tracking-widest cursor-pointer">すべて選択</label>
+          </div>
+          <div class="bg-slate-100 rounded-xl p-1 flex gap-1">
+            <button onclick="setShoppingView('source')" class="shopping-view-btn px-3 py-1.5 rounded-lg text-[10px] font-black bg-white text-emerald-700 shadow-sm" data-view="source">出自別</button>
+            <button onclick="setShoppingView('grouped')" class="shopping-view-btn px-3 py-1.5 rounded-lg text-[10px] font-black text-slate-500" data-view="grouped">材料まとめ</button>
+          </div>
+        </div>
+      </div>
+
       <!-- メインリストエリア -->
       <div id="listContainer" class="space-y-3">
         <!-- JSで動的に挿入 -->
@@ -161,9 +175,15 @@
       </div>
 
       <!-- 買い物リスト専用アクション -->
-      <div id="shoppingActions" class="hidden mt-8">
+      <div id="shoppingActions" class="hidden mt-8 space-y-3">
+        <button onclick="openShoppingManualModal()" class="w-full bg-slate-800 text-white font-black py-4 rounded-2xl shadow-lg hover:bg-slate-900 active:scale-95 transition-all flex items-center justify-center gap-2">
+          <span>＋</span> 買い物リストに手動追加
+        </button>
         <button onclick="bulkPurchase()" class="w-full bg-emerald-600 text-white font-black py-4 rounded-2xl shadow-lg shadow-emerald-200 hover:bg-emerald-700 active:scale-95 transition-all flex items-center justify-center gap-2">
           <span>✅</span> チェックした食材を購入済にする
+        </button>
+        <button onclick="bulkDeleteShopping()" class="w-full bg-rose-600 text-white font-black py-4 rounded-2xl shadow-lg shadow-rose-200 hover:bg-rose-700 active:scale-95 transition-all flex items-center justify-center gap-2">
+          <span>🗑</span> チェックした食材を一括削除
         </button>
       </div>
     </div>
@@ -356,6 +376,33 @@
         <div class="pt-4">
           <button type="submit" id="btnSubmit" class="w-full bg-slate-900 text-white font-black py-5 rounded-[1.5rem] hover:bg-black transition-all shadow-xl text-lg flex items-center justify-center gap-2">リストに追加</button>
         </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- モーダル: 買い物リスト手動追加 -->
+  <div id="shoppingManualModal" onclick="if(event.target===this) closeShoppingManualModal()" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
+    <div onclick="event.stopPropagation()" class="bg-white w-full max-w-sm rounded-[2rem] p-6 shadow-2xl transform scale-95 transition-transform duration-300 border border-slate-100">
+      <div class="flex justify-between items-center mb-5">
+        <h3 class="text-xl font-black text-slate-800 tracking-tight">買い物を追加</h3>
+        <button onclick="closeShoppingManualModal()" class="text-slate-300 hover:text-slate-600 bg-slate-100 p-2 rounded-full"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+      </div>
+      <form id="shoppingManualForm" onsubmit="handleShoppingManualSave(event)" class="space-y-4">
+        <div>
+          <label class="block text-[11px] font-black text-slate-400 uppercase mb-1.5 ml-1">品名</label>
+          <input type="text" id="shop-name" required class="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:border-emerald-500" placeholder="例: 牛乳">
+        </div>
+        <div class="grid grid-cols-[1fr_88px] gap-3">
+          <div>
+            <label class="block text-[11px] font-black text-slate-400 uppercase mb-1.5 ml-1">数量</label>
+            <input type="number" id="shop-qty" step="0.1" min="0" required class="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:border-emerald-500">
+          </div>
+          <div>
+            <label class="block text-[11px] font-black text-slate-400 uppercase mb-1.5 ml-1">単位</label>
+            <input type="text" id="shop-unit" required class="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-3 py-3 text-sm font-bold outline-none focus:border-emerald-500" placeholder="個">
+          </div>
+        </div>
+        <button type="submit" class="w-full bg-emerald-600 text-white font-black py-4 rounded-2xl hover:bg-emerald-700 active:scale-95 transition-all">追加する</button>
       </form>
     </div>
   </div>
@@ -580,6 +627,8 @@
       recipes: [],
       schedule: [],
       scheduleWeekOffset: 0,
+      shoppingView: 'source',
+      shoppingExpandedGroups: {},
       currentLoc: 'すべて',
       currentMode: 'A',
       currentBTab: 'recipes',
@@ -665,6 +714,7 @@
         scheduleCreates: [],
         scheduleDeletes: [],
         shoppingCreates: [],
+        shoppingDeletes: [],
         shoppingPurchases: []
       };
     }
@@ -697,6 +747,7 @@
         + p.recipeCreates.length + countObject(p.recipeUpdates) + p.recipeDeletes.length
         + p.scheduleCreates.length + p.scheduleDeletes.length
         + p.shoppingCreates.length
+        + p.shoppingDeletes.length
         + p.shoppingPurchases.length;
     }
 
@@ -717,7 +768,7 @@
       if (rec) parts.push(`レシピ ${rec}`);
       const sch = p.scheduleCreates.length + p.scheduleDeletes.length;
       if (sch) parts.push(`献立 ${sch}`);
-      const shop = p.shoppingCreates.length;
+      const shop = p.shoppingCreates.length + p.shoppingDeletes.length;
       if (shop) parts.push(`買い物 ${shop}`);
       if (p.shoppingPurchases.length) parts.push(`購入処理 ${p.shoppingPurchases.length}`);
       document.getElementById('syncSummary').textContent = `未同期 ${count} 件`;
@@ -766,6 +817,20 @@
         source: recipe.source || '',
         count: Number(recipe.count) || 0,
         history: recipe.history || '[]'
+      };
+    }
+
+    function cleanShoppingItem(item) {
+      return {
+        id: item.id || '',
+        name: item.name || '',
+        qty: Number(item.qty) || 0,
+        unit: item.unit || '',
+        status: item.status || '未購入',
+        recipeName: item.recipeName || '',
+        sourceType: item.sourceType || '',
+        scheduleDate: item.scheduleDate || '',
+        meal: item.meal || ''
       };
     }
 
@@ -825,12 +890,21 @@
 
     function queueShoppingCreate(item) {
       item._syncStatus = 'created';
-      state.pendingSync.shoppingCreates.push({
-        name: item.name || '',
-        qty: Number(item.qty) || 0,
-        unit: item.unit || '',
-        recipeName: item.recipeName || ''
+      state.pendingSync.shoppingCreates.push(cleanShoppingItem(item));
+      updateSyncBar();
+    }
+
+    function queueShoppingDelete(id) {
+      const wasCreated = state.pendingSync.shoppingCreates.some(i => i.id === id);
+      state.pendingSync.shoppingCreates = state.pendingSync.shoppingCreates.filter(i => i.id !== id);
+      state.pendingSync.shoppingPurchases.forEach(op => {
+        op.ids = (op.ids || []).filter(itemId => itemId !== id);
       });
+      state.pendingSync.shoppingPurchases = state.pendingSync.shoppingPurchases.filter(op => (op.ids || []).length > 0);
+      if (!wasCreated && !state.pendingSync.shoppingDeletes.includes(id)) {
+        state.pendingSync.shoppingDeletes.push(id);
+      }
+      state.shopping = state.shopping.filter(i => i.id !== id);
       updateSyncBar();
     }
 
@@ -878,6 +952,127 @@
       return `<span class="text-[9px] font-black px-2 py-0.5 ${cls} rounded-full">${label}</span>`;
     }
 
+    function getShoppingSyncBadge(item) {
+      if (!item || !item._syncStatus) return '';
+      const label = item._syncStatus === 'created' ? '未同期' : '変更あり';
+      const cls = item._syncStatus === 'created' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700';
+      return `<span class="text-[9px] font-black px-1.5 py-0.5 ${cls} rounded-full">${label}</span>`;
+    }
+
+    function getShoppingSourceText(item) {
+      if (!item) return '出自不明';
+      if (item.sourceType === '手動追加') return '手動追加';
+      if (item.sourceType === '献立スケジュール') {
+        const bits = [item.scheduleDate, item.meal, item.recipeName].filter(Boolean);
+        return bits.length ? bits.join(' · ') : '献立スケジュール';
+      }
+      if (item.sourceType === 'レシピ詳細') return item.recipeName ? `レシピ詳細 · ${item.recipeName}` : 'レシピ詳細';
+      if (item.recipeName) return `レシピ · ${item.recipeName}`;
+      return '出自不明';
+    }
+
+    function calculateInventoryShortage(name, qty, unit) {
+      const requiredQty = Number(qty) || 0;
+      const stockQty = state.inventory
+        .filter(item => item.name === name && item.unit === unit && Number(item.qty) > 0)
+        .reduce((sum, item) => sum + (Number(item.qty) || 0), 0);
+      return {
+        requiredQty,
+        stockQty,
+        shortageQty: Math.max(0, requiredQty - stockQty)
+      };
+    }
+
+    function setShoppingView(view) {
+      state.shoppingView = view === 'grouped' ? 'grouped' : 'source';
+      renderList();
+    }
+
+    function toggleShoppingGroup(key) {
+      state.shoppingExpandedGroups[key] = !state.shoppingExpandedGroups[key];
+      renderList();
+    }
+
+    function toggleShoppingGroupSelection(checkbox) {
+      const ids = (checkbox.dataset.ids || '').split(',').filter(Boolean);
+      ids.forEach(id => {
+        document.querySelectorAll(`.shop-cb[data-id="${id}"]`).forEach(cb => {
+          cb.checked = checkbox.checked;
+        });
+      });
+    }
+
+    function getSelectedShoppingIds() {
+      const ids = [];
+      document.querySelectorAll('.shop-cb:checked').forEach(el => ids.push(el.dataset.id));
+      document.querySelectorAll('.shop-group-cb:checked').forEach(el => {
+        (el.dataset.ids || '').split(',').filter(Boolean).forEach(id => ids.push(id));
+      });
+      return Array.from(new Set(ids));
+    }
+
+    function renderShoppingRow(item, compact = false) {
+      const source = getShoppingSourceText(item);
+      const syncBadge = getShoppingSyncBadge(item);
+      const pad = compact ? 'p-2' : 'p-3';
+      const qtyCls = compact ? 'text-xs' : 'text-sm';
+      return `
+        <div class="bg-white ${pad} rounded-xl shadow-sm border border-slate-100 flex items-center gap-3 transition-colors hover:bg-emerald-50">
+          <input type="checkbox" class="shop-cb w-5 h-5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 shrink-0" data-id="${item.id}">
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 mb-0.5 min-w-0">
+              <span class="font-bold text-slate-800 text-sm truncate">${escapeHtml(item.name || '')}</span>
+              ${syncBadge}
+            </div>
+            <div class="text-[10px] text-slate-400 font-bold truncate">${escapeHtml(source)}</div>
+          </div>
+          <div class="${qtyCls} font-bold text-slate-700 w-16 text-right shrink-0">${item.qty}<span class="text-[10px]">${escapeHtml(item.unit || '')}</span></div>
+          <button onclick="deleteShoppingItem('${item.id}')" class="p-2 text-slate-400 hover:text-rose-500 transition-colors text-lg leading-none shrink-0">🗑</button>
+        </div>
+      `;
+    }
+
+    function renderShoppingGrouped(list) {
+      const groups = [];
+      const byKey = {};
+      list.forEach(item => {
+        const key = `${item.name || ''}||${item.unit || ''}`;
+        if (!byKey[key]) {
+          byKey[key] = { key, name: item.name || '', unit: item.unit || '', qty: 0, items: [] };
+          groups.push(byKey[key]);
+        }
+        byKey[key].qty += Number(item.qty) || 0;
+        byKey[key].items.push(item);
+      });
+      return groups.map(group => {
+        const expanded = !!state.shoppingExpandedGroups[group.key];
+        const encodedKey = encodeURIComponent(group.key);
+        const ids = group.items.map(i => i.id).join(',');
+        const details = expanded ? `
+          <div class="ml-8 mt-2 space-y-2">
+            ${group.items.map(item => renderShoppingRow(item, true)).join('')}
+          </div>
+        ` : '';
+        return `
+          <div class="bg-white p-3 rounded-xl shadow-sm border border-slate-100">
+            <div class="flex items-center gap-3">
+              <input type="checkbox" class="shop-group-cb w-5 h-5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 shrink-0" data-ids="${ids}" onchange="toggleShoppingGroupSelection(this)">
+              <button onclick="toggleShoppingGroup(decodeURIComponent('${encodedKey}'))" class="w-7 h-7 bg-slate-100 rounded-lg text-slate-600 font-black flex items-center justify-center active:scale-90 transition-all shrink-0">${expanded ? '−' : '＋'}</button>
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 mb-0.5">
+                  <span class="font-bold text-slate-800 text-sm truncate">${escapeHtml(group.name)}</span>
+                  <span class="text-[9px] font-black px-1.5 py-0.5 bg-emerald-100 text-emerald-700 rounded-full">${group.items.length}件</span>
+                </div>
+                <div class="text-[10px] text-slate-400 font-bold truncate">${escapeHtml(group.items.map(getShoppingSourceText).join(' / '))}</div>
+              </div>
+              <div class="text-sm font-bold text-slate-700 w-16 text-right shrink-0">${group.qty}<span class="text-[10px]">${escapeHtml(group.unit)}</span></div>
+            </div>
+            ${details}
+          </div>
+        `;
+      }).join('');
+    }
+
     function discardPendingChanges() {
       state.inventory = clonePlain(state.syncedSnapshot.inventory);
       state.shopping = clonePlain(state.syncedSnapshot.shopping);
@@ -901,6 +1096,19 @@
         var sRecipes = ss.getSheetByName('レシピ集');
         var sSchedule = ss.getSheetByName('献立スケジュール');
         var sShop = ss.getSheetByName('買い物リスト');
+
+        function ensureSheetColumns(sheet, headers) {
+          var current = sheet.getRange(1, 1, 1, Math.max(headers.length, sheet.getLastColumn() || 1)).getValues()[0];
+          if(!current[0]) {
+            sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+          } else {
+            for(var hc=0; hc<headers.length; hc++) {
+              if(!current[hc]) sheet.getRange(1, hc+1).setValue(headers[hc]);
+            }
+          }
+          sheet.setFrozenRows(1);
+        }
+        ensureSheetColumns(sShop, ['リストID', '品名', '必要数量', '単位', 'ステータス', '紐づくレシピ名', '出自種別', '予定日', '食事区分']);
 
         function f(v) {
           if(!v && v !== 0) return "";
@@ -926,7 +1134,7 @@
           for(var i=1; i<shop.length; i++) {
             var r = shop[i];
             if(!r[1]) continue;
-            list.push({ id: f(r[0]), name: f(r[1]), qty: Number(r[2])||0, unit: f(r[3]), status: f(r[4]) });
+            list.push({ id: f(r[0]), name: f(r[1]), qty: Number(r[2])||0, unit: f(r[3]), status: f(r[4]), recipeName: f(r[5]), sourceType: f(r[6]), scheduleDate: f(r[7]), meal: f(r[8]) });
           }
           return list;
         }
@@ -992,6 +1200,12 @@
               sSchedule.appendRow([d.date, d.meal, d.recipeId, d.recipeName, d.status || '未完了']);
             }
           });
+        }
+
+        var shoppingDeletes = pending.shoppingDeletes || [];
+        var shopDeleteData = sShop.getDataRange().getValues();
+        for(var sdd=shopDeleteData.length-1; sdd>=1; sdd--) {
+          if(shoppingDeletes.indexOf(String(shopDeleteData[sdd][0])) !== -1) sShop.deleteRow(sdd+1);
         }
 
         var invUpdates = pending.inventoryUpdates || {};
@@ -1063,15 +1277,17 @@
           shoppingCreates.forEach(function(d) {
             var merged = false;
             for(var sci=1; sci<shopData2.length; sci++) {
-              if(String(shopData2[sci][1]) === d.name && String(shopData2[sci][4]) === '未購入' && String(shopData2[sci][3]) === d.unit) {
+              if(String(shopData2[sci][1]) === d.name && String(shopData2[sci][4]) === '未購入' && String(shopData2[sci][3]) === d.unit && f(shopData2[sci][5]) === (d.recipeName || '') && f(shopData2[sci][6]) === (d.sourceType || '') && f(shopData2[sci][7]) === (d.scheduleDate || '') && f(shopData2[sci][8]) === (d.meal || '')) {
                 var currentShopQty = Number(shopData2[sci][2]) || 0;
                 sShop.getRange(sci+1, 3).setValue(currentShopQty + d.qty);
+                shopData2[sci][2] = currentShopQty + d.qty;
                 merged = true;
                 break;
               }
             }
             if(!merged) {
-              sShop.appendRow([Utilities.getUuid(), d.name, d.qty, d.unit, '未購入', d.recipeName || '']);
+              sShop.appendRow([Utilities.getUuid(), d.name, d.qty, d.unit, '未購入', d.recipeName || '', d.sourceType || '', d.scheduleDate || '', d.meal || '']);
+              shopData2.push(['', d.name, d.qty, d.unit, '未購入', d.recipeName || '', d.sourceType || '', d.scheduleDate || '', d.meal || '']);
             }
           });
         }
@@ -1153,9 +1369,13 @@
         names.forEach(function(n){ if(!ss.getSheetByName(n)) ss.insertSheet(n); });
         function ensureHeader(sheetName, header, firstCell) {
           var sheet = ss.getSheetByName(sheetName);
-          var current = sheet.getRange(1, 1, 1, header.length).getValues()[0];
+          var current = sheet.getRange(1, 1, 1, Math.max(header.length, sheet.getLastColumn() || 1)).getValues()[0];
           if(!current[0] || current[0] !== firstCell) {
             sheet.appendRow(header);
+          } else {
+            for(var hc=0; hc<header.length; hc++) {
+              if(!current[hc]) sheet.getRange(1, hc+1).setValue(header[hc]);
+            }
           }
           sheet.setFrozenRows(1);
         }
@@ -1163,7 +1383,7 @@
         ensureHeader('レシピ集', ['レシピID', 'レシピ名', '材料JSON', '手順JSON', '出典', '調理回数', '調理日履歴'], 'レシピID');
         ensureHeader('献立スケジュール', ['予定日', '食事区分', 'レシピID', 'レシピ名', 'ステータス'], '予定日');
         ensureHeader('料理履歴', ['履歴ID', '調理日時', 'レシピID', 'レシピ名', '感想', '写真URL', '評価'], '履歴ID');
-        ensureHeader('買い物リスト', ['リストID', '品名', '必要数量', '単位', 'ステータス', '紐づくレシピ名'], 'リストID');
+        ensureHeader('買い物リスト', ['リストID', '品名', '必要数量', '単位', 'ステータス', '紐づくレシピ名', '出自種別', '予定日', '食事区分'], 'リストID');
         
         function f(v) { 
           if(!v && v !== 0) return "";
@@ -1191,7 +1411,7 @@
           for(var j=1; j<shop.length; j++) {
             var rs = shop[j];
             if(!rs[1]) continue;
-            shopping.push({ id: f(rs[0]), name: f(rs[1]), qty: Number(rs[2])||0, unit: f(rs[3]), status: f(rs[4]) });
+            shopping.push({ id: f(rs[0]), name: f(rs[1]), qty: Number(rs[2])||0, unit: f(rs[3]), status: f(rs[4]), recipeName: f(rs[5]), sourceType: f(rs[6]), scheduleDate: f(rs[7]), meal: f(rs[8]) });
           }
         }
 
@@ -1285,6 +1505,7 @@
       const container = document.getElementById('listContainer');
       const stagingActions = document.getElementById('stagingActions');
       const shoppingActions = document.getElementById('shoppingActions');
+      const shoppingControls = document.getElementById('shoppingControls');
       const controls = document.getElementById('listControls');
       if (!container) return;
       container.innerHTML = '';
@@ -1301,6 +1522,7 @@
         stagingActions.classList.remove('hidden');
         controls.classList.remove('hidden');
         shoppingActions.classList.add('hidden');
+        shoppingControls.classList.add('hidden');
         if (state.staging.length === 0) {
           container.innerHTML = '<div class="py-20 text-center text-slate-300 font-bold">登録待ちリストは空です。</div>';
           controls.classList.add('hidden');
@@ -1330,27 +1552,25 @@
         stagingActions.classList.add('hidden');
         inventoryActions.classList.add('hidden');
         shoppingActions.classList.remove('hidden');
+        shoppingControls.classList.remove('hidden');
+        document.querySelectorAll('.shopping-view-btn').forEach(btn => {
+          const active = btn.dataset.view === state.shoppingView;
+          btn.className = `shopping-view-btn px-3 py-1.5 rounded-lg text-[10px] font-black ${active ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500'}`;
+        });
         const list = (state.shopping || []).filter(i => i.status === '未購入');
         if (list.length === 0) {
           container.innerHTML = '<div class="py-20 text-center text-slate-300 font-bold">買うものはありません。</div>';
           return;
         }
-        list.forEach(item => {
-          container.insertAdjacentHTML('beforeend', `
-            <label class="bg-white p-5 rounded-[2rem] shadow-sm border border-slate-100 flex items-center gap-4 cursor-pointer hover:bg-emerald-50 transition-colors">
-              <input type="checkbox" class="shop-cb w-6 h-6 rounded-lg border-slate-200 text-emerald-600 focus:ring-emerald-500" data-id="${item.id}">
-              <div class="flex-1">
-                <h4 class="font-black text-slate-800 text-lg">${item.name}</h4>
-                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">${item.qty} ${item.unit}</p>
-              </div>
-            </label>
-          `);
-        });
+        container.innerHTML = state.shoppingView === 'grouped'
+          ? renderShoppingGrouped(list)
+          : list.map(item => renderShoppingRow(item)).join('');
         return;
       }
 
       stagingActions.classList.add('hidden');
       shoppingActions.classList.add('hidden');
+      shoppingControls.classList.add('hidden');
       let filtered = state.currentLoc === 'すべて' ? state.inventory : state.inventory.filter(i => i.loc === state.currentLoc);
       filtered = sortInventory(filtered);
       if (filtered.length === 0) {
@@ -1405,11 +1625,13 @@
     }
 
     function toggleSelectAll(checkbox) {
-      document.querySelectorAll('.staging-cb, .inv-cb').forEach(cb => {
+      document.querySelectorAll('.staging-cb, .inv-cb, .shop-cb, .shop-group-cb').forEach(cb => {
         cb.checked = checkbox.checked;
         if (cb.classList.contains('staging-cb')) {
           const idx = parseInt(cb.dataset.idx);
           if (state.staging[idx]) state.staging[idx]._selected = checkbox.checked;
+        } else if (cb.classList.contains('shop-group-cb')) {
+          toggleShoppingGroupSelection(cb);
         }
       });
     }
@@ -1562,19 +1784,23 @@
       return shortages;
     }
 
-    function addShortagesToShopping(shortages) {
+    function addShortagesToShopping(shortages, sourceMeta = {}) {
       if (!shortages || shortages.length === 0) return 0;
       shortages.forEach(item => {
-        queueShoppingCreate(item);
-        state.shopping.push({
+        const row = {
           id: createClientId('shop'),
           name: item.name,
           qty: item.qty,
           unit: item.unit,
           status: '未購入',
-          recipeName: item.recipeName,
+          recipeName: item.recipeName || sourceMeta.recipeName || '',
+          sourceType: sourceMeta.sourceType || item.sourceType || 'レシピ詳細',
+          scheduleDate: sourceMeta.scheduleDate || item.scheduleDate || '',
+          meal: sourceMeta.meal || item.meal || '',
           _syncStatus: 'created'
-        });
+        };
+        queueShoppingCreate(row);
+        state.shopping.push(row);
       });
       return shortages.length;
     }
@@ -1999,7 +2225,7 @@ ${plan ? '\n提案方針: ' + plan : ''}
 
       const shortages = compareRecipeWithInventory(recipeId);
       if (shortages.length > 0) {
-        addShortagesToShopping(shortages);
+        addShortagesToShopping(shortages, { sourceType: '献立スケジュール', scheduleDate: date, meal, recipeName });
         showToastWithAction(
           `${shortages.length} 件の不足材料を買い物リストに追加しました。`,
           '買い物リストを確認',
@@ -2262,6 +2488,57 @@ ${plan ? '\n提案方針: ' + plan : ''}
       updateSyncBar();
     }
 
+    function openShoppingManualModal() {
+      document.getElementById('syncBar').classList.add('sync-bar-hidden');
+      document.getElementById('syncBar').classList.remove('sync-bar-visible');
+      const form = document.getElementById('shoppingManualForm');
+      form.reset();
+      document.getElementById('shop-qty').value = 1;
+      const m = document.getElementById('shoppingManualModal');
+      m.classList.remove('hidden');
+      setTimeout(() => m.classList.remove('opacity-0'), 10);
+    }
+
+    function closeShoppingManualModal() {
+      const m = document.getElementById('shoppingManualModal');
+      m.classList.add('opacity-0');
+      setTimeout(() => m.classList.add('hidden'), 300);
+      updateSyncBar();
+    }
+
+    function handleShoppingManualSave(e) {
+      e.preventDefault();
+      const item = {
+        id: createClientId('shop'),
+        name: document.getElementById('shop-name').value.trim(),
+        qty: Number(document.getElementById('shop-qty').value) || 0,
+        unit: document.getElementById('shop-unit').value.trim(),
+        status: '未購入',
+        recipeName: '',
+        sourceType: '手動追加',
+        scheduleDate: '',
+        meal: '',
+        _syncStatus: 'created'
+      };
+      if (!item.name || !item.unit || item.qty <= 0) {
+        showToast('品名・数量・単位を入力してください。', 'error');
+        return;
+      }
+      const shortage = calculateInventoryShortage(item.name, item.qty, item.unit);
+      if (shortage.shortageQty <= 0) {
+        showToast(`在庫に ${shortage.stockQty}${item.unit} あるため、買い物リストには追加しません。`, 'info');
+        closeShoppingManualModal();
+        return;
+      }
+      item.qty = shortage.shortageQty;
+      queueShoppingCreate(item);
+      state.shopping.push(item);
+      closeShoppingManualModal();
+      filterByLocation('買い物リスト');
+      const detail = shortage.stockQty > 0 ? `在庫 ${shortage.stockQty}${item.unit} を差し引きました。` : '';
+      showToast(`不足分 ${item.qty}${item.unit} の追加を保留しました。${detail}`, 'success');
+    }
+
     /* --- Recipe Modal --- */
     function openRecipeEditor(recipeId) {
       document.getElementById('syncBar').classList.add('sync-bar-hidden');
@@ -2401,7 +2678,8 @@ ${plan ? '\n提案方針: ' + plan : ''}
         showToast('在庫に十分な材料があります。', 'info');
         return;
       }
-      addShortagesToShopping(shortages);
+      const recipe = state.recipes.find(r => r.id === recipeId);
+      addShortagesToShopping(shortages, { sourceType: 'レシピ詳細', recipeName: recipe ? recipe.name : '' });
       showToastWithAction(
         `${shortages.length} 件の不足材料を買い物リストに追加しました。`,
         '買い物リストを確認',
@@ -2560,10 +2838,13 @@ ${text}`;
 
     async function executeBulkPurchase(items, decision) {
       const ids = items.map(i => i.id);
+      const createdShoppingIds = state.pendingSync.shoppingCreates.map(i => i.id);
+      const syncedIds = ids.filter(id => !createdShoppingIds.includes(id));
       const today = new Date().toISOString().split('T')[0];
       const mergeNames = [];
       const newNames = [];
       items.forEach(item => {
+        const wasCreatedShopping = createdShoppingIds.includes(item.id);
         let found = null;
         if (decision === 'merge') {
           found = state.inventory.find(inv => inv.name === item.name && inv.unit === item.unit);
@@ -2574,6 +2855,7 @@ ${text}`;
           found.qty = currentQty + addQty;
           found.buy = today;
           found._syncStatus = found._syncStatus || 'updated';
+          if (wasCreatedShopping) queueInventoryUpdate(found.id, found);
           mergeNames.push(`${item.name} (${currentQty}+${addQty})`);
         } else {
           const created = {
@@ -2591,11 +2873,13 @@ ${text}`;
             _syncStatus: 'created'
           };
           state.inventory.push(created);
+          if (wasCreatedShopping) queueInventoryCreate(created);
           newNames.push(item.name);
         }
       });
       state.shopping = (state.shopping || []).filter(i => !ids.includes(i.id));
-      state.pendingSync.shoppingPurchases.push({ ids, decision });
+      state.pendingSync.shoppingCreates = state.pendingSync.shoppingCreates.filter(i => !ids.includes(i.id));
+      if (syncedIds.length > 0) state.pendingSync.shoppingPurchases.push({ ids: syncedIds, decision });
       updateSyncBar();
       filterByLocation('すべて');
       if (mergeNames.length > 0) showToast('加算予定: ' + mergeNames.join('、'), 'info');
@@ -2603,7 +2887,7 @@ ${text}`;
     }
 
     async function bulkPurchase() {
-      const checked = Array.from(document.querySelectorAll('.shop-cb:checked')).map(el => el.dataset.id);
+      const checked = getSelectedShoppingIds();
       if (checked.length === 0) { showToast('購入済にする項目を選択してください。', 'error'); return; }
       const items = checked.map(id => state.shopping.find(i => i.id === id)).filter(Boolean);
       const duplicates = items.filter(item => state.inventory.some(inv => inv.name === item.name && inv.unit === item.unit));
@@ -2612,6 +2896,20 @@ ${text}`;
         return;
       }
       await executeBulkPurchase(items, 'merge');
+    }
+
+    function deleteShoppingItem(id) {
+      queueShoppingDelete(id);
+      renderList();
+      showToast('買い物リストから削除を保留しました。同期するまでスプシ未反映です。', 'info');
+    }
+
+    function bulkDeleteShopping() {
+      const checked = getSelectedShoppingIds();
+      if (checked.length === 0) { showToast('削除する買い物を選択してください。', 'error'); return; }
+      checked.forEach(id => queueShoppingDelete(id));
+      renderList();
+      showToast(`${checked.length} 件の削除を保留しました。同期するまでスプシ未反映です。`, 'success');
     }
 
     async function adjustInventoryQty(id, delta) {

@@ -1,0 +1,21 @@
+{
+  "ticket": "TKT-0011-shopping-list-source-and-actions",
+  "status": "passed",
+  "checks": [
+    {
+      "name": "html_parse_executeGAS_GAS_URL",
+      "command": "python3 -c \"import html.parser; html.parser.HTMLParser().feed(open('app.html').read())\" && grep -q 'executeGAS' app.html && grep -q 'GAS_URL' app.html && echo 'VERIFY_PASSED'",
+      "result": "VERIFY_PASSED"
+    },
+    {
+      "name": "javascript_parse",
+      "command": "node -e \"const fs=require('fs'); const html=fs.readFileSync('app.html','utf8'); const s=html.match(/<script>([\\\\s\\\\S]*)<\\\\/script>/)[1]; new Function(s); console.log('JS_PARSE_PASSED')\"",
+      "result": "JS_PARSE_PASSED"
+    },
+    {
+      "name": "gas_write_policy_static",
+      "command": "rg -n \"alert\\\\(|confirm\\\\(|prompt\\\\(|executeGAS\\\\(payload|appendRow|deleteRow|setValue|setValues|SpreadsheetApp\" app.html",
+      "result": "executeGAS(payload) remains in syncPendingChanges and handleInit/loadSchedule read paths only. Spreadsheet writes are inside syncPendingChanges or initialization."
+    }
+  ]
+}
