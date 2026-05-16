@@ -226,15 +226,23 @@
       </div>
 
       <!-- 通常表示（ビューア未選択時） -->
-      <div id="cookingGuide" class="flex flex-col items-center justify-center min-h-[60vh] p-6 text-center">
-        <div class="w-20 h-20 bg-emerald-100 rounded-3xl flex items-center justify-center mb-6">
-          <span class="text-4xl">🍽️</span>
+      <div id="cookingGuide" class="p-4 w-full max-w-2xl mx-auto overflow-x-hidden">
+        <header class="flex justify-between items-end mb-6 pt-4">
+          <div>
+            <h2 class="text-3xl font-black tracking-tight text-slate-800">料理・記録</h2>
+            <p id="cookingModeLabel" class="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">COOKING CHECK</p>
+          </div>
+        </header>
+
+        <div id="cookingModeTopTabs" class="flex gap-2 overflow-x-auto no-scrollbar pb-3 mb-2 snap-x">
+          <button onclick="switchCTab('check')" class="c-tab active bg-emerald-600 text-white shadow-sm border border-emerald-100 px-5 py-2.5 rounded-xl text-sm font-black whitespace-nowrap snap-start transition-all" data-tab="check">レシピ確認</button>
+          <button onclick="switchCTab('history')" class="c-tab bg-white text-amber-600 border border-amber-100 px-5 py-2.5 rounded-xl text-sm font-black whitespace-nowrap snap-start transition-all" data-tab="history">料理履歴</button>
         </div>
-        <h2 class="text-2xl font-black text-slate-700 mb-2">料理・記録</h2>
-        <p class="text-sm text-slate-400 mb-6">献立を選んでください</p>
-        <button onclick="switchMode('B'); switchBTab('schedule');" class="bg-indigo-600 text-white font-black py-3 px-8 rounded-2xl shadow-lg hover:bg-indigo-700 active:scale-95 transition-all">
-          献立スケジュールを開く
-        </button>
+
+        <div id="cookingControlsPanel" class="space-y-2 pb-2"></div>
+        <div id="cookingContentContainer" class="space-y-3 mt-3 transition-colors bg-emerald-50 p-3 rounded-2xl border border-emerald-100 overflow-hidden">
+          <!-- JSで動的に挿入 -->
+        </div>
       </div>
     </div>
   </main>
@@ -740,6 +748,7 @@
       staging: [],
       recipes: [],
       schedule: [],
+      cookingHistory: [],
       scheduleWeekOffset: 0,
       shoppingView: 'source',
       shoppingExpandedGroups: {},
@@ -747,6 +756,7 @@
       currentLoc: 'すべて',
       currentMode: 'A',
       currentBTab: 'recipes',
+      currentCTab: 'check',
       isProcessing: false,
       sortBy: 'limit2',
       sortOrder: 'asc',
@@ -761,6 +771,9 @@
       aiExpiringSortOrder: 'asc',
       scheduleSortBy: 'date',
       scheduleSortOrder: 'asc',
+      cookingHistorySearchQuery: '',
+      cookingHistoryRatingFilter: 'all',
+      cookingHistoryPhotoFilter: 'all',
       editMode: null,
       editId: null,
       recipeEditId: null,
@@ -864,7 +877,8 @@
         inventory: clonePlain(state.inventory),
         shopping: clonePlain(state.shopping),
         recipes: clonePlain(state.recipes),
-        schedule: clonePlain(state.schedule)
+        schedule: clonePlain(state.schedule),
+        cookingHistory: clonePlain(state.cookingHistory)
       };
     }
 
@@ -918,6 +932,7 @@
     function rerenderCurrentViews() {
       if (state.currentMode === 'A') renderList();
       if (state.currentMode === 'B') renderRecipeMode();
+      if (state.currentMode === 'C') renderCookingMode();
       updateSyncBar();
     }
 
@@ -1648,6 +1663,7 @@
       state.shopping = clonePlain(state.syncedSnapshot.shopping);
       state.recipes = clonePlain(state.syncedSnapshot.recipes);
       state.schedule = clonePlain(state.syncedSnapshot.schedule);
+      state.cookingHistory = clonePlain(state.syncedSnapshot.cookingHistory);
       resetPendingSync();
       rerenderCurrentViews();
       showToast('未同期の変更を破棄しました。', 'info');
@@ -1745,6 +1761,31 @@
             var r = sch[i];
             if(!r[0] || !r[1]) continue;
             list.push({ date: f(r[0]), meal: f(r[1]), recipeId: f(r[2]), recipeName: f(r[3]), status: f(r[4]) || '未完了' });
+          }
+          return list;
+        }
+        function fdt(v) {
+          if(!v && v !== 0) return "";
+          if(v instanceof Date) return Utilities.formatDate(v, Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss");
+          return String(v).trim();
+        }
+        function readCookingHistory() {
+          var sHistoryRead = ss.getSheetByName('料理履歴');
+          var hist = sHistoryRead.getDataRange().getValues();
+          var list = [];
+          for(var i=1; i<hist.length; i++) {
+            var r = hist[i];
+            if(!r[0] && !r[2] && !r[3]) continue;
+            list.push({
+              id: f(r[0]),
+              cookingDate: fdt(r[1]),
+              recipeId: f(r[2]),
+              recipeName: f(r[3]),
+              comment: f(r[4]),
+              photoUrl: f(r[5]),
+              rating: Number(r[6]) || 0,
+              lastEdited: fdt(r[7])
+            });
           }
           return list;
         }
@@ -1951,7 +1992,7 @@
           SpreadsheetApp.flush();
         }
 
-        return { display: '一括同期完了', detail: { inventory: readInventory(), shopping: readShopping(), recipes: readRecipes(), schedule: readSchedule() } };
+        return { display: '一括同期完了', detail: { inventory: readInventory(), shopping: readShopping(), recipes: readRecipes(), schedule: readSchedule(), cookingHistory: readCookingHistory() } };
       })()`;
 
       const res = await executeGAS(payload, `未同期 ${getPendingSyncCount()} 件をスプレッドシートへ一括同期中...`);
@@ -1960,6 +2001,7 @@
         state.shopping = Array.isArray(res.detail.shopping) ? res.detail.shopping : [];
         state.recipes = Array.isArray(res.detail.recipes) ? res.detail.recipes : [];
         state.schedule = Array.isArray(res.detail.schedule) ? res.detail.schedule : [];
+        state.cookingHistory = Array.isArray(res.detail.cookingHistory) ? res.detail.cookingHistory : [];
         resetPendingSync();
         setSyncedSnapshot();
         rerenderCurrentViews();
@@ -2055,6 +2097,11 @@
           if(v instanceof Date) return Utilities.formatDate(v, Session.getScriptTimeZone(), "yyyy-MM-dd");
           return String(v).trim();
         }
+        function fdt(v) {
+          if(!v && v !== 0) return "";
+          if(v instanceof Date) return Utilities.formatDate(v, Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss");
+          return String(v).trim();
+        }
 
         var inv = ss.getSheetByName('食材在庫').getDataRange().getValues();
         var shop = ss.getSheetByName('買い物リスト').getDataRange().getValues();
@@ -2105,7 +2152,26 @@
           }
         }
 
-        return { display: '在庫データ読み込み完了', detail: { inventory: inventory, shopping: shopping, recipes: recipes, schedule: schedule } };
+        var hist = ss.getSheetByName('料理履歴').getDataRange().getValues();
+        var cookingHistory = [];
+        if (hist.length > 1) {
+          for(var hi=1; hi<hist.length; hi++) {
+            var hr = hist[hi];
+            if(!hr[0] && !hr[2] && !hr[3]) continue;
+            cookingHistory.push({
+              id: f(hr[0]),
+              cookingDate: fdt(hr[1]),
+              recipeId: f(hr[2]),
+              recipeName: f(hr[3]),
+              comment: f(hr[4]),
+              photoUrl: f(hr[5]),
+              rating: Number(hr[6]) || 0,
+              lastEdited: fdt(hr[7])
+            });
+          }
+        }
+
+        return { display: '在庫データ読み込み完了', detail: { inventory: inventory, shopping: shopping, recipes: recipes, schedule: schedule, cookingHistory: cookingHistory } };
       })()`;
       const res = await executeGAS(payload, 'データベースと同期中...');
       console.log('Init GAS Response:', res);
@@ -2114,16 +2180,18 @@
         const shop = (res.detail && res.detail.shopping) ? res.detail.shopping : (res.shopping || []);
         const rec = (res.detail && res.detail.recipes) ? res.detail.recipes : (res.recipes || []);
         const sch = (res.detail && res.detail.schedule) ? res.detail.schedule : (res.schedule || []);
+        const hist = (res.detail && res.detail.cookingHistory) ? res.detail.cookingHistory : (res.cookingHistory || []);
         state.inventory = Array.isArray(inv) ? inv : [];
         state.shopping = Array.isArray(shop) ? shop : [];
         state.recipes = Array.isArray(rec) ? rec : [];
         state.schedule = Array.isArray(sch) ? sch : [];
+        state.cookingHistory = Array.isArray(hist) ? hist : [];
         resetPendingSync();
         setSyncedSnapshot();
         document.getElementById('initView').classList.add('hidden');
         document.getElementById('bottomNav').classList.remove('hidden');
         switchMode('A');
-        console.log('Loaded inventory count:', state.inventory.length, 'shopping count:', state.shopping.length, 'recipes count:', state.recipes.length, 'schedule count:', state.schedule.length);
+        console.log('Loaded inventory count:', state.inventory.length, 'shopping count:', state.shopping.length, 'recipes count:', state.recipes.length, 'schedule count:', state.schedule.length, 'cooking history count:', state.cookingHistory.length);
       } else {
         showToast('データの読み込みに失敗しました。GASの実行権限を確認してください。', 'error');
       }
@@ -2358,15 +2426,7 @@
       });
       if (mode === 'A') renderList();
       if (mode === 'B') renderRecipeMode();
-      if (mode === 'C') {
-        if (!currentCookingRecipeId) {
-          const today = new Date().toISOString().split('T')[0];
-          const todaySchedule = state.schedule.find(s => s.date === today && s.recipeId);
-          if (todaySchedule) {
-            openCookingViewer(todaySchedule.recipeId);
-          }
-        }
-      }
+      if (mode === 'C' && !currentCookingRecipeId) renderCookingMode();
     }
 
     function switchBTab(tab) {
@@ -4364,6 +4424,270 @@ ${text}`;
       showToast('レシピ削除を保留しました。同期するまでスプシ未反映です。', 'info');
     }
 
+    /* --- Cooking Mode Home --- */
+    function switchCTab(tab) {
+      state.currentCTab = ['check', 'history'].includes(tab) ? tab : 'check';
+      renderCookingMode();
+    }
+
+    function getCookingTabTone(tab = state.currentCTab) {
+      if (tab === 'history') return {
+        label: 'COOKING HISTORY',
+        active: 'bg-amber-600 text-white shadow-sm border border-amber-200',
+        inactive: 'bg-white text-amber-600 border border-amber-100 hover:bg-amber-50',
+        list: 'space-y-3 mt-3 transition-colors bg-amber-50 p-3 rounded-2xl border border-amber-100 overflow-hidden'
+      };
+      return {
+        label: 'COOKING CHECK',
+        active: 'bg-emerald-600 text-white shadow-sm border border-emerald-200',
+        inactive: 'bg-white text-emerald-600 border border-emerald-100 hover:bg-emerald-50',
+        list: 'space-y-3 mt-3 transition-colors bg-emerald-50 p-3 rounded-2xl border border-emerald-100 overflow-hidden'
+      };
+    }
+
+    function updateCookingTopTabs() {
+      document.querySelectorAll('.c-tab').forEach(btn => {
+        const isActive = btn.dataset.tab === state.currentCTab;
+        const tone = getCookingTabTone(btn.dataset.tab);
+        btn.className = `c-tab ${isActive ? tone.active : tone.inactive} px-5 py-2.5 rounded-xl text-sm font-black whitespace-nowrap snap-start transition-all`;
+      });
+      const label = document.getElementById('cookingModeLabel');
+      if (label) label.textContent = getCookingTabTone().label;
+    }
+
+    function getLocalDateString(date = new Date()) {
+      return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    }
+
+    function renderCookingMode() {
+      const guide = document.getElementById('cookingGuide');
+      const viewer = document.getElementById('cookingViewer');
+      const container = document.getElementById('cookingContentContainer');
+      if (!guide || !viewer || !container) return;
+      if (currentCookingRecipeId) return;
+      viewer.classList.add('hidden');
+      guide.classList.remove('hidden');
+      updateCookingTopTabs();
+      container.className = getCookingTabTone().list;
+      if (state.currentCTab === 'history') {
+        renderCookingHistoryTab();
+      } else {
+        renderCookingCheckTab();
+      }
+    }
+
+    function renderCookingCheckTab() {
+      const controls = document.getElementById('cookingControlsPanel');
+      const container = document.getElementById('cookingContentContainer');
+      if (!controls || !container) return;
+      controls.innerHTML = `
+        <div class="h-12 grid grid-cols-2 gap-2">
+          <button onclick="switchMode('B'); switchBTab('schedule');" class="h-12 bg-sky-50 text-sky-700 border border-sky-100 px-3 rounded-xl font-black text-[11px] flex items-center justify-center gap-2 active:scale-95 transition-all">
+            <span class="text-base">📅</span><span>献立を見る</span>
+          </button>
+          <button onclick="switchMode('B'); switchBTab('recipes');" class="h-12 bg-indigo-50 text-indigo-700 border border-indigo-100 px-3 rounded-xl font-black text-[11px] flex items-center justify-center gap-2 active:scale-95 transition-all">
+            <span class="text-base">🍳</span><span>レシピ集へ</span>
+          </button>
+        </div>
+      `;
+      container.innerHTML = '';
+
+      const today = getLocalDateString();
+      const todaySchedules = state.schedule
+        .filter(s => s.date === today && s.recipeId)
+        .sort((a, b) => ['朝','昼','晩'].indexOf(a.meal) - ['朝','昼','晩'].indexOf(b.meal));
+      const nextSchedule = state.schedule
+        .filter(s => s.recipeId && s.status !== '完了' && s.date >= today)
+        .sort((a, b) => a.date.localeCompare(b.date) || ['朝','昼','晩'].indexOf(a.meal) - ['朝','昼','晩'].indexOf(b.meal))[0];
+      const recipeShortcuts = [...state.recipes]
+        .sort((a, b) => (b.updatedAt || b.createdAt || '').localeCompare(a.updatedAt || a.createdAt || ''))
+        .slice(0, 6);
+
+      container.insertAdjacentHTML('beforeend', `
+        <section class="bg-white/80 rounded-2xl p-4 shadow-sm border border-emerald-100">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="text-sm font-black text-slate-800">今日の献立</h3>
+            <span class="text-[10px] font-bold text-slate-400">${todaySchedules.length} 件</span>
+          </div>
+          <div class="space-y-2" id="todayCookingScheduleList"></div>
+        </section>
+      `);
+      const todayList = document.getElementById('todayCookingScheduleList');
+      if (todayList) {
+        if (todaySchedules.length === 0) {
+          todayList.innerHTML = '<div class="py-6 text-center text-slate-300 text-sm font-bold">今日の献立は未設定です。</div>';
+        } else {
+          todaySchedules.forEach(item => {
+            todayList.insertAdjacentHTML('beforeend', renderCookingScheduleCard(item));
+          });
+        }
+      }
+
+      if (nextSchedule && (!todaySchedules.some(s => s.date === nextSchedule.date && s.meal === nextSchedule.meal))) {
+        container.insertAdjacentHTML('beforeend', `
+          <section class="bg-white/80 rounded-2xl p-4 shadow-sm border border-emerald-100">
+            <h3 class="text-sm font-black text-slate-800 mb-3">次の未完了献立</h3>
+            ${renderCookingScheduleCard(nextSchedule)}
+          </section>
+        `);
+      }
+
+      container.insertAdjacentHTML('beforeend', `
+        <section class="bg-white/80 rounded-2xl p-4 shadow-sm border border-emerald-100">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="text-sm font-black text-slate-800">レシピ集から開始</h3>
+            <button onclick="switchMode('B'); switchBTab('recipes');" class="text-[10px] font-black text-indigo-600">すべて見る</button>
+          </div>
+          <div class="space-y-2" id="cookingRecipeShortcutList"></div>
+        </section>
+      `);
+      const recipeList = document.getElementById('cookingRecipeShortcutList');
+      if (recipeList) {
+        if (recipeShortcuts.length === 0) {
+          recipeList.innerHTML = '<div class="py-6 text-center text-slate-300 text-sm font-bold">レシピが登録されていません。</div>';
+        } else {
+          recipeShortcuts.forEach(recipe => {
+            recipeList.insertAdjacentHTML('beforeend', `
+              <div class="bg-emerald-50 border border-emerald-100 rounded-xl p-3 flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-white text-emerald-600 flex items-center justify-center shrink-0">🍽️</div>
+                <div class="min-w-0 flex-1">
+                  <p class="text-sm font-black text-slate-800 truncate">${escapeHtml(recipe.name || '（名称未設定）')}</p>
+                  <p class="text-[10px] font-bold text-slate-400">調理回数 ${Number(recipe.count) || 0} 回</p>
+                </div>
+                <button onclick="openCookingViewer('${recipe.id}')" class="shrink-0 px-3 py-2 rounded-xl bg-emerald-600 text-white text-xs font-black active:scale-95 transition-all">開始</button>
+              </div>
+            `);
+          });
+        }
+      }
+    }
+
+    function renderCookingScheduleCard(item) {
+      const statusClass = item.status === '完了' ? 'bg-slate-100 text-slate-500' : 'bg-emerald-100 text-emerald-700';
+      return `
+        <div class="bg-emerald-50 border border-emerald-100 rounded-xl p-3 flex items-center gap-3">
+          <div class="w-14 shrink-0 rounded-xl bg-white text-emerald-800 flex flex-col items-center justify-center px-2 py-2">
+            <span class="text-[10px] font-black">${escapeHtml(formatScheduleDate(item.date))}</span>
+            <span class="text-xs font-black">${escapeHtml(item.meal || '')}</span>
+          </div>
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-2 mb-0.5">
+              <p class="text-sm font-black text-slate-800 truncate">${escapeHtml(item.recipeName || '（レシピ名なし）')}</p>
+              <span class="shrink-0 text-[9px] font-black px-2 py-0.5 rounded-full ${statusClass}">${escapeHtml(item.status || '未完了')}</span>
+            </div>
+            <p class="text-[10px] font-bold text-slate-400">材料と手順を大きく表示</p>
+          </div>
+          <button onclick="openCookingViewer('${item.recipeId}')" class="shrink-0 px-3 py-2 rounded-xl bg-emerald-600 text-white text-xs font-black active:scale-95 transition-all">開始</button>
+        </div>
+      `;
+    }
+
+    function renderCookingHistoryTab() {
+      const controls = document.getElementById('cookingControlsPanel');
+      const container = document.getElementById('cookingContentContainer');
+      if (!controls || !container) return;
+      controls.innerHTML = `
+        <div class="space-y-2">
+          <input type="text" id="cookingHistorySearchInput" value="${escapeHtml(state.cookingHistorySearchQuery || '')}" oninput="state.cookingHistorySearchQuery=this.value; renderCookingHistoryTab()" class="w-full bg-white border border-amber-100 rounded-xl px-3 py-2.5 text-xs font-bold outline-none focus:border-amber-500" placeholder="レシピ名で検索...">
+          <div class="grid grid-cols-2 gap-2">
+            <select onchange="state.cookingHistoryRatingFilter=this.value; renderCookingHistoryTab()" class="bg-white border border-amber-100 rounded-xl px-3 py-2.5 text-xs font-bold outline-none focus:border-amber-500">
+              <option value="all" ${state.cookingHistoryRatingFilter === 'all' ? 'selected' : ''}>評価すべて</option>
+              <option value="5" ${state.cookingHistoryRatingFilter === '5' ? 'selected' : ''}>★★★★★</option>
+              <option value="4" ${state.cookingHistoryRatingFilter === '4' ? 'selected' : ''}>★★★★以上</option>
+              <option value="3" ${state.cookingHistoryRatingFilter === '3' ? 'selected' : ''}>★★★以上</option>
+              <option value="1" ${state.cookingHistoryRatingFilter === '1' ? 'selected' : ''}>評価あり</option>
+            </select>
+            <select onchange="state.cookingHistoryPhotoFilter=this.value; renderCookingHistoryTab()" class="bg-white border border-amber-100 rounded-xl px-3 py-2.5 text-xs font-bold outline-none focus:border-amber-500">
+              <option value="all" ${state.cookingHistoryPhotoFilter === 'all' ? 'selected' : ''}>写真すべて</option>
+              <option value="with" ${state.cookingHistoryPhotoFilter === 'with' ? 'selected' : ''}>写真あり</option>
+              <option value="without" ${state.cookingHistoryPhotoFilter === 'without' ? 'selected' : ''}>写真なし</option>
+            </select>
+          </div>
+        </div>
+      `;
+      container.innerHTML = '';
+      const history = getFilteredCookingHistory();
+      if (history.length === 0) {
+        container.innerHTML = state.cookingHistory.length === 0
+          ? '<div class="py-20 text-center text-slate-300 font-bold">料理履歴はまだありません。<br>料理完了後に同期すると表示されます。</div>'
+          : '<div class="py-20 text-center text-slate-300 font-bold">条件に一致する料理履歴がありません。</div>';
+        return;
+      }
+      history.forEach(item => {
+        container.insertAdjacentHTML('beforeend', renderCookingHistoryCard(item));
+      });
+    }
+
+    function getFilteredCookingHistory() {
+      const query = String(state.cookingHistorySearchQuery || '').trim().toLowerCase();
+      const minRating = state.cookingHistoryRatingFilter === 'all' ? 0 : Number(state.cookingHistoryRatingFilter) || 0;
+      const photoFilter = state.cookingHistoryPhotoFilter || 'all';
+      return [...state.cookingHistory]
+        .filter(item => {
+          const name = String(item.recipeName || '').toLowerCase();
+          if (query && !name.includes(query)) return false;
+          const rating = Number(item.rating) || 0;
+          if (minRating > 0 && rating < minRating) return false;
+          const hasPhoto = !!item.photoUrl;
+          if (photoFilter === 'with' && !hasPhoto) return false;
+          if (photoFilter === 'without' && hasPhoto) return false;
+          return true;
+        })
+        .sort((a, b) => String(b.cookingDate || '').localeCompare(String(a.cookingDate || '')));
+    }
+
+    function renderHistoryStars(rating) {
+      const value = Math.max(0, Math.min(5, Number(rating) || 0));
+      let html = '';
+      for (let i = 1; i <= 5; i++) {
+        html += `<span class="${i <= value ? 'text-amber-400' : 'text-slate-200'}">★</span>`;
+      }
+      return html;
+    }
+
+    function renderCookingHistoryCard(item) {
+      const hasPhoto = !!item.photoUrl;
+      const recipeId = item.recipeId || '';
+      const canCookAgain = !!state.recipes.find(r => r.id === recipeId);
+      const comment = item.comment ? escapeHtml(item.comment) : '<span class="text-slate-300">感想なし</span>';
+      const photoHtml = hasPhoto ? `
+        <div class="w-20 h-20 rounded-2xl bg-slate-100 overflow-hidden shrink-0 relative">
+          <img src="${escapeHtml(item.photoUrl)}" alt="完成写真" class="w-full h-full object-cover" onerror="handleCookingHistoryImageError(this)">
+          <a href="${escapeHtml(item.photoUrl)}" target="_blank" rel="noopener noreferrer" class="hidden absolute inset-0 bg-amber-50 text-amber-700 text-[10px] font-black items-center justify-center text-center px-2">写真を開く</a>
+        </div>
+      ` : `
+        <div class="w-20 h-20 rounded-2xl bg-amber-50 text-amber-200 border border-amber-100 flex items-center justify-center shrink-0 text-2xl">📷</div>
+      `;
+      return `
+        <article class="bg-white/85 rounded-2xl p-4 shadow-sm border border-amber-100 flex gap-3">
+          ${photoHtml}
+          <div class="min-w-0 flex-1">
+            <div class="flex items-start justify-between gap-2 mb-1">
+              <div class="min-w-0">
+                <p class="text-[10px] font-black text-amber-500">${escapeHtml(item.cookingDate || '日付なし')}</p>
+                <h3 class="text-base font-black text-slate-800 truncate">${escapeHtml(item.recipeName || '（レシピ名なし）')}</h3>
+              </div>
+              <div class="shrink-0 text-xs leading-none">${renderHistoryStars(item.rating)}</div>
+            </div>
+            <p class="text-xs font-bold text-slate-500 leading-relaxed line-clamp-2 mb-3">${comment}</p>
+            <div class="flex items-center justify-end gap-2">
+              ${hasPhoto ? `<a href="${escapeHtml(item.photoUrl)}" target="_blank" rel="noopener noreferrer" class="px-3 py-2 rounded-xl bg-amber-50 text-amber-700 text-[10px] font-black">写真を開く</a>` : ''}
+              <button onclick="openCookingViewer('${recipeId}')" class="px-3 py-2 rounded-xl bg-emerald-600 text-white text-[10px] font-black active:scale-95 transition-all ${canCookAgain ? '' : 'opacity-40 cursor-not-allowed'}" ${canCookAgain ? '' : 'disabled'}>もう一度作る</button>
+            </div>
+          </div>
+        </article>
+      `;
+    }
+
+    function handleCookingHistoryImageError(img) {
+      img.classList.add('hidden');
+      const link = img.nextElementSibling;
+      if (link) {
+        link.classList.remove('hidden');
+        link.classList.add('flex');
+      }
+    }
+
     /* --- Cooking Viewer --- */
     let currentCookingRecipeId = null;
 
@@ -4387,6 +4711,7 @@ ${text}`;
       currentCookingRecipeId = null;
       document.getElementById('cookingViewer').classList.add('hidden');
       document.getElementById('cookingGuide').classList.remove('hidden');
+      renderCookingMode();
     }
 
     function switchCookingTab(tab) {
@@ -4879,7 +5204,7 @@ ${text}`;
       }
 
       // 料理履歴を pendingSync に追加
-      state.pendingSync.cookingHistory.push({
+      const pendingHistory = {
         recipeId: recipeId,
         recipeName: recipeName,
         cookingDate: cookingDate,
@@ -4887,6 +5212,18 @@ ${text}`;
         comment: comment || '',
         photoBase64: state._tempCookingPhotoBase64 || '',
         photoFilename: photoFilename
+      };
+      state.pendingSync.cookingHistory.push(pendingHistory);
+      state.cookingHistory.unshift({
+        id: createClientId('history'),
+        cookingDate: cookingDate,
+        recipeId: recipeId,
+        recipeName: recipeName,
+        comment: comment || '',
+        photoUrl: state._tempCookingPhotoBase64 || photoUrl || '',
+        rating: rating || 0,
+        lastEdited: cookingDate,
+        _syncStatus: 'created'
       });
 
       // 一時データをクリア

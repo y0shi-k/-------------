@@ -1,0 +1,31 @@
+{
+  "ticket_id": "TKT-0027-cooking-record-history-view",
+  "status": "passed",
+  "verified_at": "2026-05-16",
+  "commands": [
+    {
+      "command": "python3 -c \"import html.parser; html.parser.HTMLParser().feed(open('app.html').read())\" && grep -q 'executeGAS' app.html && grep -q 'GAS_URL' app.html && echo 'VERIFY_PASSED'",
+      "result": "VERIFY_PASSED"
+    },
+    {
+      "command": "node -e \"const fs=require('fs'); const html=fs.readFileSync('app.html','utf8'); const scripts=[...html.matchAll(/<script[^>]*>([\\s\\S]*?)<\\/script>/g)].map(m=>m[1]); for (const s of scripts) new Function(s); console.log('JS_PARSE_PASSED')\"",
+      "result": "JS_PARSE_PASSED"
+    },
+    {
+      "command": "rg -n \"executeGAS\\(payload\" app.html",
+      "result": "既存の syncPendingChanges / handleInit / loadSchedule のみ。今回の履歴表示で新規個別書き込み通信は追加なし。"
+    },
+    {
+      "command": "rg -n \"alert\\(|confirm\\(|prompt\\(\" app.html",
+      "result": "該当なし"
+    }
+  ],
+  "checks": {
+    "html_syntax": true,
+    "js_parse": true,
+    "executeGAS_present": true,
+    "GAS_URL_present": true,
+    "manual_bulk_sync_policy": true,
+    "canvas_dialogs_absent": true
+  }
+}
