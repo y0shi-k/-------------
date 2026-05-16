@@ -1,0 +1,17 @@
+{
+  "ticket": "TKT-0025-registration-hub-ui",
+  "command": "python3 -c \"import html.parser; html.parser.HTMLParser().feed(open('app.html').read())\" && grep -q 'executeGAS' app.html && grep -q 'GAS_URL' app.html && echo 'VERIFY_PASSED'",
+  "result": "VERIFY_PASSED",
+  "passed": true,
+  "checked_at": "2026-05-16",
+  "additional_checks": [
+    {
+      "command": "awk '/<script>/{flag=1;next}/<\\/script>/{flag=0}flag' app.html > /tmp/stock-master-app-script.js && node --check /tmp/stock-master-app-script.js",
+      "result": "passed"
+    },
+    {
+      "command": "rg -n \"alert\\(|confirm\\(|prompt\\(|GEMINI_API_KEY.*(throw|return|alert|showToast)|executeGAS\\(\" app.html",
+      "result": "No alert/confirm/prompt or GEMINI_API_KEY validation matches. executeGAS call sites remain load/sync flows."
+    }
+  ]
+}

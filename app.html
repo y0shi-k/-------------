@@ -77,54 +77,30 @@
       </div>
     </div>
 
-    <!-- モードA: 在庫管理 -->
+    <!-- モードA: 食材管理 -->
     <div id="modeAView" class="hidden">
       <!-- メインインベントリ画面 -->
       <div id="inventoryView" class="p-4 max-w-2xl mx-auto">
       <div id="inventoryStickyHeader" class="sticky top-0 z-40 bg-slate-50/95 backdrop-blur-md pt-4 pb-3 border-b border-slate-100">
         <header class="flex justify-between items-end mb-6">
           <div>
-            <h2 class="text-3xl font-black tracking-tight text-slate-800">在庫管理</h2>
+            <h2 class="text-3xl font-black tracking-tight text-slate-800">食材管理</h2>
             <p class="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1" id="locationLabel">ALL STORAGE</p>
           </div>
-          <button onclick="showModal('add')" class="bg-slate-800 text-white w-12 h-12 rounded-2xl shadow-lg flex items-center justify-center hover:bg-slate-900 active:scale-90 transition-all">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-          </button>
+          <div id="inventoryTopTabs" class="bg-white/80 border border-slate-200 rounded-2xl p-1 flex items-center gap-1 shadow-sm">
+            <button id="inventoryTopTab" onclick="filterByLocation('すべて')" class="px-3 py-2 rounded-xl text-[11px] font-black transition-all active:scale-95 whitespace-nowrap">食材管理</button>
+            <button id="shoppingTopTab" onclick="filterByLocation('買い物リスト')" class="px-3 py-2 rounded-xl text-[11px] font-black transition-all active:scale-95 whitespace-nowrap">買い物リスト</button>
+            <button id="registrationTopTab" onclick="openRegistrationHub()" class="relative w-10 h-10 rounded-xl flex items-center justify-center transition-all active:scale-95" aria-label="在庫登録を開く">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"></path></svg>
+              <span id="stagingBadge" class="absolute -top-1 -right-1 bg-amber-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full hidden">0</span>
+            </button>
+          </div>
         </header>
 
-        <!-- カテゴリタブ -->
-        <div id="locationTabs" class="flex flex-wrap gap-2 pb-4 mb-2">
-          <!-- JSで動的に挿入 -->
-        </div>
-
-        <!-- ソートコントロール -->
-        <div class="flex gap-2 mb-3 px-1 items-center">
-          <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">並び</span>
-          <button onclick="setSort('limit2')" class="sort-btn text-[10px] font-bold px-3 py-1 rounded-full transition-all bg-indigo-100 text-indigo-700" data-sort="limit2">期限順 ▲</button>
-          <button onclick="setSort('name')" class="sort-btn text-[10px] font-bold px-3 py-1 rounded-full transition-all bg-slate-100 text-slate-500" data-sort="name">名前順</button>
-          <button onclick="setSort('buy')" class="sort-btn text-[10px] font-bold px-3 py-1 rounded-full transition-all bg-slate-100 text-slate-500" data-sort="buy">購入日順</button>
-        </div>
-
-        <!-- 一括選択コントロール -->
-        <div id="listControls" class="hidden mb-3 px-2 flex items-center justify-between">
-          <div class="flex items-center gap-2">
-            <input type="checkbox" id="selectAllStaging" onchange="toggleSelectAll(this)" class="w-5 h-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
-            <label for="selectAllStaging" class="text-xs font-black text-slate-500 uppercase tracking-widest cursor-pointer">すべて選択</label>
-          </div>
-        </div>
-
-        <!-- 買い物リスト表示コントロール -->
-        <div id="shoppingControls" class="hidden mb-3 px-2 space-y-3">
-          <div class="flex items-center justify-between gap-3">
-            <div class="flex items-center gap-2">
-              <input type="checkbox" id="selectAllShopping" onchange="toggleSelectAll(this)" class="w-5 h-5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500">
-              <label for="selectAllShopping" class="text-xs font-black text-slate-500 uppercase tracking-widest cursor-pointer">すべて選択</label>
-            </div>
-            <div class="bg-slate-100 rounded-xl p-1 flex gap-1">
-              <button onclick="setShoppingView('source')" class="shopping-view-btn px-3 py-1.5 rounded-lg text-[10px] font-black bg-white text-emerald-700 shadow-sm" data-view="source">出自別</button>
-              <button onclick="setShoppingView('grouped')" class="shopping-view-btn px-3 py-1.5 rounded-lg text-[10px] font-black text-slate-500" data-view="grouped">材料まとめ</button>
-            </div>
-          </div>
+        <div id="modeControlsPanel" class="space-y-2 pb-2">
+          <div id="modePrimaryRow" class="min-h-12"></div>
+          <div id="modeSecondaryRow" class="min-h-10"></div>
+          <div id="modeSelectRow" class="min-h-8"></div>
         </div>
       </div>
 
@@ -142,15 +118,9 @@
 
       <!-- 一括操作アクション (登録待ち用) -->
       <div id="stagingActions" class="hidden mt-8 space-y-3">
-        <div class="grid grid-cols-2 gap-3">
-          <button onclick="batchPredictAI()" class="bg-indigo-500 text-white font-black py-4 rounded-2xl shadow-lg hover:bg-indigo-600 active:scale-95 transition-all flex flex-col items-center justify-center gap-1 border-b-4 border-indigo-700">
-            <span class="text-lg">🧠</span>
-            <span class="text-[10px] uppercase">AI解析のみ</span>
-          </button>
-          <button onclick="batchRegisterDB()" class="bg-slate-700 text-white font-black py-4 rounded-2xl shadow-lg hover:bg-slate-800 active:scale-95 transition-all flex flex-col items-center justify-center gap-1 border-b-4 border-slate-900">
-            <span class="text-lg">💾</span>
-            <span class="text-[10px] uppercase">在庫へ追加</span>
-          </button>
+        <div class="px-1">
+          <div class="text-[10px] font-black text-slate-400 uppercase tracking-widest">在庫へ追加</div>
+          <div class="text-sm font-black text-slate-700">登録待ちリストを確認して在庫に反映</div>
         </div>
         <button onclick="batchCompleteFlow()" class="w-full bg-slate-900 text-white font-black py-5 rounded-2xl shadow-xl hover:bg-black active:scale-95 transition-all flex items-center justify-center gap-4 border-b-4 border-indigo-900">
           <span class="text-2xl">⚡</span>
@@ -159,20 +129,24 @@
             <span class="text-[10px] opacity-60 uppercase tracking-tighter mt-1">Smart Auto-Register Flow</span>
           </span>
         </button>
-        <button onclick="document.getElementById('imageScanInput').click()" class="w-full bg-rose-500 text-white font-black py-4 rounded-2xl shadow-lg hover:bg-rose-600 active:scale-95 transition-all flex items-center justify-center gap-3 border-b-4 border-rose-700">
-          <span class="text-2xl">📷</span>
-          <span class="flex flex-col items-start text-left">
-            <span class="text-base leading-none">画像スキャンで一括追加</span>
-            <span class="text-[10px] opacity-60 uppercase tracking-tighter mt-1">Scan Receipt / Package</span>
-          </span>
-        </button>
+        <div class="grid grid-cols-3 gap-3">
+          <button onclick="batchPredictAI()" class="bg-indigo-50 text-indigo-700 font-black py-3 rounded-2xl shadow-sm hover:bg-indigo-100 active:scale-95 transition-all flex flex-col items-center justify-center gap-1 border border-indigo-100">
+            <span class="text-lg">🧠</span>
+            <span class="text-[10px] uppercase">AI解析のみ</span>
+          </button>
+          <button onclick="batchRegisterDB()" class="bg-slate-100 text-slate-700 font-black py-3 rounded-2xl shadow-sm hover:bg-slate-200 active:scale-95 transition-all flex flex-col items-center justify-center gap-1 border border-slate-200">
+            <span class="text-lg">💾</span>
+            <span class="text-[10px] uppercase">在庫へ追加</span>
+          </button>
+          <button onclick="batchDeleteStaging()" class="bg-rose-50 text-rose-700 font-black py-3 rounded-2xl shadow-sm hover:bg-rose-100 active:scale-95 transition-all flex flex-col items-center justify-center gap-1 border border-rose-100">
+            <span class="text-lg">🗑</span>
+            <span class="text-[10px] uppercase">選択削除</span>
+          </button>
+        </div>
       </div>
 
       <!-- 買い物リスト専用アクション -->
       <div id="shoppingActions" class="hidden mt-8 space-y-3">
-        <button onclick="openShoppingManualModal()" class="w-full bg-slate-800 text-white font-black py-4 rounded-2xl shadow-lg hover:bg-slate-900 active:scale-95 transition-all flex items-center justify-center gap-2">
-          <span>＋</span> 買い物リストに手動追加
-        </button>
         <button onclick="bulkPurchase()" class="w-full bg-emerald-600 text-white font-black py-4 rounded-2xl shadow-lg shadow-emerald-200 hover:bg-emerald-700 active:scale-95 transition-all flex items-center justify-center gap-2">
           <span>✅</span> チェックした食材を購入済にする
         </button>
@@ -841,6 +815,10 @@
       isProcessing: false,
       sortBy: 'limit2',
       sortOrder: 'asc',
+      shoppingSortBy: 'name',
+      shoppingSortOrder: 'asc',
+      stagingSortBy: 'created',
+      stagingSortOrder: 'asc',
       editMode: null,
       editId: null,
       recipeEditId: null,
@@ -1206,6 +1184,193 @@
       renderList();
     }
 
+    function openRegistrationHub() {
+      filterByLocation('登録待ち');
+    }
+
+    function openHubManualAdd() {
+      showModal('add');
+    }
+
+    function updateInventoryTopTabs() {
+      const header = document.getElementById('inventoryStickyHeader');
+      const view = document.getElementById('inventoryView');
+      const label = document.getElementById('locationLabel');
+      const tabShell = document.getElementById('inventoryTopTabs');
+      const viewTone = state.currentLoc === '登録待ち'
+        ? {
+            view: 'p-4 max-w-2xl mx-auto transition-colors',
+            header: 'sticky top-0 z-40 bg-slate-50/95 backdrop-blur-md pt-4 pb-3 border-b border-slate-100',
+            label: 'text-xs text-slate-400 font-bold uppercase tracking-widest mt-1',
+            shell: 'bg-white/80 border border-slate-200 rounded-2xl p-1 flex items-center gap-1 shadow-sm',
+            active: 'bg-amber-500 text-white shadow-sm',
+            inactive: 'bg-white/70 text-amber-700 hover:bg-amber-100'
+          }
+        : state.currentLoc === '買い物リスト'
+          ? {
+              view: 'p-4 max-w-2xl mx-auto transition-colors',
+              header: 'sticky top-0 z-40 bg-slate-50/95 backdrop-blur-md pt-4 pb-3 border-b border-slate-100',
+              label: 'text-xs text-slate-400 font-bold uppercase tracking-widest mt-1',
+              shell: 'bg-white/80 border border-slate-200 rounded-2xl p-1 flex items-center gap-1 shadow-sm',
+              active: 'bg-emerald-600 text-white shadow-sm',
+              inactive: 'bg-white/70 text-emerald-700 hover:bg-emerald-100'
+            }
+          : {
+              view: 'p-4 max-w-2xl mx-auto transition-colors',
+              header: 'sticky top-0 z-40 bg-slate-50/95 backdrop-blur-md pt-4 pb-3 border-b border-slate-100',
+              label: 'text-xs text-slate-400 font-bold uppercase tracking-widest mt-1',
+              shell: 'bg-white/80 border border-slate-200 rounded-2xl p-1 flex items-center gap-1 shadow-sm',
+              active: 'bg-slate-900 text-white shadow-sm',
+              inactive: 'bg-white/60 text-slate-500 hover:bg-slate-100 hover:text-slate-800'
+            };
+      if (view) view.className = viewTone.view;
+      if (header) header.className = viewTone.header;
+      if (label) label.className = viewTone.label;
+      if (tabShell) tabShell.className = viewTone.shell;
+      const tabs = [
+        { id: 'inventoryTopTab', active: state.currentLoc !== '登録待ち' && state.currentLoc !== '買い物リスト' },
+        { id: 'shoppingTopTab', active: state.currentLoc === '買い物リスト' },
+        { id: 'registrationTopTab', active: state.currentLoc === '登録待ち' }
+      ];
+      tabs.forEach(tab => {
+        const el = document.getElementById(tab.id);
+        if (!el) return;
+        const base = tab.id === 'registrationTopTab'
+          ? 'relative w-10 h-10 rounded-xl flex items-center justify-center transition-all active:scale-95'
+          : 'px-3 py-2 rounded-xl text-[11px] font-black transition-all active:scale-95 whitespace-nowrap';
+        el.className = `${base} ${tab.active ? viewTone.active : viewTone.inactive}`;
+      });
+    }
+
+    function getSortArrow(active, order) {
+      if (!active) return '';
+      return order === 'asc' ? ' ▲' : ' ▼';
+    }
+
+    function renderSortButtons(items, activeKey, activeOrder, handlerName, tone = 'slate') {
+      const activeClass = tone === 'emerald'
+        ? 'bg-emerald-100 text-emerald-700'
+        : tone === 'amber'
+          ? 'bg-amber-100 text-amber-700'
+          : 'bg-slate-900 text-white';
+      return items.map(item => {
+        const active = item.key === activeKey;
+        return `<button onclick="${handlerName}('${item.key}')" class="text-[10px] font-bold px-3 py-1 rounded-full transition-all ${active ? activeClass : 'bg-white text-slate-500 border border-slate-100'}">${item.label}${getSortArrow(active, activeOrder)}</button>`;
+      }).join('');
+    }
+
+    function renderSelectControl(id, tone) {
+      const color = tone === 'emerald' ? 'emerald' : tone === 'amber' ? 'amber' : 'slate';
+      return `
+        <div class="flex items-center gap-2 px-1 h-8">
+          <input type="checkbox" id="${id}" onchange="toggleSelectAll(this)" class="w-5 h-5 rounded border-slate-300 text-${color}-600 focus:ring-${color}-500">
+          <label for="${id}" class="text-xs font-black text-slate-500 uppercase tracking-widest cursor-pointer">すべて選択</label>
+        </div>
+      `;
+    }
+
+    function renderInventoryPrimaryRow() {
+      const storageTabs = getStorageLocations().map(loc => `
+        <button onclick="filterByLocation(this.dataset.loc)" class="${getLocationTabClass(loc)}" data-loc="${escapeHtml(loc)}">${escapeHtml(loc)}</button>
+      `).join('');
+      return `
+        <div class="flex gap-2 overflow-x-auto pb-1">
+          <button onclick="filterByLocation(this.dataset.loc)" class="${getLocationTabClass('すべて')}" data-loc="すべて">すべて</button>
+          ${storageTabs}
+          <button onclick="openLocationManager()" class="bg-slate-800 text-white px-4 py-2.5 rounded-xl text-sm font-black whitespace-nowrap transition-all active:scale-95 shrink-0">＋ 管理</button>
+        </div>
+      `;
+    }
+
+    function renderModeControls() {
+      const primary = document.getElementById('modePrimaryRow');
+      const secondary = document.getElementById('modeSecondaryRow');
+      const select = document.getElementById('modeSelectRow');
+      const label = document.getElementById('locationLabel');
+      if (!primary || !secondary || !select) return;
+
+      updateInventoryTopTabs();
+      if (state.currentLoc === '登録待ち') {
+        if (label) label.textContent = 'REGISTRATION HUB';
+        primary.innerHTML = `
+          <div class="grid grid-cols-2 gap-2">
+            <button onclick="document.getElementById('imageScanInput').click()" class="h-12 bg-rose-50 text-rose-700 border border-rose-100 px-3 rounded-xl font-black text-[11px] flex items-center justify-center gap-2 active:scale-95 transition-all">
+              <span class="text-base">📷</span><span>画像スキャン</span>
+            </button>
+            <button onclick="openHubManualAdd()" class="h-12 bg-amber-50 text-amber-700 border border-amber-100 px-3 rounded-xl font-black text-[11px] flex items-center justify-center gap-2 active:scale-95 transition-all">
+              <span class="text-base">＋</span><span>手動で追加</span>
+            </button>
+          </div>
+        `;
+        secondary.innerHTML = `
+          <div class="h-10 flex items-center gap-2 overflow-x-auto px-1">
+            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider shrink-0">並び</span>
+            ${renderSortButtons([
+              { key: 'created', label: '登録順' },
+              { key: 'name', label: '名前順' },
+              { key: 'limit2', label: '期限順' }
+            ], state.stagingSortBy, state.stagingSortOrder, 'setStagingSort', 'amber')}
+          </div>
+        `;
+        select.innerHTML = renderSelectControl('selectAllStaging', 'amber');
+        return;
+      }
+
+      if (state.currentLoc === '買い物リスト') {
+        if (label) label.textContent = 'SHOPPING LIST';
+        primary.innerHTML = `
+          <div class="h-12 flex items-center justify-between gap-3 px-3 bg-emerald-50 border border-emerald-100 rounded-xl">
+            <div>
+              <div class="text-[10px] font-black text-emerald-600 uppercase tracking-widest leading-none">SHOPPING</div>
+              <div class="text-sm font-black text-slate-800 mt-1">買い物リスト</div>
+            </div>
+            <div class="bg-emerald-100 rounded-xl p-1 flex gap-1 shrink-0">
+              <button onclick="setShoppingView('source')" class="shopping-view-btn px-3 py-1.5 rounded-lg text-[10px] font-black ${state.shoppingView === 'source' ? 'bg-white text-emerald-700 shadow-sm' : 'text-emerald-700'}">出自別</button>
+              <button onclick="setShoppingView('grouped')" class="shopping-view-btn px-3 py-1.5 rounded-lg text-[10px] font-black ${state.shoppingView === 'grouped' ? 'bg-white text-emerald-700 shadow-sm' : 'text-emerald-700'}">材料まとめ</button>
+            </div>
+          </div>
+        `;
+        secondary.innerHTML = `
+          <div class="h-10 flex items-center gap-2 overflow-x-auto px-1">
+            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider shrink-0">並び</span>
+            ${renderSortButtons([
+              { key: 'name', label: '名前順' },
+              { key: 'qty', label: '数量順' },
+              { key: 'scheduleDate', label: '予定日順' }
+            ], state.shoppingSortBy, state.shoppingSortOrder, 'setShoppingSort', 'emerald')}
+          </div>
+        `;
+        select.innerHTML = renderSelectControl('selectAllShopping', 'emerald');
+        return;
+      }
+
+      if (label) label.textContent = state.currentLoc === 'すべて' ? 'ALL STORAGE' : state.currentLoc.toUpperCase();
+      primary.innerHTML = renderInventoryPrimaryRow();
+      secondary.innerHTML = `
+        <div class="h-10 flex items-center gap-2 overflow-x-auto px-1">
+          <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider shrink-0">並び</span>
+          ${renderSortButtons([
+            { key: 'limit2', label: '期限順' },
+            { key: 'name', label: '名前順' },
+            { key: 'buy', label: '購入日順' }
+          ], state.sortBy, state.sortOrder, 'setSort', 'slate')}
+        </div>
+      `;
+      select.innerHTML = renderSelectControl('selectAllInventory', 'slate');
+    }
+
+    function updateListAreaTone(container) {
+      if (!container) return;
+      const base = 'space-y-3 mt-3 transition-colors';
+      if (state.currentLoc === '買い物リスト') {
+        container.className = `${base} bg-emerald-50 p-3 rounded-2xl border border-emerald-100`;
+      } else if (state.currentLoc === '登録待ち') {
+        container.className = `${base} bg-amber-50 p-3 rounded-2xl border border-amber-100`;
+      } else {
+        container.className = `${base} bg-slate-100 p-3 rounded-2xl border border-slate-200`;
+      }
+    }
+
     function toggleShoppingGroup(key) {
       state.shoppingExpandedGroups[key] = !state.shoppingExpandedGroups[key];
       renderList();
@@ -1235,7 +1400,7 @@
       const pad = compact ? 'p-2' : 'p-3';
       const qtyCls = compact ? 'text-xs' : 'text-sm';
       return `
-        <div class="bg-white ${pad} rounded-xl shadow-sm border border-slate-100 flex items-center gap-3 transition-colors hover:bg-emerald-50">
+        <div class="bg-emerald-50 ${pad} rounded-xl shadow-sm border border-emerald-100 flex items-center gap-3 transition-colors hover:bg-emerald-100">
           <input type="checkbox" class="shop-cb w-5 h-5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 shrink-0" data-id="${item.id}">
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-2 mb-0.5 min-w-0">
@@ -1262,7 +1427,7 @@
         byKey[key].qty += Number(item.qty) || 0;
         byKey[key].items.push(item);
       });
-      return groups.map(group => {
+      return sortShoppingGroups(groups).map(group => {
         const expanded = !!state.shoppingExpandedGroups[group.key];
         const encodedKey = encodeURIComponent(group.key);
         const ids = group.items.map(i => i.id).join(',');
@@ -1272,7 +1437,7 @@
           </div>
         ` : '';
         return `
-          <div class="bg-white p-3 rounded-xl shadow-sm border border-slate-100">
+          <div class="bg-emerald-50 p-3 rounded-xl shadow-sm border border-emerald-100">
             <div class="flex items-center gap-3">
               <input type="checkbox" class="shop-group-cb w-5 h-5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 shrink-0" data-ids="${ids}" onchange="toggleShoppingGroupSelection(this)">
               <button onclick="toggleShoppingGroup(decodeURIComponent('${encodedKey}'))" class="w-7 h-7 bg-slate-100 rounded-lg text-slate-600 font-black flex items-center justify-center active:scale-90 transition-all shrink-0">${expanded ? '−' : '＋'}</button>
@@ -1337,27 +1502,11 @@
       if (loc === '買い物リスト') {
         tone = active ? 'active bg-emerald-50 text-emerald-600 shadow-sm border border-emerald-100' : 'bg-emerald-50 text-emerald-600 border border-emerald-100';
       }
-      return `location-tab ${tone} px-5 py-2.5 rounded-xl text-sm font-black whitespace-nowrap transition-all relative max-w-full`;
+      return `location-tab ${tone} px-5 py-2.5 rounded-xl text-sm font-black whitespace-nowrap transition-all relative shrink-0`;
     }
 
     function renderLocationTabs() {
-      const tabs = document.getElementById('locationTabs');
-      if (!tabs) return;
-      const label = document.getElementById('locationLabel');
-      if (label) label.textContent = state.currentLoc === 'すべて' ? 'ALL STORAGE' : state.currentLoc.toUpperCase();
-      const storageTabs = getStorageLocations().map(loc => `
-        <button onclick="filterByLocation(this.dataset.loc)" class="${getLocationTabClass(loc)}" data-loc="${escapeHtml(loc)}">${escapeHtml(loc)}</button>
-      `).join('');
-      tabs.innerHTML = `
-        <button onclick="filterByLocation(this.dataset.loc)" class="${getLocationTabClass('すべて')}" data-loc="すべて">すべて</button>
-        ${storageTabs}
-        <button onclick="openLocationManager()" class="bg-slate-800 text-white px-4 py-2.5 rounded-xl text-sm font-black whitespace-nowrap transition-all active:scale-95 max-w-full">＋ 管理</button>
-        <button onclick="filterByLocation(this.dataset.loc)" class="${getLocationTabClass('登録待ち')}" data-loc="登録待ち">
-          📝 登録待ち
-          <span id="stagingBadge" class="absolute -top-1 -right-1 bg-amber-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full hidden">0</span>
-        </button>
-        <button onclick="filterByLocation(this.dataset.loc)" class="${getLocationTabClass('買い物リスト')}" data-loc="買い物リスト">🛒 買い物リスト</button>
-      `;
+      renderModeControls();
     }
 
     function renderLocationOptions(selected) {
@@ -2051,37 +2200,38 @@
 
     /* --- List Rendering --- */
     function renderList() {
-      renderLocationTabs();
+      renderModeControls();
       const container = document.getElementById('listContainer');
       const stagingActions = document.getElementById('stagingActions');
+      const inventoryActions = document.getElementById('inventoryActions');
       const shoppingActions = document.getElementById('shoppingActions');
-      const shoppingControls = document.getElementById('shoppingControls');
-      const controls = document.getElementById('listControls');
       if (!container) return;
       container.innerHTML = '';
+      updateListAreaTone(container);
       
       const badge = document.getElementById('stagingBadge');
       if (state.staging.length > 0) {
-        badge.textContent = state.staging.length;
-        badge.classList.remove('hidden');
+        if (badge) {
+          badge.textContent = state.staging.length;
+          badge.classList.remove('hidden');
+        }
       } else {
-        badge.classList.add('hidden');
+        if (badge) badge.classList.add('hidden');
       }
 
       if (state.currentLoc === '登録待ち') {
         stagingActions.classList.remove('hidden');
-        controls.classList.remove('hidden');
+        inventoryActions.classList.add('hidden');
         shoppingActions.classList.add('hidden');
-        shoppingControls.classList.add('hidden');
         if (state.staging.length === 0) {
-          container.innerHTML = '<div class="py-20 text-center text-slate-300 font-bold">登録待ちリストは空です。</div>';
-          controls.classList.add('hidden');
+          container.innerHTML = '<div class="py-20 text-center text-slate-300 font-bold">登録待ちリストは空です。上のボタンから追加してください。</div>';
+          stagingActions.classList.add('hidden');
           return;
         }
-        state.staging.forEach((item, idx) => {
+        sortStaging(state.staging.map((item, idx) => ({ item, idx }))).forEach(({ item, idx }) => {
           const aiClass = item._newAi ? 'ai-highlight' : '';
           container.insertAdjacentHTML('beforeend', `
-            <div class="bg-white p-5 rounded-[2rem] shadow-sm border border-slate-100 staged-item flex items-center gap-4 group ${aiClass}" onclick="openStagingEditor(${idx})">
+            <div class="bg-amber-50 p-5 rounded-[2rem] shadow-sm border border-amber-100 staged-item flex items-center gap-4 group ${aiClass}" onclick="openStagingEditor(${idx})">
               <input type="checkbox" class="staging-cb w-6 h-6 rounded-lg border-slate-300 text-amber-500 focus:ring-amber-400" data-idx="${idx}" onclick="event.stopPropagation()" ${item._selected ? 'checked' : ''}>
               <div class="flex-1">
                 <div class="flex items-center gap-2 mb-1">
@@ -2098,18 +2248,13 @@
       }
 
       if (state.currentLoc === '買い物リスト') {
-        controls.classList.add('hidden');
         stagingActions.classList.add('hidden');
         inventoryActions.classList.add('hidden');
         shoppingActions.classList.remove('hidden');
-        shoppingControls.classList.remove('hidden');
-        document.querySelectorAll('.shopping-view-btn').forEach(btn => {
-          const active = btn.dataset.view === state.shoppingView;
-          btn.className = `shopping-view-btn px-3 py-1.5 rounded-lg text-[10px] font-black ${active ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500'}`;
-        });
-        const list = (state.shopping || []).filter(i => i.status === '未購入');
+        const list = sortShopping((state.shopping || []).filter(i => i.status === '未購入'));
         if (list.length === 0) {
           container.innerHTML = '<div class="py-20 text-center text-slate-300 font-bold">買うものはありません。</div>';
+          shoppingActions.classList.add('hidden');
           return;
         }
         container.innerHTML = state.shoppingView === 'grouped'
@@ -2120,20 +2265,17 @@
 
       stagingActions.classList.add('hidden');
       shoppingActions.classList.add('hidden');
-      shoppingControls.classList.add('hidden');
       let filtered = state.currentLoc === 'すべて' ? state.inventory : state.inventory.filter(i => i.loc === state.currentLoc);
       filtered = sortInventory(filtered);
       if (filtered.length === 0) {
         container.innerHTML = '<div class="py-20 text-center text-slate-300 font-bold">在庫はありません。</div>';
-        controls.classList.add('hidden');
         inventoryActions.classList.add('hidden');
         return;
       }
-      controls.classList.remove('hidden');
       inventoryActions.classList.remove('hidden');
       const today = new Date(); today.setHours(0,0,0,0);
       filtered.forEach(item => {
-        let rowClass = 'border-slate-100';
+        let rowClass = 'border-slate-200 bg-slate-50';
         let badge = '';
         const syncBadge = getInventorySyncBadge(item);
         if (item.limit2) {
@@ -2152,7 +2294,7 @@
         }
         const delta = (item.unit === 'g' || item.unit === 'ml') ? 50 : 1;
         container.insertAdjacentHTML('beforeend', `
-          <div class="bg-white p-3 rounded-xl shadow-sm border ${rowClass} flex items-center gap-3 transition-colors">
+          <div class="p-3 rounded-xl shadow-sm border ${rowClass} flex items-center gap-3 transition-colors">
             <input type="checkbox" class="inv-cb w-5 h-5 rounded border-slate-300 text-rose-500 focus:ring-rose-400 shrink-0" data-id="${item.id}">
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2 mb-0.5">
@@ -2199,13 +2341,26 @@
         state.sortBy = key;
         state.sortOrder = 'asc';
       }
-      const labels = { limit2: '期限順', name: '名前順', buy: '購入日順' };
-      document.querySelectorAll('.sort-btn').forEach(btn => {
-        const isActive = btn.dataset.sort === state.sortBy;
-        const arrow = isActive ? (state.sortOrder === 'asc' ? ' ▲' : ' ▼') : '';
-        btn.className = `sort-btn text-[10px] font-bold px-3 py-1 rounded-full transition-all ${isActive ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-500'}`;
-        btn.textContent = labels[btn.dataset.sort] + arrow;
-      });
+      renderList();
+    }
+
+    function setShoppingSort(key) {
+      if (state.shoppingSortBy === key) {
+        state.shoppingSortOrder = state.shoppingSortOrder === 'asc' ? 'desc' : 'asc';
+      } else {
+        state.shoppingSortBy = key;
+        state.shoppingSortOrder = 'asc';
+      }
+      renderList();
+    }
+
+    function setStagingSort(key) {
+      if (state.stagingSortBy === key) {
+        state.stagingSortOrder = state.stagingSortOrder === 'asc' ? 'desc' : 'asc';
+      } else {
+        state.stagingSortBy = key;
+        state.stagingSortOrder = 'asc';
+      }
       renderList();
     }
 
@@ -3139,6 +3294,50 @@ ${plan ? '\n提案方針: ' + plan : ''}
       return state.sortOrder === 'desc' ? sorted.reverse() : sorted;
     }
 
+    function sortShopping(list) {
+      const sorted = [...list].sort((a, b) => {
+        if (state.shoppingSortBy === 'qty') return (Number(a.qty) || 0) - (Number(b.qty) || 0);
+        if (state.shoppingSortBy === 'scheduleDate') {
+          if (!a.scheduleDate && !b.scheduleDate) return (a.name || '').localeCompare(b.name || '', 'ja');
+          if (!a.scheduleDate) return 1;
+          if (!b.scheduleDate) return -1;
+          return String(a.scheduleDate).localeCompare(String(b.scheduleDate));
+        }
+        return (a.name || '').localeCompare(b.name || '', 'ja');
+      });
+      return state.shoppingSortOrder === 'desc' ? sorted.reverse() : sorted;
+    }
+
+    function sortShoppingGroups(groups) {
+      const sorted = [...groups].sort((a, b) => {
+        if (state.shoppingSortBy === 'qty') return (Number(a.qty) || 0) - (Number(b.qty) || 0);
+        if (state.shoppingSortBy === 'scheduleDate') {
+          const aDate = a.items.map(i => i.scheduleDate).filter(Boolean).sort()[0] || '';
+          const bDate = b.items.map(i => i.scheduleDate).filter(Boolean).sort()[0] || '';
+          if (!aDate && !bDate) return a.name.localeCompare(b.name, 'ja');
+          if (!aDate) return 1;
+          if (!bDate) return -1;
+          return aDate.localeCompare(bDate);
+        }
+        return a.name.localeCompare(b.name, 'ja');
+      });
+      return state.shoppingSortOrder === 'desc' ? sorted.reverse() : sorted;
+    }
+
+    function sortStaging(entries) {
+      const sorted = [...entries].sort((a, b) => {
+        if (state.stagingSortBy === 'name') return (a.item.name || '').localeCompare(b.item.name || '', 'ja');
+        if (state.stagingSortBy === 'limit2') {
+          if (!a.item.limit2 && !b.item.limit2) return a.idx - b.idx;
+          if (!a.item.limit2) return 1;
+          if (!b.item.limit2) return -1;
+          return String(a.item.limit2).localeCompare(String(b.item.limit2));
+        }
+        return a.idx - b.idx;
+      });
+      return state.stagingSortOrder === 'desc' ? sorted.reverse() : sorted;
+    }
+
     /* --- Processing --- */
     
     async function batchPredictAI(quiet = false) {
@@ -3588,6 +3787,20 @@ ${text}`;
       showToast('リストから削除しました', 'info');
     }
 
+    function batchDeleteStaging() {
+      const selected = Array.from(document.querySelectorAll('.staging-cb:checked'))
+        .map(cb => parseInt(cb.dataset.idx))
+        .filter(idx => !Number.isNaN(idx))
+        .sort((a, b) => b - a);
+      if (selected.length === 0) {
+        showToast('削除する登録待ち食材を選択してください。', 'error');
+        return;
+      }
+      selected.forEach(idx => state.staging.splice(idx, 1));
+      renderList();
+      showToast(`${selected.length} 件を登録待ちリストから削除しました`, 'info');
+    }
+
     function showPurchaseConfirm(items, duplicates) {
       const existing = document.getElementById('purchaseConfirmOverlay');
       if (existing) existing.remove();
@@ -3844,7 +4057,7 @@ ${text}`;
           });
         });
         setStatus(false);
-        renderList();
+        filterByLocation('登録待ち');
         showToast(`${items.length} 件の食材を登録待ちリストに追加しました。内容を確認・修正してください。`, 'success');
       } catch (err) {
         console.error('[ImageScan] scan error:', err);
