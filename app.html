@@ -280,12 +280,53 @@
 
     <!-- モードC: 料理・記録 -->
     <div id="modeCView" class="hidden">
-      <div class="flex flex-col items-center justify-center min-h-[60vh] p-6 text-center">
+      <!-- クッキングビューア -->
+      <div id="cookingViewer" class="hidden">
+        <div class="p-4 max-w-2xl mx-auto pb-32">
+          <!-- ヘッダー -->
+          <div class="flex items-center justify-between mb-4">
+            <button onclick="closeCookingViewer()" class="p-2 bg-slate-100 rounded-xl text-slate-600 hover:bg-slate-200 transition-all">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+            </button>
+            <h2 id="cookingRecipeName" class="text-2xl font-bold text-slate-800 truncate flex-1 mx-3 text-center"></h2>
+            <div class="w-10"></div>
+          </div>
+
+          <!-- タブ -->
+          <div class="flex gap-2 mb-4">
+            <button onclick="switchCookingTab('ingredients')" id="cookingTabIngredients" class="flex-1 py-3 rounded-xl text-sm font-black bg-indigo-600 text-white shadow-md transition-all">材料</button>
+            <button onclick="switchCookingTab('steps')" id="cookingTabSteps" class="flex-1 py-3 rounded-xl text-sm font-bold bg-slate-100 text-slate-500 transition-all">手順</button>
+          </div>
+
+          <!-- 材料タブ -->
+          <div id="cookingIngredientsPanel" class="space-y-3">
+            <!-- JSで動的に挿入 -->
+          </div>
+
+          <!-- 手順タブ -->
+          <div id="cookingStepsPanel" class="hidden space-y-4">
+            <!-- JSで動的に挿入 -->
+          </div>
+        </div>
+
+        <!-- 完了ボタン -->
+        <div class="fixed bottom-20 left-0 right-0 p-4 bg-white/90 backdrop-blur-md border-t border-slate-100 z-40">
+          <button onclick="finishCooking()" class="w-full max-w-2xl mx-auto bg-emerald-600 text-white font-black py-4 rounded-2xl shadow-lg hover:bg-emerald-700 active:scale-95 transition-all flex items-center justify-center gap-2">
+            <span>✅</span> 料理を完了する
+          </button>
+        </div>
+      </div>
+
+      <!-- 通常表示（ビューア未選択時） -->
+      <div id="cookingGuide" class="flex flex-col items-center justify-center min-h-[60vh] p-6 text-center">
         <div class="w-20 h-20 bg-emerald-100 rounded-3xl flex items-center justify-center mb-6">
           <span class="text-4xl">🍽️</span>
         </div>
         <h2 class="text-2xl font-black text-slate-700 mb-2">料理・記録</h2>
-        <p class="text-sm text-slate-400">Phase 3 で実装予定</p>
+        <p class="text-sm text-slate-400 mb-6">献立を選んでください</p>
+        <button onclick="switchMode('B'); switchBTab('schedule');" class="bg-indigo-600 text-white font-black py-3 px-8 rounded-2xl shadow-lg hover:bg-indigo-700 active:scale-95 transition-all">
+          献立スケジュールを開く
+        </button>
       </div>
     </div>
   </main>
@@ -702,6 +743,26 @@
       <div class="space-y-3">
         <button onclick="changeScheduleSlotRecipe()" class="w-full bg-indigo-600 text-white font-black py-4 rounded-2xl shadow-lg hover:bg-indigo-700 active:scale-95 transition-all">別のレシピに変更</button>
         <button onclick="removeScheduleSlot()" class="w-full bg-rose-500 text-white font-black py-4 rounded-2xl shadow-lg hover:bg-rose-600 active:scale-95 transition-all">削除する</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- モーダル: 消費量調整 -->
+  <div id="consumptionModal" onclick="if(event.target===this) closeConsumptionModal()" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
+    <div onclick="event.stopPropagation()" class="bg-white w-full max-w-lg rounded-[2.5rem] p-6 shadow-2xl transform scale-95 transition-transform duration-300 border border-slate-100 max-h-[90vh] overflow-y-auto">
+      <div class="flex justify-between items-center mb-5">
+        <h3 class="text-2xl font-black text-slate-800 tracking-tight">実際の消費量を調整</h3>
+        <button onclick="closeConsumptionModal()" class="text-slate-300 hover:text-slate-600 bg-slate-100 p-2 rounded-full"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+      </div>
+      <div id="consumptionList" class="space-y-3 mb-6">
+        <!-- JSで動的に挿入 -->
+      </div>
+      <div id="consumptionWarning" class="hidden mb-4 bg-rose-50 border border-rose-200 rounded-2xl p-4">
+        <p class="text-sm font-bold text-rose-600">在庫が不足しています。実際の在庫を確認してください。</p>
+      </div>
+      <div class="flex gap-3">
+        <button onclick="closeConsumptionModal()" class="flex-1 bg-slate-100 text-slate-600 font-black py-4 rounded-2xl hover:bg-slate-200 transition-all">キャンセル</button>
+        <button id="btnConsumptionConfirm" onclick="confirmConsumption()" class="flex-[2] bg-emerald-600 text-white font-black py-4 rounded-2xl hover:bg-emerald-700 transition-all shadow-xl">確定</button>
       </div>
     </div>
   </div>
@@ -2031,6 +2092,15 @@
       });
       if (mode === 'A') renderList();
       if (mode === 'B') renderRecipeList();
+      if (mode === 'C') {
+        if (!currentCookingRecipeId) {
+          const today = new Date().toISOString().split('T')[0];
+          const todaySchedule = state.schedule.find(s => s.date === today && s.recipeId);
+          if (todaySchedule) {
+            openCookingViewer(todaySchedule.recipeId);
+          }
+        }
+      }
     }
 
     function switchBTab(tab) {
@@ -2089,6 +2159,9 @@
               <div class="flex-1 bg-indigo-50 border border-indigo-100 rounded-xl p-2 text-center cursor-pointer hover:bg-indigo-100 transition-all" onclick="openScheduleSlotMenu('${date}', '${meal}')">
                 <p class="text-[10px] font-bold text-indigo-400 mb-0.5">${meal}</p>
                 <p class="text-xs font-black text-indigo-700 truncate">${escapeHtml(assigned.recipeName)}</p>
+                <button onclick="event.stopPropagation(); openCookingViewer('${assigned.recipeId}')" class="mt-1 px-2 py-1 rounded-lg bg-indigo-600 text-white text-[10px] font-black hover:bg-indigo-700 active:scale-95 transition-all inline-flex items-center justify-center gap-0.5">
+                  <span>▶</span> 開始
+                </button>
               </div>
             `;
           } else {
@@ -2887,6 +2960,9 @@ ${plan ? '\n提案方針: ' + plan : ''}
               <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">材料 ${ingCount} 品目 | 調理回数 ${recipe.count || 0}</p>
             </div>
             <div class="flex items-center gap-1">
+              <button onclick="event.stopPropagation(); openCookingViewer('${recipe.id}')" class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 hover:bg-emerald-100 flex items-center justify-center transition-all" title="料理する">
+                <span class="text-lg">🍽️</span>
+              </button>
               <button onclick="event.stopPropagation(); openRecipeEditor('${recipe.id}')" class="w-10 h-10 rounded-xl bg-slate-50 text-slate-500 hover:bg-indigo-50 hover:text-indigo-600 flex items-center justify-center transition-all">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
               </button>
@@ -3690,6 +3766,325 @@ ${text}`;
       renderRecipeList();
       showToast('レシピ削除を保留しました。同期するまでスプシ未反映です。', 'info');
     }
+
+    /* --- Cooking Viewer --- */
+    let currentCookingRecipeId = null;
+
+    function openCookingViewer(recipeId) {
+      const recipe = state.recipes.find(r => r.id === recipeId);
+      if (!recipe) {
+        showToast('レシピが見つかりません。', 'error');
+        return;
+      }
+      currentCookingRecipeId = recipeId;
+      document.getElementById('cookingRecipeName').textContent = recipe.name || '（名称未設定）';
+      renderCookingIngredients(recipe);
+      renderCookingSteps(recipe);
+      switchCookingTab('ingredients');
+      document.getElementById('cookingViewer').classList.remove('hidden');
+      document.getElementById('cookingGuide').classList.add('hidden');
+      switchMode('C');
+    }
+
+    function closeCookingViewer() {
+      currentCookingRecipeId = null;
+      document.getElementById('cookingViewer').classList.add('hidden');
+      document.getElementById('cookingGuide').classList.remove('hidden');
+    }
+
+    function switchCookingTab(tab) {
+      const ingBtn = document.getElementById('cookingTabIngredients');
+      const stepBtn = document.getElementById('cookingTabSteps');
+      const ingPanel = document.getElementById('cookingIngredientsPanel');
+      const stepPanel = document.getElementById('cookingStepsPanel');
+      if (tab === 'ingredients') {
+        ingBtn.className = 'flex-1 py-3 rounded-xl text-sm font-black bg-indigo-600 text-white shadow-md transition-all';
+        stepBtn.className = 'flex-1 py-3 rounded-xl text-sm font-bold bg-slate-100 text-slate-500 transition-all';
+        ingPanel.classList.remove('hidden');
+        stepPanel.classList.add('hidden');
+      } else {
+        ingBtn.className = 'flex-1 py-3 rounded-xl text-sm font-bold bg-slate-100 text-slate-500 transition-all';
+        stepBtn.className = 'flex-1 py-3 rounded-xl text-sm font-black bg-indigo-600 text-white shadow-md transition-all';
+        ingPanel.classList.add('hidden');
+        stepPanel.classList.remove('hidden');
+      }
+    }
+
+    function getIngredientCategoryBadge(type, unit, name) {
+      const isSeasoning = type === '調味料' || /大さじ|小さじ/.test(unit || '') || /醤油|塩|砂糖|みりん|酒|酢|油|だし|ソース|マヨ|ケチャップ|胡椒|ガラム|カレー粉|味噌|コンソメ|わさび|からし|マスタード/.test(name || '');
+      if (isSeasoning) {
+        return '<span class="text-xs font-black px-2 py-1 rounded-full bg-yellow-100 text-yellow-800">調味料</span>';
+      }
+      return '<span class="text-xs font-black px-2 py-1 rounded-full bg-green-100 text-green-800">食材</span>';
+    }
+
+    function getAmountBadge(unit) {
+      const u = unit || '';
+      if (u.includes('大さじ')) {
+        return '<span class="text-xs font-black px-2 py-1 rounded-full bg-red-100 text-red-800">大さじ</span>';
+      }
+      if (u.includes('小さじ')) {
+        return '<span class="text-xs font-black px-2 py-1 rounded-full bg-blue-100 text-blue-800">小さじ</span>';
+      }
+      return '';
+    }
+
+    function renderCookingIngredients(recipe) {
+      const container = document.getElementById('cookingIngredientsPanel');
+      if (!container) return;
+      container.innerHTML = '';
+      let ingredients = [];
+      try {
+        ingredients = JSON.parse(recipe.ingredients || '[]');
+      } catch (e) {
+        showToast('レシピデータの読み込みに失敗しました', 'error');
+        container.innerHTML = '<div class="py-10 text-center text-slate-400 font-bold">材料データを読み込めません</div>';
+        return;
+      }
+      if (!Array.isArray(ingredients) || ingredients.length === 0) {
+        container.innerHTML = '<div class="py-10 text-center text-slate-400 font-bold">材料は登録されていません</div>';
+        return;
+      }
+      ingredients.forEach(ing => {
+        const catBadge = getIngredientCategoryBadge(ing.type, ing.unit, ing.name);
+        const amtBadge = getAmountBadge(ing.unit);
+        const amountText = [ing.amount, ing.unit].filter(Boolean).join('');
+        const required = parseFloat(ing.amount) || 0;
+        const unit = ing.unit || '';
+        const stockQty = state.inventory
+          .filter(i => i.name === ing.name && i.unit === unit && Number(i.qty) > 0)
+          .reduce((sum, item) => sum + (Number(item.qty) || 0), 0);
+        const isShortage = required > 0 && stockQty < required;
+        const stockText = `在庫: ${stockQty}${escapeHtml(unit)} / 必要: ${required > 0 ? required : '—'}${escapeHtml(unit)}`;
+        const stockClass = isShortage ? 'text-rose-500' : 'text-emerald-600';
+        const cardClass = isShortage ? 'bg-rose-50 border-rose-200' : 'bg-white border-slate-100';
+        const shortageBadge = isShortage ? '<span class="text-xs font-black px-2 py-1 rounded-full bg-rose-100 text-rose-700">⚠️ 不足</span>' : '<span class="text-xs font-black px-2 py-1 rounded-full bg-emerald-100 text-emerald-700">在庫あり</span>';
+        container.insertAdjacentHTML('beforeend', `
+          <div class="${cardClass} p-5 rounded-2xl shadow-sm border flex items-center justify-between gap-3">
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 flex-wrap mb-1">
+                <span class="text-xl font-bold text-slate-800">${escapeHtml(ing.name || '')}</span>
+                ${catBadge}
+                ${shortageBadge}
+              </div>
+              <p class="text-xs font-bold ${stockClass}">${stockText}</p>
+            </div>
+            <div class="flex items-center gap-2 flex-shrink-0">
+              <span class="text-lg font-semibold text-slate-700">${escapeHtml(amountText)}</span>
+              ${amtBadge}
+            </div>
+          </div>
+        `);
+      });
+    }
+
+    function highlightAmounts(text) {
+      const pattern = /([一-龠々ぁ-んァ-ンa-zA-Z・]+)\s*(大さじ|小さじ)\s*([0-9０-９]+(?:[\/／．.][0-9０-９]+)?)/g;
+      return escapeHtml(text).replace(pattern, (match, name, unit, num) => {
+        const colorClass = unit === '大さじ' ? 'text-red-600' : 'text-blue-600';
+        return `<span class="${colorClass} font-bold">${escapeHtml(name)} <span class="bg-gray-100 px-1 rounded">${escapeHtml(unit + num)}</span></span>`;
+      });
+    }
+
+    function renderCookingSteps(recipe) {
+      const container = document.getElementById('cookingStepsPanel');
+      if (!container) return;
+      container.innerHTML = '';
+      let steps = [];
+      try {
+        steps = JSON.parse(recipe.steps || '[]');
+      } catch (e) {
+        showToast('レシピデータの読み込みに失敗しました', 'error');
+        container.innerHTML = '<div class="py-10 text-center text-slate-400 font-bold">手順データを読み込めません</div>';
+        return;
+      }
+      if (!Array.isArray(steps) || steps.length === 0) {
+        container.innerHTML = '<div class="py-10 text-center text-slate-400 font-bold">手順は登録されていません</div>';
+        return;
+      }
+      steps.forEach((step, idx) => {
+        const highlighted = highlightAmounts(String(step));
+        container.insertAdjacentHTML('beforeend', `
+          <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex gap-4">
+            <div class="w-10 h-10 bg-indigo-100 text-indigo-700 rounded-xl flex items-center justify-center text-lg font-black flex-shrink-0">
+              ${idx + 1}
+            </div>
+            <div class="text-lg font-bold text-slate-700 leading-relaxed flex-1 pt-1">
+              ${highlighted}
+            </div>
+          </div>
+        `);
+      });
+    }
+
+    function finishCooking() {
+      if (!currentCookingRecipeId) return;
+      openConsumptionAdjustmentModal(currentCookingRecipeId);
+    }
+
+    let _consumptionRecipeId = null;
+    let _consumptionIngredients = [];
+
+    function openConsumptionAdjustmentModal(recipeId) {
+      const recipe = state.recipes.find(r => r.id === recipeId);
+      if (!recipe) {
+        showToast('レシピが見つかりません。', 'error');
+        return;
+      }
+      _consumptionRecipeId = recipeId;
+      let ingredients = [];
+      try {
+        ingredients = JSON.parse(recipe.ingredients || '[]');
+      } catch (e) {
+        showToast('レシピデータの読み込みに失敗しました', 'error');
+        return;
+      }
+      if (!Array.isArray(ingredients)) ingredients = [];
+      _consumptionIngredients = ingredients;
+
+      const container = document.getElementById('consumptionList');
+      container.innerHTML = '';
+      if (ingredients.length === 0) {
+        container.innerHTML = '<div class="py-6 text-center text-slate-400 font-bold">材料は登録されていません</div>';
+      } else {
+        ingredients.forEach((ing, idx) => {
+          const amount = parseFloat(ing.amount) || 0;
+          const unit = ing.unit || '';
+          const stockQty = state.inventory
+            .filter(i => i.name === ing.name && i.unit === unit && Number(i.qty) > 0)
+            .reduce((sum, item) => sum + (Number(item.qty) || 0), 0);
+          const isShortage = amount > 0 && stockQty < amount;
+          const stockClass = isShortage ? 'text-rose-500' : 'text-emerald-600';
+          const rowClass = isShortage ? 'bg-rose-50 border-rose-200' : 'bg-slate-50 border-transparent';
+          const shortageBadge = isShortage ? '<span class="text-[10px] font-black px-1.5 py-0.5 rounded-full bg-rose-100 text-rose-700">不足</span>' : '';
+          container.insertAdjacentHTML('beforeend', `
+            <div class="${rowClass} rounded-2xl p-4 flex items-center gap-3 border" data-idx="${idx}">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 mb-0.5">
+                  <p class="font-bold text-slate-800 text-sm">${escapeHtml(ing.name || '')}</p>
+                  ${shortageBadge}
+                </div>
+                <p class="text-[10px] text-slate-400 font-bold">規定量: ${amount > 0 ? amount : '—'}${escapeHtml(unit)} / <span class="${stockClass}">在庫: ${stockQty}${escapeHtml(unit)}</span></p>
+              </div>
+              <input type="number" min="0" step="0.1" value="${amount > 0 ? amount : ''}" placeholder="0" data-ing-name="${escapeHtml(ing.name || '')}" data-ing-unit="${escapeHtml(unit)}" data-ing-amount="${amount}" class="cons-qty w-20 bg-white border-2 border-slate-100 rounded-xl px-3 py-2 text-sm font-bold text-right outline-none focus:border-indigo-500">
+              <span class="text-xs font-bold text-slate-500 w-10">${escapeHtml(unit)}</span>
+            </div>
+          `);
+        });
+      }
+      document.getElementById('consumptionWarning').classList.add('hidden');
+      document.getElementById('btnConsumptionConfirm').disabled = false;
+      document.getElementById('btnConsumptionConfirm').classList.remove('opacity-50', 'cursor-not-allowed');
+
+      validateConsumptionInputs();
+
+      document.getElementById('syncBar').classList.add('sync-bar-hidden');
+      document.getElementById('syncBar').classList.remove('sync-bar-visible');
+      const m = document.getElementById('consumptionModal');
+      m.classList.remove('hidden');
+      setTimeout(() => m.classList.remove('opacity-0'), 10);
+    }
+
+    function closeConsumptionModal() {
+      const m = document.getElementById('consumptionModal');
+      m.classList.add('opacity-0');
+      setTimeout(() => m.classList.add('hidden'), 300);
+      updateSyncBar();
+      _consumptionRecipeId = null;
+      _consumptionIngredients = [];
+    }
+
+    function validateConsumptionInputs() {
+      const inputs = document.querySelectorAll('.cons-qty');
+      let hasShortage = false;
+      let shortageNames = [];
+      inputs.forEach(input => {
+        const name = input.dataset.ingName;
+        const unit = input.dataset.ingUnit;
+        const consumed = parseFloat(input.value) || 0;
+        if (consumed <= 0) return;
+        const stockQty = state.inventory
+          .filter(i => i.name === name && i.unit === unit && Number(i.qty) > 0)
+          .reduce((sum, item) => sum + (Number(item.qty) || 0), 0);
+        if (stockQty < consumed) {
+          hasShortage = true;
+          if (!shortageNames.includes(name)) shortageNames.push(name);
+        }
+      });
+      const warning = document.getElementById('consumptionWarning');
+      if (hasShortage) {
+        warning.innerHTML = `<p class="text-sm font-bold text-rose-600">在庫が不足する材料があります（${shortageNames.join('、')}）。減らせる分だけ減らして完了します。</p>`;
+        warning.classList.remove('hidden');
+      } else {
+        warning.classList.add('hidden');
+      }
+      return true;
+    }
+
+    function confirmConsumption() {
+      if (!_consumptionRecipeId) return;
+      const inputs = document.querySelectorAll('.cons-qty');
+      const consumedMap = [];
+      inputs.forEach(input => {
+        const name = input.dataset.ingName;
+        const unit = input.dataset.ingUnit;
+        const consumed = parseFloat(input.value) || 0;
+        if (consumed > 0) {
+          consumedMap.push({ name, unit, consumed });
+        }
+      });
+
+      const results = [];
+      let updatedCount = 0;
+      let deletedCount = 0;
+      consumedMap.forEach(({ name, unit, consumed }) => {
+        const stockQty = state.inventory
+          .filter(i => i.name === name && i.unit === unit && Number(i.qty) > 0)
+          .reduce((sum, item) => sum + (Number(item.qty) || 0), 0);
+        const isShortage = stockQty < consumed;
+        let actualConsumed = 0;
+        let remaining = consumed;
+        const targets = state.inventory.filter(i => i.name === name && i.unit === unit && Number(i.qty) > 0);
+        for (const item of targets) {
+          if (remaining <= 0) break;
+          const currentQty = Number(item.qty) || 0;
+          const deduct = Math.min(currentQty, remaining);
+          const newQty = currentQty - deduct;
+          actualConsumed += deduct;
+          remaining -= deduct;
+          if (newQty <= 0) {
+            queueInventoryDelete(item.id);
+            deletedCount++;
+          } else {
+            item.qty = newQty;
+            queueInventoryUpdate(item.id, item);
+            updatedCount++;
+          }
+        }
+        if (isShortage) {
+          results.push(`${name} は在庫不足（${stockQty}${unit}しかない）のため、全在庫を消費しました`);
+        } else {
+          results.push(`${name} を ${actualConsumed}${unit} 消費しました`);
+        }
+      });
+
+      closeConsumptionModal();
+      closeCookingViewer();
+
+      const summary = `在庫を更新しました（更新 ${updatedCount}件 / 削除 ${deletedCount}件）。同期するまでスプシ未反映です。`;
+      showToast(summary, 'success');
+      if (results.length > 0) {
+        setTimeout(() => showToast(results.join(' / '), 'info'), 1500);
+      }
+
+      updateSyncBar();
+    }
+
+    document.getElementById('consumptionModal').addEventListener('input', (e) => {
+      if (e.target.classList.contains('cons-qty')) {
+        validateConsumptionInputs();
+      }
+    });
 
     function majinCopy() {
       const data = { inventory: state.inventory, staging: state.staging, recipes: state.recipes, pendingSync: state.pendingSync };
