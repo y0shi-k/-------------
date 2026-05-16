@@ -613,33 +613,6 @@
         <button onclick="closeAiPreviewModal()" class="flex-1 bg-slate-100 text-slate-600 font-black py-4 rounded-2xl hover:bg-slate-200 transition-all">閉じる</button>
         <button onclick="openEditorFromViewer()" class="flex-[2] bg-indigo-600 text-white font-black py-4 rounded-2xl hover:bg-indigo-700 transition-all shadow-xl">編集する</button>
       </div>
-      <div class="space-y-5">
-        <div>
-          <p class="text-[11px] font-black text-slate-400 uppercase mb-1.5 ml-1">レシピ名</p>
-          <h4 id="aiPreviewName" class="text-xl font-black text-slate-800"></h4>
-        </div>
-        <div>
-          <div class="flex justify-between items-center mb-2">
-            <p class="text-[11px] font-black text-slate-400 uppercase ml-1">材料</p>
-          </div>
-          <ul id="aiPreviewIngredients" class="space-y-2 bg-slate-50 rounded-2xl p-4">
-            <!-- JSで動的に挿入 -->
-          </ul>
-        </div>
-        <div>
-          <div class="flex justify-between items-center mb-2">
-            <p class="text-[11px] font-black text-slate-400 uppercase ml-1">手順</p>
-          </div>
-          <ol id="aiPreviewSteps" class="space-y-3 bg-slate-50 rounded-2xl p-4 list-decimal list-inside">
-            <!-- JSで動的に挿入 -->
-          </ol>
-        </div>
-      </div>
-      <div class="pt-4 flex gap-3 mt-2 border-t border-slate-100">
-        <button onclick="closeAiPreviewModal()" class="flex-1 bg-slate-100 text-slate-600 font-black py-4 rounded-2xl hover:bg-slate-200 transition-all">キャンセル</button>
-        <button onclick="regenerateAiRecipe()" class="flex-1 bg-indigo-100 text-indigo-700 font-black py-4 rounded-2xl hover:bg-indigo-200 transition-all">再生成</button>
-        <button onclick="saveAiRecipeToCollection()" class="flex-[2] bg-emerald-500 text-white font-black py-4 rounded-2xl hover:bg-emerald-600 transition-all shadow-xl">レシピ集に保存</button>
-      </div>
     </div>
   </div>
 

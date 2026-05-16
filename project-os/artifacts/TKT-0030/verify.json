@@ -1,0 +1,18 @@
+{
+  "ticket_id": "TKT-0030-ai-preview-modal-duplicate-ui-fix",
+  "verify_result": "VERIFY_PASSED",
+  "checks": {
+    "html_parser": "passed",
+    "gas_url_present": "passed",
+    "execute_gas_present": "passed",
+    "duplicate_ids": {
+      "aiPreviewName": 1,
+      "aiPreviewIngredients": 1,
+      "aiPreviewSteps": 1
+    },
+    "alert_confirm_prompt": "none",
+    "showToast": "present",
+    "sync_pattern_violation": "none"
+  },
+  "timestamp": "2026-05-17T00:00:00Z"
+}
