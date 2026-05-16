@@ -1,0 +1,16 @@
+{
+  "ticket": "TKT-0022",
+  "spec": "SPEC-0022-complete-recipe-sync",
+  "verify_result": "PASSED",
+  "timestamp": "2026-05-16T00:00:00+09:00",
+  "checks": {
+    "html_valid": true,
+    "gas_url_present": true,
+    "execute_gas_present": true,
+    "no_alert": true,
+    "no_confirm": true,
+    "no_prompt": true,
+    "showToast_exists": true,
+    "completeRecipe_payload_present": true
+  }
+}

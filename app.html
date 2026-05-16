@@ -928,7 +928,10 @@
         scheduleDeletes: [],
         shoppingCreates: [],
         shoppingDeletes: [],
-        shoppingPurchases: []
+        shoppingPurchases: [],
+        scheduleUpdates: [],
+        recipeHistory: [],
+        cookingHistory: []
       };
     }
 
@@ -961,7 +964,8 @@
         + p.scheduleCreates.length + p.scheduleDeletes.length
         + p.shoppingCreates.length
         + p.shoppingDeletes.length
-        + p.shoppingPurchases.length;
+        + p.shoppingPurchases.length
+        + p.cookingHistory.length;
     }
 
     function updateSyncBar() {
@@ -984,6 +988,7 @@
       const shop = p.shoppingCreates.length + p.shoppingDeletes.length;
       if (shop) parts.push(`買い物 ${shop}`);
       if (p.shoppingPurchases.length) parts.push(`購入処理 ${p.shoppingPurchases.length}`);
+      if (p.cookingHistory.length) parts.push(`料理履歴 ${p.cookingHistory.length}`);
       document.getElementById('syncSummary').textContent = `未同期 ${count} 件`;
       document.getElementById('syncDetail').textContent = parts.join(' / ') + ' - 同期するまでスプシ未反映';
       bar.classList.remove('sync-bar-hidden');
@@ -1748,6 +1753,66 @@
           });
         }
 
+        // === 料理完了時の一括更新 ===
+        var sHistory = ss.getSheetByName('料理履歴');
+
+        // 1. 献立ステータス更新
+        var scheduleUpdates = pending.scheduleUpdates || [];
+        if(scheduleUpdates.length) {
+          var schData = sSchedule.getDataRange().getValues();
+          scheduleUpdates.forEach(function(u) {
+            for(var si=1; si<schData.length; si++) {
+              if(f(schData[si][0]) === u.date && f(schData[si][1]) === u.meal) {
+                sSchedule.getRange(si+1, 5).setValue(u.status);
+                break;
+              }
+            }
+          });
+          SpreadsheetApp.flush();
+        }
+
+        // 2. レシピ集調理回数・履歴更新
+        var recipeHistory = pending.recipeHistory || [];
+        if(recipeHistory.length) {
+          var recipeData = sRecipes.getDataRange().getValues();
+          recipeHistory.forEach(function(h) {
+            for(var ri=1; ri<recipeData.length; ri++) {
+              if(String(recipeData[ri][0]) === h.recipeId) {
+                var currentCount = Number(recipeData[ri][5]) || 0;
+                var currentHistory = recipeData[ri][6] || '[]';
+                var historyArr = [];
+                try { historyArr = JSON.parse(currentHistory); } catch(e) { historyArr = []; }
+                if(!Array.isArray(historyArr)) historyArr = [];
+                historyArr.push(h.cookingDate.split(' ')[0]);
+                sRecipes.getRange(ri+1, 6, 1, 2).setValues([[currentCount + 1, JSON.stringify(historyArr)]]);
+                break;
+              }
+            }
+          });
+          SpreadsheetApp.flush();
+        }
+
+        // 3. 料理履歴追加（画像Drive保存含む）
+        var cookingHistory = pending.cookingHistory || [];
+        if(cookingHistory.length) {
+          cookingHistory.forEach(function(ch) {
+            var photoUrl = '';
+            if(ch.photoBase64) {
+              try {
+                var base64Data = ch.photoBase64.split(',')[1] || ch.photoBase64;
+                var blob = Utilities.newBlob(Utilities.base64Decode(base64Data), 'image/jpeg', ch.photoFilename || 'cooking.jpg');
+                var file = DriveApp.createFile(blob);
+                photoUrl = file.getUrl();
+              } catch(e) {
+                // 画像保存失敗時は空文字のまま継続
+              }
+            }
+            var historyId = Utilities.getUuid();
+            sHistory.appendRow([historyId, ch.cookingDate, ch.recipeId, ch.recipeName, ch.comment || '', photoUrl, Number(ch.rating) || 0]);
+          });
+          SpreadsheetApp.flush();
+        }
+
         return { display: '一括同期完了', detail: { inventory: readInventory(), shopping: readShopping(), recipes: readRecipes(), schedule: readSchedule() } };
       })()`;
 
@@ -1770,7 +1835,8 @@
     async function executeGAS(payloadCode, label) {
       setStatus(true, label);
       const rid = 'rid_' + Date.now();
-      const bytes = new TextEncoder().encode(payloadCode);
+      const codeStr = typeof payloadCode === 'object' ? JSON.stringify(payloadCode) : String(payloadCode);
+      const bytes = new TextEncoder().encode(codeStr);
       let binary = '';
       for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
       const b64 = btoa(binary).split('+').join('-').split('/').join('_').split('=').join('');
@@ -4255,40 +4321,98 @@ ${text}`;
     }
 
     async function saveCookingRecord() {
-      const base64 = state._tempCookingPhotoBase64;
-      let photoUrl = '';
-
-      if (base64) {
-        try {
-          const now = new Date();
-          const filename = `cooking_${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}.jpg`;
-          const result = await executeGAS({
-            action: 'saveImageToDrive',
-            base64: base64.split(',')[1],
-            filename: filename
-          });
-          if (result && result.url) {
-            photoUrl = result.url;
-          } else {
-            throw new Error('No URL returned');
-          }
-        } catch (err) {
-          showToast('写真の保存に失敗しました。記録を続行します。', 'error');
-        }
+      // レシピIDをローカル変数に保存（closeCookingRecordModalでnull化されるため）
+      const recipeId = _cookingRecordRecipeId;
+      if (!recipeId) {
+        showToast('レシピIDが見つかりません。', 'error');
+        closeCookingRecordModal();
+        return;
       }
 
-      state._tempCookingPhotoUrl = photoUrl;
+      // 画像は state._tempCookingPhotoBase64 に保持済み
+      // 一括同期時に Drive へアップロードする
       state._tempCookingRating = Number(document.getElementById('cookingStarRating').dataset.rating || 0);
       state._tempCookingNote = document.getElementById('cookingRecordNote').value.trim();
 
-      closeCookingRecordModal();
-
-      // completeRecipe フローへ（TKT-0022）
+      // completeRecipe フローへ（pendingSync に積む）
       if (typeof completeRecipe === 'function') {
-        completeRecipe(_cookingRecordRecipeId, photoUrl, state._tempCookingRating, state._tempCookingNote);
+        await completeRecipe(recipeId, '', state._tempCookingRating, state._tempCookingNote);
       } else {
         showToast('料理の記録を保存しました。', 'success');
       }
+
+      closeCookingRecordModal();
+    }
+
+    async function completeRecipe(recipeId, photoUrl, rating, comment) {
+      if (!recipeId) {
+        showToast('レシピIDが見つかりません。', 'error');
+        return;
+      }
+
+      // 在庫更新は confirmConsumption で既に pendingSync に積まれている → クリアしない
+
+      // 今日の献立スケジュールから該当レシピを探す
+      const today = new Date();
+      const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+      const scheduleItem = state.schedule.find(s => s.date === todayStr && s.recipeId === recipeId && s.status !== '完了');
+      const cookingDate = `${todayStr} ${String(today.getHours()).padStart(2, '0')}:${String(today.getMinutes()).padStart(2, '0')}:${String(today.getSeconds()).padStart(2, '0')}`;
+
+      // レシピ名を取得
+      const recipe = state.recipes.find(r => r.id === recipeId);
+      const recipeName = recipe ? recipe.name : '';
+
+      // 画像ファイル名を生成（Base64は state._tempCookingPhotoBase64 に保持済み）
+      const photoFilename = state._tempCookingPhotoBase64
+        ? `cooking_${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}_${String(today.getHours()).padStart(2, '0')}${String(today.getMinutes()).padStart(2, '0')}${String(today.getSeconds()).padStart(2, '0')}.jpg`
+        : '';
+
+      // 献立ステータスをフロント側stateで「完了」に更新 + pendingSyncに積む
+      if (scheduleItem) {
+        scheduleItem.status = '完了';
+        state.pendingSync.scheduleUpdates.push({
+          date: scheduleItem.date,
+          meal: scheduleItem.meal,
+          status: '完了'
+        });
+      }
+
+      // レシピの調理回数・履歴をフロント側stateで更新 + pendingSyncに積む
+      if (recipe) {
+        recipe.count = (Number(recipe.count) || 0) + 1;
+        let history = [];
+        try {
+          history = JSON.parse(recipe.history || '[]');
+        } catch (e) {
+          history = [];
+        }
+        if (!Array.isArray(history)) history = [];
+        history.push(todayStr);
+        recipe.history = JSON.stringify(history);
+        state.pendingSync.recipeHistory.push({
+          recipeId: recipeId,
+          cookingDate: cookingDate
+        });
+      }
+
+      // 料理履歴を pendingSync に追加
+      state.pendingSync.cookingHistory.push({
+        recipeId: recipeId,
+        recipeName: recipeName,
+        cookingDate: cookingDate,
+        rating: rating || 0,
+        comment: comment || '',
+        photoBase64: state._tempCookingPhotoBase64 || '',
+        photoFilename: photoFilename
+      });
+
+      // 一時データをクリア
+      state._tempCookingPhotoBase64 = '';
+      state._tempCookingPhotoUrl = '';
+
+      updateSyncBar();
+      rerenderCurrentViews();
+      showToast('料理が完了しました！同期するまでスプシ未反映です。', 'success');
     }
 
     function majinCopy() {

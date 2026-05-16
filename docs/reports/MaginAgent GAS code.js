@@ -2704,6 +2704,101 @@ function 手動権限取得実行() {
     </script>
   </body>
   </html>`;
-  
-  
-  
+
+/* === Stock Master 追加ハンドラー === */
+
+/* 料理写真をDriveに保存 */
+function saveImageToDrive(base64, filename) {
+  try {
+    var blob = Utilities.newBlob(Utilities.base64Decode(base64), 'image/jpeg', filename);
+    var file = DriveApp.createFile(blob);
+    return { url: file.getUrl() };
+  } catch (err) {
+    return { error: err.toString() };
+  }
+}
+
+/* 料理完了時の一括更新 */
+/* ※非推奨: TKT-0023 以降はフロント側の syncPendingChanges 経由で一括同期 */
+function completeRecipe(data) {
+  try {
+    var ss = SpreadsheetApp.openById(PropertiesService.getUserProperties().getProperty('SS_ID_RECIPE_APP'));
+    var sStock = ss.getSheetByName('食材在庫');
+    var sSchedule = ss.getSheetByName('献立スケジュール');
+    var sRecipes = ss.getSheetByName('レシピ集');
+    var sHistory = ss.getSheetByName('料理履歴');
+    function f(v) { if(!v && v !== 0) return ""; if(v instanceof Date) return Utilities.formatDate(v, Session.getScriptTimeZone(), "yyyy-MM-dd"); return String(v).trim(); }
+
+    // 1. 在庫更新・削除
+    var inventoryUpdates = data.inventoryUpdates || {};
+    var inventoryDeletes = data.inventoryDeletes || [];
+    var stockData = sStock.getDataRange().getValues();
+    for(var di = stockData.length - 1; di >= 1; di--) {
+      if(inventoryDeletes.indexOf(String(stockData[di][0])) !== -1) {
+        sStock.deleteRow(di + 1);
+      }
+    }
+    var invUpdateIds = Object.keys(inventoryUpdates);
+    if(invUpdateIds.length) {
+      stockData = sStock.getDataRange().getValues();
+      for(var ui = 1; ui < stockData.length; ui++) {
+        var iid = String(stockData[ui][0]);
+        if(inventoryUpdates[iid]) {
+          var d = inventoryUpdates[iid];
+          sStock.getRange(ui + 1, 2, 1, 10).setValues([[d.type || '食材', d.name, d.qty, d.unit, d.buy || '', d.open || '', d.limit1 || '', d.limit2 || '', d.loc || '冷蔵庫', d.memo || '']]);
+        }
+      }
+    }
+    SpreadsheetApp.flush();
+
+    // 2. 献立ステータス更新
+    var scheduleKey = data.scheduleKey;
+    if(scheduleKey) {
+      var schData = sSchedule.getDataRange().getValues();
+      for(var si = 1; si < schData.length; si++) {
+        if(f(schData[si][0]) === scheduleKey.date && f(schData[si][1]) === scheduleKey.meal) {
+          sSchedule.getRange(si + 1, 5).setValue('完了');
+          break;
+        }
+      }
+      SpreadsheetApp.flush();
+    }
+
+    // 3. レシピ集更新
+    var recipeData = sRecipes.getDataRange().getValues();
+    for(var ri = 1; ri < recipeData.length; ri++) {
+      if(String(recipeData[ri][0]) === data.recipeId) {
+        var currentCount = Number(recipeData[ri][5]) || 0;
+        var currentHistory = recipeData[ri][6] || '[]';
+        var historyArr = [];
+        try { historyArr = JSON.parse(currentHistory); } catch(e) { historyArr = []; }
+        if(!Array.isArray(historyArr)) historyArr = [];
+        historyArr.push(data.cookingDate.split(' ')[0]);
+        sRecipes.getRange(ri + 1, 6, 1, 2).setValues([[currentCount + 1, JSON.stringify(historyArr)]]);
+        break;
+      }
+    }
+    SpreadsheetApp.flush();
+
+    // 4. 料理履歴追加
+    var historyId = Utilities.getUuid();
+    sHistory.appendRow([historyId, data.cookingDate, data.recipeId, data.recipeName || '', data.comment || '', data.photoUrl || '', Number(data.rating) || 0]);
+    SpreadsheetApp.flush();
+
+    // 更新後の在庫を読み込んで返す
+    var updatedInv = [];
+    var updatedStock = sStock.getDataRange().getValues();
+    for(var invI = 1; invI < updatedStock.length; invI++) {
+      var r = updatedStock[invI];
+      if(!r[2]) continue;
+      updatedInv.push({
+        id: f(r[0]), type: f(r[1]), name: f(r[2]), qty: Number(r[3])||0, unit: f(r[4]),
+        buy: f(r[5]), open: f(r[6]), limit1: f(r[7]), limit2: f(r[8]), loc: f(r[9]), memo: f(r[10])
+      });
+    }
+
+    return { success: true, updatedInventory: updatedInv };
+  } catch (err) {
+    return { success: false, error: err.toString() };
+  }
+}
