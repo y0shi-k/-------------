@@ -1,0 +1,27 @@
+{
+  "ticket_id": "TKT-0029-background-activity-status",
+  "status": "passed",
+  "verified_at": "2026-05-16",
+  "commands": [
+    {
+      "command": "python3 -c \"import html.parser; html.parser.HTMLParser().feed(open('app.html').read())\" && grep -q 'executeGAS' app.html && grep -q 'GAS_URL' app.html && echo 'VERIFY_PASSED'",
+      "result": "VERIFY_PASSED"
+    },
+    {
+      "command": "node -e \"const fs=require('fs'); const html=fs.readFileSync('app.html','utf8'); const scripts=[...html.matchAll(/<script[^>]*>([\\s\\S]*?)<\\/script>/g)].map(m=>m[1]); for (const s of scripts) new Function(s); console.log('JS_PARSE_PASSED')\"",
+      "result": "JS_PARSE_PASSED"
+    },
+    {
+      "command": "rg -n \"activityStatusBar|setActivityStatus|clearActivityStatus|写真を取得中|setSharing|ANYONE|alert\\(|confirm\\(|prompt\\(\" app.html",
+      "result": "下部ステータスと写真枠内読み込み表示を確認。setSharing/ANYONE と alert/confirm/prompt は該当なし。"
+    }
+  ],
+  "checks": {
+    "html_syntax": true,
+    "js_parse": true,
+    "activity_status_bar_present": true,
+    "photo_inline_loading_present": true,
+    "drive_sharing_change_absent": true,
+    "canvas_dialogs_absent": true
+  }
+}

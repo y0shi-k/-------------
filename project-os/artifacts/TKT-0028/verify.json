@@ -1,0 +1,39 @@
+{
+  "ticket_id": "TKT-0028-cooking-history-base64-photo-preview",
+  "status": "passed",
+  "verified_at": "2026-05-16",
+  "commands": [
+    {
+      "command": "python3 -c \"import html.parser; html.parser.HTMLParser().feed(open('app.html').read())\" && grep -q 'executeGAS' app.html && grep -q 'GAS_URL' app.html && echo 'VERIFY_PASSED'",
+      "result": "VERIFY_PASSED"
+    },
+    {
+      "command": "node -e \"const fs=require('fs'); const html=fs.readFileSync('app.html','utf8'); const scripts=[...html.matchAll(/<script[^>]*>([\\s\\S]*?)<\\/script>/g)].map(m=>m[1]); for (const s of scripts) new Function(s); console.log('JS_PARSE_PASSED')\"",
+      "result": "JS_PARSE_PASSED"
+    },
+    {
+      "command": "rg -n \"executeGAS\\(|setSharing|ANYONE|appendRow|deleteRow|setValue|setValues|alert\\(|confirm\\(|prompt\\(\" app.html",
+      "result": "TKT-0028で追加された executeGAS(imagePayload...) は DriveApp.getFileById(...).getBlob() の読み取り専用。setSharing/ANYONE は該当なし。alert/confirm/prompt は該当なし。"
+    },
+    {
+      "command": "rg -n \"executeGAS\\(|prefetchCookingHistoryImages|setSharing|ANYONE|alert\\(|confirm\\(|prompt\\(\" app.html",
+      "result": "初期同期後と一括同期後に prefetchCookingHistoryImages() を呼び、写真取得は executeGAS(..., { silent: true }) でUIを止めずに実行。setSharing/ANYONE と alert/confirm/prompt は該当なし。"
+    },
+    {
+      "command": "rg -n \"scheduleCookingHistoryImagePrefetch|prefetchCookingHistoryImages|requestIdleCallback|executeGAS\\(|setSharing|ANYONE|alert\\(|confirm\\(|prompt\\(\" app.html",
+      "result": "写真先読みは初期同期完了後に scheduleCookingHistoryImagePrefetch() で4秒遅延し、可能なら requestIdleCallback で開始。取得完了時に履歴タブ表示中なら再描画する。"
+    }
+  ],
+  "checks": {
+    "html_syntax": true,
+    "js_parse": true,
+    "executeGAS_present": true,
+    "GAS_URL_present": true,
+    "photo_base64_read_only_payload_present": true,
+    "drive_sharing_change_absent": true,
+    "background_prefetch_present": true,
+    "idle_prefetch_delay_present": true,
+    "history_auto_rerender_after_image_load": true,
+    "canvas_dialogs_absent": true
+  }
+}
