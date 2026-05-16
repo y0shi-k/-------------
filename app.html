@@ -6,6 +6,7 @@
   <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
   <title>料理レシピ・食材管理アプリ - Phase 1 (Batch Mode)</title>
   <style>
+    :root { --activity-status-height: 30px; }
     html, body { max-width: 100%; overflow-x: hidden; scrollbar-gutter: stable; }
     @keyframes slideLeft { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(-4px); } }
     .animate-slide-left { animation: slideLeft 1.5s infinite; }
@@ -24,6 +25,15 @@
     @keyframes toastSlideOut { from { opacity: 1; transform: translateX(-50%) translateY(0); } to { opacity: 0; transform: translateX(-50%) translateY(-20px); } }
     .sync-bar-hidden { transform: translateY(-100%); }
     .sync-bar-visible { transform: translateY(0); }
+    #app { padding-bottom: calc(6rem + var(--activity-status-height) + env(safe-area-inset-bottom)); }
+    #bottomNav { bottom: calc(var(--activity-status-height) + env(safe-area-inset-bottom)); }
+    #activityStatusBar {
+      min-height: calc(var(--activity-status-height) + env(safe-area-inset-bottom));
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+    #activityStatusBar .activity-status-content { height: var(--activity-status-height); }
+    #activityStatusBar[data-state="idle"] .activity-status-content { opacity: 0.45; }
+    #activityStatusBar[data-state="idle"] #activitySpinner { opacity: 0; }
   </style>
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen w-full overflow-x-hidden box-border font-sans relative">
@@ -54,13 +64,12 @@
     </div>
   </div>
 
-  <div id="activityStatusBar" class="fixed left-3 right-3 bottom-20 z-[55] pointer-events-none hidden">
-    <div class="max-w-2xl mx-auto bg-white/95 border border-slate-200 shadow-xl rounded-2xl px-4 py-3 flex items-center gap-3">
-      <div id="activitySpinner" class="w-4 h-4 border-2 border-indigo-100 border-t-indigo-600 rounded-full animate-spin shrink-0"></div>
-      <div class="min-w-0 flex-1">
-        <p id="activityStatusLabel" class="text-xs font-black text-slate-700 truncate">処理中</p>
-        <p id="activityStatusDetail" class="text-[10px] font-bold text-slate-400 truncate">しばらくお待ちください</p>
-      </div>
+  <div id="activityStatusBar" data-state="idle" class="fixed left-0 right-0 bottom-0 z-[55] pointer-events-none bg-white/95 border-t border-slate-200">
+    <div class="activity-status-content h-[var(--activity-status-height)] max-w-2xl mx-auto px-3 flex items-center gap-2 text-[11px] leading-none transition-opacity duration-200">
+      <div id="activitySpinner" class="w-3 h-3 border-2 border-indigo-100 border-t-indigo-600 rounded-full animate-spin shrink-0 transition-opacity duration-200"></div>
+      <p id="activityStatusLabel" class="font-black text-slate-600 truncate">待機中</p>
+      <span class="text-slate-300 shrink-0">|</span>
+      <p id="activityStatusDetail" class="font-bold text-slate-400 truncate">バックグラウンド処理はありません</p>
     </div>
   </div>
 
@@ -760,6 +769,7 @@
       cookingHistoryImageCache: {},
       cookingHistoryImageLoading: {},
       activityStatusToken: null,
+      isSyncing: false,
       editMode: null,
       editId: null,
       recipeEditId: null,
@@ -810,10 +820,10 @@
       state.activityStatusToken = token;
       title.textContent = stripHtml(label) || '処理中';
       sub.textContent = detail || 'バックグラウンドで処理しています';
+      bar.dataset.state = type === 'done' ? 'done' : 'busy';
       spinner.className = type === 'done'
-        ? 'w-4 h-4 rounded-full bg-emerald-500 shrink-0'
-        : 'w-4 h-4 border-2 border-indigo-100 border-t-indigo-600 rounded-full animate-spin shrink-0';
-      bar.classList.remove('hidden');
+        ? 'w-3 h-3 rounded-full bg-emerald-500 shrink-0 transition-opacity duration-200'
+        : 'w-3 h-3 border-2 border-indigo-100 border-t-indigo-600 rounded-full animate-spin shrink-0 transition-opacity duration-200';
       return token;
     }
 
@@ -825,17 +835,24 @@
       if (!bar || !title || !sub || !spinner) return;
       if (token && state.activityStatusToken && token !== state.activityStatusToken) return;
       if (doneLabel) {
+        bar.dataset.state = 'done';
         title.textContent = doneLabel;
         sub.textContent = '完了しました';
-        spinner.className = 'w-4 h-4 rounded-full bg-emerald-500 shrink-0';
+        spinner.className = 'w-3 h-3 rounded-full bg-emerald-500 shrink-0 transition-opacity duration-200';
         setTimeout(() => {
           if (!token || state.activityStatusToken === token) {
-            bar.classList.add('hidden');
+            bar.dataset.state = 'idle';
+            title.textContent = '待機中';
+            sub.textContent = 'バックグラウンド処理はありません';
+            spinner.className = 'w-3 h-3 border-2 border-indigo-100 border-t-indigo-600 rounded-full animate-spin shrink-0 transition-opacity duration-200';
             state.activityStatusToken = null;
           }
         }, 1600);
       } else {
-        bar.classList.add('hidden');
+        bar.dataset.state = 'idle';
+        title.textContent = '待機中';
+        sub.textContent = 'バックグラウンド処理はありません';
+        spinner.className = 'w-3 h-3 border-2 border-indigo-100 border-t-indigo-600 rounded-full animate-spin shrink-0 transition-opacity duration-200';
         state.activityStatusToken = null;
       }
     }
@@ -1702,10 +1719,15 @@
     }
 
     async function syncPendingChanges() {
+      if (state.isSyncing) {
+        showToast('同期中です。完了までお待ちください。', 'info');
+        return;
+      }
       if (getPendingSyncCount() === 0) {
         showToast('同期する変更はありません。', 'info');
         return;
       }
+      state.isSyncing = true;
       const pending = JSON.parse(JSON.stringify(state.pendingSync));
       const payload = `(function(){
         var pending = ${JSON.stringify(pending)};
@@ -2027,28 +2049,35 @@
         return { display: '一括同期完了', detail: { inventory: readInventory(), shopping: readShopping(), recipes: readRecipes(), schedule: readSchedule(), cookingHistory: readCookingHistory() } };
       })()`;
 
-      const res = await executeGAS(payload, `未同期 ${getPendingSyncCount()} 件をスプレッドシートへ一括同期中...`);
-      if (res && res.detail) {
-        state.inventory = Array.isArray(res.detail.inventory) ? res.detail.inventory : [];
-        state.shopping = Array.isArray(res.detail.shopping) ? res.detail.shopping : [];
-        state.recipes = Array.isArray(res.detail.recipes) ? res.detail.recipes : [];
-        state.schedule = Array.isArray(res.detail.schedule) ? res.detail.schedule : [];
-        state.cookingHistory = Array.isArray(res.detail.cookingHistory) ? res.detail.cookingHistory : [];
-        resetPendingSync();
-        setSyncedSnapshot();
-        rerenderCurrentViews();
-        scheduleCookingHistoryImagePrefetch();
-        showToast('未同期の変更をスプレッドシートへ反映しました。', 'success');
-      } else {
-        updateSyncBar();
-        showToast('同期に失敗しました。未同期の変更は保持されています。', 'error');
+      try {
+        const res = await executeGAS(payload, `未同期 ${getPendingSyncCount()} 件をスプレッドシートへ一括同期中...`, { nonBlocking: true });
+        if (res && res.detail) {
+          state.inventory = Array.isArray(res.detail.inventory) ? res.detail.inventory : [];
+          state.shopping = Array.isArray(res.detail.shopping) ? res.detail.shopping : [];
+          state.recipes = Array.isArray(res.detail.recipes) ? res.detail.recipes : [];
+          state.schedule = Array.isArray(res.detail.schedule) ? res.detail.schedule : [];
+          state.cookingHistory = Array.isArray(res.detail.cookingHistory) ? res.detail.cookingHistory : [];
+          resetPendingSync();
+          setSyncedSnapshot();
+          rerenderCurrentViews();
+          scheduleCookingHistoryImagePrefetch();
+          showToast('未同期の変更をスプレッドシートへ反映しました。', 'success');
+        } else {
+          updateSyncBar();
+          showToast('同期に失敗しました。未同期の変更は保持されています。', 'error');
+        }
+      } finally {
+        state.isSyncing = false;
       }
     }
 
     async function executeGAS(payloadCode, label, options = {}) {
       const silent = !!options.silent;
-      const activityToken = setActivityStatus(label, silent ? '裏で読み込んでいます。画面操作はそのまま続けられます。' : '通信しています');
-      if (!silent) setStatus(true, label);
+      const nonBlocking = !!options.nonBlocking;
+      const shouldBlock = !silent && !nonBlocking;
+      const detail = (silent || nonBlocking) ? '画面操作はそのまま続けられます。' : '通信しています';
+      const activityToken = setActivityStatus(label, detail);
+      if (shouldBlock) setStatus(true, label);
       const rid = 'rid_' + Date.now();
       const codeStr = typeof payloadCode === 'object' ? JSON.stringify(payloadCode) : String(payloadCode);
       const bytes = new TextEncoder().encode(codeStr);
@@ -2067,7 +2096,7 @@
         const start = Date.now();
         const poll = () => {
           if (Date.now() - start > 90000) {
-            if (!silent) setStatus(false);
+            if (shouldBlock) setStatus(false);
             clearActivityStatus(activityToken, '処理がタイムアウトしました');
             resolve({ status: 'error' });
             return;
@@ -2076,7 +2105,7 @@
           window[cb] = (r) => {
             delete window[cb];
             if (r.status === 'pending') { setTimeout(poll, 1500); return; }
-            if (!silent) setStatus(false);
+            if (shouldBlock) setStatus(false);
             if (r.status === 'completed') {
               try {
                 const parsed = (typeof r.url === 'string') ? JSON.parse(r.url) : r.url;
