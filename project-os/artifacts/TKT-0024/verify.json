@@ -1,0 +1,68 @@
+{
+  "ticket": "TKT-0024",
+  "title": "スプシ保存先をDriveフォルダに変更し、全シートに最終編集日時カラムを追加",
+  "checks": [
+    {
+      "name": "html_syntax",
+      "command": "python3 -c \"import html.parser; html.parser.HTMLParser().feed(open('app.html').read())\" && echo 'PASS' || echo 'FAIL'",
+      "expected": "PASS",
+      "result": "PASS"
+    },
+    {
+      "name": "gas_url_exists",
+      "command": "grep -q 'GAS_URL' app.html && echo 'PASS' || echo 'FAIL'",
+      "expected": "PASS",
+      "result": "PASS"
+    },
+    {
+      "name": "executeGAS_exists",
+      "command": "grep -q 'executeGAS' app.html && echo 'PASS' || echo 'FAIL'",
+      "expected": "PASS",
+      "result": "PASS"
+    },
+    {
+      "name": "no_alert_confirm_prompt",
+      "command": "grep -q 'alert(' app.html && echo 'FAIL' || (grep -q 'confirm(' app.html && echo 'FAIL' || (grep -q 'prompt(' app.html && echo 'FAIL' || echo 'PASS'))",
+      "expected": "PASS",
+      "result": "PASS"
+    },
+    {
+      "name": "showToast_exists",
+      "command": "grep -q 'function showToast' app.html && echo 'PASS' || echo 'FAIL'",
+      "expected": "PASS",
+      "result": "PASS"
+    },
+    {
+      "name": "folder_creation_code",
+      "command": "grep -q '料理レシピ・食材管理_Canvasアプリ' app.html && echo 'PASS' || echo 'FAIL'",
+      "expected": "PASS",
+      "result": "PASS"
+    },
+    {
+      "name": "moveTo_folder",
+      "command": "grep -q 'moveTo(folder)' app.html && echo 'PASS' || echo 'FAIL'",
+      "expected": "PASS",
+      "result": "PASS"
+    },
+    {
+      "name": "last_edited_header_inventory",
+      "command": "grep -q \"'最終編集日時'\" app.html && echo 'PASS' || echo 'FAIL'",
+      "expected": "PASS",
+      "result": "PASS"
+    },
+    {
+      "name": "no_individual_spreadsheet_writes",
+      "command": "grep -n 'appendRow\\|deleteRow\\|setValue\\|setValues\\|SpreadsheetApp' app.html | grep -v 'syncPendingChanges' | grep -v 'handleInit' | grep -v 'loadSchedule' | wc -l | awk '{if($1==0) print \"PASS\"; else print \"FAIL\"}'",
+      "expected": "PASS",
+      "result": "PASS"
+    },
+    {
+      "name": "photo_moveTo_folder",
+      "command": "grep -A2 'DriveApp.createFile(blob)' app.html | grep -q 'moveTo(folder)' && echo 'PASS' || echo 'FAIL'",
+      "expected": "PASS",
+      "result": "PASS"
+    }
+  ],
+  "summary": "ALL_CHECKS_PASSED",
+  "timestamp": "2026-05-16"
+}

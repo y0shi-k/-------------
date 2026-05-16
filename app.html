@@ -1558,6 +1558,11 @@
         var sSchedule = ss.getSheetByName('献立スケジュール');
         var sShop = ss.getSheetByName('買い物リスト');
 
+        var folderName = '料理レシピ・食材管理_Canvasアプリ';
+        var folders = DriveApp.getFoldersByName(folderName);
+        var folder = folders.hasNext() ? folders.next() : DriveApp.createFolder(folderName);
+        var now = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss');
+
         function ensureSheetColumns(sheet, headers) {
           var current = sheet.getRange(1, 1, 1, Math.max(headers.length, sheet.getLastColumn() || 1)).getValues()[0];
           if(!current[0]) {
@@ -1569,7 +1574,7 @@
           }
           sheet.setFrozenRows(1);
         }
-        ensureSheetColumns(sShop, ['リストID', '品名', '必要数量', '単位', 'ステータス', '紐づくレシピ名', '出自種別', '予定日', '食事区分']);
+        ensureSheetColumns(sShop, ['リストID', '品名', '必要数量', '単位', 'ステータス', '紐づくレシピ名', '出自種別', '予定日', '食事区分', '最終編集日時']);
 
         function f(v) {
           if(!v && v !== 0) return "";
@@ -1652,13 +1657,13 @@
             var updated = false;
             for(var sui=1; sui<scheduleData.length; sui++) {
               if(f(scheduleData[sui][0]) === d.date && f(scheduleData[sui][1]) === d.meal) {
-                sSchedule.getRange(sui+1, 3, 1, 3).setValues([[d.recipeId, d.recipeName, d.status || '未完了']]);
+                sSchedule.getRange(sui+1, 3, 1, 4).setValues([[d.recipeId, d.recipeName, d.status || '未完了', now]]);
                 updated = true;
                 break;
               }
             }
             if(!updated) {
-              sSchedule.appendRow([d.date, d.meal, d.recipeId, d.recipeName, d.status || '未完了']);
+              sSchedule.appendRow([d.date, d.meal, d.recipeId, d.recipeName, d.status || '未完了', now]);
             }
           });
         }
@@ -1677,7 +1682,7 @@
             var iid = String(stockData[ui][0]);
             if(invUpdates[iid]) {
               var d = invUpdates[iid];
-              sStock.getRange(ui+1, 2, 1, 10).setValues([[d.type || '食材', d.name, d.qty, d.unit, d.buy || '', d.open || '', d.limit1 || '', d.limit2 || '', d.loc || '冷蔵庫', d.memo || '']]);
+              sStock.getRange(ui+1, 2, 1, 11).setValues([[d.type || '食材', d.name, d.qty, d.unit, d.buy || '', d.open || '', d.limit1 || '', d.limit2 || '', d.loc || '冷蔵庫', d.memo || '', now]]);
             }
           }
         }
@@ -1690,17 +1695,17 @@
             var rid = String(recipeData[ru][0]);
             if(recipeUpdates[rid]) {
               var rd = recipeUpdates[rid];
-              sRecipes.getRange(ru+1, 2, 1, 4).setValues([[rd.name, rd.ingredients, rd.steps, rd.source || '']]);
+              sRecipes.getRange(ru+1, 2, 1, 5).setValues([[rd.name, rd.ingredients, rd.steps, rd.source || '', now]]);
             }
           }
         }
 
         (pending.inventoryCreates || []).forEach(function(d) {
-          sStock.appendRow([Utilities.getUuid(), d.type || '食材', d.name, d.qty, d.unit, d.buy || '', d.open || '', d.limit1 || '', d.limit2 || '', d.loc || '冷蔵庫', d.memo || '']);
+          sStock.appendRow([Utilities.getUuid(), d.type || '食材', d.name, d.qty, d.unit, d.buy || '', d.open || '', d.limit1 || '', d.limit2 || '', d.loc || '冷蔵庫', d.memo || '', now]);
         });
 
         (pending.recipeCreates || []).forEach(function(d) {
-          sRecipes.appendRow([Utilities.getUuid(), d.name, d.ingredients || '[]', d.steps || '[]', d.source || '', Number(d.count)||0, d.history || '[]']);
+          sRecipes.appendRow([Utilities.getUuid(), d.name, d.ingredients || '[]', d.steps || '[]', d.source || '', Number(d.count)||0, d.history || '[]', now]);
         });
 
         var purchases = pending.shoppingPurchases || [];
@@ -1713,6 +1718,7 @@
           for(var pi=1; pi<shopData.length; pi++) {
             if(ids.indexOf(String(shopData[pi][0])) === -1) continue;
             sShop.getRange(pi+1, 5).setValue('購入済');
+            sShop.getRange(pi+1, 10).setValue(now);
             var found = false;
             if(decision === 'merge') {
               for(var sj=1; sj<stockRows.length; sj++) {
@@ -1721,13 +1727,14 @@
                   var addQty = Number(shopData[pi][2]) || 0;
                   sStock.getRange(sj+1, 4).setValue(currentQty + addQty);
                   sStock.getRange(sj+1, 6).setValue(today);
+                  sStock.getRange(sj+1, 12).setValue(now);
                   found = true;
                   break;
                 }
               }
             }
             if(!found) {
-              sStock.appendRow([Utilities.getUuid(), '食材', shopData[pi][1], shopData[pi][2], shopData[pi][3], today, '', '', '', '冷蔵庫', '買い物より移行']);
+              sStock.appendRow([Utilities.getUuid(), '食材', shopData[pi][1], shopData[pi][2], shopData[pi][3], today, '', '', '', '冷蔵庫', '買い物より移行', now]);
             }
           }
         });
@@ -1741,14 +1748,15 @@
               if(String(shopData2[sci][1]) === d.name && String(shopData2[sci][4]) === '未購入' && String(shopData2[sci][3]) === d.unit && f(shopData2[sci][5]) === (d.recipeName || '') && f(shopData2[sci][6]) === (d.sourceType || '') && f(shopData2[sci][7]) === (d.scheduleDate || '') && f(shopData2[sci][8]) === (d.meal || '')) {
                 var currentShopQty = Number(shopData2[sci][2]) || 0;
                 sShop.getRange(sci+1, 3).setValue(currentShopQty + d.qty);
+                sShop.getRange(sci+1, 10).setValue(now);
                 shopData2[sci][2] = currentShopQty + d.qty;
                 merged = true;
                 break;
               }
             }
             if(!merged) {
-              sShop.appendRow([Utilities.getUuid(), d.name, d.qty, d.unit, '未購入', d.recipeName || '', d.sourceType || '', d.scheduleDate || '', d.meal || '']);
-              shopData2.push(['', d.name, d.qty, d.unit, '未購入', d.recipeName || '', d.sourceType || '', d.scheduleDate || '', d.meal || '']);
+              sShop.appendRow([Utilities.getUuid(), d.name, d.qty, d.unit, '未購入', d.recipeName || '', d.sourceType || '', d.scheduleDate || '', d.meal || '', now]);
+              shopData2.push(['', d.name, d.qty, d.unit, '未購入', d.recipeName || '', d.sourceType || '', d.scheduleDate || '', d.meal || '', now]);
             }
           });
         }
@@ -1764,6 +1772,7 @@
             for(var si=1; si<schData.length; si++) {
               if(f(schData[si][0]) === u.date && f(schData[si][1]) === u.meal) {
                 sSchedule.getRange(si+1, 5).setValue(u.status);
+                sSchedule.getRange(si+1, 6).setValue(now);
                 break;
               }
             }
@@ -1784,7 +1793,7 @@
                 try { historyArr = JSON.parse(currentHistory); } catch(e) { historyArr = []; }
                 if(!Array.isArray(historyArr)) historyArr = [];
                 historyArr.push(h.cookingDate.split(' ')[0]);
-                sRecipes.getRange(ri+1, 6, 1, 2).setValues([[currentCount + 1, JSON.stringify(historyArr)]]);
+                sRecipes.getRange(ri+1, 6, 1, 3).setValues([[currentCount + 1, JSON.stringify(historyArr), now]]);
                 break;
               }
             }
@@ -1802,13 +1811,14 @@
                 var base64Data = ch.photoBase64.split(',')[1] || ch.photoBase64;
                 var blob = Utilities.newBlob(Utilities.base64Decode(base64Data), 'image/jpeg', ch.photoFilename || 'cooking.jpg');
                 var file = DriveApp.createFile(blob);
+                file.moveTo(folder);
                 photoUrl = file.getUrl();
               } catch(e) {
                 // 画像保存失敗時は空文字のまま継続
               }
             }
             var historyId = Utilities.getUuid();
-            sHistory.appendRow([historyId, ch.cookingDate, ch.recipeId, ch.recipeName, ch.comment || '', photoUrl, Number(ch.rating) || 0]);
+            sHistory.appendRow([historyId, ch.cookingDate, ch.recipeId, ch.recipeName, ch.comment || '', photoUrl, Number(ch.rating) || 0, now]);
           });
           SpreadsheetApp.flush();
         }
@@ -1879,6 +1889,9 @@
       const payload = `(function(){
         var props = PropertiesService.getUserProperties();
         var ssId = props.getProperty('SS_ID_RECIPE_APP');
+        var folderName = '料理レシピ・食材管理_Canvasアプリ';
+        var folders = DriveApp.getFoldersByName(folderName);
+        var folder = folders.hasNext() ? folders.next() : DriveApp.createFolder(folderName);
         var ss;
         if (ssId) {
           try { ss = SpreadsheetApp.openById(ssId); } catch(e) { ss = null; }
@@ -1886,6 +1899,8 @@
         if (!ss) {
           ss = SpreadsheetApp.create('料理レシピ・食材管理DB');
           props.setProperty('SS_ID_RECIPE_APP', ss.getId());
+          var file = DriveApp.getFileById(ss.getId());
+          file.moveTo(folder);
         }
         var names = ['食材在庫','レシピ集','献立スケジュール','料理履歴','買い物リスト'];
         names.forEach(function(n){ if(!ss.getSheetByName(n)) ss.insertSheet(n); });
@@ -1901,11 +1916,11 @@
           }
           sheet.setFrozenRows(1);
         }
-        ensureHeader('食材在庫', ['ID', '分類', '品名', '数量', '単位', '購入日', '開封日', '表示期限', '実質期限', '保存場所', '状態メモ'], 'ID');
-        ensureHeader('レシピ集', ['レシピID', 'レシピ名', '材料JSON', '手順JSON', '出典', '調理回数', '調理日履歴'], 'レシピID');
-        ensureHeader('献立スケジュール', ['予定日', '食事区分', 'レシピID', 'レシピ名', 'ステータス'], '予定日');
-        ensureHeader('料理履歴', ['履歴ID', '調理日時', 'レシピID', 'レシピ名', '感想', '写真URL', '評価'], '履歴ID');
-        ensureHeader('買い物リスト', ['リストID', '品名', '必要数量', '単位', 'ステータス', '紐づくレシピ名', '出自種別', '予定日', '食事区分'], 'リストID');
+        ensureHeader('食材在庫', ['ID', '分類', '品名', '数量', '単位', '購入日', '開封日', '表示期限', '実質期限', '保存場所', '状態メモ', '最終編集日時'], 'ID');
+        ensureHeader('レシピ集', ['レシピID', 'レシピ名', '材料JSON', '手順JSON', '出典', '調理回数', '調理日履歴', '最終編集日時'], 'レシピID');
+        ensureHeader('献立スケジュール', ['予定日', '食事区分', 'レシピID', 'レシピ名', 'ステータス', '最終編集日時'], '予定日');
+        ensureHeader('料理履歴', ['履歴ID', '調理日時', 'レシピID', 'レシピ名', '感想', '写真URL', '評価', '最終編集日時'], '履歴ID');
+        ensureHeader('買い物リスト', ['リストID', '品名', '必要数量', '単位', 'ステータス', '紐づくレシピ名', '出自種別', '予定日', '食事区分', '最終編集日時'], 'リストID');
         
         function f(v) { 
           if(!v && v !== 0) return "";
