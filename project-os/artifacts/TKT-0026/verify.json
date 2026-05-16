@@ -4,6 +4,7 @@
   "result": "VERIFY_PASSED",
   "passed": true,
   "checked_at": "2026-05-16",
+  "context": "rerun after Mode B schedule slot frame reservation fix",
   "additional_checks": [
     {
       "command": "awk '/<script>/{flag=1;next}/<\\/script>/{flag=0}flag' app.html > /tmp/stock-master-app-script.js && node --check /tmp/stock-master-app-script.js",
@@ -12,6 +13,10 @@
     {
       "command": "rg -n \"alert\\(|confirm\\(|prompt\\(|executeGAS\\(\" app.html",
       "result": "No alert/confirm/prompt. executeGAS call sites remain sync/load flows."
+    },
+    {
+      "command": "git diff -- app.html project-os/specs/SPEC-0026-recipe-mode-shared-frame.md project-os/artifacts/TKT-0026/manual-smokes.md project-os/artifacts/TKT-0026/report.md project-os/artifacts/TKT-0026/review.md project-os/artifacts/TKT-0026/verify.json",
+      "result": "Diff limited to Mode B schedule layout constraints plus TKT-0026 spec/artifact updates."
     }
   ]
 }
