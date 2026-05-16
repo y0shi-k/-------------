@@ -767,6 +767,51 @@
     </div>
   </div>
 
+  <!-- モーダル: 料理の記録 -->
+  <div id="cookingRecordModal" onclick="if(event.target===this) closeCookingRecordModal()" class="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
+    <div onclick="event.stopPropagation()" class="bg-white w-full max-w-lg rounded-[2.5rem] p-6 shadow-2xl transform scale-95 transition-transform duration-300 border border-slate-100 max-h-[90vh] overflow-y-auto">
+      <div class="flex justify-between items-center mb-5">
+        <h3 class="text-2xl font-black text-slate-800 tracking-tight">料理の記録</h3>
+        <button onclick="closeCookingRecordModal()" class="text-slate-300 hover:text-slate-600 bg-slate-100 p-2 rounded-full"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg></button>
+      </div>
+
+      <div class="space-y-5">
+        <!-- 写真アップロード -->
+        <div>
+          <label class="block text-[11px] font-black text-slate-400 uppercase mb-1.5 ml-1">完成写真</label>
+          <div id="photoUploadArea" class="relative">
+            <input type="file" id="cookingPhotoInput" accept="image/*" onchange="handlePhotoSelect(event)" class="hidden">
+            <label for="cookingPhotoInput" id="photoDropzone" class="flex flex-col items-center justify-center gap-2 w-full h-40 bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl cursor-pointer hover:bg-slate-100 hover:border-indigo-300 transition-all">
+              <span class="text-3xl">📷</span>
+              <span class="text-xs font-bold text-slate-400">タップして写真を選択</span>
+            </label>
+            <div id="photoPreviewContainer" class="hidden relative">
+              <img id="photoPreview" class="w-full h-48 object-cover rounded-2xl border border-slate-200">
+              <button onclick="clearCookingPhoto()" class="absolute top-2 right-2 bg-slate-800/80 text-white text-xs font-black px-3 py-1.5 rounded-full hover:bg-slate-700 transition-all">変更</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 評価 -->
+        <div>
+          <label class="block text-[11px] font-black text-slate-400 uppercase mb-1.5 ml-1">評価</label>
+          <div id="cookingStarRating" class="flex gap-1" data-rating="0"></div>
+        </div>
+
+        <!-- 感想 -->
+        <div>
+          <label class="block text-[11px] font-black text-slate-400 uppercase mb-1.5 ml-1">感想</label>
+          <textarea id="cookingRecordNote" rows="3" class="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:border-indigo-500 resize-none" placeholder="今回の調理の感想、次回の改善点など（任意）"></textarea>
+        </div>
+      </div>
+
+      <div class="pt-4 flex gap-3 mt-2 border-t border-slate-100">
+        <button onclick="closeCookingRecordModal()" class="flex-1 bg-slate-100 text-slate-600 font-black py-4 rounded-2xl hover:bg-slate-200 transition-all">スキップ</button>
+        <button onclick="saveCookingRecord()" class="flex-[2] bg-emerald-600 text-white font-black py-4 rounded-2xl hover:bg-emerald-700 transition-all shadow-xl">記録を保存</button>
+      </div>
+    </div>
+  </div>
+
   <input type="file" accept="image/*" capture="environment" id="imageScanInput" onchange="handleImageScan(event)" hidden>
 
   <button id="geminiCopyBtn" onclick="majinCopy()" style="display:none;" class="fixed bottom-24 left-4 z-[70] bg-slate-900 text-white text-[10px] font-black py-2.5 px-5 rounded-full shadow-2xl flex items-center gap-2 hover:scale-105 transition-all border border-slate-700">
@@ -802,7 +847,11 @@
       customLocations: [],
       hiddenLocations: [],
       pendingSync: createEmptyPendingSync(),
-      syncedSnapshot: { inventory: [], shopping: [], recipes: [], schedule: [] }
+      syncedSnapshot: { inventory: [], shopping: [], recipes: [], schedule: [] },
+      _tempCookingPhotoBase64: '',
+      _tempCookingPhotoUrl: '',
+      _tempCookingRating: 0,
+      _tempCookingNote: ''
     };
 
     /* --- Core --- */
@@ -4022,7 +4071,8 @@ ${text}`;
     }
 
     function confirmConsumption() {
-      if (!_consumptionRecipeId) return;
+      const recipeId = _consumptionRecipeId;
+      if (!recipeId) return;
       const inputs = document.querySelectorAll('.cons-qty');
       const consumedMap = [];
       inputs.forEach(input => {
@@ -4078,6 +4128,9 @@ ${text}`;
       }
 
       updateSyncBar();
+
+      // 料理の記録モーダルを自動で開く
+      setTimeout(() => openCookingRecordModal(recipeId), 500);
     }
 
     document.getElementById('consumptionModal').addEventListener('input', (e) => {
@@ -4085,6 +4138,158 @@ ${text}`;
         validateConsumptionInputs();
       }
     });
+
+    let _cookingRecordRecipeId = null;
+
+    function openCookingRecordModal(recipeId) {
+      _cookingRecordRecipeId = recipeId;
+      // リセット
+      state._tempCookingPhotoBase64 = '';
+      state._tempCookingPhotoUrl = '';
+      state._tempCookingRating = 0;
+      state._tempCookingNote = '';
+      document.getElementById('cookingRecordNote').value = '';
+      document.getElementById('photoDropzone').classList.remove('hidden');
+      document.getElementById('photoPreviewContainer').classList.add('hidden');
+      document.getElementById('photoPreview').src = '';
+      document.getElementById('cookingPhotoInput').value = '';
+      renderStarRating(0);
+
+      document.getElementById('syncBar').classList.add('sync-bar-hidden');
+      document.getElementById('syncBar').classList.remove('sync-bar-visible');
+      const m = document.getElementById('cookingRecordModal');
+      m.classList.remove('hidden');
+      setTimeout(() => m.classList.remove('opacity-0'), 10);
+    }
+
+    function closeCookingRecordModal() {
+      const m = document.getElementById('cookingRecordModal');
+      m.classList.add('opacity-0');
+      setTimeout(() => m.classList.add('hidden'), 300);
+      updateSyncBar();
+      _cookingRecordRecipeId = null;
+    }
+
+    function handlePhotoSelect(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      if (!file.type.startsWith('image/')) {
+        showToast('画像ファイルを選択してください。', 'error');
+        return;
+      }
+
+      setStatus(true, '画像を処理中...');
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        let dataUrl = e.target.result;
+        if (dataUrl.length > 5 * 1024 * 1024) {
+          try {
+            dataUrl = await resizeImage(dataUrl, 1024);
+          } catch (err) {
+            showToast('画像の処理に失敗しました。', 'error');
+            setStatus(false);
+            return;
+          }
+        }
+        state._tempCookingPhotoBase64 = dataUrl;
+        document.getElementById('photoDropzone').classList.add('hidden');
+        document.getElementById('photoPreviewContainer').classList.remove('hidden');
+        document.getElementById('photoPreview').src = dataUrl;
+        setStatus(false);
+      };
+      reader.onerror = () => {
+        showToast('画像の読み込みに失敗しました。', 'error');
+        setStatus(false);
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function resizeImage(dataUrl, maxSize) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+          let w = img.width, h = img.height;
+          if (w > maxSize || h > maxSize) {
+            if (w > h) {
+              h = Math.round(h * (maxSize / w));
+              w = maxSize;
+            } else {
+              w = Math.round(w * (maxSize / h));
+              h = maxSize;
+            }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, w, h);
+          resolve(canvas.toDataURL('image/jpeg', 0.85));
+        };
+        img.onerror = reject;
+        img.src = dataUrl;
+      });
+    }
+
+    function clearCookingPhoto() {
+      state._tempCookingPhotoBase64 = '';
+      document.getElementById('photoDropzone').classList.remove('hidden');
+      document.getElementById('photoPreviewContainer').classList.add('hidden');
+      document.getElementById('photoPreview').src = '';
+      document.getElementById('cookingPhotoInput').value = '';
+    }
+
+    function renderStarRating(rating) {
+      const container = document.getElementById('cookingStarRating');
+      container.dataset.rating = rating;
+      let html = '';
+      for (let i = 1; i <= 5; i++) {
+        const filled = i <= rating;
+        const colorClass = filled ? 'text-amber-400' : 'text-slate-200';
+        html += `<button type="button" onclick="setCookingRating(${i})" class="text-3xl leading-none transition-transform active:scale-90 ${colorClass}" aria-label="${i}星">★</button>`;
+      }
+      container.innerHTML = html;
+    }
+
+    function setCookingRating(value) {
+      renderStarRating(value);
+    }
+
+    async function saveCookingRecord() {
+      const base64 = state._tempCookingPhotoBase64;
+      let photoUrl = '';
+
+      if (base64) {
+        try {
+          const now = new Date();
+          const filename = `cooking_${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}.jpg`;
+          const result = await executeGAS({
+            action: 'saveImageToDrive',
+            base64: base64.split(',')[1],
+            filename: filename
+          });
+          if (result && result.url) {
+            photoUrl = result.url;
+          } else {
+            throw new Error('No URL returned');
+          }
+        } catch (err) {
+          showToast('写真の保存に失敗しました。記録を続行します。', 'error');
+        }
+      }
+
+      state._tempCookingPhotoUrl = photoUrl;
+      state._tempCookingRating = Number(document.getElementById('cookingStarRating').dataset.rating || 0);
+      state._tempCookingNote = document.getElementById('cookingRecordNote').value.trim();
+
+      closeCookingRecordModal();
+
+      // completeRecipe フローへ（TKT-0022）
+      if (typeof completeRecipe === 'function') {
+        completeRecipe(_cookingRecordRecipeId, photoUrl, state._tempCookingRating, state._tempCookingNote);
+      } else {
+        showToast('料理の記録を保存しました。', 'success');
+      }
+    }
 
     function majinCopy() {
       const data = { inventory: state.inventory, staging: state.staging, recipes: state.recipes, pendingSync: state.pendingSync };
