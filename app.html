@@ -54,6 +54,16 @@
     </div>
   </div>
 
+  <div id="activityStatusBar" class="fixed left-3 right-3 bottom-20 z-[55] pointer-events-none hidden">
+    <div class="max-w-2xl mx-auto bg-white/95 border border-slate-200 shadow-xl rounded-2xl px-4 py-3 flex items-center gap-3">
+      <div id="activitySpinner" class="w-4 h-4 border-2 border-indigo-100 border-t-indigo-600 rounded-full animate-spin shrink-0"></div>
+      <div class="min-w-0 flex-1">
+        <p id="activityStatusLabel" class="text-xs font-black text-slate-700 truncate">処理中</p>
+        <p id="activityStatusDetail" class="text-[10px] font-bold text-slate-400 truncate">しばらくお待ちください</p>
+      </div>
+    </div>
+  </div>
+
   <main id="app" class="pt-14 pb-24">
     <!-- 初期承認画面 -->
     <div id="initView" class="flex flex-col items-center justify-center min-h-screen p-6 text-center">
@@ -774,6 +784,9 @@
       cookingHistorySearchQuery: '',
       cookingHistoryRatingFilter: 'all',
       cookingHistoryPhotoFilter: 'all',
+      cookingHistoryImageCache: {},
+      cookingHistoryImageLoading: {},
+      activityStatusToken: null,
       editMode: null,
       editId: null,
       recipeEditId: null,
@@ -806,6 +819,52 @@
       document.querySelectorAll('button, input, select').forEach(el => {
         if (!el.id.includes('geminiCopyBtn')) el.disabled = show;
       });
+    }
+
+    function stripHtml(text) {
+      const div = document.createElement('div');
+      div.innerHTML = String(text || '');
+      return (div.textContent || div.innerText || '').trim();
+    }
+
+    function setActivityStatus(label, detail = 'バックグラウンドで処理しています', type = 'busy') {
+      const bar = document.getElementById('activityStatusBar');
+      const title = document.getElementById('activityStatusLabel');
+      const sub = document.getElementById('activityStatusDetail');
+      const spinner = document.getElementById('activitySpinner');
+      if (!bar || !title || !sub || !spinner) return null;
+      const token = 'activity_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+      state.activityStatusToken = token;
+      title.textContent = stripHtml(label) || '処理中';
+      sub.textContent = detail || 'バックグラウンドで処理しています';
+      spinner.className = type === 'done'
+        ? 'w-4 h-4 rounded-full bg-emerald-500 shrink-0'
+        : 'w-4 h-4 border-2 border-indigo-100 border-t-indigo-600 rounded-full animate-spin shrink-0';
+      bar.classList.remove('hidden');
+      return token;
+    }
+
+    function clearActivityStatus(token, doneLabel = '') {
+      const bar = document.getElementById('activityStatusBar');
+      const title = document.getElementById('activityStatusLabel');
+      const sub = document.getElementById('activityStatusDetail');
+      const spinner = document.getElementById('activitySpinner');
+      if (!bar || !title || !sub || !spinner) return;
+      if (token && state.activityStatusToken && token !== state.activityStatusToken) return;
+      if (doneLabel) {
+        title.textContent = doneLabel;
+        sub.textContent = '完了しました';
+        spinner.className = 'w-4 h-4 rounded-full bg-emerald-500 shrink-0';
+        setTimeout(() => {
+          if (!token || state.activityStatusToken === token) {
+            bar.classList.add('hidden');
+            state.activityStatusToken = null;
+          }
+        }, 1600);
+      } else {
+        bar.classList.add('hidden');
+        state.activityStatusToken = null;
+      }
     }
 
     function showToast(message, type = 'info') {
@@ -2005,6 +2064,7 @@
         resetPendingSync();
         setSyncedSnapshot();
         rerenderCurrentViews();
+        scheduleCookingHistoryImagePrefetch();
         showToast('未同期の変更をスプレッドシートへ反映しました。', 'success');
       } else {
         updateSyncBar();
@@ -2012,8 +2072,10 @@
       }
     }
 
-    async function executeGAS(payloadCode, label) {
-      setStatus(true, label);
+    async function executeGAS(payloadCode, label, options = {}) {
+      const silent = !!options.silent;
+      const activityToken = setActivityStatus(label, silent ? '裏で読み込んでいます。画面操作はそのまま続けられます。' : '通信しています');
+      if (!silent) setStatus(true, label);
       const rid = 'rid_' + Date.now();
       const codeStr = typeof payloadCode === 'object' ? JSON.stringify(payloadCode) : String(payloadCode);
       const bytes = new TextEncoder().encode(codeStr);
@@ -2031,20 +2093,30 @@
       return new Promise((resolve) => {
         const start = Date.now();
         const poll = () => {
-          if (Date.now() - start > 90000) { setStatus(false); resolve({ status: 'error' }); return; }
+          if (Date.now() - start > 90000) {
+            if (!silent) setStatus(false);
+            clearActivityStatus(activityToken, '処理がタイムアウトしました');
+            resolve({ status: 'error' });
+            return;
+          }
           let cb = 'cb_' + Date.now();
           window[cb] = (r) => {
             delete window[cb];
             if (r.status === 'pending') { setTimeout(poll, 1500); return; }
-            setStatus(false);
+            if (!silent) setStatus(false);
             if (r.status === 'completed') {
               try {
                 const parsed = (typeof r.url === 'string') ? JSON.parse(r.url) : r.url;
+                clearActivityStatus(activityToken, '読み込みが完了しました');
                 resolve(parsed);
               } catch(e) {
+                clearActivityStatus(activityToken, '読み込みが完了しました');
                 resolve({ status: 'error', display: r.url, detail: { raw: r.url } });
               }
-            } else { resolve({ status: 'error', display: r.url }); }
+            } else {
+              clearActivityStatus(activityToken, '処理に失敗しました');
+              resolve({ status: 'error', display: r.url });
+            }
           };
           const sc = document.createElement('script');
           sc.src = GAS_URL + '?action=check&requestId=' + rid + '&callback=' + cb + '&t=' + Date.now();
@@ -2191,6 +2263,7 @@
         document.getElementById('initView').classList.add('hidden');
         document.getElementById('bottomNav').classList.remove('hidden');
         switchMode('A');
+        scheduleCookingHistoryImagePrefetch();
         console.log('Loaded inventory count:', state.inventory.length, 'shopping count:', state.shopping.length, 'recipes count:', state.recipes.length, 'schedule count:', state.schedule.length, 'cooking history count:', state.cookingHistory.length);
       } else {
         showToast('データの読み込みに失敗しました。GASの実行権限を確認してください。', 'error');
@@ -4616,6 +4689,7 @@ ${text}`;
       history.forEach(item => {
         container.insertAdjacentHTML('beforeend', renderCookingHistoryCard(item));
       });
+      setTimeout(() => loadCookingHistoryImages(history), 0);
     }
 
     function getFilteredCookingHistory() {
@@ -4650,10 +4724,13 @@ ${text}`;
       const recipeId = item.recipeId || '';
       const canCookAgain = !!state.recipes.find(r => r.id === recipeId);
       const comment = item.comment ? escapeHtml(item.comment) : '<span class="text-slate-300">感想なし</span>';
+      const photoSrc = getCookingHistoryPhotoSrc(item.photoUrl);
       const photoHtml = hasPhoto ? `
         <div class="w-20 h-20 rounded-2xl bg-slate-100 overflow-hidden shrink-0 relative">
-          <img src="${escapeHtml(item.photoUrl)}" alt="完成写真" class="w-full h-full object-cover" onerror="handleCookingHistoryImageError(this)">
-          <a href="${escapeHtml(item.photoUrl)}" target="_blank" rel="noopener noreferrer" class="hidden absolute inset-0 bg-amber-50 text-amber-700 text-[10px] font-black items-center justify-center text-center px-2">写真を開く</a>
+          ${photoSrc
+            ? `<img src="${escapeHtml(photoSrc)}" alt="完成写真" class="w-full h-full object-cover" onerror="handleCookingHistoryImageError(this)">`
+            : '<div class="absolute inset-0 bg-amber-50 text-amber-600 text-[10px] font-black flex flex-col items-center justify-center text-center px-2 gap-2"><span class="w-5 h-5 border-2 border-amber-100 border-t-amber-500 rounded-full animate-spin"></span><span>写真を取得中</span></div>'}
+          <a href="${escapeHtml(item.photoUrl)}" target="_blank" rel="noopener noreferrer" class="${photoSrc ? 'hidden' : ''} absolute inset-0 bg-amber-50 text-amber-700 text-[10px] font-black items-center justify-center text-center px-2 ${photoSrc ? '' : 'opacity-0 hover:opacity-100 transition-opacity'}">写真を開く</a>
         </div>
       ` : `
         <div class="w-20 h-20 rounded-2xl bg-amber-50 text-amber-200 border border-amber-100 flex items-center justify-center shrink-0 text-2xl">📷</div>
@@ -4677,6 +4754,102 @@ ${text}`;
           </div>
         </article>
       `;
+    }
+
+    function getCookingHistoryPhotoSrc(url) {
+      if (!url) return '';
+      if (String(url).startsWith('data:image/')) return url;
+      const fileId = extractDriveFileId(url);
+      if (!fileId) return '';
+      return state.cookingHistoryImageCache[fileId] || '';
+    }
+
+    function extractDriveFileId(url) {
+      const text = String(url || '');
+      if (!text) return '';
+      const pathMatch = text.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+      if (pathMatch) return pathMatch[1];
+      const openMatch = text.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+      if (openMatch) return openMatch[1];
+      const ucMatch = text.match(/\/uc\?(?:[^#]*&)?id=([a-zA-Z0-9_-]+)/);
+      if (ucMatch) return ucMatch[1];
+      return '';
+    }
+
+    let cookingHistoryPrefetchTimer = null;
+
+    function scheduleCookingHistoryImagePrefetch(delay = 4000) {
+      if (cookingHistoryPrefetchTimer) clearTimeout(cookingHistoryPrefetchTimer);
+      cookingHistoryPrefetchTimer = setTimeout(() => {
+        cookingHistoryPrefetchTimer = null;
+        const run = () => prefetchCookingHistoryImages();
+        if ('requestIdleCallback' in window) {
+          requestIdleCallback(run, { timeout: 3000 });
+        } else {
+          setTimeout(run, 0);
+        }
+      }, delay);
+    }
+
+    function prefetchCookingHistoryImages() {
+      const history = [...state.cookingHistory]
+        .sort((a, b) => String(b.cookingDate || '').localeCompare(String(a.cookingDate || '')))
+        .slice(0, 6);
+      loadCookingHistoryImages(history, { background: true, limit: 6 });
+    }
+
+    async function loadCookingHistoryImages(history, options = {}) {
+      const background = !!options.background;
+      if (!background && (state.currentMode !== 'C' || state.currentCTab !== 'history')) return;
+      const targets = [];
+      const seen = new Set();
+      history.forEach(item => {
+        const url = item.photoUrl || '';
+        if (!url || String(url).startsWith('data:image/')) return;
+        const fileId = extractDriveFileId(url);
+        if (!fileId || seen.has(fileId)) return;
+        seen.add(fileId);
+        if (state.cookingHistoryImageCache[fileId] || state.cookingHistoryImageLoading[fileId]) return;
+        targets.push({ fileId });
+      });
+      if (targets.length === 0) return;
+      const batch = targets.slice(0, options.limit || 6);
+      batch.forEach(item => { state.cookingHistoryImageLoading[item.fileId] = true; });
+      const imagePayload = `(function(){
+        var requests = ${JSON.stringify(batch)};
+        var images = [];
+        requests.forEach(function(req) {
+          var item = { fileId: req.fileId, status: 'error', dataUrl: '' };
+          try {
+            var file = DriveApp.getFileById(req.fileId);
+            var blob = file.getBlob();
+            var mime = blob.getContentType() || 'image/jpeg';
+            if (mime.indexOf('image/') !== 0) mime = 'image/jpeg';
+            item.status = 'ok';
+            item.dataUrl = 'data:' + mime + ';base64,' + Utilities.base64Encode(blob.getBytes());
+          } catch(e) {
+            item.message = e.toString();
+          }
+          images.push(item);
+        });
+        return { display: '料理履歴写真を取得しました', detail: { images: images } };
+      })()`;
+      try {
+        const res = await executeGAS(imagePayload, `料理履歴の写真を読み込み中（${batch.length}件）`, { silent: true });
+        const images = res && res.detail && Array.isArray(res.detail.images) ? res.detail.images : [];
+        images.forEach(item => {
+          if (item.status === 'ok' && item.dataUrl) {
+            state.cookingHistoryImageCache[item.fileId] = item.dataUrl;
+          }
+          delete state.cookingHistoryImageLoading[item.fileId];
+        });
+        batch.forEach(item => { delete state.cookingHistoryImageLoading[item.fileId]; });
+      } catch (e) {
+        batch.forEach(item => { delete state.cookingHistoryImageLoading[item.fileId]; });
+      }
+      if (options.rerender !== false && state.currentMode === 'C' && state.currentCTab === 'history' && !currentCookingRecipeId) {
+        renderCookingHistoryTab();
+      }
     }
 
     function handleCookingHistoryImageError(img) {
