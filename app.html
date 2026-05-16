@@ -1294,12 +1294,28 @@
     }
 
     function renderInventoryPrimaryRow() {
-      const storageTabs = getStorageLocations().map(loc => `
-        <button onclick="filterByLocation(this.dataset.loc)" class="${getLocationTabClass(loc)}" data-loc="${escapeHtml(loc)}">${escapeHtml(loc)}</button>
-      `).join('');
+      const allCount = state.inventory.length;
+      const allActive = state.currentLoc === 'すべて';
+      const allBadgeClass = allActive ? 'bg-indigo-100 text-indigo-700' : 'bg-white/60 text-slate-500';
+
+      const storageTabs = getStorageLocations().map(loc => {
+        const count = state.inventory.filter(item => item.loc === loc).length;
+        const active = state.currentLoc === loc;
+        const badgeClass = active ? 'bg-indigo-100 text-indigo-700' : 'bg-white/60 text-slate-500';
+        return `
+          <button onclick="filterByLocation(this.dataset.loc)" class="${getLocationTabClass(loc)}" data-loc="${escapeHtml(loc)}">
+            ${escapeHtml(loc)}
+            <span class="ml-1 text-[10px] font-black px-1.5 py-0.5 rounded-full ${badgeClass}">${count}</span>
+          </button>
+        `;
+      }).join('');
+
       return `
         <div class="flex gap-2 overflow-x-auto pb-1">
-          <button onclick="filterByLocation(this.dataset.loc)" class="${getLocationTabClass('すべて')}" data-loc="すべて">すべて</button>
+          <button onclick="filterByLocation(this.dataset.loc)" class="${getLocationTabClass('すべて')}" data-loc="すべて">
+            すべて
+            <span class="ml-1 text-[10px] font-black px-1.5 py-0.5 rounded-full ${allBadgeClass}">${allCount}</span>
+          </button>
           ${storageTabs}
           <button onclick="openLocationManager()" class="bg-slate-800 text-white px-4 py-2.5 rounded-xl text-sm font-black whitespace-nowrap transition-all active:scale-95 shrink-0">＋ 管理</button>
         </div>

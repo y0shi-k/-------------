@@ -1,0 +1,17 @@
+{
+  "ticket": "TKT-0032",
+  "title": "保存場所タブに件数バッジを表示",
+  "verify_timestamp": "2026-05-17T00:00:00+09:00",
+  "verify_command": "python3 -c \"import html.parser; html.parser.HTMLParser().feed(open('app.html').read())\" && grep -q 'executeGAS' app.html && grep -q 'GAS_URL' app.html && echo 'VERIFY_PASSED'",
+  "verify_result": "VERIFY_PASSED",
+  "checks": {
+    "html_valid": true,
+    "gas_url_present": true,
+    "execute_gas_present": true,
+    "no_alert_confirm_prompt": true,
+    "showToast_exists": true,
+    "syncPendingChanges_exists": true,
+    "no_individual_gas_write": true,
+    "pattern_reuse": true
+  }
+}
