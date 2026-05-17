@@ -1,0 +1,22 @@
+{
+  "ticket": "TKT-0047-cooking-viewer-tabs-stock-toggle",
+  "spec": "SPEC-0047-cooking-viewer-tabs-stock-toggle",
+  "status": "passed",
+  "checks": [
+    {
+      "name": "html_structure_verify",
+      "command": "python3 -c \"import html.parser; html.parser.HTMLParser().feed(open('app.html').read())\" && grep -q 'executeGAS' app.html && grep -q 'GAS_URL' app.html && echo 'VERIFY_PASSED'",
+      "result": "VERIFY_PASSED"
+    },
+    {
+      "name": "js_syntax",
+      "command": "perl -0777 -ne 'print $1 if /<script>(.*)<\\\\/script>/s' app.html > /tmp/stock-master-app-script.js && node --check /tmp/stock-master-app-script.js",
+      "result": "passed"
+    },
+    {
+      "name": "forbidden_dialogs_and_payload_write_scan",
+      "command": "rg -n \"alert\\\\(|confirm\\\\(|prompt\\\\(|executeGAS\\\\(payload\" app.html",
+      "result": "existing executeGAS(payload) usages only; no alert/confirm/prompt matches"
+    }
+  ]
+}
