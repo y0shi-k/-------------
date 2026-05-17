@@ -1,0 +1,39 @@
+{
+  "ticket_id": "TKT-0033",
+  "verify_date": "2025-05-17",
+  "results": {
+    "html_syntax": {
+      "command": "python3 -c \"import html.parser; html.parser.HTMLParser().feed(open('app.html').read())\" && grep -q 'executeGAS' app.html && grep -q 'GAS_URL' app.html && echo 'VERIFY_PASSED'",
+      "status": "PASSED",
+      "output": "VERIFY_PASSED"
+    },
+    "showToast_exists": {
+      "command": "grep -c 'function showToast' app.html",
+      "status": "PASSED",
+      "output": "2"
+    },
+    "no_alert_confirm_prompt": {
+      "command": "grep -E '^\\s*alert\\(' app.html | wc -l && grep -E '^\\s*confirm\\(' app.html | wc -l && grep -E '^\\s*prompt\\(' app.html | wc -l",
+      "status": "PASSED",
+      "output": "0 0 0"
+    },
+    "gas_pattern_preserved": {
+      "command": "grep -n 'executeGAS' app.html | grep -v 'syncPendingChanges' | grep -v 'function executeGAS' | grep -v 'loadSchedule\\|handleInit\\|approveAllAndInit\\|syncPendingChanges'",
+      "status": "PASSED",
+      "notes": "Direct executeGAS calls are only in handleInit, loadSchedule, syncPendingChanges, and image prefetch — no new direct writes introduced."
+    },
+    "batch_sync_only": {
+      "command": "grep -n 'executeGAS(payload' app.html | grep -v 'syncPendingChanges' | grep -v 'loadSchedule' | grep -v 'handleInit' | grep -v 'imagePayload'",
+      "status": "PASSED",
+      "output": ""
+    }
+  },
+  "notes": [
+    "献立スケジュールシートを8列化（ID, 予定日, 食事区分, レシピID, レシピ名, ステータス, 表示順, 最終編集日時）",
+    "既存6列データの自動移行処理をGAS側に追加",
+    "IDベースの scheduleCreate/Delete/Update キューを実装",
+    "D&Dによる同ブロック並び替え・別ブロック移動を実装",
+    "選択モード＋一括削除（完了済み含む場合は確認モーダル）を実装",
+    "alert/confirm/prompt は使用していない"
+  ]
+}

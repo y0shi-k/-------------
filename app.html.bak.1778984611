@@ -655,21 +655,6 @@
     </div>
   </div>
 
-  <!-- モーダル: 献立一括削除確認 -->
-  <div id="scheduleBatchDeleteModal" onclick="if(event.target===this) closeScheduleBatchDeleteModal()" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
-    <div onclick="event.stopPropagation()" class="bg-white w-full max-w-sm rounded-[2.5rem] p-6 shadow-2xl transform scale-95 transition-transform duration-300 border border-slate-100">
-      <div class="flex justify-between items-center mb-5">
-        <h3 class="text-xl font-black text-slate-800 tracking-tight">献立の削除確認</h3>
-        <button onclick="closeScheduleBatchDeleteModal()" class="text-slate-300 hover:text-slate-600 bg-slate-100 p-2 rounded-full"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg></button>
-      </div>
-      <p class="text-sm font-bold text-slate-600 mb-6">完了済みの献立が含まれています。削除してもよろしいですか？</p>
-      <div class="flex gap-3">
-        <button onclick="closeScheduleBatchDeleteModal()" class="flex-1 bg-slate-100 text-slate-600 font-black py-4 rounded-2xl hover:bg-slate-200 transition-all">キャンセル</button>
-        <button onclick="batchDeleteScheduleConfirmed()" class="flex-1 bg-rose-500 text-white font-black py-4 rounded-2xl hover:bg-rose-600 transition-all shadow-lg">削除する</button>
-      </div>
-    </div>
-  </div>
-
   <!-- モーダル: 消費量調整 -->
   <div id="consumptionModal" onclick="if(event.target===this) closeConsumptionModal()" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
     <div onclick="event.stopPropagation()" class="bg-white w-full max-w-lg rounded-[2.5rem] p-6 shadow-2xl transform scale-95 transition-transform duration-300 border border-slate-100 max-h-[90vh] overflow-y-auto">
@@ -778,8 +763,6 @@
       aiExpiringSortOrder: 'asc',
       scheduleSortBy: 'date',
       scheduleSortOrder: 'asc',
-      scheduleSelectMode: false,
-      scheduleSelectedIds: [],
       cookingHistorySearchQuery: '',
       cookingHistoryRatingFilter: 'all',
       cookingHistoryPhotoFilter: 'all',
@@ -961,7 +944,7 @@
       const p = state.pendingSync;
       return p.inventoryCreates.length + countObject(p.inventoryUpdates) + p.inventoryDeletes.length
         + p.recipeCreates.length + countObject(p.recipeUpdates) + p.recipeDeletes.length
-        + p.scheduleCreates.length + p.scheduleDeletes.length + p.scheduleUpdates.length
+        + p.scheduleCreates.length + p.scheduleDeletes.length
         + p.shoppingCreates.length
         + p.shoppingDeletes.length
         + p.shoppingPurchases.length
@@ -983,7 +966,7 @@
       const rec = p.recipeCreates.length + countObject(p.recipeUpdates) + p.recipeDeletes.length;
       if (inv) parts.push(`在庫 ${inv}`);
       if (rec) parts.push(`レシピ ${rec}`);
-      const sch = p.scheduleCreates.length + p.scheduleDeletes.length + p.scheduleUpdates.length;
+      const sch = p.scheduleCreates.length + p.scheduleDeletes.length;
       if (sch) parts.push(`献立 ${sch}`);
       const shop = p.shoppingCreates.length + p.shoppingDeletes.length;
       if (shop) parts.push(`買い物 ${shop}`);
@@ -1086,13 +1069,11 @@
 
     function cleanScheduleItem(item) {
       return {
-        id: item.id || '',
         date: item.date || '',
         meal: item.meal || '',
         recipeId: item.recipeId || '',
         recipeName: item.recipeName || '',
-        status: item.status || '未完了',
-        sortOrder: Number(item.sortOrder) || 0
+        status: item.status || '未完了'
       };
     }
 
@@ -1103,36 +1084,10 @@
     }
 
     function queueScheduleDelete(item) {
-      const key = item.id ? ('id:' + item.id) : (item.date + '|' + item.meal + '|' + item.recipeId);
-      if (!state.pendingSync.scheduleDeletes.some(d => {
-        const dk = d.id ? ('id:' + d.id) : (d.date + '|' + d.meal + '|' + d.recipeId);
-        return dk === key;
-      })) {
-        state.pendingSync.scheduleDeletes.push(cleanScheduleItem(item));
+      if (!state.pendingSync.scheduleDeletes.some(d => d.date === item.date && d.meal === item.meal)) {
+        state.pendingSync.scheduleDeletes.push({ date: item.date, meal: item.meal });
       }
-      if (item.id) {
-        state.schedule = state.schedule.filter(s => s.id !== item.id);
-      } else {
-        state.schedule = state.schedule.filter(s => !(s.date === item.date && s.meal === item.meal && s.recipeId === item.recipeId));
-      }
-      updateSyncBar();
-    }
-
-    function queueScheduleUpdate(item) {
-      const key = item.id || (item.date + '|' + item.meal + '|' + item.recipeId);
-      const existing = state.pendingSync.scheduleUpdates.findIndex(u => (u.id || (u.date + '|' + u.meal + '|' + u.recipeId)) === key);
-      if (existing >= 0) {
-        Object.assign(state.pendingSync.scheduleUpdates[existing], cleanScheduleItem(item));
-      } else {
-        state.pendingSync.scheduleUpdates.push(cleanScheduleItem(item));
-      }
-      if (item.id) {
-        const idx = state.schedule.findIndex(s => s.id === item.id);
-        if (idx >= 0) Object.assign(state.schedule[idx], item);
-      } else {
-        const idx = state.schedule.findIndex(s => s.date === item.date && s.meal === item.meal && s.recipeId === item.recipeId);
-        if (idx >= 0) Object.assign(state.schedule[idx], item);
-      }
+      state.schedule = state.schedule.filter(s => !(s.date === item.date && s.meal === item.meal));
       updateSyncBar();
     }
 
@@ -1920,13 +1875,10 @@
         var scheduleDeletes = pending.scheduleDeletes || [];
         var scheduleData = sSchedule.getDataRange().getValues();
         for(var sdi=scheduleData.length-1; sdi>=1; sdi--) {
-          var sdId = f(scheduleData[sdi][0]);
-          var sdDate = f(scheduleData[sdi][1]);
-          var sdMeal = f(scheduleData[sdi][2]);
-          var sdRecipeId = f(scheduleData[sdi][3]);
+          var sdDate = f(scheduleData[sdi][0]);
+          var sdMeal = f(scheduleData[sdi][1]);
           for(var sdk=0; sdk<scheduleDeletes.length; sdk++) {
-            var del = scheduleDeletes[sdk];
-            if((del.id && del.id === sdId) || (!del.id && del.date === sdDate && del.meal === sdMeal && del.recipeId === sdRecipeId)) {
+            if(scheduleDeletes[sdk].date === sdDate && scheduleDeletes[sdk].meal === sdMeal) {
               sSchedule.deleteRow(sdi+1);
               break;
             }
@@ -1939,18 +1891,14 @@
           scheduleCreates.forEach(function(d) {
             var updated = false;
             for(var sui=1; sui<scheduleData.length; sui++) {
-              var exId = f(scheduleData[sui][0]);
-              var exDate = f(scheduleData[sui][1]);
-              var exMeal = f(scheduleData[sui][2]);
-              var exRecipeId = f(scheduleData[sui][3]);
-              if((d.id && d.id === exId) || (!d.id && d.date === exDate && d.meal === exMeal && d.recipeId === exRecipeId)) {
-                sSchedule.getRange(sui+1, 1, 1, 8).setValues([[d.id || exId || ('sched_' + Utilities.getUuid()), d.date, d.meal, d.recipeId, d.recipeName, d.status || '未完了', Number(d.sortOrder) || 0, now]]);
+              if(f(scheduleData[sui][0]) === d.date && f(scheduleData[sui][1]) === d.meal) {
+                sSchedule.getRange(sui+1, 3, 1, 4).setValues([[d.recipeId, d.recipeName, d.status || '未完了', now]]);
                 updated = true;
                 break;
               }
             }
             if(!updated) {
-              sSchedule.appendRow([d.id || ('sched_' + Utilities.getUuid()), d.date, d.meal, d.recipeId, d.recipeName, d.status || '未完了', Number(d.sortOrder) || 0, now]);
+              sSchedule.appendRow([d.date, d.meal, d.recipeId, d.recipeName, d.status || '未完了', now]);
             }
           });
         }
@@ -2060,14 +2008,9 @@
           var schData = sSchedule.getDataRange().getValues();
           scheduleUpdates.forEach(function(u) {
             for(var si=1; si<schData.length; si++) {
-              var suId = f(schData[si][0]);
-              var suDate = f(schData[si][1]);
-              var suMeal = f(schData[si][2]);
-              var suRecipeId = f(schData[si][3]);
-              if((u.id && u.id === suId) || (!u.id && u.date === suDate && u.meal === suMeal && u.recipeId === suRecipeId)) {
-                if(u.status !== undefined) sSchedule.getRange(si+1, 6).setValue(u.status);
-                if(u.sortOrder !== undefined) sSchedule.getRange(si+1, 7).setValue(Number(u.sortOrder) || 0);
-                sSchedule.getRange(si+1, 8).setValue(now);
+              if(f(schData[si][0]) === u.date && f(schData[si][1]) === u.meal) {
+                sSchedule.getRange(si+1, 5).setValue(u.status);
+                sSchedule.getRange(si+1, 6).setValue(now);
                 break;
               }
             }
@@ -2235,19 +2178,7 @@
         }
         ensureHeader('食材在庫', ['ID', '分類', '品名', '数量', '単位', '購入日', '開封日', '表示期限', '実質期限', '保存場所', '状態メモ', '最終編集日時'], 'ID');
         ensureHeader('レシピ集', ['レシピID', 'レシピ名', '材料JSON', '手順JSON', '出典', '調理回数', '調理日履歴', '登録日時', '最終編集日時'], 'レシピID');
-        ensureHeader('献立スケジュール', ['ID', '予定日', '食事区分', 'レシピID', 'レシピ名', 'ステータス', '表示順', '最終編集日時'], 'ID');
-        // 献立スケジュール: 旧6列構造→新8列構造への自動移行
-        var sScheduleMigrate = ss.getSheetByName('献立スケジュール');
-        var schHeaderMigrate = sScheduleMigrate.getRange(1,1,1,Math.max(8, sScheduleMigrate.getLastColumn()||1)).getValues()[0];
-        if(schHeaderMigrate[0] === '予定日') {
-          var schDataOld = sScheduleMigrate.getDataRange().getValues();
-          sScheduleMigrate.clear();
-          sScheduleMigrate.appendRow(['ID', '予定日', '食事区分', 'レシピID', 'レシピ名', 'ステータス', '表示順', '最終編集日時']);
-          for(var smi=1; smi<schDataOld.length; smi++) {
-            var row = schDataOld[smi];
-            sScheduleMigrate.appendRow(['sched_' + Utilities.getUuid(), f(row[0]), f(row[1]), f(row[2]), f(row[3]), f(row[4]) || '未完了', 0, f(row[5]) || now]);
-          }
-        }
+        ensureHeader('献立スケジュール', ['予定日', '食事区分', 'レシピID', 'レシピ名', 'ステータス', '最終編集日時'], '予定日');
         ensureHeader('料理履歴', ['履歴ID', '調理日時', 'レシピID', 'レシピ名', '感想', '写真URL', '評価', '最終編集日時'], '履歴ID');
         ensureHeader('買い物リスト', ['リストID', '品名', '必要数量', '単位', 'ステータス', '紐づくレシピ名', '出自種別', '予定日', '食事区分', '最終編集日時'], 'リストID');
         
@@ -2307,9 +2238,8 @@
           for(var si=1; si<sch.length; si++) {
             var sr = sch[si];
             if(!sr[0] || !sr[1]) continue;
-            schedule.push({ id: f(sr[0]), date: f(sr[1]), meal: f(sr[2]), recipeId: f(sr[3]), recipeName: f(sr[4]), status: f(sr[5]) || '未完了', sortOrder: Number(sr[6]) || 0 });
+            schedule.push({ date: f(sr[0]), meal: f(sr[1]), recipeId: f(sr[2]), recipeName: f(sr[3]), status: f(sr[4]) || '未完了' });
           }
-          schedule.sort(function(a,b){ return a.sortOrder - b.sortOrder; });
         }
 
         var hist = ss.getSheetByName('料理履歴').getDataRange().getValues();
@@ -2383,12 +2313,11 @@
         for(var i=1; i<data.length; i++) {
           var r = data[i];
           if(!r[0] || !r[1]) continue;
-          var rowDate = f(r[1]);
+          var rowDate = f(r[0]);
           if(rowDate >= '${startDate}' && rowDate <= '${endDate}') {
-            list.push({ id: f(r[0]), date: rowDate, meal: f(r[2]), recipeId: f(r[3]), recipeName: f(r[4]), status: f(r[5]) || '未完了', sortOrder: Number(r[6]) || 0 });
+            list.push({ date: rowDate, meal: f(r[1]), recipeId: f(r[2]), recipeName: f(r[3]), status: f(r[4]) || '未完了' });
           }
         }
-        list.sort(function(a,b){ return a.sortOrder - b.sortOrder; });
         return { display: '献立データ読み込み完了', detail: { schedule: list } };
       })()`;
       const res = await executeGAS(payload, '献立スケジュールを読み込み中...');
@@ -2396,14 +2325,10 @@
         const loaded = res.detail.schedule;
         const existingPending = state.pendingSync.scheduleCreates || [];
         loaded.forEach(item => {
-          const pendingIdx = existingPending.findIndex(p => {
-            if (p.id && item.id) return p.id === item.id;
-            return p.date === item.date && p.meal === item.meal && p.recipeId === item.recipeId;
-          });
+          const pendingIdx = existingPending.findIndex(p => p.date === item.date && p.meal === item.meal);
           if (pendingIdx >= 0) {
             item.recipeId = existingPending[pendingIdx].recipeId;
             item.recipeName = existingPending[pendingIdx].recipeName;
-            item.sortOrder = existingPending[pendingIdx].sortOrder;
           }
         });
         state.schedule = loaded;
@@ -2686,13 +2611,12 @@
 
       if (state.currentBTab === 'schedule') {
         const weekLabel = getScheduleWeekLabel();
-        const selectCount = state.scheduleSelectedIds.length;
         primary.innerHTML = `
-          <div class="grid grid-cols-[1fr_auto_1fr] gap-2 w-full min-w-0">
+          <div class="grid grid-cols-3 gap-2 w-full min-w-0">
             <button onclick="changeScheduleWeek(-1)" class="min-w-0 overflow-hidden h-12 bg-sky-50 text-sky-700 border border-sky-100 px-2 rounded-xl font-black text-[11px] flex items-center justify-center gap-1 active:scale-95 transition-all">
               <span class="shrink-0">←</span><span class="min-w-0 truncate">前の週</span>
             </button>
-            <div class="min-w-0 overflow-hidden h-12 bg-sky-600 text-white px-3 rounded-xl font-black text-[12px] flex items-center justify-center shadow-sm">
+            <div class="min-w-0 overflow-hidden h-12 bg-sky-600 text-white px-2 rounded-xl font-black text-[12px] flex items-center justify-center shadow-sm">
               <span id="scheduleWeekLabel" class="min-w-0 truncate">${weekLabel}</span>
             </div>
             <button onclick="changeScheduleWeek(1)" class="min-w-0 overflow-hidden h-12 bg-sky-50 text-sky-700 border border-sky-100 px-2 rounded-xl font-black text-[11px] flex items-center justify-center gap-1 active:scale-95 transition-all">
@@ -2701,11 +2625,8 @@
           </div>
         `;
         secondary.innerHTML = `
-          <div class="h-20 flex items-start gap-2 px-1 pt-2">
-            <button onclick="toggleScheduleSelectMode()" class="h-8 px-3 rounded-lg ${state.scheduleSelectMode ? 'bg-sky-600 text-white' : 'bg-white text-sky-600 border border-sky-200'} text-[11px] font-black flex items-center gap-1 active:scale-95 transition-all">
-              <span>${state.scheduleSelectMode ? '✓' : '☐'}</span> 選択モード
-            </button>
-            ${state.scheduleSelectMode && selectCount > 0 ? `<span class="h-8 px-2 rounded-lg bg-sky-100 text-sky-700 text-[11px] font-black flex items-center">${selectCount} 件選択中</span>` : ''}
+          <div class="h-20 flex items-start px-1 pt-2">
+            <div class="text-[10px] font-bold text-slate-400">朝・昼・晩のスロットをタップして献立を編集</div>
           </div>
         `;
         select.innerHTML = renderRecipeCountLine(getWeekDates(state.scheduleWeekOffset).length, '日分');
@@ -2813,8 +2734,8 @@
 
     function getScheduleDaySummary(date) {
       const meals = ['朝','昼','晩'];
-      const assigned = meals.flatMap(meal => state.schedule.filter(s => s.date === date && s.meal === meal));
-      const openCount = assigned.filter(s => s.status !== '完了').length;
+      const assigned = meals.map(meal => state.schedule.find(s => s.date === date && s.meal === meal)).filter(Boolean);
+      const openCount = meals.length - assigned.filter(s => s.status === '完了').length;
       const firstName = assigned.map(s => s.recipeName || '').filter(Boolean).sort((a, b) => a.localeCompare(b, 'ja'))[0] || '';
       return { assigned, openCount, firstName };
     }
@@ -2848,36 +2769,26 @@
         const meals = ['朝','昼','晩'];
         let slotsHtml = '';
         meals.forEach(meal => {
-          const assigned = state.schedule.filter(s => s.date === date && s.meal === meal).sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
-          const isEmpty = assigned.length === 0;
-          let cardsHtml = '';
-          assigned.forEach(item => {
-            const isDone = item.status === '完了';
-            const checked = state.scheduleSelectedIds.includes(item.id || '') ? 'checked' : '';
-            const cbHtml = state.scheduleSelectMode ? `<input type="checkbox" class="schedule-cb w-4 h-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500 shrink-0" data-id="${item.id || ''}" onclick="event.stopPropagation(); toggleScheduleSelection('${item.id || ''}')" ${checked}>` : '';
-            cardsHtml += `
-              <div class="w-full max-w-full min-w-0 h-12 bg-sky-50 border border-sky-100 rounded-lg px-2 flex items-center gap-2 cursor-pointer hover:bg-sky-100 transition-all ${isDone ? 'opacity-60' : ''}" draggable="true" data-schedule-id="${item.id || ''}" ondragstart="handleScheduleDragStart(event, '${item.id || ''}')" onclick="${state.scheduleSelectMode ? `toggleScheduleSelection('${item.id || ''}')` : `openScheduleSlotMenu('${item.id || ''}')`}">
-                <div class="shrink-0 text-sky-300 cursor-grab active:cursor-grabbing select-none" onmousedown="event.stopPropagation()" ontouchstart="event.stopPropagation()">≡</div>
-                ${cbHtml}
-                <div class="flex-1 min-w-0 flex flex-col justify-center">
-                  <p class="text-xs font-black text-sky-800 truncate">${escapeHtml(item.recipeName)}</p>
-                  ${isDone ? '<p class="text-[9px] font-bold text-emerald-600">完了</p>' : ''}
-                </div>
-                <button onclick="event.stopPropagation(); openCookingViewer('${item.recipeId}')" class="shrink-0 w-12 h-6 rounded bg-sky-600 text-white text-[10px] font-black hover:bg-sky-700 active:scale-95 transition-all flex items-center justify-center gap-0.5">
+          const assigned = state.schedule.find(s => s.date === date && s.meal === meal);
+          if (assigned) {
+            slotsHtml += `
+              <div class="w-full max-w-full min-w-0 h-24 overflow-hidden bg-sky-50 border border-sky-100 rounded-xl p-2 text-center cursor-pointer hover:bg-sky-100 transition-all grid grid-rows-[1rem_1.75rem_2rem] items-center" onclick="openScheduleSlotMenu('${date}', '${meal}')">
+                <p class="h-4 leading-4 text-[10px] font-bold text-sky-500">${meal}</p>
+                <p class="block w-full max-w-full min-w-0 h-7 leading-7 overflow-hidden text-ellipsis whitespace-nowrap text-xs font-black text-sky-800">${escapeHtml(assigned.recipeName)}</p>
+                <button onclick="event.stopPropagation(); openCookingViewer('${assigned.recipeId}')" class="w-16 max-w-full h-7 mx-auto px-2 rounded-lg bg-sky-600 text-white text-[10px] font-black hover:bg-sky-700 active:scale-95 transition-all inline-flex items-center justify-center gap-0.5 overflow-hidden">
                   <span class="shrink-0">▶</span><span class="min-w-0 truncate">開始</span>
                 </button>
               </div>
             `;
-          });
-          slotsHtml += `
-            <div class="w-full max-w-full min-w-0 min-h-[4.5rem] flex flex-col gap-1 bg-white border ${isEmpty ? 'border-slate-200' : 'border-sky-100'} rounded-xl p-2 transition-all"
-              data-schedule-date="${date}" data-schedule-meal="${meal}"
-              ondragover="handleScheduleDragOver(event)" ondragleave="handleScheduleDragLeave(event)" ondrop="handleScheduleDrop(event, '${date}', '${meal}')">
-              <p class="text-[10px] font-bold ${isEmpty ? 'text-slate-400' : 'text-sky-500'} text-center leading-none mb-1">${meal}</p>
-              ${cardsHtml}
-              <button onclick="openScheduleRecipePicker('${date}', '${meal}')" class="w-full h-8 rounded-lg ${isEmpty ? 'bg-white text-slate-300 hover:bg-slate-50' : 'bg-sky-50 text-sky-400 hover:bg-sky-100'} text-lg font-black flex items-center justify-center transition-all active:scale-95 border border-dashed ${isEmpty ? 'border-slate-200' : 'border-sky-200'}">＋</button>
-            </div>
-          `;
+          } else {
+            slotsHtml += `
+              <div class="w-full max-w-full min-w-0 h-24 overflow-hidden bg-white border border-slate-200 rounded-xl p-2 text-center cursor-pointer hover:bg-slate-50 transition-all grid grid-rows-[1rem_1.75rem_2rem] items-center" onclick="openScheduleRecipePicker('${date}', '${meal}')">
+                <p class="h-4 leading-4 text-[10px] font-bold text-slate-400">${meal}</p>
+                <p class="block w-full max-w-full min-w-0 h-7 leading-7 overflow-hidden text-ellipsis whitespace-nowrap text-xs font-black text-slate-300 opacity-0 select-none" aria-hidden="true">未設定</p>
+                <div class="w-16 max-w-full h-7 mx-auto rounded-lg text-slate-300 text-xl font-black flex items-center justify-center">＋</div>
+              </div>
+            `;
+          }
         });
         container.insertAdjacentHTML('beforeend', `
           <div class="w-full max-w-full min-w-0 overflow-hidden bg-white/80 rounded-2xl p-3 shadow-sm border border-sky-100 flex items-stretch gap-3">
@@ -2888,15 +2799,6 @@
           </div>
         `);
       });
-      if (state.scheduleSelectMode && state.scheduleSelectedIds.length > 0) {
-        container.insertAdjacentHTML('beforeend', `
-          <div class="mt-4">
-            <button onclick="batchDeleteSchedule()" class="w-full bg-rose-600 text-white font-black py-4 rounded-2xl shadow-lg shadow-rose-200 hover:bg-rose-700 active:scale-95 transition-all flex items-center justify-center gap-2">
-              <span>🗑</span> チェックした献立を一括削除 (${state.scheduleSelectedIds.length}件)
-            </button>
-          </div>
-        `);
-      }
       resetHorizontalScroll();
     }
 
@@ -3514,7 +3416,6 @@ ${plan ? '\n提案方針: ' + plan : ''}
     let _schedulePendingDate = '';
     let _schedulePendingMeal = '';
     let _schedulePendingChange = false;
-    let _schedulePendingId = '';
 
     function openScheduleRecipePicker(date, meal) {
       document.getElementById('syncBar').classList.add('sync-bar-hidden');
@@ -3565,28 +3466,13 @@ ${plan ? '\n提案方針: ' + plan : ''}
       const date = _schedulePendingDate;
       const meal = _schedulePendingMeal;
       if (!date || !meal) return;
-      const sameBlock = state.schedule.filter(s => s.date === date && s.meal === meal);
-      const existingIdx = state.schedule.findIndex(s => s.date === date && s.meal === meal && s.recipeId === recipeId);
-      let targetItem;
-      if (_schedulePendingChange && _schedulePendingId) {
-        // 変更モード: 既存アイテムのレシピを差し替え
-        const changeIdx = state.schedule.findIndex(s => s.id === _schedulePendingId);
-        if (changeIdx >= 0) {
-          const oldItem = state.schedule[changeIdx];
-          queueScheduleDelete(oldItem);
-          targetItem = { id: createClientId('sched'), date, meal, recipeId, recipeName, status: '未完了', sortOrder: oldItem.sortOrder || 0 };
-          state.schedule[changeIdx] = targetItem;
-        }
-      } else if (existingIdx >= 0) {
-        targetItem = state.schedule[existingIdx];
-        targetItem.recipeName = recipeName;
-        targetItem.status = '未完了';
+      const existingIdx = state.schedule.findIndex(s => s.date === date && s.meal === meal);
+      if (existingIdx >= 0) {
+        state.schedule[existingIdx] = { date, meal, recipeId, recipeName, status: '未完了' };
       } else {
-        const maxSort = sameBlock.length ? Math.max(...sameBlock.map(s => s.sortOrder || 0)) : -1;
-        targetItem = { id: createClientId('sched'), date, meal, recipeId, recipeName, status: '未完了', sortOrder: maxSort + 1 };
-        state.schedule.push(targetItem);
+        state.schedule.push({ date, meal, recipeId, recipeName, status: '未完了' });
       }
-      if (targetItem) queueScheduleCreate(targetItem);
+      queueScheduleCreate({ date, meal, recipeId, recipeName, status: '未完了' });
       closeScheduleRecipeModal();
       renderRecipeMode();
 
@@ -3603,16 +3489,14 @@ ${plan ? '\n提案方針: ' + plan : ''}
       }
     }
 
-    function openScheduleSlotMenu(id) {
-      const item = state.schedule.find(s => s.id === id);
-      if (!item) return;
+    function openScheduleSlotMenu(date, meal) {
       document.getElementById('syncBar').classList.add('sync-bar-hidden');
       document.getElementById('syncBar').classList.remove('sync-bar-visible');
-      _schedulePendingId = id;
-      _schedulePendingDate = item.date;
-      _schedulePendingMeal = item.meal;
+      _schedulePendingDate = date;
+      _schedulePendingMeal = meal;
+      const assigned = state.schedule.find(s => s.date === date && s.meal === meal);
       const title = document.getElementById('scheduleSlotMenuTitle');
-      if (title) title.textContent = `${formatScheduleDate(item.date)} ${item.meal} · ${item.recipeName}`;
+      if (title && assigned) title.textContent = `${formatScheduleDate(date)} ${meal} · ${assigned.recipeName}`;
       const m = document.getElementById('scheduleSlotMenu');
       m.classList.remove('hidden');
       setTimeout(() => m.classList.remove('opacity-0'), 10);
@@ -3636,120 +3520,13 @@ ${plan ? '\n提案方針: ' + plan : ''}
     }
 
     function removeScheduleSlot() {
-      const item = state.schedule.find(s => s.id === _schedulePendingId);
-      if (!item) return;
-      queueScheduleDelete(item);
+      const date = _schedulePendingDate;
+      const meal = _schedulePendingMeal;
+      if (!date || !meal) return;
+      queueScheduleDelete({ date, meal });
       closeScheduleSlotMenu();
       renderRecipeMode();
       showToast('献立を削除しました。同期するまでスプシ未反映です。', 'info');
-    }
-
-    /* --- Schedule Drag & Drop --- */
-    function handleScheduleDragStart(event, id) {
-      event.dataTransfer.setData('text/plain', id);
-      event.dataTransfer.effectAllowed = 'move';
-      event.target.classList.add('opacity-50');
-    }
-
-    function handleScheduleDragOver(event) {
-      event.preventDefault();
-      event.dataTransfer.dropEffect = 'move';
-      const zone = event.currentTarget;
-      zone.classList.add('bg-sky-100', 'border-sky-300');
-    }
-
-    function handleScheduleDragLeave(event) {
-      const zone = event.currentTarget;
-      zone.classList.remove('bg-sky-100', 'border-sky-300');
-    }
-
-    function handleScheduleDrop(event, targetDate, targetMeal) {
-      event.preventDefault();
-      const zone = event.currentTarget;
-      zone.classList.remove('bg-sky-100', 'border-sky-300');
-      const id = event.dataTransfer.getData('text/plain');
-      if (!id) return;
-      const item = state.schedule.find(s => s.id === id);
-      if (!item) return;
-      const sameBlock = item.date === targetDate && item.meal === targetMeal;
-      if (sameBlock) {
-        // 同ブロック内並び替え
-        const blockItems = state.schedule.filter(s => s.date === targetDate && s.meal === targetMeal).sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
-        const fromIdx = blockItems.findIndex(s => s.id === id);
-        if (fromIdx < 0) return;
-        // ドロップ位置を計算（マウスY座標から挿入位置を推定）
-        const rect = zone.getBoundingClientRect();
-        const y = event.clientY - rect.top;
-        const cardHeight = 48 + 4; // h-12 + gap-1
-        const headerOffset = 16; // meal label
-        let toIdx = Math.max(0, Math.min(blockItems.length - 1, Math.floor((y - headerOffset) / cardHeight)));
-        if (toIdx === fromIdx) return;
-        blockItems.splice(fromIdx, 1);
-        blockItems.splice(toIdx, 0, item);
-        blockItems.forEach((it, idx) => { it.sortOrder = idx * 10; });
-        blockItems.forEach(it => queueScheduleUpdate({ id: it.id, date: it.date, meal: it.meal, recipeId: it.recipeId, recipeName: it.recipeName, status: it.status, sortOrder: it.sortOrder }));
-      } else {
-        // 別ブロックへの移動
-        const targetBlock = state.schedule.filter(s => s.date === targetDate && s.meal === targetMeal);
-        const maxSort = targetBlock.length ? Math.max(...targetBlock.map(s => s.sortOrder || 0)) : -1;
-        item.date = targetDate;
-        item.meal = targetMeal;
-        item.sortOrder = maxSort + 10;
-        queueScheduleUpdate({ id: item.id, date: item.date, meal: item.meal, recipeId: item.recipeId, recipeName: item.recipeName, status: item.status, sortOrder: item.sortOrder });
-      }
-      renderRecipeMode();
-      showToast('献立を移動しました。同期するまでスプシ未反映です。', 'info');
-    }
-
-    /* --- Schedule Selection Mode --- */
-    function toggleScheduleSelectMode() {
-      state.scheduleSelectMode = !state.scheduleSelectMode;
-      state.scheduleSelectedIds = [];
-      renderRecipeMode();
-    }
-
-    function toggleScheduleSelection(id) {
-      if (!id) return;
-      const idx = state.scheduleSelectedIds.indexOf(id);
-      if (idx >= 0) {
-        state.scheduleSelectedIds.splice(idx, 1);
-      } else {
-        state.scheduleSelectedIds.push(id);
-      }
-      renderRecipeMode();
-    }
-
-    function batchDeleteSchedule() {
-      if (state.scheduleSelectedIds.length === 0) return;
-      const targets = state.schedule.filter(s => state.scheduleSelectedIds.includes(s.id || ''));
-      const hasDone = targets.some(t => t.status === '完了');
-      if (hasDone) {
-        openScheduleBatchDeleteModal();
-      } else {
-        batchDeleteScheduleConfirmed();
-      }
-    }
-
-    function batchDeleteScheduleConfirmed() {
-      const targets = state.schedule.filter(s => state.scheduleSelectedIds.includes(s.id || ''));
-      targets.forEach(item => queueScheduleDelete(item));
-      state.scheduleSelectMode = false;
-      state.scheduleSelectedIds = [];
-      closeScheduleBatchDeleteModal();
-      renderRecipeMode();
-      showToast(`${targets.length} 件の献立を削除しました。同期するまでスプシ未反映です。`, 'info');
-    }
-
-    function openScheduleBatchDeleteModal() {
-      const m = document.getElementById('scheduleBatchDeleteModal');
-      m.classList.remove('hidden');
-      setTimeout(() => m.classList.remove('opacity-0'), 10);
-    }
-
-    function closeScheduleBatchDeleteModal() {
-      const m = document.getElementById('scheduleBatchDeleteModal');
-      m.classList.add('opacity-0');
-      setTimeout(() => m.classList.add('hidden'), 300);
     }
 
     function updateAiSelectedTags() {
@@ -5592,10 +5369,8 @@ ${text}`;
       if (scheduleItem) {
         scheduleItem.status = '完了';
         state.pendingSync.scheduleUpdates.push({
-          id: scheduleItem.id || '',
           date: scheduleItem.date,
           meal: scheduleItem.meal,
-          recipeId: scheduleItem.recipeId,
           status: '完了'
         });
       }
