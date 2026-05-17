@@ -925,6 +925,7 @@
       stagingSortBy: 'created',
       stagingSortOrder: 'asc',
       recipeSearchMode: 'name',
+      recipeSearchLogic: 'and',
       recipeSortBy: 'createdAt',
       recipeSortOrder: 'desc',
       aiExpiringSortBy: 'limit',
@@ -3025,11 +3026,15 @@
       `;
       secondary.innerHTML = `
         <div class="h-20 space-y-2">
-          <div class="grid grid-cols-[auto_1fr] gap-2 items-center">
+          <div class="grid grid-cols-[auto_auto_1fr] gap-2 items-center">
             <div class="bg-indigo-100 rounded-xl p-1 flex gap-1">
               <button onclick="setRecipeSearchMode('name')" class="recipe-search-mode-btn px-3 py-1.5 rounded-lg text-[10px] font-medium ${state.recipeSearchMode === 'name' ? 'bg-white text-indigo-700 shadow-sm' : 'text-indigo-700'}" data-mode="name">レシピ名</button>
               <button onclick="setRecipeSearchMode('ingredient')" class="recipe-search-mode-btn px-3 py-1.5 rounded-lg text-[10px] font-medium ${state.recipeSearchMode === 'ingredient' ? 'bg-white text-indigo-700 shadow-sm' : 'text-indigo-700'}" data-mode="ingredient">食材</button>
               <button onclick="setRecipeSearchMode('all')" class="recipe-search-mode-btn px-3 py-1.5 rounded-lg text-[10px] font-medium ${state.recipeSearchMode === 'all' ? 'bg-white text-indigo-700 shadow-sm' : 'text-indigo-700'}" data-mode="all">すべて</button>
+            </div>
+            <div class="bg-slate-100 rounded-xl p-1 flex gap-1">
+              <button onclick="setRecipeSearchLogic('and')" class="recipe-search-logic-btn px-3 py-1.5 rounded-lg text-[10px] font-medium ${state.recipeSearchLogic === 'and' ? 'bg-white text-slate-700 shadow-sm' : 'text-slate-500'}" data-logic="and">AND</button>
+              <button onclick="setRecipeSearchLogic('or')" class="recipe-search-logic-btn px-3 py-1.5 rounded-lg text-[10px] font-medium ${state.recipeSearchLogic === 'or' ? 'bg-white text-slate-700 shadow-sm' : 'text-slate-500'}" data-logic="or">OR</button>
             </div>
             <input type="text" id="recipeSearchInput" value="${escapeHtml(state.recipeSearchQuery || '')}" oninput="state.recipeSearchQuery=this.value; renderRecipeList()" class="min-w-0 w-full bg-white border border-indigo-100 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:border-indigo-500" placeholder="検索...">
           </div>
@@ -4396,26 +4401,38 @@ ${plan ? '\n提案方針: ' + plan : ''}
     function getFilteredSortedRecipes() {
       let recipesToRender = state.recipes;
       const searchMode = state.recipeSearchMode || 'name';
-      const q = (state.recipeSearchQuery || document.getElementById('recipeSearchInput')?.value || '').trim().toLowerCase();
+      const searchLogic = state.recipeSearchLogic || 'and';
+      const rawQ = (state.recipeSearchQuery || document.getElementById('recipeSearchInput')?.value || '').trim().toLowerCase();
 
-      if (q) {
+      if (rawQ) {
+        const keywords = rawQ.split(/\s+/).filter(Boolean);
         recipesToRender = state.recipes.filter(r => {
-          const nameMatch = (r.name || '').toLowerCase().includes(q);
-          let ingMatch = false;
+          const name = (r.name || '').toLowerCase();
+          const source = (r.source || '').toLowerCase();
+          let ingredients = [];
+          let seasonings = [];
           try {
-            const ingredients = JSON.parse(r.ingredients || '[]');
-            const seasonings = JSON.parse(r.seasonings || '[]');
-            if (Array.isArray(ingredients)) {
-              ingMatch = ingredients.some(ing => (ing.name || '').toLowerCase().includes(q));
-            }
-            if (!ingMatch && Array.isArray(seasonings)) {
-              ingMatch = seasonings.some(sea => (sea.name || '').toLowerCase().includes(q));
-            }
-          } catch(e) { ingMatch = false; }
+            ingredients = JSON.parse(r.ingredients || '[]');
+            seasonings = JSON.parse(r.seasonings || '[]');
+          } catch(e) {}
+          const ingNames = [
+            ...(Array.isArray(ingredients) ? ingredients.map(i => (i.name || '').toLowerCase()) : []),
+            ...(Array.isArray(seasonings) ? seasonings.map(s => (s.name || '').toLowerCase()) : [])
+          ];
 
-          if (searchMode === 'name') return nameMatch;
-          if (searchMode === 'ingredient') return ingMatch;
-          return nameMatch || ingMatch;
+          // キーワードごとのマッチ判定
+          const keywordMatches = keywords.map(k => {
+            const nameMatch = name.includes(k);
+            const sourceMatch = source.includes(k);
+            const ingMatch = ingNames.some(n => n.includes(k));
+            if (searchMode === 'name') return nameMatch || sourceMatch;
+            if (searchMode === 'ingredient') return ingMatch;
+            return nameMatch || sourceMatch || ingMatch;
+          });
+
+          return searchLogic === 'and'
+            ? keywordMatches.every(Boolean)
+            : keywordMatches.some(Boolean);
         });
       }
       const sorted = [...recipesToRender].sort((a, b) => {
@@ -4484,6 +4501,11 @@ ${plan ? '\n提案方針: ' + plan : ''}
 
     function setRecipeSearchMode(mode) {
       state.recipeSearchMode = ['name', 'ingredient', 'all'].includes(mode) ? mode : 'name';
+      renderRecipeMode();
+    }
+
+    function setRecipeSearchLogic(logic) {
+      state.recipeSearchLogic = ['and', 'or'].includes(logic) ? logic : 'and';
       renderRecipeMode();
     }
 

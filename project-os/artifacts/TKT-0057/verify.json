@@ -1,0 +1,35 @@
+{
+  "ticket": "TKT-0057",
+  "description": "レシピ集検索の And/Or 対応 + 出典検索",
+  "verify": {
+    "html_syntax": "PASS",
+    "gas_url_present": "PASS",
+    "execute_gas_present": "PASS",
+    "no_native_dialogs": "PASS",
+    "showToast_exists": "PASS",
+    "no_individual_gas_calls": "PASS"
+  },
+  "changes": [
+    {
+      "file": "app.html",
+      "type": "addition",
+      "description": "state.recipeSearchLogic: 'and' を追加"
+    },
+    {
+      "file": "app.html",
+      "type": "modification",
+      "description": "renderRecipeModeControls: 検索UIに AND/OR 切替ボタンを追加"
+    },
+    {
+      "file": "app.html",
+      "type": "modification",
+      "description": "getFilteredSortedRecipes: スペース区切り複数キーワード対応、source検索対応、And/Orロジック対応"
+    },
+    {
+      "file": "app.html",
+      "type": "addition",
+      "description": "setRecipeSearchLogic(logic) 関数を追加"
+    }
+  ],
+  "notes": "UI/フィルタリングのみの変更。GAS通信・スプシ書き込みは一切未変更。"
+}
