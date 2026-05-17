@@ -360,6 +360,17 @@
               <input type="date" id="f-limit1" class="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-4 text-sm font-bold outline-none focus:border-indigo-500">
             </div>
           </div>
+          <div>
+            <label class="block text-[11px] font-medium text-slate-400 uppercase mb-1.5 ml-1">単位換算</label>
+            <div class="grid grid-cols-[4.5rem_1fr_auto_4.5rem_1fr] gap-2 items-center">
+              <input type="number" id="f-conv-from-qty" min="0" step="0.001" class="min-w-0 bg-slate-50 border border-slate-100 rounded-xl px-3 py-3 text-sm font-bold outline-none focus:border-indigo-500" placeholder="1">
+              <input type="text" id="f-conv-from-unit" class="min-w-0 bg-slate-50 border border-slate-100 rounded-xl px-3 py-3 text-sm font-bold outline-none focus:border-indigo-500" placeholder="パック">
+              <span class="text-slate-300 font-bold text-sm text-center">=</span>
+              <input type="number" id="f-conv-to-qty" min="0" step="0.001" class="min-w-0 bg-slate-50 border border-slate-100 rounded-xl px-3 py-3 text-sm font-bold outline-none focus:border-indigo-500" placeholder="150">
+              <input type="text" id="f-conv-to-unit" class="min-w-0 bg-slate-50 border border-slate-100 rounded-xl px-3 py-3 text-sm font-bold outline-none focus:border-indigo-500" placeholder="g">
+            </div>
+            <p class="text-[10px] text-slate-400 font-bold mt-1.5 ml-1">例: 1パック = 150g。料理完了時に双方向で換算します。</p>
+          </div>
           <div class="grid grid-cols-2 gap-4">
             <div>
               <label class="block text-[11px] font-medium text-slate-400 uppercase mb-1.5 ml-1">購入日</label>
@@ -1320,6 +1331,44 @@
       return String(id || '').indexOf('_tmp_') !== -1;
     }
 
+    function normalizeUnitConversion(value) {
+      if (!value) return null;
+      let raw = value;
+      if (typeof value === 'string') {
+        try { raw = JSON.parse(value); } catch (e) { return null; }
+      }
+      if (!raw || typeof raw !== 'object') return null;
+      const fromQty = Number(raw.fromQty);
+      const toQty = Number(raw.toQty);
+      const fromUnit = String(raw.fromUnit || '').trim();
+      const toUnit = String(raw.toUnit || '').trim();
+      if (!fromQty || !toQty || fromQty <= 0 || toQty <= 0 || !fromUnit || !toUnit) return null;
+      return { fromQty, fromUnit, toQty, toUnit };
+    }
+
+    function serializeUnitConversion(value) {
+      const conv = normalizeUnitConversion(value);
+      return conv ? JSON.stringify(conv) : '';
+    }
+
+    function formatQty(value) {
+      const num = Number(value);
+      if (!Number.isFinite(num)) return '0';
+      return String(Math.round(num * 1000) / 1000).replace(/\.0+$/, '').replace(/(\.\d*?)0+$/, '$1');
+    }
+
+    function convertUnitAmount(amount, sourceUnit, targetUnit, item) {
+      const qty = Number(amount) || 0;
+      const from = String(sourceUnit || '').trim();
+      const to = String(targetUnit || '').trim();
+      if (!from || !to || from === to) return from === to ? qty : null;
+      const conv = normalizeUnitConversion(item && item.unitConversion);
+      if (!conv) return null;
+      if (conv.fromUnit === from && conv.toUnit === to) return qty * conv.toQty / conv.fromQty;
+      if (conv.toUnit === from && conv.fromUnit === to) return qty * conv.fromQty / conv.toQty;
+      return null;
+    }
+
     function cleanInventoryItem(item) {
       return {
         id: item.id || '',
@@ -1332,7 +1381,8 @@
         limit1: item.limit1 || '',
         limit2: item.limit2 || '',
         loc: item.loc || '冷蔵庫',
-        memo: item.memo || ''
+        memo: item.memo || '',
+        unitConversion: serializeUnitConversion(item.unitConversion)
       };
     }
 
@@ -2167,6 +2217,24 @@
           }
           sheet.setFrozenRows(1);
         }
+        function ensureInventoryHeader(sheet) {
+          var headers = ['ID', '分類', '品名', '数量', '単位', '購入日', '開封日', '表示期限', '実質期限', '保存場所', '状態メモ', '単位換算JSON', '最終編集日時'];
+          var current = sheet.getRange(1, 1, 1, Math.max(headers.length, sheet.getLastColumn() || 1)).getValues()[0];
+          if(!current[0]) {
+            sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+          } else {
+            var hasConversion = current.indexOf('単位換算JSON') !== -1;
+            if(!hasConversion && current[11] === '最終編集日時') {
+              sheet.insertColumnBefore(12);
+              current = sheet.getRange(1, 1, 1, Math.max(headers.length, sheet.getLastColumn() || 1)).getValues()[0];
+            }
+            for(var hc=0; hc<headers.length; hc++) {
+              if(current[hc] !== headers[hc]) sheet.getRange(1, hc+1).setValue(headers[hc]);
+            }
+          }
+          sheet.setFrozenRows(1);
+        }
+        ensureInventoryHeader(sStock);
         ensureSheetColumns(sShop, ['リストID', '品名', '必要数量', '単位', 'ステータス', '紐づくレシピ名', '出自種別', '予定日', '食事区分', '最終編集日時']);
         function ensureRecipeHeader(sheet) {
           var headers = ['レシピID', 'レシピ名', '材料JSON', '手順JSON', '出典', '調理回数', '調理日履歴', '登録日時', '最終編集日時', '調味料JSON', '下ごしらえJSON'];
@@ -2195,7 +2263,7 @@
             if(!r[2]) continue;
             list.push({
               id: f(r[0]), type: f(r[1]), name: f(r[2]), qty: Number(r[3])||0, unit: f(r[4]),
-              buy: f(r[5]), open: f(r[6]), limit1: f(r[7]), limit2: f(r[8]), loc: f(r[9]), memo: f(r[10])
+              buy: f(r[5]), open: f(r[6]), limit1: f(r[7]), limit2: f(r[8]), loc: f(r[9]), memo: f(r[10]), unitConversion: f(r[11])
             });
           }
           return list;
@@ -2323,7 +2391,7 @@
             var iid = String(stockData[ui][0]);
             if(invUpdates[iid]) {
               var d = invUpdates[iid];
-              sStock.getRange(ui+1, 2, 1, 11).setValues([[d.type || '食材', d.name, d.qty, d.unit, d.buy || '', d.open || '', d.limit1 || '', d.limit2 || '', d.loc || '冷蔵庫', d.memo || '', now]]);
+              sStock.getRange(ui+1, 2, 1, 12).setValues([[d.type || '食材', d.name, d.qty, d.unit, d.buy || '', d.open || '', d.limit1 || '', d.limit2 || '', d.loc || '冷蔵庫', d.memo || '', d.unitConversion || '', now]]);
             }
           }
         }
@@ -2345,7 +2413,7 @@
         }
 
         (pending.inventoryCreates || []).forEach(function(d) {
-          sStock.appendRow([Utilities.getUuid(), d.type || '食材', d.name, d.qty, d.unit, d.buy || '', d.open || '', d.limit1 || '', d.limit2 || '', d.loc || '冷蔵庫', d.memo || '', now]);
+          sStock.appendRow([Utilities.getUuid(), d.type || '食材', d.name, d.qty, d.unit, d.buy || '', d.open || '', d.limit1 || '', d.limit2 || '', d.loc || '冷蔵庫', d.memo || '', d.unitConversion || '', now]);
         });
 
         (pending.recipeCreates || []).forEach(function(d) {
@@ -2372,14 +2440,14 @@
                   var addQty = Number(shopData[pi][2]) || 0;
                   sStock.getRange(sj+1, 4).setValue(currentQty + addQty);
                   sStock.getRange(sj+1, 6).setValue(today);
-                  sStock.getRange(sj+1, 12).setValue(now);
+                  sStock.getRange(sj+1, 13).setValue(now);
                   found = true;
                   break;
                 }
               }
             }
             if(!found) {
-              sStock.appendRow([Utilities.getUuid(), '食材', shopData[pi][1], shopData[pi][2], shopData[pi][3], today, '', '', '', '冷蔵庫', '買い物より移行', now]);
+              sStock.appendRow([Utilities.getUuid(), '食材', shopData[pi][1], shopData[pi][2], shopData[pi][3], today, '', '', '', '冷蔵庫', '買い物より移行', '', now]);
             }
           }
         });
@@ -2576,6 +2644,7 @@
         }
         var names = ['食材在庫','レシピ集','献立スケジュール','料理履歴','買い物リスト'];
         names.forEach(function(n){ if(!ss.getSheetByName(n)) ss.insertSheet(n); });
+        var now = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss');
         function ensureHeader(sheetName, header, firstCell) {
           var sheet = ss.getSheetByName(sheetName);
           var current = sheet.getRange(1, 1, 1, Math.max(header.length, sheet.getLastColumn() || 1)).getValues()[0];
@@ -2588,7 +2657,25 @@
           }
           sheet.setFrozenRows(1);
         }
-        ensureHeader('食材在庫', ['ID', '分類', '品名', '数量', '単位', '購入日', '開封日', '表示期限', '実質期限', '保存場所', '状態メモ', '最終編集日時'], 'ID');
+        function ensureInventoryHeader() {
+          var sheet = ss.getSheetByName('食材在庫');
+          var header = ['ID', '分類', '品名', '数量', '単位', '購入日', '開封日', '表示期限', '実質期限', '保存場所', '状態メモ', '単位換算JSON', '最終編集日時'];
+          var current = sheet.getRange(1, 1, 1, Math.max(header.length, sheet.getLastColumn() || 1)).getValues()[0];
+          if(!current[0] || current[0] !== 'ID') {
+            sheet.appendRow(header);
+          } else {
+            var hasConversion = current.indexOf('単位換算JSON') !== -1;
+            if(!hasConversion && current[11] === '最終編集日時') {
+              sheet.insertColumnBefore(12);
+              current = sheet.getRange(1, 1, 1, Math.max(header.length, sheet.getLastColumn() || 1)).getValues()[0];
+            }
+            for(var hc=0; hc<header.length; hc++) {
+              if(!current[hc] || current[hc] !== header[hc]) sheet.getRange(1, hc+1).setValue(header[hc]);
+            }
+          }
+          sheet.setFrozenRows(1);
+        }
+        ensureInventoryHeader();
         ensureHeader('レシピ集', ['レシピID', 'レシピ名', '材料JSON', '手順JSON', '出典', '調理回数', '調理日履歴', '登録日時', '最終編集日時'], 'レシピID');
         ensureHeader('献立スケジュール', ['ID', '予定日', '食事区分', 'レシピID', 'レシピ名', 'ステータス', '表示順', '最終編集日時'], 'ID');
         // 献立スケジュール: 旧6列構造→新8列構造への自動移行
@@ -2627,7 +2714,7 @@
             if(!r[2]) continue; // 品名がなければスキップ
             inventory.push({
               id: f(r[0]), type: f(r[1]), name: f(r[2]), qty: Number(r[3])||0, unit: f(r[4]),
-              buy: f(r[5]), open: f(r[6]), limit1: f(r[7]), limit2: f(r[8]), loc: f(r[9]), memo: f(r[10])
+              buy: f(r[5]), open: f(r[6]), limit1: f(r[7]), limit2: f(r[8]), loc: f(r[9]), memo: f(r[10]), unitConversion: f(r[11])
             });
           }
         }
@@ -2882,6 +2969,10 @@
           }
         }
         const delta = (item.unit === 'g' || item.unit === 'ml') ? 50 : 1;
+        const conv = normalizeUnitConversion(item.unitConversion);
+        const conversionBadge = conv
+          ? `<span class="text-[9px] font-medium px-1.5 py-0.5 bg-indigo-100 text-indigo-700 rounded-full">${formatQty(conv.fromQty)}${escapeHtml(conv.fromUnit)}=${formatQty(conv.toQty)}${escapeHtml(conv.toUnit)}</span>`
+          : '';
         container.insertAdjacentHTML('beforeend', `
           <div class="p-3 rounded-xl shadow-sm border ${rowClass} flex items-center gap-3 transition-colors">
             <input type="checkbox" class="inv-cb w-5 h-5 rounded border-slate-300 text-rose-500 focus:ring-rose-400 shrink-0" data-id="${item.id}" onchange="updateBulkActionSlot()">
@@ -2890,6 +2981,7 @@
                 <span class="font-bold text-slate-800 text-sm truncate">${item.name}</span>
                 ${badge}
                 ${syncBadge}
+                ${conversionBadge}
               </div>
               <div class="text-[10px] text-slate-400 font-bold">${item.loc} · 購入 ${item.buy || '—'}</div>
             </div>
@@ -4768,6 +4860,10 @@ ${plan ? '\n提案方針: ' + plan : ''}
       document.getElementById('modalTitle').textContent = mode === 'add' ? "食材をリストへ" : "項目の編集";
       document.getElementById('aiResultArea').classList.add('hidden');
       document.getElementById('btnSubmit').textContent = mode === 'add' ? "リストに追加" : "内容を更新する";
+      document.getElementById('f-conv-from-qty').value = '';
+      document.getElementById('f-conv-from-unit').value = '';
+      document.getElementById('f-conv-to-qty').value = '';
+      document.getElementById('f-conv-to-unit').value = '';
       m.classList.remove('hidden');
       setTimeout(() => m.classList.remove('opacity-0'), 10);
     }
@@ -4784,6 +4880,26 @@ ${plan ? '\n提案方針: ' + plan : ''}
       document.getElementById('f-date2').value = item.open || '';
       document.getElementById('f-limit2').value = item.limit2 || '';
       document.getElementById('f-memo').value = item.memo || '';
+      const conv = normalizeUnitConversion(item.unitConversion);
+      document.getElementById('f-conv-from-qty').value = conv ? conv.fromQty : '';
+      document.getElementById('f-conv-from-unit').value = conv ? conv.fromUnit : '';
+      document.getElementById('f-conv-to-qty').value = conv ? conv.toQty : '';
+      document.getElementById('f-conv-to-unit').value = conv ? conv.toUnit : '';
+    }
+
+    function getUnitConversionFromForm() {
+      const fromQtyRaw = document.getElementById('f-conv-from-qty').value;
+      const fromUnit = document.getElementById('f-conv-from-unit').value.trim();
+      const toQtyRaw = document.getElementById('f-conv-to-qty').value;
+      const toUnit = document.getElementById('f-conv-to-unit').value.trim();
+      const hasAny = fromQtyRaw || fromUnit || toQtyRaw || toUnit;
+      if (!hasAny) return { value: '' };
+      const fromQty = Number(fromQtyRaw);
+      const toQty = Number(toQtyRaw);
+      if (!fromQty || !toQty || fromQty <= 0 || toQty <= 0 || !fromUnit || !toUnit) {
+        return { error: '単位換算は「1 パック = 150 g」のように数量と単位をすべて入力してください。' };
+      }
+      return { value: { fromQty, fromUnit, toQty, toUnit } };
     }
 
     function openStagingEditor(idx) {
@@ -5285,6 +5401,11 @@ ${text}`;
           return;
         }
       }
+      const conversionResult = getUnitConversionFromForm();
+      if (conversionResult.error) {
+        showToast(conversionResult.error, 'error');
+        return;
+      }
       const item = {
         name: document.getElementById('f-name').value,
         type: document.getElementById('f-type').value,
@@ -5295,7 +5416,8 @@ ${text}`;
         open: document.getElementById('f-date2').value,
         limit1: document.getElementById('f-limit1').value,
         limit2: document.getElementById('f-limit2').value || null,
-        memo: document.getElementById('f-memo').value
+        memo: document.getElementById('f-memo').value,
+        unitConversion: conversionResult.value
       };
 
       if (state.editMode === 'edit-inventory' && state.editId) {
@@ -5404,6 +5526,7 @@ ${text}`;
             limit2: '',
             loc: '冷蔵庫',
             memo: '買い物より移行',
+            unitConversion: '',
             _syncStatus: 'created'
           };
           state.inventory.push(created);
@@ -6399,6 +6522,58 @@ ${text}`;
     let _substitutionSortBy = 'limit2';
     let _substitutionSortOrder = 'asc';
 
+    function getConsumptionTargetName(ing) {
+      return ing && ing.substitute ? ing.substitute.name : (ing && ing.name) || '';
+    }
+
+    function getConsumptionTargetItems(ing, recipeUnit) {
+      const targetName = getConsumptionTargetName(ing);
+      const substituteId = ing && ing.substitute ? ing.substitute.id : '';
+      const items = state.inventory.filter(item => item.name === targetName && Number(item.qty) > 0);
+      return items.sort((a, b) => {
+        const aSelected = substituteId && a.id === substituteId ? 1 : 0;
+        const bSelected = substituteId && b.id === substituteId ? 1 : 0;
+        if (aSelected !== bSelected) return bSelected - aSelected;
+        const aSame = a.unit === recipeUnit ? 1 : 0;
+        const bSame = b.unit === recipeUnit ? 1 : 0;
+        if (aSame !== bSame) return bSame - aSame;
+        const aConvertible = convertUnitAmount(1, recipeUnit, a.unit, a) !== null ? 1 : 0;
+        const bConvertible = convertUnitAmount(1, recipeUnit, b.unit, b) !== null ? 1 : 0;
+        if (aConvertible !== bConvertible) return bConvertible - aConvertible;
+        return (a.limit2 || a.limit1 || '9999').localeCompare(b.limit2 || b.limit1 || '9999');
+      });
+    }
+
+    function analyzeConsumptionLine(ing, recipeConsumed, manualConsumed) {
+      const recipeUnit = ing.unit || '';
+      const targetItems = getConsumptionTargetItems(ing, recipeUnit);
+      const autoTargets = targetItems.filter(item => convertUnitAmount(1, recipeUnit, item.unit, item) !== null);
+      const manualTarget = autoTargets.length ? null : targetItems[0] || null;
+      const autoAvailable = autoTargets.reduce((sum, item) => {
+        const converted = convertUnitAmount(Number(item.qty) || 0, item.unit, recipeUnit, item);
+        return converted === null ? sum : sum + converted;
+      }, 0);
+      const displayTarget = autoTargets[0] || manualTarget;
+      const displayUnit = displayTarget ? displayTarget.unit || '' : recipeUnit;
+      const displayConsumption = displayTarget
+        ? convertUnitAmount(recipeConsumed, recipeUnit, displayUnit, displayTarget)
+        : null;
+      const manualAvailable = manualTarget ? Number(manualTarget.qty) || 0 : 0;
+      return {
+        recipeUnit,
+        targetItems,
+        autoTargets,
+        manualTarget,
+        autoAvailable,
+        manualAvailable,
+        displayUnit,
+        displayConsumption,
+        manualConsumed: Number(manualConsumed) || 0,
+        needsManual: recipeConsumed > 0 && targetItems.length > 0 && autoTargets.length === 0 && recipeUnit !== displayUnit,
+        hasStock: targetItems.length > 0
+      };
+    }
+
     function openConsumptionAdjustmentModal(recipeId) {
       const recipe = state.recipes.find(r => r.id === recipeId);
       if (!recipe) {
@@ -6458,9 +6633,14 @@ ${text}`;
 
       // 既存の入力値を保存して復元するためのマップ
       const existingValues = {};
+      const existingManualValues = {};
       document.querySelectorAll('.cons-qty').forEach(input => {
         const idx = input.closest('[data-idx]')?.dataset.idx;
         if (idx !== undefined) existingValues[idx] = input.value;
+      });
+      document.querySelectorAll('.cons-manual-qty').forEach(input => {
+        const idx = input.closest('[data-idx]')?.dataset.idx;
+        if (idx !== undefined) existingManualValues[idx] = input.value;
       });
 
       const filtered = _consumptionIngredients.filter((ing, idx) => {
@@ -6481,11 +6661,19 @@ ${text}`;
         const idx = _consumptionIngredients.indexOf(ing);
         const amount = parseFloat(ing.amount) || 0;
         const unit = ing.unit || '';
-        const targetName = ing.substitute ? ing.substitute.name : ing.name;
-        const stockQty = state.inventory
-          .filter(i => i.name === targetName && i.unit === unit && Number(i.qty) > 0)
-          .reduce((sum, item) => sum + (Number(item.qty) || 0), 0);
-        const isShortage = amount > 0 && stockQty < amount;
+        const targetName = getConsumptionTargetName(ing);
+        const savedValue = existingValues[idx] !== undefined ? existingValues[idx] : (amount > 0 ? amount : '');
+        const savedManualValue = existingManualValues[idx] !== undefined ? existingManualValues[idx] : '';
+        const analysis = analyzeConsumptionLine(ing, parseFloat(savedValue) || 0, parseFloat(savedManualValue) || 0);
+        const stockQty = analysis.needsManual
+          ? analysis.manualAvailable
+          : analysis.autoAvailable;
+        const displayStockQty = analysis.displayUnit !== unit && analysis.autoTargets[0]
+          ? analysis.autoTargets.filter(item => item.unit === analysis.displayUnit).reduce((sum, item) => sum + (Number(item.qty) || 0), 0)
+          : stockQty;
+        const isShortage = analysis.needsManual
+          ? analysis.manualConsumed > 0 && stockQty < analysis.manualConsumed
+          : amount > 0 && stockQty < (parseFloat(savedValue) || 0);
         const stockClass = isShortage ? 'text-rose-500' : 'text-emerald-600';
         const rowClass = isShortage ? 'bg-rose-50 border-rose-200' : 'bg-slate-50 border-transparent';
         const shortageBadge = isShortage ? '<span class="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-rose-100 text-rose-700">不足</span>' : '';
@@ -6493,31 +6681,103 @@ ${text}`;
           ? '<span class="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700">調味料</span>'
           : '<span class="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-green-100 text-green-700">材料</span>';
 
-        let nameHtml = `<p class="font-bold text-slate-800 text-sm">${escapeHtml(ing.name || '')}</p>`;
-        let subHtml = '';
-        if (ing.substitute) {
-          nameHtml = `<p class="font-bold text-slate-800 text-sm">${escapeHtml(ing.substitute.name)}</p>`;
-          subHtml = `<p class="text-[10px] text-slate-400 font-bold">元: ${escapeHtml(ing.name)} <button type="button" onclick="clearSubstitution(${idx})" class="text-indigo-600 hover:text-indigo-800 ml-1">元に戻す</button></p>`;
+        let conversionHtml = '';
+        let manualHtml = '';
+        const stockUnit = analysis.displayUnit || unit;
+        if (analysis.needsManual) {
+          conversionHtml = `<p class="text-[10px] text-amber-600 font-bold">単位が違うため、今回減らす在庫量を入力してください。</p>`;
+          manualHtml = `
+            <div class="mt-2 flex items-center gap-2">
+              <span class="text-[10px] text-slate-400 font-bold shrink-0">今回消費</span>
+              <input type="number" min="0" step="0.1" value="${savedManualValue}" placeholder="0" data-idx="${idx}" data-manual-unit="${escapeHtml(stockUnit)}" class="cons-manual-qty w-20 bg-white border border-amber-100 rounded-xl px-3 py-2 text-sm font-bold text-right outline-none focus:border-amber-500">
+              <span class="text-xs font-bold text-slate-500">${escapeHtml(stockUnit)}</span>
+            </div>
+          `;
+        } else if (analysis.displayConsumption !== null && stockUnit !== unit) {
+          conversionHtml = `<p class="text-[10px] text-indigo-600 font-bold">レシピ: ${formatQty(parseFloat(savedValue) || 0)}${escapeHtml(unit)} → 在庫消費: ${formatQty(analysis.displayConsumption)}${escapeHtml(stockUnit)}</p>`;
+        } else if (!analysis.hasStock) {
+          conversionHtml = `<p class="text-[10px] text-rose-500 font-bold">在庫に同名の食材がありません。</p>`;
         }
 
-        const savedValue = existingValues[idx] !== undefined ? existingValues[idx] : (amount > 0 ? amount : '');
+        const recipeQtyText = `${formatQty(parseFloat(savedValue) || amount || 0)}${escapeHtml(unit)}`;
+        const substituteQtyValue = analysis.needsManual
+          ? (savedManualValue ? formatQty(savedManualValue) : '入力待ち')
+          : (analysis.displayConsumption !== null ? formatQty(analysis.displayConsumption) : formatQty(parseFloat(savedValue) || 0));
+        const substituteQtyText = `${substituteQtyValue}${escapeHtml(stockUnit)}`;
+        const inputControlsHtml = `
+          <div class="flex items-center gap-2 shrink-0">
+            <button type="button" onclick="openSubstitutionModal(${idx})" class="text-[10px] font-medium text-indigo-600 bg-indigo-50 px-2 py-1 rounded-lg hover:bg-indigo-100 active:scale-95 transition-all whitespace-nowrap">代替</button>
+            <input type="number" min="0" step="0.1" value="${savedValue}" placeholder="0" data-ing-name="${escapeHtml(ing.name || '')}" data-ing-unit="${escapeHtml(unit)}" data-ing-amount="${amount}" data-idx="${idx}" class="cons-qty w-20 bg-white border border-slate-100 rounded-xl px-3 py-2 text-sm font-bold text-right outline-none focus:border-indigo-500">
+            <span class="text-xs font-bold text-slate-500 w-10 break-words">${escapeHtml(unit)}</span>
+          </div>
+        `;
+        const normalBodyHtml = `
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 mb-0.5 flex-wrap">
+              <p class="font-bold text-slate-800 text-sm">${escapeHtml(ing.name || '')}</p>
+              ${labelBadge}
+              ${shortageBadge}
+            </div>
+            <p class="text-[10px] text-slate-400 font-bold">規定量: ${amount > 0 ? amount : '—'}${escapeHtml(unit)} / <span class="${stockClass}">在庫: ${formatQty(displayStockQty)}${escapeHtml(stockUnit)}</span></p>
+            ${conversionHtml}
+            ${manualHtml}
+          </div>
+          ${inputControlsHtml}
+        `;
+        const substituteControlHtml = analysis.needsManual ? `
+          <div class="flex items-center justify-center gap-2">
+            <button type="button" onclick="openSubstitutionModal(${idx})" class="text-[10px] font-medium text-indigo-600 bg-indigo-50 px-2 py-1 rounded-lg hover:bg-indigo-100 active:scale-95 transition-all whitespace-nowrap">代替</button>
+            <input type="number" min="0" step="0.1" value="${savedValue}" data-ing-name="${escapeHtml(ing.name || '')}" data-ing-unit="${escapeHtml(unit)}" data-ing-amount="${amount}" data-idx="${idx}" class="cons-qty hidden">
+            <input type="number" min="0" step="0.1" value="${savedManualValue}" placeholder="0" data-idx="${idx}" data-manual-unit="${escapeHtml(stockUnit)}" class="cons-manual-qty w-24 bg-white border border-indigo-200 rounded-xl px-3 py-2 text-sm font-bold text-right outline-none focus:border-indigo-500">
+            <span class="text-xs font-bold text-slate-500 break-words">${escapeHtml(stockUnit)}</span>
+          </div>
+        ` : `
+          <div class="flex items-center justify-center gap-2">
+            <button type="button" onclick="openSubstitutionModal(${idx})" class="text-[10px] font-medium text-indigo-600 bg-indigo-50 px-2 py-1 rounded-lg hover:bg-indigo-100 active:scale-95 transition-all whitespace-nowrap">代替</button>
+            <input type="number" min="0" step="0.1" value="${savedValue}" placeholder="0" data-ing-name="${escapeHtml(ing.name || '')}" data-ing-unit="${escapeHtml(unit)}" data-ing-amount="${amount}" data-idx="${idx}" class="cons-qty w-24 bg-white border border-indigo-200 rounded-xl px-3 py-2 text-sm font-bold text-right outline-none focus:border-indigo-500">
+            <span class="text-xs font-bold text-slate-500 break-words">${escapeHtml(unit)}</span>
+          </div>
+        `;
+        const substituteBodyHtml = `
+          <div class="w-full min-w-0 space-y-3">
+            <div class="flex items-center gap-2 flex-wrap">
+              ${labelBadge}
+              ${shortageBadge}
+              <span class="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700">代替中</span>
+              <button type="button" onclick="clearSubstitution(${idx})" class="text-[10px] font-bold text-indigo-600 hover:text-indigo-800">元に戻す</button>
+            </div>
+            <div class="rounded-xl border border-slate-100 bg-white p-3 space-y-2">
+              <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0">
+                  <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">元の材料</p>
+                  <p class="font-bold text-slate-800 text-sm break-words">${escapeHtml(ing.name || '')}</p>
+                </div>
+                <p class="text-sm font-bold text-slate-700 shrink-0 text-right">${recipeQtyText}</p>
+              </div>
+              <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-2 text-indigo-400">
+                <div class="h-px bg-indigo-100"></div>
+                <div class="flex items-center gap-3">
+                  <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 5v14m0 0 6-6m-6 6-6-6"/></svg>
+                  ${substituteControlHtml}
+                </div>
+                <div class="h-px bg-indigo-100"></div>
+              </div>
+              <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0">
+                  <p class="text-[10px] font-bold text-indigo-500 uppercase tracking-widest">代替品</p>
+                  <p class="font-bold text-slate-800 text-base break-words">${escapeHtml(ing.substitute ? ing.substitute.name : targetName)}</p>
+                </div>
+                <p class="text-base font-bold text-indigo-700 shrink-0 text-right">${substituteQtyText}</p>
+              </div>
+            </div>
+            <p class="text-[10px] text-slate-400 font-bold">在庫: <span class="${stockClass}">${formatQty(displayStockQty)}${escapeHtml(stockUnit)}</span></p>
+            ${conversionHtml}
+          </div>
+        `;
 
         container.insertAdjacentHTML('beforeend', `
-          <div class="${rowClass} rounded-xl p-4 flex items-center gap-3 border" data-idx="${idx}">
-            <div class="flex-1 min-w-0">
-              <div class="flex items-center gap-2 mb-0.5 flex-wrap">
-                ${nameHtml}
-                ${labelBadge}
-                ${shortageBadge}
-              </div>
-              ${subHtml}
-              <p class="text-[10px] text-slate-400 font-bold">規定量: ${amount > 0 ? amount : '—'}${escapeHtml(unit)} / <span class="${stockClass}">在庫: ${stockQty}${escapeHtml(unit)}</span></p>
-            </div>
-            <div class="flex items-center gap-2 shrink-0">
-              <button type="button" onclick="openSubstitutionModal(${idx})" class="text-[10px] font-medium text-indigo-600 bg-indigo-50 px-2 py-1 rounded-lg hover:bg-indigo-100 active:scale-95 transition-all whitespace-nowrap">代替</button>
-              <input type="number" min="0" step="0.1" value="${savedValue}" placeholder="0" data-ing-name="${escapeHtml(ing.name || '')}" data-ing-unit="${escapeHtml(unit)}" data-ing-amount="${amount}" data-idx="${idx}" class="cons-qty w-20 bg-white border border-slate-100 rounded-xl px-3 py-2 text-sm font-bold text-right outline-none focus:border-indigo-500">
-              <span class="text-xs font-bold text-slate-500 w-10">${escapeHtml(unit)}</span>
-            </div>
+          <div class="${rowClass} rounded-xl p-4 flex ${ing.substitute ? 'flex-col' : 'items-center'} gap-3 border" data-idx="${idx}">
+            ${ing.substitute ? substituteBodyHtml : normalBodyHtml}
           </div>
         `);
       });
@@ -6542,14 +6802,16 @@ ${text}`;
         const idx = parseInt(input.dataset.idx);
         const ing = _consumptionIngredients[idx];
         if (!ing) return;
-        const targetName = ing.substitute ? ing.substitute.name : ing.name;
-        const unit = input.dataset.ingUnit;
+        const targetName = getConsumptionTargetName(ing);
         const consumed = parseFloat(input.value) || 0;
         if (consumed <= 0) return;
-        const stockQty = state.inventory
-          .filter(i => i.name === targetName && i.unit === unit && Number(i.qty) > 0)
-          .reduce((sum, item) => sum + (Number(item.qty) || 0), 0);
-        if (stockQty < consumed) {
+        const manualInput = document.querySelector(`.cons-manual-qty[data-idx="${idx}"]`);
+        const manualConsumed = manualInput ? (parseFloat(manualInput.value) || 0) : 0;
+        const analysis = analyzeConsumptionLine(ing, consumed, manualConsumed);
+        const shortage = analysis.needsManual
+          ? manualConsumed > 0 && analysis.manualAvailable < manualConsumed
+          : analysis.autoAvailable < consumed;
+        if (shortage) {
           hasShortage = true;
           if (!shortageNames.includes(targetName)) shortageNames.push(targetName);
         }
@@ -6573,32 +6835,51 @@ ${text}`;
         const idx = parseInt(input.dataset.idx);
         const ing = _consumptionIngredients[idx];
         if (!ing) return;
-        const targetName = ing.substitute ? ing.substitute.name : ing.name;
-        const unit = input.dataset.ingUnit;
-        const consumed = parseFloat(input.value) || 0;
-        if (consumed > 0) {
-          consumedMap.push({ name: targetName, unit, consumed, originalName: ing.name });
+        const name = getConsumptionTargetName(ing);
+        const recipeUnit = input.dataset.ingUnit;
+        const recipeConsumed = parseFloat(input.value) || 0;
+        const manualInput = document.querySelector(`.cons-manual-qty[data-idx="${idx}"]`);
+        const manualConsumed = manualInput ? (parseFloat(manualInput.value) || 0) : 0;
+        const analysis = analyzeConsumptionLine(ing, recipeConsumed, manualConsumed);
+        if (analysis.needsManual) {
+          if (manualConsumed > 0 && analysis.manualTarget) {
+            consumedMap.push({ mode: 'manual', name, unit: analysis.manualTarget.unit || '', consumed: manualConsumed, originalName: ing.name, targetItems: analysis.targetItems.filter(item => item.unit === analysis.manualTarget.unit) });
+          }
+        } else if (recipeConsumed > 0) {
+          consumedMap.push({ mode: 'auto', name, unit: recipeUnit, consumed: recipeConsumed, originalName: ing.name, targetItems: analysis.autoTargets });
         }
       });
 
       const results = [];
       let updatedCount = 0;
       let deletedCount = 0;
-      consumedMap.forEach(({ name, unit, consumed, originalName }) => {
-        const stockQty = state.inventory
-          .filter(i => i.name === name && i.unit === unit && Number(i.qty) > 0)
-          .reduce((sum, item) => sum + (Number(item.qty) || 0), 0);
+      consumedMap.forEach(({ mode, name, unit, consumed, originalName, targetItems }) => {
+        const usableTargets = (targetItems || []).filter(item => Number(item.qty) > 0);
+        const stockQty = mode === 'manual'
+          ? usableTargets.reduce((sum, item) => sum + (Number(item.qty) || 0), 0)
+          : usableTargets.reduce((sum, item) => {
+              const converted = convertUnitAmount(Number(item.qty) || 0, item.unit, unit, item);
+              return converted === null ? sum : sum + converted;
+            }, 0);
         const isShortage = stockQty < consumed;
         let actualConsumed = 0;
         let remaining = consumed;
-        const targets = state.inventory.filter(i => i.name === name && i.unit === unit && Number(i.qty) > 0);
-        for (const item of targets) {
+        const resultUnits = {};
+        for (const item of usableTargets) {
           if (remaining <= 0) break;
           const currentQty = Number(item.qty) || 0;
-          const deduct = Math.min(currentQty, remaining);
+          const neededInItemUnit = mode === 'manual'
+            ? remaining
+            : convertUnitAmount(remaining, unit, item.unit, item);
+          if (neededInItemUnit === null) continue;
+          const deduct = Math.min(currentQty, neededInItemUnit);
           const newQty = currentQty - deduct;
-          actualConsumed += deduct;
-          remaining -= deduct;
+          const actualInRecipeUnit = mode === 'manual'
+            ? deduct
+            : convertUnitAmount(deduct, item.unit, unit, item);
+          actualConsumed += actualInRecipeUnit === null ? 0 : actualInRecipeUnit;
+          remaining -= actualInRecipeUnit === null ? 0 : actualInRecipeUnit;
+          resultUnits[item.unit || ''] = (resultUnits[item.unit || ''] || 0) + deduct;
           if (newQty <= 0) {
             queueInventoryDelete(item.id);
             deletedCount++;
@@ -6609,10 +6890,13 @@ ${text}`;
           }
         }
         const displayName = originalName !== name ? `${originalName}→${name}` : name;
+        const consumedText = Object.keys(resultUnits).length
+          ? Object.keys(resultUnits).map(u => `${formatQty(resultUnits[u])}${u}`).join(' + ')
+          : `${formatQty(actualConsumed)}${unit}`;
         if (isShortage) {
-          results.push(`${displayName} は在庫不足（${stockQty}${unit}しかない）のため、全在庫を消費しました`);
+          results.push(`${displayName} は在庫不足（${formatQty(stockQty)}${unit}しかない）のため、全在庫を消費しました`);
         } else {
-          results.push(`${displayName} を ${actualConsumed}${unit} 消費しました`);
+          results.push(`${displayName} を ${consumedText} 消費しました`);
         }
       });
 
@@ -6766,7 +7050,7 @@ ${text}`;
     }
 
     document.getElementById('consumptionModal').addEventListener('input', (e) => {
-      if (e.target.classList.contains('cons-qty')) {
+      if (e.target.classList.contains('cons-qty') || e.target.classList.contains('cons-manual-qty')) {
         validateConsumptionInputs();
       }
     });

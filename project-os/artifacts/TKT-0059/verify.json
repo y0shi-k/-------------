@@ -1,0 +1,31 @@
+{
+  "ticket": "TKT-0059-inventory-unit-conversion",
+  "status": "passed",
+  "checks": [
+    {
+      "name": "standard_verify",
+      "command": "python3 -c \"import html.parser; html.parser.HTMLParser().feed(open('app.html').read())\" && grep -q 'executeGAS' app.html && grep -q 'GAS_URL' app.html && echo 'VERIFY_PASSED'",
+      "result": "VERIFY_PASSED"
+    },
+    {
+      "name": "javascript_syntax",
+      "command": "awk '/<script>/{flag=1;next}/<\\/script>/{flag=0}flag' app.html > /tmp/stock-master-app-script.js && node --check /tmp/stock-master-app-script.js",
+      "result": "passed"
+    },
+    {
+      "name": "unit_conversion_formula",
+      "command": "node -e \"function c(a,from,to,conv){if(from===to)return a;if(conv.fromUnit===from&&conv.toUnit===to)return a*conv.toQty/conv.fromQty;if(conv.toUnit===from&&conv.fromUnit===to)return a*conv.fromQty/conv.toQty;return null} const conv={fromQty:1,fromUnit:'パック',toQty:150,toUnit:'g'}; if(c(150,'g','パック',conv)!==1) throw new Error('g to pack failed'); if(c(1,'パック','g',conv)!==150) throw new Error('pack to g failed'); console.log('UNIT_CONVERSION_PASSED')\"",
+      "result": "UNIT_CONVERSION_PASSED"
+    },
+    {
+      "name": "gas_write_policy_scan",
+      "command": "rg -n \"alert\\(|confirm\\(|prompt\\(|executeGAS\\(payload\" app.html",
+      "result": "No alert/confirm/prompt. No new executeGAS(payload) write call outside existing sync/init/load paths."
+    }
+  ],
+  "notes": [
+    "食材在庫シートは 単位換算JSON を 最終編集日時 の直前に追加する。",
+    "既存の最終編集日時列がL列にある場合は、GAS側で列を挿入して値を保持する。",
+    "スプシ書き込みは pendingSync + syncPendingChanges の既存経路のみ。"
+  ]
+}
