@@ -1,0 +1,26 @@
+{
+  "ticket": "TKT-0037-ai-selected-ingredient-required-toggle",
+  "status": "passed",
+  "checks": [
+    {
+      "name": "project_verify",
+      "command": "python3 -c \"import html.parser; html.parser.HTMLParser().feed(open('app.html').read())\" && grep -q 'executeGAS' app.html && grep -q 'GAS_URL' app.html && echo 'VERIFY_PASSED'",
+      "result": "VERIFY_PASSED"
+    },
+    {
+      "name": "diff_check",
+      "command": "git diff --check",
+      "result": "passed"
+    },
+    {
+      "name": "legacy_selection_state_removed",
+      "command": "rg -n \"aiIngredientSelectedIds\" app.html",
+      "result": "no matches"
+    },
+    {
+      "name": "required_optional_prompt_static",
+      "command": "rg -n \"_aiRequired|必須材料は指定せず|使える場合のみ|toggleAiIngredientRequired\" app.html",
+      "result": "required/optional state, prompt text, and badge toggle are present"
+    }
+  ]
+}

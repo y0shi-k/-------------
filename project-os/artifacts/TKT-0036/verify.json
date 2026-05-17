@@ -1,0 +1,31 @@
+{
+  "ticket": "TKT-0036-ai-json-response-hardening",
+  "status": "passed",
+  "checks": [
+    {
+      "name": "html_parser",
+      "command": "python3 -c \"import html.parser; html.parser.HTMLParser().feed(open('app.html').read())\"",
+      "result": "passed"
+    },
+    {
+      "name": "source_markers",
+      "command": "grep -q 'executeGAS' app.html && grep -q 'GAS_URL' app.html",
+      "result": "passed"
+    },
+    {
+      "name": "project_verify",
+      "command": "python3 -c \"import html.parser; html.parser.HTMLParser().feed(open('app.html').read())\" && grep -q 'executeGAS' app.html && grep -q 'GAS_URL' app.html && echo 'VERIFY_PASSED'",
+      "result": "VERIFY_PASSED"
+    },
+    {
+      "name": "ai_json_parser_static_scan",
+      "command": "rg -n \"JSON\\\\.parse\\\\((raw|text|data\\\\.candidates|data\\\\.candidates\\\\[0\\\\])|parseAIJsonResponse|extractFirstJsonBlock\" app.html",
+      "result": "direct AI response parsing replaced by parseAIJsonResponse; remaining JSON.parse(raw) is inside the shared parser"
+    },
+    {
+      "name": "ai_json_parser_samples",
+      "command": "node -e '<sample parser cases>'",
+      "result": "passed for trailing text, markdown json fence, and braces inside JSON string"
+    }
+  ]
+}

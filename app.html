@@ -607,6 +607,7 @@
           <span class="text-[11px] font-medium text-slate-400 uppercase">選択済み</span>
           <button onclick="clearAiIngredientSelection()" class="text-[11px] font-bold text-rose-500 hover:text-rose-700">すべて解除</button>
         </div>
+        <p class="text-[10px] text-slate-400 font-bold mb-2 ml-1">バッジをクリックで必須/任意を切替</p>
         <div id="aiSelectedTags" class="flex flex-wrap gap-2">
           <!-- JSで動的に挿入 -->
         </div>
@@ -837,6 +838,61 @@
     };
 
     /* --- Core --- */
+    function parseAIJsonResponse(text, context = 'AI') {
+      const raw = String(text || '').trim();
+      if (!raw) throw new Error(`${context}の応答が空です。`);
+      try {
+        return JSON.parse(raw);
+      } catch (directErr) {
+        const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+        if (fenced) {
+          try {
+            return JSON.parse(fenced[1].trim());
+          } catch (fencedErr) {}
+        }
+        const jsonText = extractFirstJsonBlock(raw);
+        if (jsonText) {
+          try {
+            return JSON.parse(jsonText);
+          } catch (extractedErr) {}
+        }
+        console.error(`[${context}] JSON parse error:`, directErr, 'Raw text:', raw);
+        throw new Error(`${context}のJSON解析に失敗しました。`);
+      }
+    }
+
+    function extractFirstJsonBlock(text) {
+      const source = String(text || '');
+      const start = source.search(/[\[{]/);
+      if (start === -1) return '';
+      const stack = [];
+      let inString = false;
+      let escaped = false;
+      for (let i = start; i < source.length; i++) {
+        const ch = source[i];
+        if (inString) {
+          if (escaped) {
+            escaped = false;
+          } else if (ch === '\\') {
+            escaped = true;
+          } else if (ch === '"') {
+            inString = false;
+          }
+          continue;
+        }
+        if (ch === '"') {
+          inString = true;
+        } else if (ch === '{' || ch === '[') {
+          stack.push(ch);
+        } else if (ch === '}' || ch === ']') {
+          const open = stack.pop();
+          if ((ch === '}' && open !== '{') || (ch === ']' && open !== '[')) return '';
+          if (stack.length === 0) return source.slice(start, i + 1);
+        }
+      }
+      return '';
+    }
+
     function setStatus(show, label = 'Processing...') {
       const bar = document.getElementById('statusBar');
       const overlay = document.getElementById('processingOverlay');
@@ -3093,7 +3149,7 @@
 
     let aiIngredientSort = 'limit2';
     let aiIngredientSortOrder = 'asc';
-    let aiIngredientSelectedIds = new Set();
+    let aiIngredientSelection = new Map();
 
     function openAiIngredientSelector() {
       document.getElementById('syncBar').classList.add('sync-bar-hidden');
@@ -3116,7 +3172,7 @@
       document.getElementById('aiIngredientSearch').value = '';
       document.getElementById('aiIngredientTypeFilter').value = 'すべて';
       // 選択状態リセット
-      aiIngredientSelectedIds = new Set();
+      aiIngredientSelection = new Map();
       renderAiSelectedTags();
       renderAiIngredientList();
     }
@@ -3127,7 +3183,7 @@
       setTimeout(() => m.classList.add('hidden'), 300);
       updateSyncBar();
       // 選択状態をクリア（次回開くときにリセット）
-      aiIngredientSelectedIds = new Set();
+      aiIngredientSelection = new Map();
     }
 
     function setAiSort(key) {
@@ -3166,8 +3222,8 @@
         return;
       }
       const sorted = [...filtered].sort((a, b) => {
-        const aSel = aiIngredientSelectedIds.has(a.id) ? 1 : 0;
-        const bSel = aiIngredientSelectedIds.has(b.id) ? 1 : 0;
+        const aSel = aiIngredientSelection.has(a.id) ? 1 : 0;
+        const bSel = aiIngredientSelection.has(b.id) ? 1 : 0;
         if (aSel !== bSel) return bSel - aSel; // 選択済みを常に先頭に
         let cmp = 0;
         if (aiIngredientSort === 'name') cmp = a.name.localeCompare(b.name, 'ja');
@@ -3198,7 +3254,7 @@
           else if (diff <= 3) { rowClass = 'border-amber-200 bg-amber-50'; limitText += ' (あと' + diff + '日)'; }
         }
         const typeLabel = item.type ? ` · ${escapeHtml(item.type)}` : '';
-        const isSelected = aiIngredientSelectedIds.has(item.id);
+        const isSelected = aiIngredientSelection.has(item.id);
         const selectedClass = isSelected ? 'bg-indigo-50 border-indigo-200 ring-1 ring-indigo-100' : 'bg-white';
         container.insertAdjacentHTML('beforeend', `
           <div class="${selectedClass} p-3 rounded-xl shadow-sm border ${rowClass} flex items-center gap-3 cursor-pointer" onclick="toggleAiIngredientSelection('${item.id}')">
@@ -3213,12 +3269,20 @@
     }
 
     function toggleAiIngredientSelection(id) {
-      if (aiIngredientSelectedIds.has(id)) {
-        aiIngredientSelectedIds.delete(id);
+      if (aiIngredientSelection.has(id)) {
+        aiIngredientSelection.delete(id);
       } else {
-        aiIngredientSelectedIds.add(id);
+        aiIngredientSelection.set(id, { required: true });
       }
       renderAiIngredientList();
+      renderAiSelectedTags();
+    }
+
+    function toggleAiIngredientRequired(id) {
+      const selection = aiIngredientSelection.get(id);
+      if (!selection) return;
+      selection.required = !selection.required;
+      aiIngredientSelection.set(id, selection);
       renderAiSelectedTags();
     }
 
@@ -3227,53 +3291,93 @@
       const container = document.getElementById('aiSelectedTags');
       const btn = document.getElementById('aiGenerateBtn');
       if (!area || !container || !btn) return;
-      const count = aiIngredientSelectedIds.size;
+      const count = aiIngredientSelection.size;
       if (count === 0) {
         area.classList.add('hidden');
         btn.textContent = 'レシピを考案';
+        container.innerHTML = '';
         return;
       }
       area.classList.remove('hidden');
       btn.textContent = `レシピを考案 (${count})`;
       container.innerHTML = '';
-      aiIngredientSelectedIds.forEach(id => {
+      aiIngredientSelection.forEach((selection, id) => {
         const item = state.inventory.find(i => i.id === id);
         if (!item) return;
+        const required = selection.required !== false;
+        const tagClass = required
+          ? 'bg-indigo-50 border-indigo-100 text-indigo-700'
+          : 'bg-slate-100 border-slate-200 text-slate-600';
+        const labelClass = required ? 'bg-indigo-100 text-indigo-700' : 'bg-white text-slate-500';
+        const removeClass = required ? 'hover:bg-indigo-200 text-indigo-500' : 'hover:bg-slate-200 text-slate-500';
         container.insertAdjacentHTML('beforeend', `
-          <span class="inline-flex items-center gap-1 bg-indigo-50 border border-indigo-100 text-indigo-700 text-xs font-bold px-2.5 py-1.5 rounded-full">
+          <span onclick="toggleAiIngredientRequired('${item.id}')" class="inline-flex items-center gap-1 ${tagClass} border text-xs font-bold px-2.5 py-1.5 rounded-full cursor-pointer select-none transition-colors" title="クリックで必須/任意を切替">
             ${escapeHtml(item.name)}
-            <button onclick="event.stopPropagation(); toggleAiIngredientSelection('${item.id}')" class="w-4 h-4 flex items-center justify-center rounded-full hover:bg-indigo-200 text-indigo-500 transition-colors">×</button>
+            <span class="${labelClass} text-[10px] px-1.5 py-0.5 rounded-full">${required ? '必須' : '任意'}</span>
+            <button onclick="event.stopPropagation(); toggleAiIngredientSelection('${item.id}')" class="w-4 h-4 flex items-center justify-center rounded-full ${removeClass} transition-colors">×</button>
           </span>
         `);
       });
     }
 
     function clearAiIngredientSelection() {
-      aiIngredientSelectedIds = new Set();
+      aiIngredientSelection = new Map();
       // 全チェックボックスを更新
       document.querySelectorAll('.ai-ing-cb').forEach(cb => { cb.checked = false; });
       renderAiSelectedTags();
+      renderAiIngredientList();
     }
 
     async function generateSelectedRecipe() {
-      if (aiIngredientSelectedIds.size === 0) {
+      if (aiIngredientSelection.size === 0) {
         showToast('食材を1つ以上選択してください。', 'error');
         return;
       }
-      const selectedIds = Array.from(aiIngredientSelectedIds);
-      const items = state.inventory.filter(i => selectedIds.indexOf(i.id) !== -1);
+      const items = Array.from(aiIngredientSelection.entries()).map(([id, selection]) => {
+        const item = state.inventory.find(i => i.id === id);
+        return item ? { ...item, _aiRequired: selection.required !== false } : null;
+      }).filter(Boolean);
       closeAiIngredientModal();
       openAiRequestModal(items, 'selected');
     }
 
     function buildAiPrompt(mode, items) {
+      if (mode === 'selected') {
+        const requiredNames = items.filter(i => i._aiRequired !== false).map(i => i.name);
+        const optionalNames = items.filter(i => i._aiRequired === false).map(i => i.name);
+        const requiredBlock = requiredNames.length
+          ? `以下の食材は必須材料として必ず含めてください。\n${requiredNames.map(n => `- ${n}`).join('\n')}`
+          : '必須材料は指定せず、任意食材を活用できるレシピにしてください。';
+        const optionalBlock = optionalNames.length
+          ? `\n\n以下の食材は使える場合のみ活用してください。必ず使う必要はありません。\n${optionalNames.map(n => `- ${n}`).join('\n')}`
+          : '';
+        return `指定食材からレシピを1つ提案してください。
+${requiredBlock}${optionalBlock}
+
+※調理に必要な分量だけ使ってください。在庫をすべて使い切る必要はありません。
+
+他に必要な材料も含めて、以下の厳密なJSON形式で出力してください。
+{
+  "name": "レシピ名",
+  "ingredients": [
+    {"name": "材料名", "amount": "数量", "unit": "単位"},
+    ...
+  ],
+  "steps": [
+    "手順1",
+    "手順2",
+    ...
+  ]
+}
+注意:
+- amount は文字列として出力（数値と単位が混在する場合があるため）
+- 材料がない場合は空配列、手順がない場合は空配列
+- JSON以外の説明文は一切出力しないでください`;
+      }
       const names = items.map(i => i.name);
-      const header = mode === 'priority'
-        ? '以下の食材を優先的に使うレシピを1つ提案してください。'
-        : '以下の食材を必須材料として含むレシピを1つ提案してください。';
-      const listLabel = mode === 'priority' ? '期限が近い食材' : '指定食材';
+      const header = '以下の食材を優先的に使うレシピを1つ提案してください。';
       return `${header}
-${listLabel}:
+期限が近い食材:
 ${names.map(n => `- ${n}`).join('\n')}
 
 ※調理に必要な分量だけ使ってください。在庫をすべて使い切る必要はありません。
@@ -3307,9 +3411,16 @@ ${names.map(n => `- ${n}`).join('\n')}
       const itemsContainer = document.getElementById('aiRequestItems');
       itemsContainer.innerHTML = '';
       items.forEach(item => {
+        const showRequirement = mode === 'selected';
+        const required = item._aiRequired !== false;
+        const tagClass = !showRequirement
+          ? 'bg-white border-slate-200 text-slate-700'
+          : (required ? 'bg-indigo-50 border-indigo-100 text-indigo-700' : 'bg-slate-100 border-slate-200 text-slate-600');
+        const labelClass = required ? 'bg-indigo-100 text-indigo-700' : 'bg-white text-slate-500';
         itemsContainer.insertAdjacentHTML('beforeend', `
-          <span class="inline-flex items-center bg-white border border-slate-200 text-slate-700 text-xs font-bold px-3 py-2 rounded-full shadow-sm">
+          <span class="inline-flex items-center gap-1 ${tagClass} border text-xs font-bold px-3 py-2 rounded-full shadow-sm">
             ${escapeHtml(item.name)}
+            ${showRequirement ? `<span class="${labelClass} text-[10px] px-1.5 py-0.5 rounded-full">${required ? '必須' : '任意'}</span>` : ''}
           </span>
         `);
       });
@@ -3414,7 +3525,7 @@ ${plan ? '\n提案方針: ' + plan : ''}
         }
         const data = await res.json();
         const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-        const parsed = JSON.parse(raw);
+        const parsed = parseAIJsonResponse(raw, 'AI Recipe');
         state._aiGeneratedRecipe = parsed;
         state._aiGeneratedMode = mode;
         state._aiGeneratedItems = items;
@@ -3531,7 +3642,12 @@ ${plan ? '\n提案方針: ' + plan : ''}
 
     async function regenerateAiRecipe() {
       if (!state._aiGeneratedItems || !state._aiGeneratedMode) return;
-      await generateAiRecipe(state._aiGeneratedMode, state._aiGeneratedItems);
+      state._aiPendingItems = state._aiGeneratedItems;
+      state._aiPendingMode = state._aiGeneratedMode;
+      if (!state._aiPendingPrompt) {
+        state._aiPendingPrompt = buildAiPrompt(state._aiGeneratedMode, state._aiGeneratedItems);
+      }
+      await generateAiRecipeFromPlan();
     }
 
     async function saveAiRecipeToCollection() {
@@ -3555,11 +3671,6 @@ ${plan ? '\n提案方針: ' + plan : ''}
       renderRecipeMode();
       showToast('レシピを保存しました。同期するまでスプシ未反映です。', 'success');
       switchBTab('recipes');
-    }
-
-    function clearAiSelection() {
-      document.querySelectorAll('.ai-ing-cb').forEach(cb => cb.checked = false);
-      updateAiSelectedTags();
     }
 
     /* --- Schedule Operations --- */
@@ -3804,28 +3915,6 @@ ${plan ? '\n提案方針: ' + plan : ''}
       setTimeout(() => m.classList.add('hidden'), 300);
     }
 
-    function updateAiSelectedTags() {
-      const selectedIds = Array.from(document.querySelectorAll('.ai-ing-cb:checked')).map(cb => cb.dataset.id);
-      const tagsContainer = document.getElementById('aiSelectedTags');
-      const tagsList = document.getElementById('aiSelectedTagsList');
-      if (selectedIds.length === 0) {
-        tagsContainer.classList.add('hidden');
-        return;
-      }
-      tagsContainer.classList.remove('hidden');
-      tagsList.innerHTML = '';
-      selectedIds.forEach(id => {
-        const item = state.inventory.find(i => i.id === id);
-        if (!item) return;
-        tagsList.insertAdjacentHTML('beforeend', `
-          <span class="inline-flex items-center gap-1 bg-indigo-50 text-indigo-700 text-xs font-bold px-3 py-1.5 rounded-full">
-            ${escapeHtml(item.name)}
-            <button onclick="document.querySelector('.ai-ing-cb[data-id=\\'${item.id}\\']')?.click()" class="w-4 h-4 rounded-full bg-indigo-100 hover:bg-indigo-200 flex items-center justify-center text-indigo-600 leading-none">×</button>
-          </span>
-        `);
-      });
-    }
-
     /* --- Recipe Rendering --- */
     function getFilteredSortedRecipes() {
       let recipesToRender = state.recipes;
@@ -4041,7 +4130,9 @@ ${plan ? '\n提案方針: ' + plan : ''}
           body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseMimeType: "application/json" } })
         });
         const data = await res.json();
-        const results = JSON.parse(data.candidates[0].content.parts[0].text);
+        const parsedResults = parseAIJsonResponse(data.candidates?.[0]?.content?.parts?.[0]?.text || '', 'Shelf Life AI');
+        const results = Array.isArray(parsedResults) ? parsedResults : ((parsedResults && (parsedResults.items || parsedResults.results)) || []);
+        if (!Array.isArray(results)) throw new Error('AI解析結果が配列ではありません。');
         
         let log = "【AI解析結果】\n";
         results.forEach(resItem => {
@@ -4407,7 +4498,7 @@ ${text}`;
         }
         const data = await res.json();
         const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-        const parsed = JSON.parse(raw);
+        const parsed = parseAIJsonResponse(raw, 'RecipeAI');
         closeRecipeTextModal();
         openRecipeEditor();
         document.getElementById('r-name').value = parsed.name || '';
@@ -4748,7 +4839,7 @@ ${text}`;
 
     function parseAIImageResponse(text) {
       try {
-        const parsed = JSON.parse(text);
+        const parsed = parseAIJsonResponse(text, 'ImageScan');
         if (Array.isArray(parsed)) return parsed;
         if (parsed && Array.isArray(parsed.items)) return parsed.items;
         return [];

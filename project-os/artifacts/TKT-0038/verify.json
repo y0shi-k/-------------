@@ -1,0 +1,21 @@
+{
+  "ticket": "TKT-0038-ai-recipe-regenerate-handler",
+  "status": "passed",
+  "checks": [
+    {
+      "name": "project_verify",
+      "command": "python3 -c \"import html.parser; html.parser.HTMLParser().feed(open('app.html').read())\" && grep -q 'executeGAS' app.html && grep -q 'GAS_URL' app.html && echo 'VERIFY_PASSED'",
+      "result": "VERIFY_PASSED"
+    },
+    {
+      "name": "regenerate_reference_scan",
+      "command": "rg -n \"generateAiRecipe\\\\(|regenerateAiRecipe|generateAiRecipeFromPlan\" app.html",
+      "result": "regenerateAiRecipe calls generateAiRecipeFromPlan; no generateAiRecipe call remains"
+    },
+    {
+      "name": "diff_check",
+      "command": "git diff --check",
+      "result": "passed"
+    }
+  ]
+}
