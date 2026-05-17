@@ -254,7 +254,7 @@
                 <p class="text-[11px] font-medium text-indigo-700 uppercase tracking-widest">手順</p>
                 <p class="text-[10px] font-bold text-indigo-500">文中の材料をタップで照合</p>
               </div>
-              <div id="cookingStepTabs" class="grid grid-cols-2 gap-1 bg-white/70 border border-indigo-100 rounded-xl p-1 mb-3">
+              <div id="cookingStepTabs" class="grid grid-cols-3 gap-1 bg-white/70 border border-indigo-100 rounded-xl p-1 mb-3">
                 <!-- JSで動的に挿入 -->
               </div>
               <div id="cookingStepsPanel" class="space-y-4">
@@ -920,7 +920,7 @@
       cookingHistoryImageLoading: {},
       cookingInventoryCheckEnabled: false,
       cookingIngredientTab: 'ingredients',
-      cookingStepTab: 'prep',
+      cookingStepTab: 'all',
       activityStatusToken: null,
       isSyncing: false,
       editMode: null,
@@ -5800,7 +5800,7 @@ ${text}`;
       const parts = getCookingRecipeParts(recipe);
       state.cookingInventoryCheckEnabled = false;
       state.cookingIngredientTab = 'all';
-      state.cookingStepTab = !parts || parts.prepSteps.length > 0 || parts.cookSteps.length === 0 ? 'prep' : 'cook';
+      state.cookingStepTab = 'all';
     }
 
     function getCurrentCookingRecipe() {
@@ -5815,7 +5815,7 @@ ${text}`;
     }
 
     function setCookingStepTab(tab) {
-      if (!['prep', 'cook'].includes(tab)) return;
+      if (!['all', 'prep', 'cook'].includes(tab)) return;
       state.cookingStepTab = tab;
       const recipe = getCurrentCookingRecipe();
       if (recipe) renderCookingSteps(recipe);
@@ -6087,12 +6087,23 @@ ${text}`;
       const hasCook = Array.isArray(cookSteps) && cookSteps.length > 0;
       if (state.cookingStepTab === 'prep' && !hasPrep && hasCook) state.cookingStepTab = 'cook';
       if (state.cookingStepTab === 'cook' && !hasCook && hasPrep) state.cookingStepTab = 'prep';
+      if (!['all', 'prep', 'cook'].includes(state.cookingStepTab)) state.cookingStepTab = 'all';
       renderCookingSegmentedTabs('cookingStepTabs', [
+        { value: 'all', label: 'ALL', count: prepSteps.length + cookSteps.length, disabled: !hasPrep && !hasCook, onclick: "setCookingStepTab('all')" },
         { value: 'prep', label: '下ごしらえ', count: prepSteps.length, disabled: !hasPrep, onclick: "setCookingStepTab('prep')" },
         { value: 'cook', label: '調理工程', count: cookSteps.length, disabled: !hasCook, onclick: "setCookingStepTab('cook')" }
       ], state.cookingStepTab, 'indigo');
       if (!hasPrep && !hasCook) {
         container.innerHTML = '<div class="py-10 text-center text-slate-400 font-bold">手順は登録されていません</div>';
+        return;
+      }
+      if (state.cookingStepTab === 'all') {
+        if (hasPrep) {
+          renderCookingStepList(container, prepSteps, '下ごしらえ', 'bg-teal-100 text-teal-700', recipe);
+        }
+        if (hasCook) {
+          renderCookingStepList(container, cookSteps, '調理工程', 'bg-indigo-100 text-indigo-700', recipe, hasPrep);
+        }
         return;
       }
       const currentSteps = state.cookingStepTab === 'cook' ? cookSteps : prepSteps;
@@ -6102,8 +6113,12 @@ ${text}`;
         container.innerHTML = `<div class="py-10 text-center text-slate-400 font-bold">${label}は登録されていません</div>`;
         return;
       }
-      container.insertAdjacentHTML('beforeend', `<p class="text-[11px] font-medium text-slate-400 uppercase tracking-widest mb-2">${label}</p>`);
-      currentSteps.forEach((step, idx) => {
+      renderCookingStepList(container, currentSteps, label, colorClass, recipe);
+    }
+
+    function renderCookingStepList(container, steps, label, colorClass, recipe, addTopMargin = false) {
+      container.insertAdjacentHTML('beforeend', `<p class="text-[11px] font-medium text-slate-400 uppercase tracking-widest mb-2 ${addTopMargin ? 'mt-4' : ''}">${label}</p>`);
+      steps.forEach((step, idx) => {
         container.insertAdjacentHTML('beforeend', renderCookingStepCard(step, idx, colorClass, recipe));
       });
     }
