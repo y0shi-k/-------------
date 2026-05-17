@@ -1,0 +1,27 @@
+{
+  "ticket_id": "TKT-0048",
+  "status": "pass",
+  "checks": [
+    {
+      "name": "html_parse_executeGAS_GAS_URL",
+      "command": "python3 -c \"import html.parser; html.parser.HTMLParser().feed(open('app.html').read())\" && grep -q 'executeGAS' app.html && grep -q 'GAS_URL' app.html && echo 'VERIFY_PASSED'",
+      "result": "VERIFY_PASSED"
+    },
+    {
+      "name": "canvas_dialog_and_payload_callsite_check",
+      "command": "rg -n \"alert\\(|confirm\\(|prompt\\(|executeGAS\\(payload\" app.html",
+      "result": "alert/confirm/prompt は検出なし。executeGAS(payload...) は syncPendingChanges, handleInit, loadSchedule と関数定義のみ。新規の個別書き込み通信は追加なし。"
+    },
+    {
+      "name": "schedule_readback_schema_check",
+      "command": "rg -n \"function readSchedule\\(|list.push\\(\\{ id: f\\(r\\[0\\]\\), date: f\\(r\\[1\\]\\)|sortOrder: Number\\(r\\[6\\]\\)\" app.html",
+      "result": "syncPendingChanges 内 readSchedule が id/date/meal/recipeId/recipeName/status/sortOrder の8列構造で読み戻すことを確認。"
+    }
+  ],
+  "summary": {
+    "executeGAS_present": true,
+    "GAS_URL_present": true,
+    "manual_bulk_sync_policy": "preserved",
+    "schema_readback": "8-column schedule mapping"
+  }
+}

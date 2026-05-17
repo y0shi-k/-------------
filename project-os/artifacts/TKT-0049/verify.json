@@ -1,0 +1,27 @@
+{
+  "ticket_id": "TKT-0049",
+  "status": "pass",
+  "checks": [
+    {
+      "name": "html_parse_executeGAS_GAS_URL",
+      "command": "python3 -c \"import html.parser; html.parser.HTMLParser().feed(open('app.html').read())\" && grep -q 'executeGAS' app.html && grep -q 'GAS_URL' app.html && echo 'VERIFY_PASSED'",
+      "result": "VERIFY_PASSED"
+    },
+    {
+      "name": "navigation_callsite_check",
+      "command": "rg -n \"openCookingViewer\\(|cookingReturnContext|getCookingReturnContext|restoreCookingReturnContext\" app.html",
+      "result": "スケジュール、レシピ集、料理履歴の起動元が戻り先を渡し、closeCookingViewer が保存した戻り先へ復帰することを確認。"
+    },
+    {
+      "name": "no_new_write_transport",
+      "command": "rg -n \"alert\\(|confirm\\(|prompt\\(|executeGAS\\(payload\" app.html",
+      "result": "alert/confirm/prompt は検出なし。executeGAS(payload...) の書き込み系呼び出しは増加なし。"
+    }
+  ],
+  "summary": {
+    "route_restore": "implemented",
+    "executeGAS_present": true,
+    "GAS_URL_present": true,
+    "spreadsheet_changes": "none"
+  }
+}
