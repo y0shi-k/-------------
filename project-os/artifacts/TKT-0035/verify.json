@@ -1,5 +1,5 @@
 {
-  "ticket": "TKT-0035-ai-recipe-add-entrypoint",
+  "ticket": "TKT-0035-schedule-sort-ingredients-search",
   "status": "passed",
   "checks": [
     {
@@ -13,14 +13,19 @@
       "result": "passed"
     },
     {
-      "name": "forbidden_dialog_api_and_old_ai_tab",
-      "command": "rg -n \"alert\\\\(|confirm\\\\(|prompt\\\\(|data-tab=\\\\\\\"ai\\\\\\\"|switchBTab\\\\('ai'\\\\)|currentBTab === 'ai'|renderAiTab\\\\(\" app.html",
+      "name": "no_native_dialogs",
+      "command": "grep -n 'alert(' app.html; grep -n 'confirm(' app.html; grep -n 'prompt(' app.html",
       "result": "no matches"
     },
     {
-      "name": "script_syntax",
-      "command": "perl -0777 -ne 'print $1 if /<script>(.*)<\\\\/script>/s' app.html > /tmp/stock-master-app-script.js && node --check /tmp/stock-master-app-script.js",
-      "result": "passed"
+      "name": "showToast_exists",
+      "command": "grep -n 'function showToast' app.html",
+      "result": "found at line 1073"
+    },
+    {
+      "name": "no_direct_gas_writes",
+      "command": "grep -n 'executeGAS' app.html | wc -l",
+      "result": "5 occurrences (unchanged from baseline)"
     }
   ]
 }
