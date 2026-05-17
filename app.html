@@ -665,9 +665,15 @@
   <!-- モーダル: AIレシピプレビュー -->
   <div id="aiRecipePreviewModal" onclick="if(event.target===this) closeAiPreviewModal()" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
     <div onclick="event.stopPropagation()" class="bg-white w-full max-w-lg rounded-xl p-6 shadow transform scale-95 transition-transform duration-300 border border-slate-100 max-h-[90vh] overflow-y-auto">
-      <div class="flex justify-between items-center mb-5">
+      <div class="flex justify-between items-center gap-3 mb-5">
         <h3 id="aiPreviewTitle" class="text-2xl font-medium text-slate-800 tracking-tight">生成されたレシピ</h3>
-        <button onclick="closeAiPreviewModal()" class="text-slate-300 hover:text-slate-600 bg-slate-100 p-2 rounded-full"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg></button>
+        <div class="flex items-center gap-2 shrink-0">
+          <button id="recipeHeaderScheduleBtn" onclick="openScheduleAddFromViewer()" class="hidden inline-flex items-center gap-1.5 px-3 py-2 rounded-full bg-sky-100 text-sky-700 text-[11px] font-bold hover:bg-sky-200 active:scale-95 transition-all">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+            スケジュール追加
+          </button>
+          <button onclick="closeAiPreviewModal()" class="text-slate-300 hover:text-slate-600 bg-slate-100 p-2 rounded-full"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg></button>
+        </div>
       </div>
       <div class="space-y-5">
         <div>
@@ -717,9 +723,6 @@
       <!-- レシピ閲覧時のボタン -->
       <div id="recipeViewActions" class="hidden pt-4 flex gap-3 mt-2 border-t border-slate-100">
         <button onclick="closeAiPreviewModal()" class="flex-1 bg-slate-100 text-slate-600 font-medium py-4 rounded-xl hover:bg-slate-200 transition-all">閉じる</button>
-        <button onclick="openScheduleAddFromViewer()" class="flex-1 bg-sky-100 text-sky-700 font-medium py-4 rounded-xl hover:bg-sky-200 transition-all flex items-center justify-center gap-1">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg> スケジュールに追加
-        </button>
         <button onclick="openEditorFromViewer()" class="flex-[2] bg-indigo-600 text-white font-medium py-4 rounded-xl hover:bg-indigo-700 transition-all shadow">編集する</button>
       </div>
     </div>
@@ -797,7 +800,7 @@
         <div class="grid grid-cols-3 gap-2">
           <button onclick="assignScheduleFromViewer('朝')" class="meal-btn bg-sky-50 text-sky-700 border border-sky-100 font-medium py-3 rounded-xl hover:bg-sky-100 active:scale-95 transition-all">朝</button>
           <button onclick="assignScheduleFromViewer('昼')" class="meal-btn bg-sky-50 text-sky-700 border border-sky-100 font-medium py-3 rounded-xl hover:bg-sky-100 active:scale-95 transition-all">昼</button>
-          <button onclick="assignScheduleFromViewer('夜')" class="meal-btn bg-sky-50 text-sky-700 border border-sky-100 font-medium py-3 rounded-xl hover:bg-sky-100 active:scale-95 transition-all">夜</button>
+          <button onclick="assignScheduleFromViewer('晩')" class="meal-btn bg-sky-50 text-sky-700 border border-sky-100 font-medium py-3 rounded-xl hover:bg-sky-100 active:scale-95 transition-all">晩</button>
         </div>
       </div>
     </div>
@@ -1331,7 +1334,7 @@
       return {
         id: item.id || '',
         date: item.date || '',
-        meal: item.meal || '',
+        meal: normalizeScheduleMeal(item.meal),
         recipeId: item.recipeId || '',
         recipeName: item.recipeName || '',
         status: item.status || '未完了',
@@ -1346,9 +1349,10 @@
     }
 
     function queueScheduleDelete(item) {
-      const key = item.id ? ('id:' + item.id) : (item.date + '|' + item.meal + '|' + item.recipeId);
+      const itemMeal = normalizeScheduleMeal(item.meal);
+      const key = item.id ? ('id:' + item.id) : (item.date + '|' + itemMeal + '|' + item.recipeId);
       if (!state.pendingSync.scheduleDeletes.some(d => {
-        const dk = d.id ? ('id:' + d.id) : (d.date + '|' + d.meal + '|' + d.recipeId);
+        const dk = d.id ? ('id:' + d.id) : (d.date + '|' + normalizeScheduleMeal(d.meal) + '|' + d.recipeId);
         return dk === key;
       })) {
         state.pendingSync.scheduleDeletes.push(cleanScheduleItem(item));
@@ -1356,14 +1360,15 @@
       if (item.id) {
         state.schedule = state.schedule.filter(s => s.id !== item.id);
       } else {
-        state.schedule = state.schedule.filter(s => !(s.date === item.date && s.meal === item.meal && s.recipeId === item.recipeId));
+        state.schedule = state.schedule.filter(s => !(s.date === item.date && normalizeScheduleMeal(s.meal) === itemMeal && s.recipeId === item.recipeId));
       }
       updateSyncBar();
     }
 
     function queueScheduleUpdate(item) {
-      const key = item.id || (item.date + '|' + item.meal + '|' + item.recipeId);
-      const existing = state.pendingSync.scheduleUpdates.findIndex(u => (u.id || (u.date + '|' + u.meal + '|' + u.recipeId)) === key);
+      const itemMeal = normalizeScheduleMeal(item.meal);
+      const key = item.id || (item.date + '|' + itemMeal + '|' + item.recipeId);
+      const existing = state.pendingSync.scheduleUpdates.findIndex(u => (u.id || (u.date + '|' + normalizeScheduleMeal(u.meal) + '|' + u.recipeId)) === key);
       if (existing >= 0) {
         Object.assign(state.pendingSync.scheduleUpdates[existing], cleanScheduleItem(item));
       } else {
@@ -1373,7 +1378,7 @@
         const idx = state.schedule.findIndex(s => s.id === item.id);
         if (idx >= 0) Object.assign(state.schedule[idx], item);
       } else {
-        const idx = state.schedule.findIndex(s => s.date === item.date && s.meal === item.meal && s.recipeId === item.recipeId);
+        const idx = state.schedule.findIndex(s => s.date === item.date && normalizeScheduleMeal(s.meal) === itemMeal && s.recipeId === item.recipeId);
         if (idx >= 0) Object.assign(state.schedule[idx], item);
       }
       updateSyncBar();
@@ -1583,6 +1588,37 @@
       `;
     }
 
+    function renderBulkActionSlot() {
+      return '<div id="bulkActionSlot" class="hidden shrink-0 flex items-center gap-1.5"></div>';
+    }
+
+    function updateBulkActionSlot() {
+      const slot = document.getElementById('bulkActionSlot');
+      if (!slot) return;
+      slot.innerHTML = '';
+      slot.classList.add('hidden');
+
+      if (state.currentLoc === '買い物リスト') {
+        const count = getSelectedShoppingIds().length;
+        if (count === 0) return;
+        slot.innerHTML = `
+          <button onclick="bulkPurchase()" class="inline-flex h-8 items-center justify-center rounded-full bg-emerald-600 px-3 text-[11px] font-bold text-white shadow-sm active:scale-95 transition-all whitespace-nowrap">購入済み</button>
+          <button onclick="bulkDeleteShopping()" class="inline-flex h-8 items-center justify-center rounded-full bg-rose-600 px-3 text-[11px] font-bold text-white shadow-sm active:scale-95 transition-all whitespace-nowrap">選択削除</button>
+        `;
+        slot.classList.remove('hidden');
+        return;
+      }
+
+      if (state.currentLoc !== '登録待ち') {
+        const count = document.querySelectorAll('.inv-cb:checked').length;
+        if (count === 0) return;
+        slot.innerHTML = `
+          <button onclick="batchDeleteInventory()" class="inline-flex h-8 items-center justify-center rounded-full bg-rose-600 px-3 text-[11px] font-bold text-white shadow-sm active:scale-95 transition-all whitespace-nowrap">選択削除</button>
+        `;
+        slot.classList.remove('hidden');
+      }
+    }
+
     function renderInventoryPrimaryRow() {
       const allCount = state.inventory.length;
       const countBadgeClass = 'absolute -top-1 -right-1 min-w-[1.25rem] h-5 px-1 rounded-full bg-rose-600 text-white ring-2 ring-white flex items-center justify-center text-[10px] font-medium';
@@ -1630,13 +1666,15 @@
           </div>
         `;
         secondary.innerHTML = `
-          <div class="h-10 flex items-center gap-2 overflow-x-auto px-1">
+          <div class="h-10 flex items-center justify-between gap-2 px-1">
+            <div class="flex min-w-0 items-center gap-2 overflow-x-auto no-scrollbar">
             <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider shrink-0">並び</span>
             ${renderSortButtons([
               { key: 'created', label: '登録順' },
               { key: 'name', label: '名前順' },
               { key: 'limit2', label: '期限順' }
             ], state.stagingSortBy, state.stagingSortOrder, 'setStagingSort', 'amber')}
+            </div>
           </div>
         `;
         select.innerHTML = renderSelectControl('selectAllStaging', 'amber');
@@ -1658,13 +1696,16 @@
           </div>
         `;
         secondary.innerHTML = `
-          <div class="h-10 flex items-center gap-2 overflow-x-auto px-1">
-            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider shrink-0">並び</span>
-            ${renderSortButtons([
-              { key: 'name', label: '名前順' },
-              { key: 'qty', label: '数量順' },
-              { key: 'scheduleDate', label: '予定日順' }
-            ], state.shoppingSortBy, state.shoppingSortOrder, 'setShoppingSort', 'emerald')}
+          <div class="h-10 flex items-center justify-between gap-2 px-1">
+            <div class="flex min-w-0 items-center gap-2 overflow-x-auto no-scrollbar">
+              <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider shrink-0">並び</span>
+              ${renderSortButtons([
+                { key: 'name', label: '名前順' },
+                { key: 'qty', label: '数量順' },
+                { key: 'scheduleDate', label: '予定日順' }
+              ], state.shoppingSortBy, state.shoppingSortOrder, 'setShoppingSort', 'emerald')}
+            </div>
+            ${renderBulkActionSlot()}
           </div>
         `;
         select.innerHTML = renderSelectControl('selectAllShopping', 'emerald');
@@ -1674,13 +1715,16 @@
       if (label) label.textContent = state.currentLoc === 'すべて' ? 'ALL STORAGE' : state.currentLoc.toUpperCase();
       primary.innerHTML = renderInventoryPrimaryRow();
       secondary.innerHTML = `
-        <div class="h-10 flex items-center gap-2 overflow-x-auto px-1">
-          <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider shrink-0">並び</span>
-          ${renderSortButtons([
-            { key: 'limit2', label: '期限順' },
-            { key: 'name', label: '名前順' },
-            { key: 'buy', label: '購入日順' }
-          ], state.sortBy, state.sortOrder, 'setSort', 'slate')}
+        <div class="h-10 flex items-center justify-between gap-2 px-1">
+          <div class="flex min-w-0 items-center gap-2 overflow-x-auto no-scrollbar">
+            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider shrink-0">並び</span>
+            ${renderSortButtons([
+              { key: 'limit2', label: '期限順' },
+              { key: 'name', label: '名前順' },
+              { key: 'buy', label: '購入日順' }
+            ], state.sortBy, state.sortOrder, 'setSort', 'slate')}
+          </div>
+          ${renderBulkActionSlot()}
         </div>
       `;
       select.innerHTML = renderSelectControl('selectAllInventory', 'slate');
@@ -1710,6 +1754,7 @@
           cb.checked = checkbox.checked;
         });
       });
+      updateBulkActionSlot();
     }
 
     function getSelectedShoppingIds() {
@@ -1728,7 +1773,7 @@
       const qtyCls = compact ? 'text-xs' : 'text-sm';
       return `
         <div class="bg-emerald-50 ${pad} rounded-xl shadow-sm border border-emerald-100 flex items-center gap-3 transition-colors hover:bg-emerald-100">
-          <input type="checkbox" class="shop-cb w-5 h-5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 shrink-0" data-id="${item.id}">
+          <input type="checkbox" class="shop-cb w-5 h-5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 shrink-0" data-id="${item.id}" onchange="updateBulkActionSlot()">
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-2 mb-0.5 min-w-0">
               <span class="font-bold text-slate-800 text-sm truncate">${escapeHtml(item.name || '')}</span>
@@ -2647,7 +2692,7 @@
         loaded.forEach(item => {
           const pendingIdx = existingPending.findIndex(p => {
             if (p.id && item.id) return p.id === item.id;
-            return p.date === item.date && p.meal === item.meal && p.recipeId === item.recipeId;
+            return p.date === item.date && normalizeScheduleMeal(p.meal) === normalizeScheduleMeal(item.meal) && p.recipeId === item.recipeId;
           });
           if (pendingIdx >= 0) {
             item.recipeId = existingPending[pendingIdx].recipeId;
@@ -2725,16 +2770,18 @@
       if (state.currentLoc === '買い物リスト') {
         stagingActions.classList.add('hidden');
         inventoryActions.classList.add('hidden');
-        shoppingActions.classList.remove('hidden');
+        shoppingActions.classList.add('hidden');
         const list = sortShopping((state.shopping || []).filter(i => i.status === '未購入'));
         if (list.length === 0) {
           container.innerHTML = '<div class="py-20 text-center text-slate-300 font-bold">買うものはありません。</div>';
           shoppingActions.classList.add('hidden');
+          updateBulkActionSlot();
           return;
         }
         container.innerHTML = state.shoppingView === 'grouped'
           ? renderShoppingGrouped(list)
           : list.map(item => renderShoppingRow(item)).join('');
+        updateBulkActionSlot();
         return;
       }
 
@@ -2745,9 +2792,10 @@
       if (filtered.length === 0) {
         container.innerHTML = '<div class="py-20 text-center text-slate-300 font-bold">在庫はありません。</div>';
         inventoryActions.classList.add('hidden');
+        updateBulkActionSlot();
         return;
       }
-      inventoryActions.classList.remove('hidden');
+      inventoryActions.classList.add('hidden');
       const today = new Date(); today.setHours(0,0,0,0);
       filtered.forEach(item => {
         let rowClass = 'border-slate-200 bg-slate-50';
@@ -2770,7 +2818,7 @@
         const delta = (item.unit === 'g' || item.unit === 'ml') ? 50 : 1;
         container.insertAdjacentHTML('beforeend', `
           <div class="p-3 rounded-xl shadow-sm border ${rowClass} flex items-center gap-3 transition-colors">
-            <input type="checkbox" class="inv-cb w-5 h-5 rounded border-slate-300 text-rose-500 focus:ring-rose-400 shrink-0" data-id="${item.id}">
+            <input type="checkbox" class="inv-cb w-5 h-5 rounded border-slate-300 text-rose-500 focus:ring-rose-400 shrink-0" data-id="${item.id}" onchange="updateBulkActionSlot()">
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2 mb-0.5">
                 <span class="font-bold text-slate-800 text-sm truncate">${item.name}</span>
@@ -2789,6 +2837,7 @@
           </div>
         `);
       });
+      updateBulkActionSlot();
     }
 
     function toggleSelectAll(checkbox) {
@@ -2801,6 +2850,7 @@
           toggleShoppingGroupSelection(cb);
         }
       });
+      updateBulkActionSlot();
     }
 
     function filterByLocation(loc) {
@@ -2929,11 +2979,14 @@
           </div>
         `;
         secondary.innerHTML = `
-          <div class="h-20 flex items-start gap-2 px-1 pt-2">
-            <button onclick="toggleScheduleSelectMode()" class="h-8 px-3 rounded-lg ${state.scheduleSelectMode ? 'bg-sky-600 text-white' : 'bg-white text-sky-600 border border-sky-200'} text-[11px] font-medium flex items-center gap-1 active:scale-95 transition-all">
-              ${state.scheduleSelectMode ? '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m5 12 4 4L19 6"/></svg>' : '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="2" stroke-width="2"/></svg>'} 選択モード
-            </button>
-            ${state.scheduleSelectMode && selectCount > 0 ? `<span class="h-8 px-2 rounded-lg bg-sky-100 text-sky-700 text-[11px] font-medium flex items-center">${selectCount} 件選択中</span>` : ''}
+          <div class="h-20 flex items-start justify-between gap-2 px-1 pt-2">
+            <div class="min-w-0 flex items-center gap-2 overflow-x-auto no-scrollbar">
+              <button onclick="toggleScheduleSelectMode()" class="h-8 px-3 rounded-lg ${state.scheduleSelectMode ? 'bg-sky-600 text-white' : 'bg-white text-sky-600 border border-sky-200'} text-[11px] font-medium flex items-center gap-1 active:scale-95 transition-all whitespace-nowrap">
+                ${state.scheduleSelectMode ? '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m5 12 4 4L19 6"/></svg>' : '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="2" stroke-width="2"/></svg>'} 選択モード
+              </button>
+              ${state.scheduleSelectMode && selectCount > 0 ? `<span class="h-8 px-2 rounded-lg bg-sky-100 text-sky-700 text-[11px] font-medium flex items-center whitespace-nowrap">${selectCount} 件選択中</span>` : ''}
+            </div>
+            ${state.scheduleSelectMode && selectCount > 0 ? `<button onclick="batchDeleteSchedule()" class="shrink-0 inline-flex h-8 items-center justify-center rounded-full bg-rose-600 px-3 text-[11px] font-bold text-white shadow-sm active:scale-95 transition-all whitespace-nowrap">選択削除</button>` : ''}
           </div>
         `;
         select.innerHTML = renderRecipeCountLine(getWeekDates(state.scheduleWeekOffset).length, '日分');
@@ -3027,6 +3080,19 @@
       return dates;
     }
 
+    function getScheduleWeekOffsetForDate(dateStr) {
+      const parts = String(dateStr || '').split('-').map(Number);
+      if (parts.length !== 3 || parts.some(n => !Number.isFinite(n))) return state.scheduleWeekOffset || 0;
+      const target = new Date(parts[0], parts[1] - 1, parts[2]);
+      target.setHours(0,0,0,0);
+      const today = new Date();
+      today.setHours(0,0,0,0);
+      const currentWeekStart = new Date(today);
+      currentWeekStart.setDate(today.getDate() - today.getDay());
+      const diffDays = Math.floor((target - currentWeekStart) / 86400000);
+      return Math.floor(diffDays / 7);
+    }
+
     function formatScheduleDate(dateStr) {
       const d = new Date(dateStr);
       const days = ['日','月','火','水','木','金','土'];
@@ -3037,9 +3103,14 @@
       return state.scheduleWeekOffset === 0 ? '今週' : `${state.scheduleWeekOffset > 0 ? '+' : ''}${state.scheduleWeekOffset}週`;
     }
 
+    function normalizeScheduleMeal(meal) {
+      const value = String(meal || '').trim();
+      return value === '夜' ? '晩' : value;
+    }
+
     function getScheduleDaySummary(date) {
       const meals = ['朝','昼','晩'];
-      const assigned = meals.flatMap(meal => state.schedule.filter(s => s.date === date && s.meal === meal));
+      const assigned = meals.flatMap(meal => state.schedule.filter(s => s.date === date && normalizeScheduleMeal(s.meal) === meal));
       const openCount = assigned.filter(s => s.status !== '完了').length;
       const firstName = assigned.map(s => s.recipeName || '').filter(Boolean).sort((a, b) => a.localeCompare(b, 'ja'))[0] || '';
       return { assigned, openCount, firstName };
@@ -3074,7 +3145,7 @@
         const meals = ['朝','昼','晩'];
         let slotsHtml = '';
         meals.forEach(meal => {
-          const assigned = state.schedule.filter(s => s.date === date && s.meal === meal).sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+          const assigned = state.schedule.filter(s => s.date === date && normalizeScheduleMeal(s.meal) === meal).sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
           const isEmpty = assigned.length === 0;
           let cardsHtml = '';
           assigned.forEach(item => {
@@ -3114,15 +3185,6 @@
           </div>
         `);
       });
-      if (state.scheduleSelectMode && state.scheduleSelectedIds.length > 0) {
-        container.insertAdjacentHTML('beforeend', `
-          <div class="mt-4">
-            <button onclick="batchDeleteSchedule()" class="w-full bg-rose-600 text-white font-medium py-4 rounded-xl shadow-sm hover:bg-rose-700 active:scale-95 transition-all flex items-center justify-center gap-2">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6h18M8 6V4h8v2m-9 0 1 14h8l1-14M10 10v6M14 10v6"/></svg> チェックした献立を一括削除 (${state.scheduleSelectedIds.length}件)
-            </button>
-          </div>
-        `);
-      }
       resetHorizontalScroll();
     }
 
@@ -3749,7 +3811,9 @@ ${plan ? '\n提案方針: ' + plan : ''}
       document.getElementById('aiPreviewTitle').textContent = '生成されたレシピ';
       document.getElementById('aiPreviewActions').classList.remove('hidden');
       document.getElementById('recipeViewActions').classList.add('hidden');
+      document.getElementById('recipeHeaderScheduleBtn').classList.add('hidden');
       document.getElementById('aiPreviewName').textContent = data.name || '（名称未設定）';
+      document.getElementById('aiPreviewSource').innerHTML = '';
 
       const ingContainer = document.getElementById('aiPreviewIngredients');
       ingContainer.innerHTML = '';
@@ -3832,6 +3896,7 @@ ${plan ? '\n提案方針: ' + plan : ''}
       document.getElementById('aiPreviewTitle').textContent = 'レシピ詳細';
       document.getElementById('aiPreviewActions').classList.add('hidden');
       document.getElementById('recipeViewActions').classList.remove('hidden');
+      document.getElementById('recipeHeaderScheduleBtn').classList.remove('hidden');
       document.getElementById('aiPreviewName').textContent = recipe.name || '（名称未設定）';
       // source URL 表示
       const sourceContainer = document.getElementById('aiPreviewSource');
@@ -4086,10 +4151,10 @@ ${plan ? '\n提案方針: ' + plan : ''}
 
     function assignScheduleRecipe(recipeId, recipeName) {
       const date = _schedulePendingDate;
-      const meal = _schedulePendingMeal;
+      const meal = normalizeScheduleMeal(_schedulePendingMeal);
       if (!date || !meal) return;
-      const sameBlock = state.schedule.filter(s => s.date === date && s.meal === meal);
-      const existingIdx = state.schedule.findIndex(s => s.date === date && s.meal === meal && s.recipeId === recipeId);
+      const sameBlock = state.schedule.filter(s => s.date === date && normalizeScheduleMeal(s.meal) === meal);
+      const existingIdx = state.schedule.findIndex(s => s.date === date && normalizeScheduleMeal(s.meal) === meal && s.recipeId === recipeId);
       let targetItem;
       if (_schedulePendingChange && _schedulePendingId) {
         // 変更モード: 既存アイテムのレシピを差し替え
@@ -4194,10 +4259,11 @@ ${plan ? '\n提案方針: ' + plan : ''}
       if (!id) return;
       const item = state.schedule.find(s => s.id === id);
       if (!item) return;
-      const sameBlock = item.date === targetDate && item.meal === targetMeal;
+      const normalizedTargetMeal = normalizeScheduleMeal(targetMeal);
+      const sameBlock = item.date === targetDate && normalizeScheduleMeal(item.meal) === normalizedTargetMeal;
       if (sameBlock) {
         // 同ブロック内並び替え
-        const blockItems = state.schedule.filter(s => s.date === targetDate && s.meal === targetMeal).sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+        const blockItems = state.schedule.filter(s => s.date === targetDate && normalizeScheduleMeal(s.meal) === normalizedTargetMeal).sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
         const fromIdx = blockItems.findIndex(s => s.id === id);
         if (fromIdx < 0) return;
         // ドロップ位置を計算（マウスY座標から挿入位置を推定）
@@ -4213,10 +4279,10 @@ ${plan ? '\n提案方針: ' + plan : ''}
         blockItems.forEach(it => queueScheduleUpdate({ id: it.id, date: it.date, meal: it.meal, recipeId: it.recipeId, recipeName: it.recipeName, status: it.status, sortOrder: it.sortOrder }));
       } else {
         // 別ブロックへの移動
-        const targetBlock = state.schedule.filter(s => s.date === targetDate && s.meal === targetMeal);
+        const targetBlock = state.schedule.filter(s => s.date === targetDate && normalizeScheduleMeal(s.meal) === normalizedTargetMeal);
         const maxSort = targetBlock.length ? Math.max(...targetBlock.map(s => s.sortOrder || 0)) : -1;
         item.date = targetDate;
-        item.meal = targetMeal;
+        item.meal = normalizedTargetMeal;
         item.sortOrder = maxSort + 10;
         queueScheduleUpdate({ id: item.id, date: item.date, meal: item.meal, recipeId: item.recipeId, recipeName: item.recipeName, status: item.status, sortOrder: item.sortOrder });
       }
@@ -5790,13 +5856,14 @@ ${text}`;
     }
 
     function assignScheduleFromViewer(meal) {
+      meal = normalizeScheduleMeal(meal);
       const recipeId = state._scheduleAddRecipeId;
       const date = state._scheduleAddSelectedDate;
       if (!recipeId || !date) return;
       const recipe = state.recipes.find(r => r.id === recipeId);
       if (!recipe) return;
-      const sameBlock = state.schedule.filter(s => s.date === date && s.meal === meal);
-      const existingIdx = state.schedule.findIndex(s => s.date === date && s.meal === meal && s.recipeId === recipeId);
+      const sameBlock = state.schedule.filter(s => s.date === date && normalizeScheduleMeal(s.meal) === meal);
+      const existingIdx = state.schedule.findIndex(s => s.date === date && normalizeScheduleMeal(s.meal) === meal && s.recipeId === recipeId);
       let targetItem;
       if (existingIdx >= 0) {
         targetItem = state.schedule[existingIdx];
@@ -5810,6 +5877,9 @@ ${text}`;
       if (targetItem) queueScheduleCreate(targetItem);
       closeScheduleAddModal();
       closeAiPreviewModal();
+      state.scheduleWeekOffset = getScheduleWeekOffsetForDate(date);
+      state.currentBTab = 'schedule';
+      switchMode('B');
       const shortages = compareRecipeWithInventory(recipeId);
       if (shortages.length > 0) {
         addShortagesToShopping(shortages, { sourceType: '献立スケジュール', scheduleDate: date, meal, recipeName: recipe.name });

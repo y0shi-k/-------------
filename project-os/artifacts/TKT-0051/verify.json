@@ -1,0 +1,16 @@
+{
+  "ticket": "TKT-0051-compact-action-button-placement",
+  "status": "passed",
+  "checks": [
+    {
+      "name": "AGENTS verify",
+      "command": "python3 -c \"import html.parser; html.parser.HTMLParser().feed(open('app.html').read())\" && grep -q 'executeGAS' app.html && grep -q 'GAS_URL' app.html && echo 'VERIFY_PASSED'",
+      "result": "VERIFY_PASSED"
+    },
+    {
+      "name": "forbidden dialogs and executeGAS payload scan",
+      "command": "rg -n \"alert\\(|confirm\\(|prompt\\(|executeGAS\\(payload\" app.html",
+      "result": "No alert/confirm/prompt matches. Existing executeGAS payload calls remain limited to current sync/load paths."
+    }
+  ]
+}

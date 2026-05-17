@@ -1,0 +1,16 @@
+{
+  "ticket": "TKT-0054-schedule-meal-name-normalization",
+  "status": "passed",
+  "checks": [
+    {
+      "name": "AGENTS verify",
+      "command": "python3 -c \"import html.parser; html.parser.HTMLParser().feed(open('app.html').read())\" && grep -q 'executeGAS' app.html && grep -q 'GAS_URL' app.html && echo 'VERIFY_PASSED'",
+      "result": "VERIFY_PASSED"
+    },
+    {
+      "name": "meal name scan",
+      "command": "rg -n \"assignScheduleFromViewer\\('夜'\\)|>夜<|夜\" app.html",
+      "result": "No UI entrypoint still saves 夜. Only normalizeScheduleMeal maps legacy 夜 to 晩."
+    }
+  ]
+}
