@@ -446,13 +446,35 @@
           </div>
         </div>
 
-        <!-- 手順セクション -->
+        <!-- 調味料セクション -->
         <div>
           <div class="flex justify-between items-center mb-2">
-            <label class="block text-[11px] font-medium text-slate-400 uppercase ml-1">手順</label>
-            <button type="button" onclick="addStepRow()" class="text-[11px] font-medium text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-full hover:bg-indigo-100 transition-all">＋ 手順を追加</button>
+            <label class="block text-[11px] font-medium text-slate-400 uppercase ml-1">調味料</label>
+            <button type="button" onclick="addSeasoningRow()" class="text-[11px] font-medium text-amber-600 bg-amber-50 px-3 py-1.5 rounded-full hover:bg-amber-100 transition-all">＋ 調味料を追加</button>
           </div>
-          <div id="stepList" class="space-y-2">
+          <div id="seasoningList" class="space-y-2">
+            <!-- JSで動的に挿入 -->
+          </div>
+        </div>
+
+        <!-- 下ごしらえセクション -->
+        <div>
+          <div class="flex justify-between items-center mb-2">
+            <label class="block text-[11px] font-medium text-slate-400 uppercase ml-1">下ごしらえ</label>
+            <button type="button" onclick="addPrepStepRow()" class="text-[11px] font-medium text-teal-600 bg-teal-50 px-3 py-1.5 rounded-full hover:bg-teal-100 transition-all">＋ 下ごしらえを追加</button>
+          </div>
+          <div id="prepStepList" class="space-y-2">
+            <!-- JSで動的に挿入 -->
+          </div>
+        </div>
+
+        <!-- 調理工程セクション -->
+        <div>
+          <div class="flex justify-between items-center mb-2">
+            <label class="block text-[11px] font-medium text-slate-400 uppercase ml-1">調理工程</label>
+            <button type="button" onclick="addCookStepRow()" class="text-[11px] font-medium text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-full hover:bg-indigo-100 transition-all">＋ 工程を追加</button>
+          </div>
+          <div id="cookStepList" class="space-y-2">
             <!-- JSで動的に挿入 -->
           </div>
         </div>
@@ -643,7 +665,23 @@
         </div>
         <div>
           <div class="flex justify-between items-center mb-2">
-            <p class="text-[11px] font-medium text-slate-400 uppercase ml-1">手順</p>
+            <p class="text-[11px] font-medium text-slate-400 uppercase ml-1">調味料</p>
+          </div>
+          <ul id="aiPreviewSeasonings" class="space-y-2 bg-amber-50 rounded-xl p-4">
+            <!-- JSで動的に挿入 -->
+          </ul>
+        </div>
+        <div>
+          <div class="flex justify-between items-center mb-2">
+            <p class="text-[11px] font-medium text-slate-400 uppercase ml-1">下ごしらえ</p>
+          </div>
+          <ol id="aiPreviewPrepSteps" class="space-y-3 bg-teal-50 rounded-xl p-4 list-decimal list-inside">
+            <!-- JSで動的に挿入 -->
+          </ol>
+        </div>
+        <div>
+          <div class="flex justify-between items-center mb-2">
+            <p class="text-[11px] font-medium text-slate-400 uppercase ml-1">調理工程</p>
           </div>
           <ol id="aiPreviewSteps" class="space-y-3 bg-slate-50 rounded-xl p-4 list-decimal list-inside">
             <!-- JSで動的に挿入 -->
@@ -1125,7 +1163,9 @@
         id: recipe.id || '',
         name: recipe.name || '',
         ingredients: recipe.ingredients || '[]',
+        seasonings: recipe.seasonings || '[]',
         steps: recipe.steps || '[]',
+        prepSteps: recipe.prepSteps || '[]',
         source: recipe.source || '',
         count: Number(recipe.count) || 0,
         history: recipe.history || '[]',
@@ -1909,7 +1949,7 @@
         }
         ensureSheetColumns(sShop, ['リストID', '品名', '必要数量', '単位', 'ステータス', '紐づくレシピ名', '出自種別', '予定日', '食事区分', '最終編集日時']);
         function ensureRecipeHeader(sheet) {
-          var headers = ['レシピID', 'レシピ名', '材料JSON', '手順JSON', '出典', '調理回数', '調理日履歴', '登録日時', '最終編集日時'];
+          var headers = ['レシピID', 'レシピ名', '材料JSON', '手順JSON', '出典', '調理回数', '調理日履歴', '登録日時', '最終編集日時', '調味料JSON', '下ごしらえJSON'];
           var current = sheet.getRange(1, 1, 1, Math.max(headers.length, sheet.getLastColumn() || 1)).getValues()[0];
           if(!current[0]) {
             sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
@@ -1958,7 +1998,7 @@
             if(!r[1]) continue;
             var created = f(r[7]) || f(r[8]);
             var updated = f(r[8]) || created;
-            list.push({ id:f(r[0]), name:f(r[1]), ingredients:f(r[2]), steps:f(r[3]), source:f(r[4]), count:Number(r[5])||0, history:f(r[6]), createdAt:created, updatedAt:updated });
+            list.push({ id:f(r[0]), name:f(r[1]), ingredients:f(r[2]), steps:f(r[3]), source:f(r[4]), count:Number(r[5])||0, history:f(r[6]), createdAt:created, updatedAt:updated, seasonings:f(r[9]), prepSteps:f(r[10]) });
           }
           return list;
         }
@@ -2078,6 +2118,7 @@
               var existingCreated = f(recipeData[ru][7]) || f(recipeData[ru][8]) || rd.createdAt || now;
               sRecipes.getRange(ru+1, 2, 1, 4).setValues([[rd.name, rd.ingredients, rd.steps, rd.source || '']]);
               sRecipes.getRange(ru+1, 8, 1, 2).setValues([[existingCreated, now]]);
+              sRecipes.getRange(ru+1, 10, 1, 2).setValues([[rd.seasonings || '[]', rd.prepSteps || '[]']]);
             }
           }
         }
@@ -2088,7 +2129,7 @@
 
         (pending.recipeCreates || []).forEach(function(d) {
           var createdAt = d.createdAt || now;
-          sRecipes.appendRow([Utilities.getUuid(), d.name, d.ingredients || '[]', d.steps || '[]', d.source || '', Number(d.count)||0, d.history || '[]', createdAt, now]);
+          sRecipes.appendRow([Utilities.getUuid(), d.name, d.ingredients || '[]', d.steps || '[]', d.source || '', Number(d.count)||0, d.history || '[]', createdAt, now, d.seasonings || '[]', d.prepSteps || '[]']);
         });
 
         var purchases = pending.shoppingPurchases || [];
@@ -2389,7 +2430,8 @@
             var updated = f(rr[8]) || created;
             recipes.push({
               id: f(rr[0]), name: f(rr[1]), ingredients: f(rr[2]), steps: f(rr[3]),
-              source: f(rr[4]), count: Number(rr[5])||0, history: f(rr[6]), createdAt: created, updatedAt: updated
+              source: f(rr[4]), count: Number(rr[5])||0, history: f(rr[6]), createdAt: created, updatedAt: updated,
+              seasonings: f(rr[9]), prepSteps: f(rr[10])
             });
           }
         }
@@ -2740,7 +2782,10 @@
     function getRecipeIngredientCount(recipe) {
       try {
         const ingredients = JSON.parse(recipe.ingredients || '[]');
-        return Array.isArray(ingredients) ? ingredients.length : 0;
+        const seasonings = JSON.parse(recipe.seasonings || '[]');
+        const ingCount = Array.isArray(ingredients) ? ingredients.length : 0;
+        const seaCount = Array.isArray(seasonings) ? seasonings.length : 0;
+        return ingCount + seaCount;
       } catch(e) {
         return 0;
       }
@@ -2977,13 +3022,16 @@
       const recipe = state.recipes.find(r => r.id === recipeId);
       if (!recipe) return [];
       let ingredients = [];
+      let seasonings = [];
       try {
         ingredients = JSON.parse(recipe.ingredients || '[]');
-      } catch(e) { ingredients = []; }
-      if (!Array.isArray(ingredients) || ingredients.length === 0) return [];
+        seasonings = JSON.parse(recipe.seasonings || '[]');
+      } catch(e) { /* fallback */ }
+      const allItems = [...ingredients, ...seasonings];
+      if (!Array.isArray(allItems) || allItems.length === 0) return [];
 
       const shortages = [];
-      ingredients.forEach(ing => {
+      allItems.forEach(ing => {
         const name = ing.name || '';
         const amount = parseFloat(ing.amount) || 0;
         const unit = ing.unit || '';
@@ -3507,7 +3555,35 @@ ${request ? '\nユーザーの追加要望: ' + request : ''}
 ${request ? '\nユーザーの追加要望: ' + request : ''}
 ${plan ? '\n提案方針: ' + plan : ''}
 
-上記に基づいて、JSON形式でレシピを出力してください。`;
+上記に基づいて、JSON形式でレシピを出力してください。
+
+出力形式:
+{
+  "name": "レシピ名",
+  "ingredients": [
+    {"name": "材料名", "amount": "数量", "unit": "単位"}
+  ],
+  "seasonings": [
+    {"name": "調味料名", "amount": "数量", "unit": "単位"}
+  ],
+  "prepSteps": [
+    "下ごしらえ1",
+    "下ごしらえ2"
+  ],
+  "steps": [
+    "調理工程1",
+    "調理工程2"
+  ]
+}
+
+注意事項:
+- ingredients は「材料」（野菜・肉・魚・豆腐・卵など）のみを含む
+- seasonings は「調味料」（醤油・塩・砂糖・味噌・酢・酒・コンソメ・だしの素など）のみを含む
+- prepSteps は「下ごしらえ」（切る・揉む・下味をつける・水洗い・塩もみ・浸すなど）を含む
+- steps は「調理工程」（火を通す・煮る・炒める・蒸す・盛り付けなど）のみを含む
+- amount は文字列として出力（数値と単位が混在する場合があるため）
+- 該当する項目がない場合は空配列を出力
+- JSON以外の説明文は一切出力しないでください`;
 
       closeAiRequestModal();
       setStatus(true, 'AIがレシピを考案中...<br><span class="text-[10px] font-bold opacity-50 uppercase tracking-widest">Recipe Generation</span>');
@@ -3550,6 +3626,7 @@ ${plan ? '\n提案方針: ' + plan : ''}
       document.getElementById('aiPreviewActions').classList.remove('hidden');
       document.getElementById('recipeViewActions').classList.add('hidden');
       document.getElementById('aiPreviewName').textContent = data.name || '（名称未設定）';
+
       const ingContainer = document.getElementById('aiPreviewIngredients');
       ingContainer.innerHTML = '';
       const ingredients = Array.isArray(data.ingredients) ? data.ingredients : [];
@@ -3565,11 +3642,41 @@ ${plan ? '\n提案方針: ' + plan : ''}
           `);
         });
       }
+
+      const seaContainer = document.getElementById('aiPreviewSeasonings');
+      seaContainer.innerHTML = '';
+      const seasonings = Array.isArray(data.seasonings) ? data.seasonings : [];
+      if (seasonings.length === 0) {
+        seaContainer.innerHTML = '<li class="text-sm text-slate-400 font-bold">調味料が設定されていません</li>';
+      } else {
+        seasonings.forEach(sea => {
+          seaContainer.insertAdjacentHTML('beforeend', `
+            <li class="text-sm font-bold text-slate-700 flex items-center gap-2">
+              <span class="w-2 h-2 bg-amber-400 rounded-full"></span>
+              ${escapeHtml(sea.name || '')} ${escapeHtml(String(sea.amount || ''))}${escapeHtml(sea.unit || '')}
+            </li>
+          `);
+        });
+      }
+
+      const prepContainer = document.getElementById('aiPreviewPrepSteps');
+      prepContainer.innerHTML = '';
+      const prepSteps = Array.isArray(data.prepSteps) ? data.prepSteps : [];
+      if (prepSteps.length === 0) {
+        prepContainer.innerHTML = '<li class="text-sm text-slate-400 font-bold">下ごしらえが設定されていません</li>';
+      } else {
+        prepSteps.forEach(step => {
+          prepContainer.insertAdjacentHTML('beforeend', `
+            <li class="text-sm font-bold text-slate-700 pl-1">${escapeHtml(String(step))}</li>
+          `);
+        });
+      }
+
       const stepContainer = document.getElementById('aiPreviewSteps');
       stepContainer.innerHTML = '';
       const steps = Array.isArray(data.steps) ? data.steps : [];
       if (steps.length === 0) {
-        stepContainer.innerHTML = '<li class="text-sm text-slate-400 font-bold">手順が設定されていません</li>';
+        stepContainer.innerHTML = '<li class="text-sm text-slate-400 font-bold">調理工程が設定されていません</li>';
       } else {
         steps.forEach(step => {
           stepContainer.insertAdjacentHTML('beforeend', `
@@ -3632,12 +3739,44 @@ ${plan ? '\n提案方針: ' + plan : ''}
           `);
         });
       }
+
+      const seaContainer = document.getElementById('aiPreviewSeasonings');
+      seaContainer.innerHTML = '';
+      let seasonings = [];
+      try { seasonings = JSON.parse(recipe.seasonings || '[]'); } catch(e) { seasonings = []; }
+      if (!Array.isArray(seasonings) || seasonings.length === 0) {
+        seaContainer.innerHTML = '<li class="text-sm text-slate-400 font-bold">調味料が設定されていません</li>';
+      } else {
+        seasonings.forEach(sea => {
+          seaContainer.insertAdjacentHTML('beforeend', `
+            <li class="text-sm font-bold text-slate-700 flex items-center gap-2">
+              <span class="w-2 h-2 bg-amber-400 rounded-full"></span>
+              ${escapeHtml(sea.name || '')} ${escapeHtml(String(sea.amount || ''))}${escapeHtml(sea.unit || '')}
+            </li>
+          `);
+        });
+      }
+
+      const prepContainer = document.getElementById('aiPreviewPrepSteps');
+      prepContainer.innerHTML = '';
+      let prepSteps = [];
+      try { prepSteps = JSON.parse(recipe.prepSteps || '[]'); } catch(e) { prepSteps = []; }
+      if (!Array.isArray(prepSteps) || prepSteps.length === 0) {
+        prepContainer.innerHTML = '<li class="text-sm text-slate-400 font-bold">下ごしらえが設定されていません</li>';
+      } else {
+        prepSteps.forEach(step => {
+          prepContainer.insertAdjacentHTML('beforeend', `
+            <li class="text-sm font-bold text-slate-700 pl-1">${escapeHtml(String(step))}</li>
+          `);
+        });
+      }
+
       const stepContainer = document.getElementById('aiPreviewSteps');
       stepContainer.innerHTML = '';
       let steps = [];
       try { steps = JSON.parse(recipe.steps || '[]'); } catch(e) { steps = []; }
       if (!Array.isArray(steps) || steps.length === 0) {
-        stepContainer.innerHTML = '<li class="text-sm text-slate-400 font-bold">手順が設定されていません</li>';
+        stepContainer.innerHTML = '<li class="text-sm text-slate-400 font-bold">調理工程が設定されていません</li>';
       } else {
         steps.forEach(step => {
           stepContainer.insertAdjacentHTML('beforeend', `
@@ -3676,6 +3815,8 @@ ${plan ? '\n提案方針: ' + plan : ''}
         id: createClientId('recipe'),
         name: data.name || '（名称未設定）',
         ingredients: JSON.stringify(data.ingredients || []),
+        seasonings: JSON.stringify(data.seasonings || []),
+        prepSteps: JSON.stringify(data.prepSteps || []),
         steps: JSON.stringify(data.steps || []),
         source: 'AI生成',
         count: 0,
@@ -3943,8 +4084,12 @@ ${plan ? '\n提案方針: ' + plan : ''}
           let ingMatch = false;
           try {
             const ingredients = JSON.parse(r.ingredients || '[]');
+            const seasonings = JSON.parse(r.seasonings || '[]');
             if (Array.isArray(ingredients)) {
               ingMatch = ingredients.some(ing => (ing.name || '').toLowerCase().includes(q));
+            }
+            if (!ingMatch && Array.isArray(seasonings)) {
+              ingMatch = seasonings.some(sea => (sea.name || '').toLowerCase().includes(q));
             }
           } catch(e) { ingMatch = false; }
 
@@ -3986,13 +4131,9 @@ ${plan ? '\n提案方針: ' + plan : ''}
         }
         return;
       }
-      recipesToRender.forEach((recipe, idx) => {
-        let ingCount = 0;
+      recipesToRender.forEach((recipe) => {
+        const ingCount = getRecipeIngredientCount(recipe);
         const syncBadge = getRecipeSyncBadge(recipe);
-        try {
-          const ing = JSON.parse(recipe.ingredients || '[]');
-          ingCount = Array.isArray(ing) ? ing.length : 0;
-        } catch(e) { ingCount = 0; }
         container.insertAdjacentHTML('beforeend', `
           <div class="bg-white/80 p-5 rounded-xl shadow-sm border border-indigo-100 flex items-center gap-4 group cursor-pointer hover:bg-indigo-50 transition-colors" onclick="openRecipeViewer('${recipe.id}')">
             <div class="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center flex-shrink-0">
@@ -4321,7 +4462,9 @@ ${plan ? '\n提案方針: ' + plan : ''}
           document.getElementById('r-name').value = recipe.name || '';
           document.getElementById('r-source').value = recipe.source || '';
           renderIngredientInputs(recipe.ingredients);
-          renderStepInputs(recipe.steps);
+          renderSeasoningInputs(recipe.seasonings);
+          renderPrepStepInputs(recipe.prepSteps);
+          renderCookStepInputs(recipe.steps);
           state.recipeEditId = recipeId;
           return;
         }
@@ -4329,7 +4472,9 @@ ${plan ? '\n提案方針: ' + plan : ''}
       document.getElementById('r-name').value = '';
       document.getElementById('r-source').value = '';
       renderIngredientInputs();
-      renderStepInputs();
+      renderSeasoningInputs();
+      renderPrepStepInputs();
+      renderCookStepInputs();
       state.recipeEditId = null;
     }
 
@@ -4346,7 +4491,7 @@ ${plan ? '\n提案方針: ' + plan : ''}
       let items = [];
       try { items = JSON.parse(ingredientsJson || '[]'); } catch(e) { items = []; }
       if (!Array.isArray(items) || items.length === 0) items = [{ name: '', amount: '', unit: '' }];
-      items.forEach((item, idx) => {
+      items.forEach((item) => {
         container.insertAdjacentHTML('beforeend', `
           <div class="flex gap-2 items-center ingredient-row">
             <input type="text" placeholder="品名" class="r-ing-name flex-1 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-indigo-500" value="${escapeHtml(item.name || '')}">
@@ -4370,40 +4515,108 @@ ${plan ? '\n提案方針: ' + plan : ''}
       `);
     }
 
-    function renderStepInputs(stepsJson) {
-      const container = document.getElementById('stepList');
+    function renderSeasoningInputs(seasoningsJson) {
+      const container = document.getElementById('seasoningList');
+      container.innerHTML = '';
+      let items = [];
+      try { items = JSON.parse(seasoningsJson || '[]'); } catch(e) { items = []; }
+      if (!Array.isArray(items) || items.length === 0) items = [{ name: '', amount: '', unit: '' }];
+      items.forEach((item) => {
+        container.insertAdjacentHTML('beforeend', `
+          <div class="flex gap-2 items-center seasoning-row">
+            <input type="text" placeholder="調味料名" class="r-sea-name flex-1 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-amber-500" value="${escapeHtml(item.name || '')}">
+            <input type="text" placeholder="数量" class="r-sea-amount w-16 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-amber-500" value="${escapeHtml(String(item.amount || ''))}">
+            <input type="text" placeholder="単位" class="r-sea-unit w-16 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-amber-500" value="${escapeHtml(item.unit || '')}">
+            <button type="button" onclick="this.closest('.seasoning-row').remove()" class="w-9 h-9 rounded-xl bg-rose-50 text-rose-500 hover:bg-rose-100 flex items-center justify-center flex-shrink-0">×</button>
+          </div>
+        `);
+      });
+    }
+
+    function addSeasoningRow() {
+      const container = document.getElementById('seasoningList');
+      container.insertAdjacentHTML('beforeend', `
+        <div class="flex gap-2 items-center seasoning-row">
+          <input type="text" placeholder="調味料名" class="r-sea-name flex-1 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-amber-500">
+          <input type="text" placeholder="数量" class="r-sea-amount w-16 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-amber-500">
+          <input type="text" placeholder="単位" class="r-sea-unit w-16 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-amber-500">
+          <button type="button" onclick="this.closest('.seasoning-row').remove()" class="w-9 h-9 rounded-xl bg-rose-50 text-rose-500 hover:bg-rose-100 flex items-center justify-center flex-shrink-0">×</button>
+        </div>
+      `);
+    }
+
+    function renderCookStepInputs(stepsJson) {
+      const container = document.getElementById('cookStepList');
       container.innerHTML = '';
       let items = [];
       try { items = JSON.parse(stepsJson || '[]'); } catch(e) { items = []; }
       if (!Array.isArray(items) || items.length === 0) items = [''];
       items.forEach((step, idx) => {
         container.insertAdjacentHTML('beforeend', `
-          <div class="flex gap-2 items-start step-row">
-            <span class="w-7 h-7 bg-indigo-100 text-indigo-600 rounded-lg flex items-center justify-center text-xs font-medium flex-shrink-0 mt-1">${idx + 1}</span>
-            <textarea placeholder="手順を入力" class="r-step flex-1 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-indigo-500 resize-none" rows="2">${escapeHtml(String(step || ''))}</textarea>
-            <button type="button" onclick="this.closest('.step-row').remove(); renumberSteps();" class="w-9 h-9 rounded-xl bg-rose-50 text-rose-500 hover:bg-rose-100 flex items-center justify-center flex-shrink-0 mt-1">×</button>
+          <div class="flex gap-2 items-center cook-step-row">
+            <span class="w-6 h-6 bg-indigo-100 text-indigo-700 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">${idx + 1}</span>
+            <input type="text" placeholder="工程を入力" class="r-cook-step flex-1 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-indigo-500" value="${escapeHtml(String(step || ''))}">
+            <button type="button" onclick="this.closest('.cook-step-row').remove(); renumberCookSteps();" class="w-9 h-9 rounded-xl bg-rose-50 text-rose-500 hover:bg-rose-100 flex items-center justify-center flex-shrink-0">×</button>
           </div>
         `);
       });
     }
 
-    function addStepRow() {
-      const container = document.getElementById('stepList');
-      const num = container.querySelectorAll('.step-row').length + 1;
+    function addCookStepRow() {
+      const container = document.getElementById('cookStepList');
+      const count = container.querySelectorAll('.cook-step-row').length;
       container.insertAdjacentHTML('beforeend', `
-        <div class="flex gap-2 items-start step-row">
-          <span class="step-num w-7 h-7 bg-indigo-100 text-indigo-600 rounded-lg flex items-center justify-center text-xs font-medium flex-shrink-0 mt-1">${num}</span>
-          <textarea placeholder="手順を入力" class="r-step flex-1 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-indigo-500 resize-none" rows="2"></textarea>
-          <button type="button" onclick="this.closest('.step-row').remove(); renumberSteps();" class="w-9 h-9 rounded-xl bg-rose-50 text-rose-500 hover:bg-rose-100 flex items-center justify-center flex-shrink-0 mt-1">×</button>
+        <div class="flex gap-2 items-center cook-step-row">
+          <span class="w-6 h-6 bg-indigo-100 text-indigo-700 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 cook-step-num">${count + 1}</span>
+          <input type="text" placeholder="工程を入力" class="r-cook-step flex-1 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-indigo-500">
+          <button type="button" onclick="this.closest('.cook-step-row').remove(); renumberCookSteps();" class="w-9 h-9 rounded-xl bg-rose-50 text-rose-500 hover:bg-rose-100 flex items-center justify-center flex-shrink-0">×</button>
         </div>
       `);
     }
 
-    function renumberSteps() {
-      document.querySelectorAll('#stepList .step-num').forEach((el, i) => {
+    function renumberCookSteps() {
+      document.querySelectorAll('#cookStepList .cook-step-num').forEach((el, i) => {
         el.textContent = i + 1;
       });
     }
+
+    function renderPrepStepInputs(stepsJson) {
+      const container = document.getElementById('prepStepList');
+      container.innerHTML = '';
+      let items = [];
+      try { items = JSON.parse(stepsJson || '[]'); } catch(e) { items = []; }
+      if (!Array.isArray(items) || items.length === 0) items = [''];
+      items.forEach((step, idx) => {
+        container.insertAdjacentHTML('beforeend', `
+          <div class="flex gap-2 items-center prep-step-row">
+            <span class="w-6 h-6 bg-teal-100 text-teal-700 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">${idx + 1}</span>
+            <input type="text" placeholder="下ごしらえを入力" class="r-prep-step flex-1 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-teal-500" value="${escapeHtml(String(step || ''))}">
+            <button type="button" onclick="this.closest('.prep-step-row').remove(); renumberPrepSteps();" class="w-9 h-9 rounded-xl bg-rose-50 text-rose-500 hover:bg-rose-100 flex items-center justify-center flex-shrink-0">×</button>
+          </div>
+        `);
+      });
+    }
+
+    function addPrepStepRow() {
+      const container = document.getElementById('prepStepList');
+      const count = container.querySelectorAll('.prep-step-row').length;
+      container.insertAdjacentHTML('beforeend', `
+        <div class="flex gap-2 items-center prep-step-row">
+          <span class="w-6 h-6 bg-teal-100 text-teal-700 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 prep-step-num">${count + 1}</span>
+          <input type="text" placeholder="下ごしらえを入力" class="r-prep-step flex-1 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-teal-500">
+          <button type="button" onclick="this.closest('.prep-step-row').remove(); renumberPrepSteps();" class="w-9 h-9 rounded-xl bg-rose-50 text-rose-500 hover:bg-rose-100 flex items-center justify-center flex-shrink-0">×</button>
+        </div>
+      `);
+    }
+
+    function renumberPrepSteps() {
+      document.querySelectorAll('#prepStepList .prep-step-num').forEach((el, i) => {
+        el.textContent = i + 1;
+      });
+    }
+
+    function addStepRow() { addCookStepRow(); }
+    function renumberSteps() { renumberCookSteps(); }
 
     function getRecipeFormData() {
       const name = document.getElementById('r-name').value.trim();
@@ -4415,12 +4628,24 @@ ${plan ? '\n提案方針: ' + plan : ''}
         const u = row.querySelector('.r-ing-unit').value.trim();
         if (n) ingredients.push({ name: n, amount: a || '', unit: u || '' });
       });
-      const steps = [];
-      document.querySelectorAll('#stepList .r-step').forEach(ta => {
-        const s = ta.value.trim();
-        if (s) steps.push(s);
+      const seasonings = [];
+      document.querySelectorAll('#seasoningList .seasoning-row').forEach(row => {
+        const n = row.querySelector('.r-sea-name').value.trim();
+        const a = row.querySelector('.r-sea-amount').value.trim();
+        const u = row.querySelector('.r-sea-unit').value.trim();
+        if (n) seasonings.push({ name: n, amount: a || '', unit: u || '' });
       });
-      return { name, source, ingredients: JSON.stringify(ingredients), steps: JSON.stringify(steps) };
+      const prepSteps = [];
+      document.querySelectorAll('#prepStepList .r-prep-step').forEach(ta => {
+        const s = ta.value.trim();
+        if (s) prepSteps.push(s);
+      });
+      const cookSteps = [];
+      document.querySelectorAll('#cookStepList .r-cook-step').forEach(ta => {
+        const s = ta.value.trim();
+        if (s) cookSteps.push(s);
+      });
+      return { name, source, ingredients: JSON.stringify(ingredients), seasonings: JSON.stringify(seasonings), prepSteps: JSON.stringify(prepSteps), steps: JSON.stringify(cookSteps) };
     }
 
     async function handleRecipeSave(e) {
@@ -4474,27 +4699,34 @@ ${plan ? '\n提案方針: ' + plan : ''}
       const text = document.getElementById('r-text-input').value.trim();
       if (!text) { showToast('テキストを入力してください。', 'error'); return; }
       setStatus(true, 'AIがレシピを解析中...<br><span class="text-[10px] font-bold opacity-50 uppercase tracking-widest">Recipe Structuring</span>');
-      const prompt = `あなたはレシピ構造化アシスタントです。以下のレシピテキストから、レシピ名・材料一覧・手順リスト・出典URLを抽出し、以下の厳密なJSON形式で出力してください。
+      const prompt = `あなたはレシピ構造化アシスタントです。以下のレシピテキストから、レシピ名・材料・調味料・下ごしらえ・調理工程を抽出し、以下の厳密なJSON形式で出力してください。
 
 出力形式:
 {
   "name": "レシピ名",
   "ingredients": [
-    {"name": "材料名", "amount": "数量", "unit": "単位"},
-    ...
+    {"name": "材料名", "amount": "数量", "unit": "単位"}
+  ],
+  "seasonings": [
+    {"name": "調味料名", "amount": "数量", "unit": "単位"}
+  ],
+  "prepSteps": [
+    "下ごしらえ1",
+    "下ごしらえ2"
   ],
   "steps": [
-    "手順1",
-    "手順2",
-    ...
-  ],
-  "source": "テキスト内に動画や参考URLがあればそのURL。複数ある場合は改行で区切って出力。なければ空文字"
+    "調理工程1",
+    "調理工程2"
+  ]
 }
 
 注意事項:
+- ingredients は「材料」（野菜・肉・魚・豆腐・卵など）のみを含む
+- seasonings は「調味料」（醤油・塩・砂糖・味噌・酢・酒・コンソメ・だしの素など）のみを含む
+- prepSteps は「下ごしらえ」（切る・揉む・下味をつける・水洗い・塩もみ・浸すなど）を含む。テキストに「下ごしらえ」「下準備」「準備」などの見出しがある場合はその内容を抽出
+- steps は「調理工程」（火を通す・煮る・炒める・蒸す・盛り付けなど）のみを含む
 - amount は文字列として出力（数値と単位が混在する場合があるため）
-- 材料がない場合は空配列、手順がない場合は空配列
-- source はテキスト中に含まれる YouTube URL、ブログ URL、SNS URL などを改行区切りで出力
+- 該当する項目がない場合は空配列を出力
 - JSON以外の説明文は一切出力しないでください
 - レシピ名が不明確な場合は「不明なレシピ」とする
 
@@ -4528,7 +4760,9 @@ ${text}`;
         document.getElementById('r-name').value = parsed.name || '';
         document.getElementById('r-source').value = source;
         renderIngredientInputs(JSON.stringify(parsed.ingredients || []));
-        renderStepInputs(JSON.stringify(parsed.steps || []));
+        renderSeasoningInputs(JSON.stringify(parsed.seasonings || []));
+        renderPrepStepInputs(JSON.stringify(parsed.prepSteps || []));
+        renderCookStepInputs(JSON.stringify(parsed.steps || []));
         setStatus(false);
         showToast('レシピを構造化しました。内容を確認・修正してください。', 'success');
       } catch (err) {
@@ -5347,53 +5581,71 @@ ${text}`;
       return '';
     }
 
+    function renderCookingIngredientCard(ing, labelBadge, labelColor) {
+      const amtBadge = getAmountBadge(ing.unit);
+      const amountText = [ing.amount, ing.unit].filter(Boolean).join('');
+      const required = parseFloat(ing.amount) || 0;
+      const unit = ing.unit || '';
+      const stockQty = state.inventory
+        .filter(i => i.name === ing.name && i.unit === unit && Number(i.qty) > 0)
+        .reduce((sum, item) => sum + (Number(item.qty) || 0), 0);
+      const isShortage = required > 0 && stockQty < required;
+      const stockText = `在庫: ${stockQty}${escapeHtml(unit)} / 必要: ${required > 0 ? required : '—'}${escapeHtml(unit)}`;
+      const stockClass = isShortage ? 'text-rose-500' : 'text-emerald-600';
+      const cardClass = isShortage ? 'bg-rose-50 border-rose-200' : 'bg-white border-slate-100';
+      const shortageBadge = isShortage ? '<span class="text-xs font-medium px-2 py-1 rounded-full bg-rose-100 text-rose-700 inline-flex items-center gap-1"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3 2 20h20L12 3Zm0 6v5m0 3h.01"/></svg>不足</span>' : '<span class="text-xs font-medium px-2 py-1 rounded-full bg-emerald-100 text-emerald-700">在庫あり</span>';
+      return `
+        <div class="${cardClass} p-5 rounded-xl shadow-sm border flex items-center justify-between gap-3">
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 flex-wrap mb-1">
+              <span class="text-xl font-bold text-slate-800">${escapeHtml(ing.name || '')}</span>
+              ${labelBadge}
+              ${shortageBadge}
+            </div>
+            <p class="text-xs font-bold ${stockClass}">${stockText}</p>
+          </div>
+          <div class="flex items-center gap-2 flex-shrink-0">
+            <span class="text-lg font-semibold text-slate-700">${escapeHtml(amountText)}</span>
+            ${amtBadge}
+          </div>
+        </div>
+      `;
+    }
+
     function renderCookingIngredients(recipe) {
       const container = document.getElementById('cookingIngredientsPanel');
       if (!container) return;
       container.innerHTML = '';
       let ingredients = [];
+      let seasonings = [];
       try {
         ingredients = JSON.parse(recipe.ingredients || '[]');
+        seasonings = JSON.parse(recipe.seasonings || '[]');
       } catch (e) {
         showToast('レシピデータの読み込みに失敗しました', 'error');
         container.innerHTML = '<div class="py-10 text-center text-slate-400 font-bold">材料データを読み込めません</div>';
         return;
       }
-      if (!Array.isArray(ingredients) || ingredients.length === 0) {
-        container.innerHTML = '<div class="py-10 text-center text-slate-400 font-bold">材料は登録されていません</div>';
+      const hasIngredients = Array.isArray(ingredients) && ingredients.length > 0;
+      const hasSeasonings = Array.isArray(seasonings) && seasonings.length > 0;
+      if (!hasIngredients && !hasSeasonings) {
+        container.innerHTML = '<div class="py-10 text-center text-slate-400 font-bold">材料・調味料は登録されていません</div>';
         return;
       }
-      ingredients.forEach(ing => {
-        const catBadge = getIngredientCategoryBadge(ing.type, ing.unit, ing.name);
-        const amtBadge = getAmountBadge(ing.unit);
-        const amountText = [ing.amount, ing.unit].filter(Boolean).join('');
-        const required = parseFloat(ing.amount) || 0;
-        const unit = ing.unit || '';
-        const stockQty = state.inventory
-          .filter(i => i.name === ing.name && i.unit === unit && Number(i.qty) > 0)
-          .reduce((sum, item) => sum + (Number(item.qty) || 0), 0);
-        const isShortage = required > 0 && stockQty < required;
-        const stockText = `在庫: ${stockQty}${escapeHtml(unit)} / 必要: ${required > 0 ? required : '—'}${escapeHtml(unit)}`;
-        const stockClass = isShortage ? 'text-rose-500' : 'text-emerald-600';
-        const cardClass = isShortage ? 'bg-rose-50 border-rose-200' : 'bg-white border-slate-100';
-        const shortageBadge = isShortage ? '<span class="text-xs font-medium px-2 py-1 rounded-full bg-rose-100 text-rose-700 inline-flex items-center gap-1"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3 2 20h20L12 3Zm0 6v5m0 3h.01"/></svg>不足</span>' : '<span class="text-xs font-medium px-2 py-1 rounded-full bg-emerald-100 text-emerald-700">在庫あり</span>';
-        container.insertAdjacentHTML('beforeend', `
-          <div class="${cardClass} p-5 rounded-xl shadow-sm border flex items-center justify-between gap-3">
-            <div class="flex-1 min-w-0">
-              <div class="flex items-center gap-2 flex-wrap mb-1">
-                <span class="text-xl font-bold text-slate-800">${escapeHtml(ing.name || '')}</span>
-                ${catBadge}
-                ${shortageBadge}
-              </div>
-              <p class="text-xs font-bold ${stockClass}">${stockText}</p>
-            </div>
-            <div class="flex items-center gap-2 flex-shrink-0">
-              <span class="text-lg font-semibold text-slate-700">${escapeHtml(amountText)}</span>
-              ${amtBadge}
-            </div>
-          </div>
-        `);
-      });
+      if (hasIngredients) {
+        container.insertAdjacentHTML('beforeend', `<p class="text-[11px] font-medium text-slate-400 uppercase tracking-widest mb-2">材料</p>`);
+        ingredients.forEach(ing => {
+          const labelBadge = `<span class="text-xs font-medium px-2 py-1 rounded-full bg-green-100 text-green-800">材料</span>`;
+          container.insertAdjacentHTML('beforeend', renderCookingIngredientCard(ing, labelBadge));
+        });
+      }
+      if (hasSeasonings) {
+        container.insertAdjacentHTML('beforeend', `<p class="text-[11px] font-medium text-slate-400 uppercase tracking-widest mb-2 mt-4">調味料</p>`);
+        seasonings.forEach(sea => {
+          const labelBadge = `<span class="text-xs font-medium px-2 py-1 rounded-full bg-amber-100 text-amber-800">調味料</span>`;
+          container.insertAdjacentHTML('beforeend', renderCookingIngredientCard(sea, labelBadge));
+        });
+      }
     }
 
     function highlightAmounts(text) {
@@ -5404,35 +5656,52 @@ ${text}`;
       });
     }
 
+    function renderCookingStepCard(step, idx, colorClass) {
+      const highlighted = highlightAmounts(String(step));
+      return `
+        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-100 flex gap-4">
+          <div class="w-10 h-10 ${colorClass} rounded-xl flex items-center justify-center text-lg font-medium flex-shrink-0">
+            ${idx + 1}
+          </div>
+          <div class="text-lg font-bold text-slate-700 leading-relaxed flex-1 pt-1">
+            ${highlighted}
+          </div>
+        </div>
+      `;
+    }
+
     function renderCookingSteps(recipe) {
       const container = document.getElementById('cookingStepsPanel');
       if (!container) return;
       container.innerHTML = '';
-      let steps = [];
+      let prepSteps = [];
+      let cookSteps = [];
       try {
-        steps = JSON.parse(recipe.steps || '[]');
+        prepSteps = JSON.parse(recipe.prepSteps || '[]');
+        cookSteps = JSON.parse(recipe.steps || '[]');
       } catch (e) {
         showToast('レシピデータの読み込みに失敗しました', 'error');
         container.innerHTML = '<div class="py-10 text-center text-slate-400 font-bold">手順データを読み込めません</div>';
         return;
       }
-      if (!Array.isArray(steps) || steps.length === 0) {
+      const hasPrep = Array.isArray(prepSteps) && prepSteps.length > 0;
+      const hasCook = Array.isArray(cookSteps) && cookSteps.length > 0;
+      if (!hasPrep && !hasCook) {
         container.innerHTML = '<div class="py-10 text-center text-slate-400 font-bold">手順は登録されていません</div>';
         return;
       }
-      steps.forEach((step, idx) => {
-        const highlighted = highlightAmounts(String(step));
-        container.insertAdjacentHTML('beforeend', `
-          <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-100 flex gap-4">
-            <div class="w-10 h-10 bg-indigo-100 text-indigo-700 rounded-xl flex items-center justify-center text-lg font-medium flex-shrink-0">
-              ${idx + 1}
-            </div>
-            <div class="text-lg font-bold text-slate-700 leading-relaxed flex-1 pt-1">
-              ${highlighted}
-            </div>
-          </div>
-        `);
-      });
+      if (hasPrep) {
+        container.insertAdjacentHTML('beforeend', `<p class="text-[11px] font-medium text-slate-400 uppercase tracking-widest mb-2">下ごしらえ</p>`);
+        prepSteps.forEach((step, idx) => {
+          container.insertAdjacentHTML('beforeend', renderCookingStepCard(step, idx, 'bg-teal-100 text-teal-700'));
+        });
+      }
+      if (hasCook) {
+        container.insertAdjacentHTML('beforeend', `<p class="text-[11px] font-medium text-slate-400 uppercase tracking-widest mb-2 mt-4">調理工程</p>`);
+        cookSteps.forEach((step, idx) => {
+          container.insertAdjacentHTML('beforeend', renderCookingStepCard(step, idx, 'bg-indigo-100 text-indigo-700'));
+        });
+      }
     }
 
     function finishCooking() {
@@ -5451,21 +5720,24 @@ ${text}`;
       }
       _consumptionRecipeId = recipeId;
       let ingredients = [];
+      let seasonings = [];
       try {
         ingredients = JSON.parse(recipe.ingredients || '[]');
+        seasonings = JSON.parse(recipe.seasonings || '[]');
       } catch (e) {
         showToast('レシピデータの読み込みに失敗しました', 'error');
         return;
       }
       if (!Array.isArray(ingredients)) ingredients = [];
-      _consumptionIngredients = ingredients;
+      if (!Array.isArray(seasonings)) seasonings = [];
+      _consumptionIngredients = [...ingredients, ...seasonings];
 
       const container = document.getElementById('consumptionList');
       container.innerHTML = '';
-      if (ingredients.length === 0) {
-        container.innerHTML = '<div class="py-6 text-center text-slate-400 font-bold">材料は登録されていません</div>';
+      if (_consumptionIngredients.length === 0) {
+        container.innerHTML = '<div class="py-6 text-center text-slate-400 font-bold">材料・調味料は登録されていません</div>';
       } else {
-        ingredients.forEach((ing, idx) => {
+        _consumptionIngredients.forEach((ing, idx) => {
           const amount = parseFloat(ing.amount) || 0;
           const unit = ing.unit || '';
           const stockQty = state.inventory
@@ -5475,11 +5747,15 @@ ${text}`;
           const stockClass = isShortage ? 'text-rose-500' : 'text-emerald-600';
           const rowClass = isShortage ? 'bg-rose-50 border-rose-200' : 'bg-slate-50 border-transparent';
           const shortageBadge = isShortage ? '<span class="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-rose-100 text-rose-700">不足</span>' : '';
+          const labelBadge = seasonings.includes(ing)
+            ? '<span class="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700">調味料</span>'
+            : '<span class="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-green-100 text-green-700">材料</span>';
           container.insertAdjacentHTML('beforeend', `
             <div class="${rowClass} rounded-xl p-4 flex items-center gap-3 border" data-idx="${idx}">
               <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-2 mb-0.5">
                   <p class="font-bold text-slate-800 text-sm">${escapeHtml(ing.name || '')}</p>
+                  ${labelBadge}
                   ${shortageBadge}
                 </div>
                 <p class="text-[10px] text-slate-400 font-bold">規定量: ${amount > 0 ? amount : '—'}${escapeHtml(unit)} / <span class="${stockClass}">在庫: ${stockQty}${escapeHtml(unit)}</span></p>
