@@ -47,27 +47,27 @@
 
   <!-- 全画面プロセッシング・オーバーレイ -->
   <div id="processingOverlay" class="fixed inset-0 z-[65] bg-slate-900/20 backdrop-blur-[2px] flex flex-col items-center justify-center opacity-0 invisible overlay-fade">
-    <div class="bg-white/90 p-8 rounded-3xl shadow-2xl flex flex-col items-center gap-4 max-w-[80%] border border-white">
+    <div class="bg-white/90 p-8 rounded-xl shadow flex flex-col items-center gap-4 max-w-[80%] border border-white">
       <div class="w-12 h-12 border-4 border-indigo-100 border-t-indigo-600 rounded-full animate-spin"></div>
-      <p id="overlayStatusLabel" class="text-sm font-black text-slate-700 tracking-tight text-center">処理を実行中...</p>
+      <p id="overlayStatusLabel" class="text-sm font-medium text-slate-700 tracking-tight text-center">処理を実行中...</p>
     </div>
   </div>
 
-  <div id="syncBar" class="sync-bar-hidden fixed top-0 left-0 right-0 z-[70] bg-slate-900 text-white shadow-2xl border-b border-slate-700 p-2 transition-transform duration-300">
+  <div id="syncBar" class="sync-bar-hidden fixed top-0 left-0 right-0 z-[70] bg-slate-900 text-white shadow border-b border-slate-700 p-2 transition-transform duration-300">
     <div class="flex items-center gap-3 max-w-2xl mx-auto px-3">
       <div class="flex-1 min-w-0">
-        <p id="syncSummary" class="text-sm font-black truncate">未同期 0 件</p>
+        <p id="syncSummary" class="text-sm font-medium truncate">未同期 0 件</p>
         <p id="syncDetail" class="text-[10px] text-slate-300 font-bold truncate">変更はまだスプレッドシートへ反映されていません</p>
       </div>
-      <button onclick="discardPendingChanges()" class="px-3 py-2 rounded-xl bg-slate-700 text-slate-100 text-xs font-black hover:bg-slate-600 active:scale-95 transition-all">破棄</button>
-      <button onclick="syncPendingChanges()" class="px-4 py-2 rounded-xl bg-emerald-500 text-white text-xs font-black hover:bg-emerald-600 active:scale-95 transition-all">同期する</button>
+      <button onclick="discardPendingChanges()" class="px-3 py-2 rounded-xl bg-slate-700 text-slate-100 text-xs font-medium hover:bg-slate-600 active:scale-95 transition-all">破棄</button>
+      <button onclick="syncPendingChanges()" class="px-4 py-2 rounded-xl bg-emerald-500 text-white text-xs font-medium hover:bg-emerald-600 active:scale-95 transition-all">同期する</button>
     </div>
   </div>
 
   <div id="activityStatusBar" data-state="idle" class="fixed left-0 right-0 bottom-0 z-[55] pointer-events-none bg-white/95 border-t border-slate-200">
     <div class="activity-status-content h-[var(--activity-status-height)] max-w-2xl mx-auto px-3 flex items-center gap-2 text-[11px] leading-none transition-opacity duration-200">
-      <div id="activitySpinner" class="w-3 h-3 border-2 border-indigo-100 border-t-indigo-600 rounded-full animate-spin shrink-0 transition-opacity duration-200"></div>
-      <p id="activityStatusLabel" class="font-black text-slate-600 truncate">待機中</p>
+      <div id="activitySpinner" class="w-3 h-3 border border-indigo-100 border-t-indigo-600 rounded-full animate-spin shrink-0 transition-opacity duration-200"></div>
+      <p id="activityStatusLabel" class="font-medium text-slate-600 truncate">待機中</p>
       <span class="text-slate-300 shrink-0">|</span>
       <p id="activityStatusDetail" class="font-bold text-slate-400 truncate">バックグラウンド処理はありません</p>
     </div>
@@ -76,21 +76,21 @@
   <main id="app" class="pt-14 pb-24">
     <!-- 初期承認画面 -->
     <div id="initView" class="flex flex-col items-center justify-center min-h-screen p-6 text-center">
-      <div class="w-20 h-20 bg-indigo-100 rounded-3xl flex items-center justify-center mb-8 shadow-inner">
-        <span class="text-4xl">🍳</span>
+      <div class="w-20 h-20 bg-indigo-100 rounded-xl flex items-center justify-center mb-8 shadow-inner text-indigo-700">
+        <svg class="w-9 h-9" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 3v18M10 3v18M6 8h4M17 3v8a3 3 0 0 1-3 3h0v7"/></svg>
       </div>
-      <h1 class="text-2xl font-black text-slate-700 mb-2">Stock Master</h1>
+      <h1 class="text-2xl font-medium text-slate-700 mb-2">Stock Master</h1>
       <p class="text-sm text-slate-400 mb-10">料理レシピ・食材管理アプリ (Phase 1 Update)</p>
       
-      <div class="inline-flex items-stretch shadow-xl rounded-2xl overflow-hidden">
+      <div class="inline-flex items-stretch shadow rounded-xl overflow-hidden">
         <button id="btnStart" onclick="handleInit()" class="bg-indigo-600 text-white font-bold py-4 px-10 hover:bg-indigo-700 active:scale-95 transition-all">アプリを起動</button>
         <div class="relative">
           <button id="dropdownToggle" onclick="document.getElementById('dropdownMenu').classList.toggle('hidden')" class="bg-indigo-700 text-white font-bold py-4 px-3 hover:bg-indigo-800 transition-all border-l border-indigo-500 h-full flex items-center">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M19 9l-7 7-7-7"/></svg>
           </button>
-          <div id="dropdownMenu" class="hidden absolute right-0 bottom-full mb-2 w-56 bg-white rounded-xl shadow-2xl border border-slate-200 z-50 overflow-hidden">
+          <div id="dropdownMenu" class="hidden absolute right-0 bottom-full mb-2 w-56 bg-white rounded-xl shadow border border-slate-200 z-50 overflow-hidden">
             <button onclick="approveAllAndInit()" class="w-full text-left px-4 py-4 text-sm text-slate-700 hover:bg-indigo-50 transition-colors flex items-center gap-2">
-              <span>⚡</span> この会話内はすべて承認
+              <svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 3 4 14h7l-1 7 9-11h-7l1-7Z"/></svg> この会話内はすべて承認
             </button>
           </div>
         </div>
@@ -104,15 +104,15 @@
       <div id="inventoryStickyHeader" class="sticky top-0 z-40 bg-slate-50/95 backdrop-blur-md pt-4 pb-3 border-b border-slate-100">
         <header class="flex justify-between items-end mb-6">
           <div>
-            <h2 class="text-3xl font-black tracking-tight text-slate-800">食材管理</h2>
+            <h2 class="text-3xl font-medium tracking-tight text-slate-800">食材管理</h2>
             <p class="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1" id="locationLabel">ALL STORAGE</p>
           </div>
-          <div id="inventoryTopTabs" class="bg-white/80 border border-slate-200 rounded-2xl p-1 flex items-center gap-1 shadow-sm">
-            <button id="inventoryTopTab" onclick="filterByLocation('すべて')" class="px-3 py-2 rounded-xl text-[11px] font-black transition-all active:scale-95 whitespace-nowrap">食材管理</button>
-            <button id="shoppingTopTab" onclick="filterByLocation('買い物リスト')" class="px-3 py-2 rounded-xl text-[11px] font-black transition-all active:scale-95 whitespace-nowrap">買い物リスト</button>
+          <div id="inventoryTopTabs" class="bg-white/80 border border-slate-200 rounded-xl p-1 flex items-center gap-1 shadow-sm">
+            <button id="inventoryTopTab" onclick="filterByLocation('すべて')" class="px-3 py-2 rounded-xl text-[11px] font-medium transition-all active:scale-95 whitespace-nowrap">食材管理</button>
+            <button id="shoppingTopTab" onclick="filterByLocation('買い物リスト')" class="px-3 py-2 rounded-xl text-[11px] font-medium transition-all active:scale-95 whitespace-nowrap">買い物リスト</button>
             <button id="registrationTopTab" onclick="openRegistrationHub()" class="relative w-10 h-10 rounded-xl flex items-center justify-center transition-all active:scale-95" aria-label="在庫登録を開く">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"></path></svg>
-              <span id="stagingBadge" class="absolute -top-1 -right-1 bg-amber-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full hidden">0</span>
+              <span id="stagingBadge" class="absolute -top-1 -right-1 bg-amber-500 text-white text-[10px] font-medium px-1.5 py-0.5 rounded-full hidden">0</span>
             </button>
           </div>
         </header>
@@ -131,35 +131,35 @@
 
       <!-- 一括操作アクション (在庫用) -->
       <div id="inventoryActions" class="hidden mt-8">
-        <button onclick="batchDeleteInventory()" class="w-full bg-rose-600 text-white font-black py-4 rounded-2xl shadow-lg shadow-rose-200 hover:bg-rose-700 active:scale-95 transition-all flex items-center justify-center gap-2">
-          <span>🗑</span> チェックした食材を一括削除
+        <button onclick="batchDeleteInventory()" class="w-full bg-rose-600 text-white font-medium py-4 rounded-xl shadow-sm hover:bg-rose-700 active:scale-95 transition-all flex items-center justify-center gap-2">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6h18M8 6V4h8v2m-9 0 1 14h8l1-14M10 10v6M14 10v6"/></svg> チェックした食材を一括削除
         </button>
       </div>
 
       <!-- 一括操作アクション (登録待ち用) -->
       <div id="stagingActions" class="hidden mt-8 space-y-3">
         <div class="px-1">
-          <div class="text-[10px] font-black text-slate-400 uppercase tracking-widest">在庫へ追加</div>
-          <div class="text-sm font-black text-slate-700">登録待ちリストを確認して在庫に反映</div>
+          <div class="text-[10px] font-medium text-slate-400 uppercase tracking-widest">在庫へ追加</div>
+          <div class="text-sm font-medium text-slate-700">登録待ちリストを確認して在庫に反映</div>
         </div>
-        <button onclick="batchCompleteFlow()" class="w-full bg-slate-900 text-white font-black py-5 rounded-2xl shadow-xl hover:bg-black active:scale-95 transition-all flex items-center justify-center gap-4 border-b-4 border-indigo-900">
-          <span class="text-2xl">⚡</span>
+        <button onclick="batchCompleteFlow()" class="w-full bg-slate-900 text-white font-medium py-5 rounded-xl shadow hover:bg-black active:scale-95 transition-all flex items-center justify-center gap-4 border-b border-indigo-900">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 3 4 14h7l-1 7 9-11h-7l1-7Z"/></svg>
           <span class="flex flex-col items-start text-left">
             <span class="text-base leading-none">まとめてAI解析して在庫へ追加</span>
             <span class="text-[10px] opacity-60 uppercase tracking-tighter mt-1">Smart Auto-Register Flow</span>
           </span>
         </button>
         <div class="grid grid-cols-3 gap-3">
-          <button onclick="batchPredictAI()" class="bg-indigo-50 text-indigo-700 font-black py-3 rounded-2xl shadow-sm hover:bg-indigo-100 active:scale-95 transition-all flex flex-col items-center justify-center gap-1 border border-indigo-100">
-            <span class="text-lg">🧠</span>
+          <button onclick="batchPredictAI()" class="bg-indigo-50 text-indigo-700 font-medium py-3 rounded-xl shadow-sm hover:bg-indigo-100 active:scale-95 transition-all flex flex-col items-center justify-center gap-1 border border-indigo-100">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m12 3 1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6L12 3ZM19 14l.8 2.2L22 17l-2.2.8L19 20l-.8-2.2L16 17l2.2-.8L19 14ZM5 14l.8 2.2L8 17l-2.2.8L5 20l-.8-2.2L2 17l2.2-.8L5 14Z"/></svg>
             <span class="text-[10px] uppercase">AI解析のみ</span>
           </button>
-          <button onclick="batchRegisterDB()" class="bg-slate-100 text-slate-700 font-black py-3 rounded-2xl shadow-sm hover:bg-slate-200 active:scale-95 transition-all flex flex-col items-center justify-center gap-1 border border-slate-200">
-            <span class="text-lg">💾</span>
+          <button onclick="batchRegisterDB()" class="bg-slate-100 text-slate-700 font-medium py-3 rounded-xl shadow-sm hover:bg-slate-200 active:scale-95 transition-all flex flex-col items-center justify-center gap-1 border border-slate-200">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7c0-2.2 3.6-4 8-4s8 1.8 8 4-3.6 4-8 4-8-1.8-8-4Zm0 0v5c0 2.2 3.6 4 8 4s8-1.8 8-4V7M4 12v5c0 2.2 3.6 4 8 4s8-1.8 8-4v-5"/></svg>
             <span class="text-[10px] uppercase">在庫へ追加</span>
           </button>
-          <button onclick="batchDeleteStaging()" class="bg-rose-50 text-rose-700 font-black py-3 rounded-2xl shadow-sm hover:bg-rose-100 active:scale-95 transition-all flex flex-col items-center justify-center gap-1 border border-rose-100">
-            <span class="text-lg">🗑</span>
+          <button onclick="batchDeleteStaging()" class="bg-rose-50 text-rose-700 font-medium py-3 rounded-xl shadow-sm hover:bg-rose-100 active:scale-95 transition-all flex flex-col items-center justify-center gap-1 border border-rose-100">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6h18M8 6V4h8v2m-9 0 1 14h8l1-14M10 10v6M14 10v6"/></svg>
             <span class="text-[10px] uppercase">選択削除</span>
           </button>
         </div>
@@ -167,11 +167,11 @@
 
       <!-- 買い物リスト専用アクション -->
       <div id="shoppingActions" class="hidden mt-8 space-y-3">
-        <button onclick="bulkPurchase()" class="w-full bg-emerald-600 text-white font-black py-4 rounded-2xl shadow-lg shadow-emerald-200 hover:bg-emerald-700 active:scale-95 transition-all flex items-center justify-center gap-2">
-          <span>✅</span> チェックした食材を購入済にする
+        <button onclick="bulkPurchase()" class="w-full bg-emerald-600 text-white font-medium py-4 rounded-xl shadow-sm hover:bg-emerald-700 active:scale-95 transition-all flex items-center justify-center gap-2">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg> チェックした食材を購入済にする
         </button>
-        <button onclick="bulkDeleteShopping()" class="w-full bg-rose-600 text-white font-black py-4 rounded-2xl shadow-lg shadow-rose-200 hover:bg-rose-700 active:scale-95 transition-all flex items-center justify-center gap-2">
-          <span>🗑</span> チェックした食材を一括削除
+        <button onclick="bulkDeleteShopping()" class="w-full bg-rose-600 text-white font-medium py-4 rounded-xl shadow-sm hover:bg-rose-700 active:scale-95 transition-all flex items-center justify-center gap-2">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6h18M8 6V4h8v2m-9 0 1 14h8l1-14M10 10v6M14 10v6"/></svg> チェックした食材を一括削除
         </button>
       </div>
     </div>
@@ -182,15 +182,15 @@
       <div class="p-4 w-full max-w-2xl mx-auto overflow-x-hidden">
         <header class="flex justify-between items-end mb-6 pt-4">
           <div>
-            <h2 class="text-3xl font-black tracking-tight text-slate-800">献立・レシピ</h2>
+            <h2 class="text-3xl font-medium tracking-tight text-slate-800">献立・レシピ</h2>
             <p id="recipeModeLabel" class="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">RECIPE COLLECTION</p>
           </div>
         </header>
 
         <div id="recipeModeTopTabs" class="flex gap-2 overflow-x-auto no-scrollbar pb-3 mb-2 snap-x">
-          <button onclick="switchBTab('recipes')" class="b-tab active bg-indigo-600 text-white shadow-sm border border-indigo-100 px-5 py-2.5 rounded-xl text-sm font-black whitespace-nowrap snap-start transition-all" data-tab="recipes">レシピ集</button>
-          <button onclick="switchBTab('ai')" class="b-tab bg-white text-violet-600 border border-violet-100 px-5 py-2.5 rounded-xl text-sm font-black whitespace-nowrap snap-start transition-all" data-tab="ai">AI考案</button>
-          <button onclick="switchBTab('schedule')" class="b-tab bg-white text-sky-600 border border-sky-100 px-5 py-2.5 rounded-xl text-sm font-black whitespace-nowrap snap-start transition-all" data-tab="schedule">スケジュール</button>
+          <button onclick="switchBTab('recipes')" class="b-tab active bg-indigo-600 text-white shadow-sm border border-indigo-100 px-5 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap snap-start transition-all" data-tab="recipes">レシピ集</button>
+          <button onclick="switchBTab('ai')" class="b-tab bg-white text-violet-600 border border-violet-100 px-5 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap snap-start transition-all" data-tab="ai">AI考案</button>
+          <button onclick="switchBTab('schedule')" class="b-tab bg-white text-sky-600 border border-sky-100 px-5 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap snap-start transition-all" data-tab="schedule">スケジュール</button>
         </div>
 
         <div id="recipeModeControlsPanel" class="space-y-2 pb-2">
@@ -199,7 +199,7 @@
           <div id="recipeSelectRow" class="h-8 overflow-hidden"></div>
         </div>
 
-        <div id="recipeListContainer" class="space-y-3 mt-3 transition-colors bg-indigo-50 p-3 rounded-2xl border border-indigo-100 overflow-hidden">
+        <div id="recipeListContainer" class="space-y-3 mt-3 transition-colors bg-indigo-50 p-3 rounded-xl border border-indigo-100 overflow-hidden">
           <!-- JSで動的に挿入 -->
         </div>
       </div>
@@ -221,7 +221,7 @@
 
           <!-- タブ -->
           <div class="flex gap-2 mb-4">
-            <button onclick="switchCookingTab('ingredients')" id="cookingTabIngredients" class="flex-1 py-3 rounded-xl text-sm font-black bg-indigo-600 text-white shadow-md transition-all">材料</button>
+            <button onclick="switchCookingTab('ingredients')" id="cookingTabIngredients" class="flex-1 py-3 rounded-xl text-sm font-medium bg-indigo-600 text-white shadow-sm transition-all">材料</button>
             <button onclick="switchCookingTab('steps')" id="cookingTabSteps" class="flex-1 py-3 rounded-xl text-sm font-bold bg-slate-100 text-slate-500 transition-all">手順</button>
           </div>
 
@@ -238,8 +238,8 @@
 
         <!-- 完了ボタン -->
         <div class="fixed bottom-20 left-0 right-0 p-4 bg-white/90 backdrop-blur-md border-t border-slate-100 z-40">
-          <button onclick="finishCooking()" class="w-full max-w-2xl mx-auto bg-emerald-600 text-white font-black py-4 rounded-2xl shadow-lg hover:bg-emerald-700 active:scale-95 transition-all flex items-center justify-center gap-2">
-            <span>✅</span> 料理を完了する
+          <button onclick="finishCooking()" class="w-full max-w-2xl mx-auto bg-emerald-600 text-white font-medium py-4 rounded-xl shadow-sm hover:bg-emerald-700 active:scale-95 transition-all flex items-center justify-center gap-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg> 料理を完了する
           </button>
         </div>
       </div>
@@ -248,18 +248,18 @@
       <div id="cookingGuide" class="p-4 w-full max-w-2xl mx-auto overflow-x-hidden">
         <header class="flex justify-between items-end mb-6 pt-4">
           <div>
-            <h2 class="text-3xl font-black tracking-tight text-slate-800">料理・記録</h2>
+            <h2 class="text-3xl font-medium tracking-tight text-slate-800">料理・記録</h2>
             <p id="cookingModeLabel" class="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">COOKING CHECK</p>
           </div>
         </header>
 
         <div id="cookingModeTopTabs" class="flex gap-2 overflow-x-auto no-scrollbar pb-3 mb-2 snap-x">
-          <button onclick="switchCTab('check')" class="c-tab active bg-emerald-600 text-white shadow-sm border border-emerald-100 px-5 py-2.5 rounded-xl text-sm font-black whitespace-nowrap snap-start transition-all" data-tab="check">レシピ確認</button>
-          <button onclick="switchCTab('history')" class="c-tab bg-white text-amber-600 border border-amber-100 px-5 py-2.5 rounded-xl text-sm font-black whitespace-nowrap snap-start transition-all" data-tab="history">料理履歴</button>
+          <button onclick="switchCTab('check')" class="c-tab active bg-emerald-600 text-white shadow-sm border border-emerald-100 px-5 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap snap-start transition-all" data-tab="check">レシピ確認</button>
+          <button onclick="switchCTab('history')" class="c-tab bg-white text-amber-600 border border-amber-100 px-5 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap snap-start transition-all" data-tab="history">料理履歴</button>
         </div>
 
         <div id="cookingControlsPanel" class="space-y-2 pb-2"></div>
-        <div id="cookingContentContainer" class="space-y-3 mt-3 transition-colors bg-emerald-50 p-3 rounded-2xl border border-emerald-100 overflow-hidden">
+        <div id="cookingContentContainer" class="space-y-3 mt-3 transition-colors bg-emerald-50 p-3 rounded-xl border border-emerald-100 overflow-hidden">
           <!-- JSで動的に挿入 -->
         </div>
       </div>
@@ -270,15 +270,15 @@
   <nav id="bottomNav" class="fixed bottom-0 left-0 w-full z-50 glass-nav pb-[env(safe-area-inset-bottom)] hidden">
     <div class="max-w-2xl mx-auto flex">
       <button onclick="switchMode('A')" class="flex-1 py-3 flex flex-col items-center gap-0.5 text-indigo-600" data-mode="A">
-        <span class="text-xl">🍳</span>
-        <span class="text-[10px] font-black">食材管理</span>
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 3v18M10 3v18M6 8h4M17 3v8a3 3 0 0 1-3 3h0v7"/></svg>
+        <span class="text-[10px] font-medium">食材管理</span>
       </button>
       <button onclick="switchMode('B')" class="flex-1 py-3 flex flex-col items-center gap-0.5 text-slate-400" data-mode="B">
-        <span class="text-xl">📅</span>
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14H3V6a2 2 0 0 1 2-2Z"/></svg>
         <span class="text-[10px] font-bold">献立・レシピ</span>
       </button>
       <button onclick="switchMode('C')" class="flex-1 py-3 flex flex-col items-center gap-0.5 text-slate-400" data-mode="C">
-        <span class="text-xl">🍽️</span>
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 3v18M10 3v18M6 8h4M17 3v8a3 3 0 0 1-3 3h0v7"/></svg>
         <span class="text-[10px] font-bold">料理・記録</span>
       </button>
     </div>
@@ -286,9 +286,9 @@
 
   <!-- モーダル: 食材の追加/編集 -->
   <div id="itemModal" onclick="if(event.target===this) closeModal()" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
-    <div onclick="event.stopPropagation()" class="bg-white w-full max-w-md rounded-[2.5rem] p-8 shadow-2xl transform scale-95 transition-transform duration-300 border border-slate-100" id="modalContent">
+    <div onclick="event.stopPropagation()" class="bg-white w-full max-w-md rounded-xl p-8 shadow transform scale-95 transition-transform duration-300 border border-slate-100" id="modalContent">
       <div class="flex justify-between items-center mb-6">
-        <h3 id="modalTitle" class="text-2xl font-black text-slate-800 tracking-tight">リストに追加</h3>
+        <h3 id="modalTitle" class="text-2xl font-medium text-slate-800 tracking-tight">リストに追加</h3>
         <button onclick="closeModal()" class="text-slate-300 hover:text-slate-600 bg-slate-100 p-2 rounded-full"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg></button>
       </div>
       
@@ -297,13 +297,13 @@
         <input type="hidden" id="f-inventory-id" value="">
         <div class="space-y-4">
           <div>
-            <label class="block text-[11px] font-black text-slate-400 uppercase mb-1.5 ml-1">品名</label>
-            <input type="text" id="f-name" required class="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 text-base focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none font-bold transition-all" placeholder="例: 牛乳">
+            <label class="block text-[11px] font-medium text-slate-400 uppercase mb-1.5 ml-1">品名</label>
+            <input type="text" id="f-name" required class="w-full bg-slate-50 border border-slate-100 rounded-xl px-5 py-4 text-base focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none font-bold transition-all" placeholder="例: 牛乳">
           </div>
           <div class="grid grid-cols-2 gap-4">
             <div>
-              <label class="block text-[11px] font-black text-slate-400 uppercase mb-1.5 ml-1">分類</label>
-              <select id="f-type" class="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-4 py-4 text-sm font-bold outline-none focus:border-indigo-500 appearance-none cursor-pointer">
+              <label class="block text-[11px] font-medium text-slate-400 uppercase mb-1.5 ml-1">分類</label>
+              <select id="f-type" class="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-4 text-sm font-bold outline-none focus:border-indigo-500 appearance-none cursor-pointer">
                 <option value="食材">食材</option>
                 <option value="野菜">野菜</option>
                 <option value="肉">肉</option>
@@ -315,52 +315,52 @@
               </select>
             </div>
             <div>
-              <label class="block text-[11px] font-black text-slate-400 uppercase mb-1.5 ml-1">保存場所</label>
-              <select id="f-loc" onchange="handleLocationSelectChange()" class="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-4 py-4 text-sm font-bold outline-none focus:border-indigo-500 appearance-none cursor-pointer">
+              <label class="block text-[11px] font-medium text-slate-400 uppercase mb-1.5 ml-1">保存場所</label>
+              <select id="f-loc" onchange="handleLocationSelectChange()" class="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-4 text-sm font-bold outline-none focus:border-indigo-500 appearance-none cursor-pointer">
               </select>
               <div id="newLocationFields" class="hidden mt-2 flex gap-2">
-                <input type="text" id="f-new-loc" class="min-w-0 flex-1 bg-white border-2 border-indigo-100 rounded-xl px-3 py-2 text-sm font-bold outline-none focus:border-indigo-500" placeholder="例: 野菜室">
-                <button type="button" onclick="addLocationFromForm()" class="shrink-0 bg-indigo-600 text-white text-xs font-black px-3 py-2 rounded-xl active:scale-95 transition-all">追加</button>
+                <input type="text" id="f-new-loc" class="min-w-0 flex-1 bg-white border border-indigo-100 rounded-xl px-3 py-2 text-sm font-bold outline-none focus:border-indigo-500" placeholder="例: 野菜室">
+                <button type="button" onclick="addLocationFromForm()" class="shrink-0 bg-indigo-600 text-white text-xs font-medium px-3 py-2 rounded-xl active:scale-95 transition-all">追加</button>
               </div>
             </div>
           </div>
           <div class="grid grid-cols-2 gap-4">
             <div>
-              <label class="block text-[11px] font-black text-slate-400 uppercase mb-1.5 ml-1">数量・単位</label>
+              <label class="block text-[11px] font-medium text-slate-400 uppercase mb-1.5 ml-1">数量・単位</label>
               <div class="flex">
-                <input type="number" id="f-qty" step="0.1" required class="w-full bg-slate-50 border-2 border-slate-100 rounded-l-2xl px-4 py-4 text-sm font-bold outline-none focus:border-indigo-500 border-r-0">
-                <input type="text" id="f-unit" required class="w-20 bg-slate-50 border-2 border-slate-100 rounded-r-2xl px-2 py-4 text-sm font-bold outline-none focus:border-indigo-500" placeholder="個">
+                <input type="number" id="f-qty" step="0.1" required class="w-full bg-slate-50 border border-slate-100 rounded-l-2xl px-4 py-4 text-sm font-bold outline-none focus:border-indigo-500 border-r-0">
+                <input type="text" id="f-unit" required class="w-20 bg-slate-50 border border-slate-100 rounded-r-2xl px-2 py-4 text-sm font-bold outline-none focus:border-indigo-500" placeholder="個">
               </div>
             </div>
             <div>
-              <label class="block text-[11px] font-black text-slate-400 uppercase mb-1.5 ml-1">表示期限</label>
-              <input type="date" id="f-limit1" class="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-4 py-4 text-sm font-bold outline-none focus:border-indigo-500">
+              <label class="block text-[11px] font-medium text-slate-400 uppercase mb-1.5 ml-1">表示期限</label>
+              <input type="date" id="f-limit1" class="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-4 text-sm font-bold outline-none focus:border-indigo-500">
             </div>
           </div>
           <div class="grid grid-cols-2 gap-4">
             <div>
-              <label class="block text-[11px] font-black text-slate-400 uppercase mb-1.5 ml-1">購入日</label>
-              <input type="date" id="f-date1" class="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-4 py-4 text-sm font-bold outline-none focus:border-indigo-500">
+              <label class="block text-[11px] font-medium text-slate-400 uppercase mb-1.5 ml-1">購入日</label>
+              <input type="date" id="f-date1" class="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-4 text-sm font-bold outline-none focus:border-indigo-500">
             </div>
             <div>
-              <label class="block text-[11px] font-black text-indigo-400 uppercase mb-1.5 ml-1">開封日 (推測用)</label>
-              <input type="date" id="f-date2" class="w-full bg-indigo-50 border-2 border-indigo-100 rounded-2xl px-4 py-4 text-sm font-bold outline-none focus:border-indigo-500">
+              <label class="block text-[11px] font-medium text-indigo-400 uppercase mb-1.5 ml-1">開封日 (推測用)</label>
+              <input type="date" id="f-date2" class="w-full bg-indigo-50 border border-indigo-100 rounded-xl px-4 py-4 text-sm font-bold outline-none focus:border-indigo-500">
             </div>
           </div>
           <div>
-            <label class="block text-[11px] font-black text-slate-400 uppercase mb-1.5 ml-1">メモ</label>
-            <textarea id="f-memo" rows="2" class="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:border-indigo-500 resize-none"></textarea>
+            <label class="block text-[11px] font-medium text-slate-400 uppercase mb-1.5 ml-1">メモ</label>
+            <textarea id="f-memo" rows="2" class="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:border-indigo-500 resize-none"></textarea>
           </div>
           <div id="aiResultArea" class="hidden">
-            <div class="bg-indigo-50/50 p-5 rounded-[2rem] border-2 border-indigo-100 relative">
-              <label class="block text-[11px] font-black text-indigo-600 uppercase mb-1.5">AI判定済 実質期限</label>
-              <input type="date" id="f-limit2" class="w-full bg-transparent border-none p-0 text-xl font-black text-indigo-700 outline-none">
+            <div class="bg-indigo-50/50 p-5 rounded-xl border border-indigo-100 relative">
+              <label class="block text-[11px] font-medium text-indigo-600 uppercase mb-1.5">AI判定済 実質期限</label>
+              <input type="date" id="f-limit2" class="w-full bg-transparent border-none p-0 text-xl font-medium text-indigo-700 outline-none">
               <div class="absolute right-5 top-5"><span class="text-xs bg-indigo-600 text-white px-2 py-0.5 rounded-full font-bold">AI</span></div>
             </div>
           </div>
         </div>
         <div class="pt-4">
-          <button type="submit" id="btnSubmit" class="w-full bg-slate-900 text-white font-black py-5 rounded-[1.5rem] hover:bg-black transition-all shadow-xl text-lg flex items-center justify-center gap-2">リストに追加</button>
+          <button type="submit" id="btnSubmit" class="w-full bg-slate-900 text-white font-medium py-5 rounded-xl hover:bg-black transition-all shadow text-lg flex items-center justify-center gap-2">リストに追加</button>
         </div>
       </form>
     </div>
@@ -368,10 +368,10 @@
 
   <!-- モーダル: 保存場所管理 -->
   <div id="locationManageModal" onclick="if(event.target===this) closeLocationManager()" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
-    <div onclick="event.stopPropagation()" class="bg-white w-full max-w-md rounded-[2rem] p-6 shadow-2xl transform scale-95 transition-transform duration-300 border border-slate-100">
+    <div onclick="event.stopPropagation()" class="bg-white w-full max-w-md rounded-xl p-6 shadow transform scale-95 transition-transform duration-300 border border-slate-100">
       <div class="flex justify-between items-center mb-5">
         <div>
-          <h3 class="text-2xl font-black text-slate-800 tracking-tight">保存場所の管理</h3>
+          <h3 class="text-2xl font-medium text-slate-800 tracking-tight">保存場所の管理</h3>
           <p class="text-xs text-slate-400 font-bold mt-1">在庫がある場所は変更を同期待ちにします</p>
         </div>
         <button onclick="closeLocationManager()" class="text-slate-300 hover:text-slate-600 bg-slate-100 p-2 rounded-full"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg></button>
@@ -380,63 +380,63 @@
         <!-- JSで動的に挿入 -->
       </div>
       <div class="mt-5 flex gap-2">
-        <input type="text" id="managerNewLocation" class="min-w-0 flex-1 bg-slate-50 border-2 border-slate-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:border-indigo-500" placeholder="新しい保存場所">
-        <button onclick="addLocationFromManager()" class="bg-slate-800 text-white text-sm font-black px-4 py-3 rounded-2xl active:scale-95 transition-all">追加</button>
+        <input type="text" id="managerNewLocation" class="min-w-0 flex-1 bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:border-indigo-500" placeholder="新しい保存場所">
+        <button onclick="addLocationFromManager()" class="bg-slate-800 text-white text-sm font-medium px-4 py-3 rounded-xl active:scale-95 transition-all">追加</button>
       </div>
     </div>
   </div>
 
   <!-- モーダル: 買い物リスト手動追加 -->
   <div id="shoppingManualModal" onclick="if(event.target===this) closeShoppingManualModal()" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
-    <div onclick="event.stopPropagation()" class="bg-white w-full max-w-sm rounded-[2rem] p-6 shadow-2xl transform scale-95 transition-transform duration-300 border border-slate-100">
+    <div onclick="event.stopPropagation()" class="bg-white w-full max-w-sm rounded-xl p-6 shadow transform scale-95 transition-transform duration-300 border border-slate-100">
       <div class="flex justify-between items-center mb-5">
-        <h3 class="text-xl font-black text-slate-800 tracking-tight">買い物を追加</h3>
+        <h3 class="text-xl font-medium text-slate-800 tracking-tight">買い物を追加</h3>
         <button onclick="closeShoppingManualModal()" class="text-slate-300 hover:text-slate-600 bg-slate-100 p-2 rounded-full"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg></button>
       </div>
       <form id="shoppingManualForm" onsubmit="handleShoppingManualSave(event)" class="space-y-4">
         <div>
-          <label class="block text-[11px] font-black text-slate-400 uppercase mb-1.5 ml-1">品名</label>
-          <input type="text" id="shop-name" required class="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:border-emerald-500" placeholder="例: 牛乳">
+          <label class="block text-[11px] font-medium text-slate-400 uppercase mb-1.5 ml-1">品名</label>
+          <input type="text" id="shop-name" required class="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:border-emerald-500" placeholder="例: 牛乳">
         </div>
         <div class="grid grid-cols-[1fr_88px] gap-3">
           <div>
-            <label class="block text-[11px] font-black text-slate-400 uppercase mb-1.5 ml-1">数量</label>
-            <input type="number" id="shop-qty" step="0.1" min="0" required class="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:border-emerald-500">
+            <label class="block text-[11px] font-medium text-slate-400 uppercase mb-1.5 ml-1">数量</label>
+            <input type="number" id="shop-qty" step="0.1" min="0" required class="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:border-emerald-500">
           </div>
           <div>
-            <label class="block text-[11px] font-black text-slate-400 uppercase mb-1.5 ml-1">単位</label>
-            <input type="text" id="shop-unit" required class="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-3 py-3 text-sm font-bold outline-none focus:border-emerald-500" placeholder="個">
+            <label class="block text-[11px] font-medium text-slate-400 uppercase mb-1.5 ml-1">単位</label>
+            <input type="text" id="shop-unit" required class="w-full bg-slate-50 border border-slate-100 rounded-xl px-3 py-3 text-sm font-bold outline-none focus:border-emerald-500" placeholder="個">
           </div>
         </div>
-        <button type="submit" class="w-full bg-emerald-600 text-white font-black py-4 rounded-2xl hover:bg-emerald-700 active:scale-95 transition-all">追加する</button>
+        <button type="submit" class="w-full bg-emerald-600 text-white font-medium py-4 rounded-xl hover:bg-emerald-700 active:scale-95 transition-all">追加する</button>
       </form>
     </div>
   </div>
 
   <!-- モーダル: レシピの追加/編集 -->
   <div id="recipeModal" onclick="if(event.target===this) closeRecipeModal()" class="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
-    <div onclick="event.stopPropagation()" class="bg-white w-full max-w-lg rounded-[2.5rem] p-6 shadow-2xl transform scale-95 transition-transform duration-300 border border-slate-100 max-h-[90vh] overflow-y-auto">
+    <div onclick="event.stopPropagation()" class="bg-white w-full max-w-lg rounded-xl p-6 shadow transform scale-95 transition-transform duration-300 border border-slate-100 max-h-[90vh] overflow-y-auto">
       <div class="flex justify-between items-center mb-5">
-        <h3 id="recipeModalTitle" class="text-2xl font-black text-slate-800 tracking-tight">レシピを追加</h3>
+        <h3 id="recipeModalTitle" class="text-2xl font-medium text-slate-800 tracking-tight">レシピを追加</h3>
         <button onclick="closeRecipeModal()" class="text-slate-300 hover:text-slate-600 bg-slate-100 p-2 rounded-full"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg></button>
       </div>
 
       <form id="recipeForm" onsubmit="handleRecipeSave(event)" class="space-y-5">
         <input type="hidden" id="r-id" value="">
         <div>
-          <label class="block text-[11px] font-black text-slate-400 uppercase mb-1.5 ml-1">レシピ名</label>
-          <input type="text" id="r-name" required class="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 text-base focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none font-bold transition-all" placeholder="例: カレーライス">
+          <label class="block text-[11px] font-medium text-slate-400 uppercase mb-1.5 ml-1">レシピ名</label>
+          <input type="text" id="r-name" required class="w-full bg-slate-50 border border-slate-100 rounded-xl px-5 py-4 text-base focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none font-bold transition-all" placeholder="例: カレーライス">
         </div>
         <div>
-          <label class="block text-[11px] font-black text-slate-400 uppercase mb-1.5 ml-1">出典</label>
-          <input type="text" id="r-source" class="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 text-sm focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none font-bold transition-all" placeholder="例: https://... または本の名前">
+          <label class="block text-[11px] font-medium text-slate-400 uppercase mb-1.5 ml-1">出典</label>
+          <input type="text" id="r-source" class="w-full bg-slate-50 border border-slate-100 rounded-xl px-5 py-4 text-sm focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none font-bold transition-all" placeholder="例: https://... または本の名前">
         </div>
 
         <!-- 材料セクション -->
         <div>
           <div class="flex justify-between items-center mb-2">
-            <label class="block text-[11px] font-black text-slate-400 uppercase ml-1">材料</label>
-            <button type="button" onclick="addIngredientRow()" class="text-[11px] font-black text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-full hover:bg-indigo-100 transition-all">＋ 材料を追加</button>
+            <label class="block text-[11px] font-medium text-slate-400 uppercase ml-1">材料</label>
+            <button type="button" onclick="addIngredientRow()" class="text-[11px] font-medium text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-full hover:bg-indigo-100 transition-all">＋ 材料を追加</button>
           </div>
           <div id="ingredientList" class="space-y-2">
             <!-- JSで動的に挿入 -->
@@ -446,8 +446,8 @@
         <!-- 手順セクション -->
         <div>
           <div class="flex justify-between items-center mb-2">
-            <label class="block text-[11px] font-black text-slate-400 uppercase ml-1">手順</label>
-            <button type="button" onclick="addStepRow()" class="text-[11px] font-black text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-full hover:bg-indigo-100 transition-all">＋ 手順を追加</button>
+            <label class="block text-[11px] font-medium text-slate-400 uppercase ml-1">手順</label>
+            <button type="button" onclick="addStepRow()" class="text-[11px] font-medium text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-full hover:bg-indigo-100 transition-all">＋ 手順を追加</button>
           </div>
           <div id="stepList" class="space-y-2">
             <!-- JSで動的に挿入 -->
@@ -455,9 +455,9 @@
         </div>
 
         <div class="pt-2 flex gap-3">
-          <button type="button" onclick="closeRecipeModal()" class="flex-1 bg-slate-100 text-slate-600 font-black py-4 rounded-2xl hover:bg-slate-200 transition-all">キャンセル</button>
-          <button type="button" onclick="addCurrentRecipeToShopping()" class="flex-1 bg-emerald-100 text-emerald-700 font-black py-4 rounded-2xl hover:bg-emerald-200 transition-all flex items-center justify-center gap-1">🛒 買い物へ</button>
-          <button type="submit" id="btnRecipeSubmit" class="flex-[2] bg-slate-900 text-white font-black py-4 rounded-2xl hover:bg-black transition-all shadow-xl">保存</button>
+          <button type="button" onclick="closeRecipeModal()" class="flex-1 bg-slate-100 text-slate-600 font-medium py-4 rounded-xl hover:bg-slate-200 transition-all">キャンセル</button>
+          <button type="button" onclick="addCurrentRecipeToShopping()" class="flex-1 bg-emerald-100 text-emerald-700 font-medium py-4 rounded-xl hover:bg-emerald-200 transition-all flex items-center justify-center gap-1"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l2.2 11h9.6L19 6H6M8 21a1 1 0 1 0 0-2 1 1 0 0 0 0 2ZM17 21a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z"/></svg> 買い物へ</button>
+          <button type="submit" id="btnRecipeSubmit" class="flex-[2] bg-slate-900 text-white font-medium py-4 rounded-xl hover:bg-black transition-all shadow">保存</button>
         </div>
       </form>
     </div>
@@ -465,18 +465,18 @@
 
   <!-- モーダル: テキストからレシピ構造化 -->
   <div id="recipeTextModal" onclick="if(event.target===this) closeRecipeTextModal()" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
-    <div onclick="event.stopPropagation()" class="bg-white w-full max-w-lg rounded-[2.5rem] p-6 shadow-2xl transform scale-95 transition-transform duration-300 border border-slate-100 max-h-[90vh] overflow-y-auto">
+    <div onclick="event.stopPropagation()" class="bg-white w-full max-w-lg rounded-xl p-6 shadow transform scale-95 transition-transform duration-300 border border-slate-100 max-h-[90vh] overflow-y-auto">
       <div class="flex justify-between items-center mb-5">
-        <h3 class="text-2xl font-black text-slate-800 tracking-tight">テキストからレシピを追加</h3>
+        <h3 class="text-2xl font-medium text-slate-800 tracking-tight">テキストからレシピを追加</h3>
         <button onclick="closeRecipeTextModal()" class="text-slate-300 hover:text-slate-600 bg-slate-100 p-2 rounded-full"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg></button>
       </div>
       <div class="space-y-4">
         <div>
-          <label class="block text-[11px] font-black text-slate-400 uppercase mb-1.5 ml-1">レシピテキスト</label>
-          <textarea id="r-text-input" rows="8" class="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:border-indigo-500 resize-none" placeholder="Webやメモからコピーしたレシピテキストをここに貼り付けてください..."></textarea>
+          <label class="block text-[11px] font-medium text-slate-400 uppercase mb-1.5 ml-1">レシピテキスト</label>
+          <textarea id="r-text-input" rows="8" class="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:border-indigo-500 resize-none" placeholder="Webやメモからコピーしたレシピテキストをここに貼り付けてください..."></textarea>
         </div>
-        <button onclick="parseRecipeTextWithAI()" class="w-full bg-indigo-600 text-white font-black py-4 rounded-2xl shadow-lg hover:bg-indigo-700 active:scale-95 transition-all flex items-center justify-center gap-2">
-          <span>🧠</span> AIで構造化
+        <button onclick="parseRecipeTextWithAI()" class="w-full bg-indigo-600 text-white font-medium py-4 rounded-xl shadow-sm hover:bg-indigo-700 active:scale-95 transition-all flex items-center justify-center gap-2">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m12 3 1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6L12 3ZM19 14l.8 2.2L22 17l-2.2.8L19 20l-.8-2.2L16 17l2.2-.8L19 14ZM5 14l.8 2.2L8 17l-2.2.8L5 20l-.8-2.2L2 17l2.2-.8L5 14Z"/></svg> AIで構造化
         </button>
       </div>
     </div>
@@ -484,47 +484,47 @@
 
   <!-- モーダル: AIレシピ相談 -->
   <div id="aiRequestModal" onclick="if(event.target===this) closeAiRequestModal()" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
-    <div onclick="event.stopPropagation()" class="bg-white w-full max-w-lg rounded-[2.5rem] p-6 shadow-2xl transform scale-95 transition-transform duration-300 border border-slate-100 max-h-[90vh] overflow-y-auto">
+    <div onclick="event.stopPropagation()" class="bg-white w-full max-w-lg rounded-xl p-6 shadow transform scale-95 transition-transform duration-300 border border-slate-100 max-h-[90vh] overflow-y-auto">
       <div class="flex justify-between items-center mb-5">
-        <h3 id="aiRequestTitle" class="text-2xl font-black text-slate-800 tracking-tight">レシピのリクエスト</h3>
+        <h3 id="aiRequestTitle" class="text-2xl font-medium text-slate-800 tracking-tight">レシピのリクエスト</h3>
         <button onclick="closeAiRequestModal()" class="text-slate-300 hover:text-slate-600 bg-slate-100 p-2 rounded-full"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg></button>
       </div>
 
       <!-- 画面A: 要望入力 -->
       <div id="aiRequestInputView" class="space-y-4">
         <div>
-          <p class="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">使う食材</p>
+          <p class="text-[11px] font-medium text-slate-400 uppercase tracking-widest mb-2">使う食材</p>
           <div id="aiRequestItems" class="flex flex-wrap gap-2">
             <!-- JSで動的に挿入 -->
           </div>
         </div>
         <div>
           <div class="flex justify-between items-center mb-1.5">
-            <label class="text-[11px] font-black text-slate-400 uppercase ml-1">AI提案プロンプト（編集できます）</label>
-            <button onclick="resetAiPromptToDefault()" class="text-[10px] font-black text-indigo-600 hover:text-indigo-700">提案に戻す</button>
+            <label class="text-[11px] font-medium text-slate-400 uppercase ml-1">AI提案プロンプト（編集できます）</label>
+            <button onclick="resetAiPromptToDefault()" class="text-[10px] font-medium text-indigo-600 hover:text-indigo-700">提案に戻す</button>
           </div>
-          <textarea id="aiPromptEdit" rows="10" class="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-4 py-3 text-xs font-bold outline-none focus:border-indigo-500 resize-none font-mono leading-relaxed" placeholder="プロンプトが表示されます..."></textarea>
+          <textarea id="aiPromptEdit" rows="10" class="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-xs font-bold outline-none focus:border-indigo-500 resize-none font-mono leading-relaxed" placeholder="プロンプトが表示されます..."></textarea>
           <p class="text-[10px] text-slate-400 font-bold mt-1 ml-1">※このプロンプトを直接編集するか、下に追加の要望を書いてください。</p>
         </div>
         <div class="border-t border-slate-100 pt-4">
-          <label class="block text-[11px] font-black text-slate-400 uppercase mb-1.5 ml-1">追加の要望（任意）</label>
-          <textarea id="aiRequestTextarea" rows="3" class="w-full bg-white border-2 border-slate-200 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:border-indigo-500 resize-none" placeholder="例: 子供向けに、卵は半熟で、パスタにしてほしい..."></textarea>
+          <label class="block text-[11px] font-medium text-slate-400 uppercase mb-1.5 ml-1">追加の要望（任意）</label>
+          <textarea id="aiRequestTextarea" rows="3" class="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:border-indigo-500 resize-none" placeholder="例: 子供向けに、卵は半熟で、パスタにしてほしい..."></textarea>
           <p class="text-[10px] text-slate-400 font-bold mt-1 ml-1">※ここに書いた内容は、上のプロンプトに追加されます。</p>
         </div>
-        <button onclick="consultAiRecipe()" class="w-full bg-indigo-600 text-white font-black py-4 rounded-2xl shadow-lg hover:bg-indigo-700 active:scale-95 transition-all flex items-center justify-center gap-2">
-          <span>🧠</span> AIに相談する
+        <button onclick="consultAiRecipe()" class="w-full bg-indigo-600 text-white font-medium py-4 rounded-xl shadow-sm hover:bg-indigo-700 active:scale-95 transition-all flex items-center justify-center gap-2">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m12 3 1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6L12 3ZM19 14l.8 2.2L22 17l-2.2.8L19 20l-.8-2.2L16 17l2.2-.8L19 14ZM5 14l.8 2.2L8 17l-2.2.8L5 20l-.8-2.2L2 17l2.2-.8L5 14Z"/></svg> AIに相談する
         </button>
       </div>
 
       <!-- 画面B: 方針確認 -->
       <div id="aiRequestConfirmView" class="hidden space-y-5">
-        <div class="bg-indigo-50 rounded-2xl p-5 border border-indigo-100">
-          <p class="text-[11px] font-black text-indigo-400 uppercase tracking-widest mb-2">AIの提案方針</p>
+        <div class="bg-indigo-50 rounded-xl p-5 border border-indigo-100">
+          <p class="text-[11px] font-medium text-indigo-400 uppercase tracking-widest mb-2">AIの提案方針</p>
           <p id="aiRequestPlanText" class="text-sm font-bold text-slate-700 leading-relaxed"></p>
         </div>
         <div class="flex gap-3">
-          <button onclick="backToAiRequestInput()" class="flex-1 bg-slate-100 text-slate-600 font-black py-4 rounded-2xl hover:bg-slate-200 transition-all">要望を変える</button>
-          <button onclick="generateAiRecipeFromPlan()" class="flex-[2] bg-indigo-600 text-white font-black py-4 rounded-2xl hover:bg-indigo-700 transition-all shadow-xl">この方針でレシピを生成</button>
+          <button onclick="backToAiRequestInput()" class="flex-1 bg-slate-100 text-slate-600 font-medium py-4 rounded-xl hover:bg-slate-200 transition-all">要望を変える</button>
+          <button onclick="generateAiRecipeFromPlan()" class="flex-[2] bg-indigo-600 text-white font-medium py-4 rounded-xl hover:bg-indigo-700 transition-all shadow">この方針でレシピを生成</button>
         </div>
       </div>
     </div>
@@ -532,25 +532,25 @@
 
   <!-- モーダル: AI食材選択 -->
   <div id="aiIngredientSelectModal" class="fixed inset-0 z-50 flex items-start justify-center pt-12 p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
-    <div onclick="event.stopPropagation()" class="bg-white w-full max-w-lg rounded-[2.5rem] p-6 shadow-2xl transform scale-95 transition-transform duration-300 border border-slate-100 max-h-[85vh] overflow-y-auto">
+    <div onclick="event.stopPropagation()" class="bg-white w-full max-w-lg rounded-xl p-6 shadow transform scale-95 transition-transform duration-300 border border-slate-100 max-h-[85vh] overflow-y-auto">
       <div class="flex justify-between items-center mb-5">
-        <h3 class="text-2xl font-black text-slate-800 tracking-tight">食材を選択</h3>
+        <h3 class="text-2xl font-medium text-slate-800 tracking-tight">食材を選択</h3>
         <button onclick="closeAiIngredientModal()" class="text-slate-300 hover:text-slate-600 bg-slate-100 p-2 rounded-full"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg></button>
       </div>
       <div class="mb-4 space-y-3">
-        <input type="text" id="aiIngredientSearch" oninput="renderAiIngredientList()" class="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:border-indigo-500" placeholder="食材名で検索...">
+        <input type="text" id="aiIngredientSearch" oninput="renderAiIngredientList()" class="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:border-indigo-500" placeholder="食材名で検索...">
         <div class="flex gap-2">
           <div class="flex-1 flex bg-slate-100 rounded-xl p-1 gap-1">
-            <button type="button" onclick="setAiSort('name')" data-ai-sort="name" class="ai-sort-btn flex-1 text-xs font-black py-2 rounded-lg transition-all">名前</button>
-            <button type="button" onclick="setAiSort('buy')" data-ai-sort="buy" class="ai-sort-btn flex-1 text-xs font-black py-2 rounded-lg transition-all">購入日</button>
-            <button type="button" onclick="setAiSort('limit2')" data-ai-sort="limit2" class="ai-sort-btn flex-1 text-xs font-black py-2 rounded-lg transition-all bg-white text-indigo-600 shadow-sm">期限</button>
+            <button type="button" onclick="setAiSort('name')" data-ai-sort="name" class="ai-sort-btn flex-1 text-xs font-medium py-2 rounded-lg transition-all">名前</button>
+            <button type="button" onclick="setAiSort('buy')" data-ai-sort="buy" class="ai-sort-btn flex-1 text-xs font-medium py-2 rounded-lg transition-all">購入日</button>
+            <button type="button" onclick="setAiSort('limit2')" data-ai-sort="limit2" class="ai-sort-btn flex-1 text-xs font-medium py-2 rounded-lg transition-all bg-white text-indigo-600 shadow-sm">期限</button>
           </div>
         </div>
         <div class="flex gap-2">
-          <select id="aiIngredientLocFilter" onchange="renderAiIngredientList()" class="flex-1 bg-slate-50 border-2 border-slate-100 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:border-indigo-500 appearance-none cursor-pointer">
+          <select id="aiIngredientLocFilter" onchange="renderAiIngredientList()" class="flex-1 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:border-indigo-500 appearance-none cursor-pointer">
             <option value="すべて">すべての場所</option>
           </select>
-          <select id="aiIngredientTypeFilter" onchange="renderAiIngredientList()" class="flex-1 bg-slate-50 border-2 border-slate-100 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:border-indigo-500 appearance-none cursor-pointer">
+          <select id="aiIngredientTypeFilter" onchange="renderAiIngredientList()" class="flex-1 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:border-indigo-500 appearance-none cursor-pointer">
             <option value="すべて">すべての分類</option>
             <option value="食材">食材</option>
             <option value="野菜">野菜</option>
@@ -568,7 +568,7 @@
       </div>
       <div id="aiSelectedTagsArea" class="hidden pt-3 border-t border-slate-100 mt-2">
         <div class="flex items-center justify-between mb-2">
-          <span class="text-[11px] font-black text-slate-400 uppercase">選択済み</span>
+          <span class="text-[11px] font-medium text-slate-400 uppercase">選択済み</span>
           <button onclick="clearAiIngredientSelection()" class="text-[11px] font-bold text-rose-500 hover:text-rose-700">すべて解除</button>
         </div>
         <div id="aiSelectedTags" class="flex flex-wrap gap-2">
@@ -576,64 +576,64 @@
         </div>
       </div>
       <div class="pt-4 flex gap-3 mt-2 border-t border-slate-100">
-        <button onclick="closeAiIngredientModal()" class="flex-1 bg-slate-100 text-slate-600 font-black py-4 rounded-2xl hover:bg-slate-200 transition-all">キャンセル</button>
-        <button id="aiGenerateBtn" onclick="generateSelectedRecipe()" class="flex-[2] bg-indigo-600 text-white font-black py-4 rounded-2xl hover:bg-indigo-700 transition-all shadow-xl">レシピを考案</button>
+        <button onclick="closeAiIngredientModal()" class="flex-1 bg-slate-100 text-slate-600 font-medium py-4 rounded-xl hover:bg-slate-200 transition-all">キャンセル</button>
+        <button id="aiGenerateBtn" onclick="generateSelectedRecipe()" class="flex-[2] bg-indigo-600 text-white font-medium py-4 rounded-xl hover:bg-indigo-700 transition-all shadow">レシピを考案</button>
       </div>
     </div>
   </div>
 
   <!-- モーダル: AIレシピプレビュー -->
   <div id="aiRecipePreviewModal" onclick="if(event.target===this) closeAiPreviewModal()" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
-    <div onclick="event.stopPropagation()" class="bg-white w-full max-w-lg rounded-[2.5rem] p-6 shadow-2xl transform scale-95 transition-transform duration-300 border border-slate-100 max-h-[90vh] overflow-y-auto">
+    <div onclick="event.stopPropagation()" class="bg-white w-full max-w-lg rounded-xl p-6 shadow transform scale-95 transition-transform duration-300 border border-slate-100 max-h-[90vh] overflow-y-auto">
       <div class="flex justify-between items-center mb-5">
-        <h3 id="aiPreviewTitle" class="text-2xl font-black text-slate-800 tracking-tight">生成されたレシピ</h3>
+        <h3 id="aiPreviewTitle" class="text-2xl font-medium text-slate-800 tracking-tight">生成されたレシピ</h3>
         <button onclick="closeAiPreviewModal()" class="text-slate-300 hover:text-slate-600 bg-slate-100 p-2 rounded-full"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg></button>
       </div>
       <div class="space-y-5">
         <div>
-          <p class="text-[11px] font-black text-slate-400 uppercase mb-1.5 ml-1">レシピ名</p>
-          <h4 id="aiPreviewName" class="text-xl font-black text-slate-800"></h4>
+          <p class="text-[11px] font-medium text-slate-400 uppercase mb-1.5 ml-1">レシピ名</p>
+          <h4 id="aiPreviewName" class="text-xl font-medium text-slate-800"></h4>
         </div>
         <div>
           <div class="flex justify-between items-center mb-2">
-            <p class="text-[11px] font-black text-slate-400 uppercase ml-1">材料</p>
+            <p class="text-[11px] font-medium text-slate-400 uppercase ml-1">材料</p>
           </div>
-          <ul id="aiPreviewIngredients" class="space-y-2 bg-slate-50 rounded-2xl p-4">
+          <ul id="aiPreviewIngredients" class="space-y-2 bg-slate-50 rounded-xl p-4">
             <!-- JSで動的に挿入 -->
           </ul>
         </div>
         <div>
           <div class="flex justify-between items-center mb-2">
-            <p class="text-[11px] font-black text-slate-400 uppercase ml-1">手順</p>
+            <p class="text-[11px] font-medium text-slate-400 uppercase ml-1">手順</p>
           </div>
-          <ol id="aiPreviewSteps" class="space-y-3 bg-slate-50 rounded-2xl p-4 list-decimal list-inside">
+          <ol id="aiPreviewSteps" class="space-y-3 bg-slate-50 rounded-xl p-4 list-decimal list-inside">
             <!-- JSで動的に挿入 -->
           </ol>
         </div>
       </div>
       <!-- AI生成時のボタン -->
       <div id="aiPreviewActions" class="pt-4 flex gap-3 mt-2 border-t border-slate-100">
-        <button onclick="closeAiPreviewModal()" class="flex-1 bg-slate-100 text-slate-600 font-black py-4 rounded-2xl hover:bg-slate-200 transition-all">キャンセル</button>
-        <button onclick="regenerateAiRecipe()" class="flex-1 bg-indigo-100 text-indigo-700 font-black py-4 rounded-2xl hover:bg-indigo-200 transition-all">再生成</button>
-        <button onclick="saveAiRecipeToCollection()" class="flex-[2] bg-emerald-500 text-white font-black py-4 rounded-2xl hover:bg-emerald-600 transition-all shadow-xl">レシピ集に保存</button>
+        <button onclick="closeAiPreviewModal()" class="flex-1 bg-slate-100 text-slate-600 font-medium py-4 rounded-xl hover:bg-slate-200 transition-all">キャンセル</button>
+        <button onclick="regenerateAiRecipe()" class="flex-1 bg-indigo-100 text-indigo-700 font-medium py-4 rounded-xl hover:bg-indigo-200 transition-all">再生成</button>
+        <button onclick="saveAiRecipeToCollection()" class="flex-[2] bg-emerald-500 text-white font-medium py-4 rounded-xl hover:bg-emerald-600 transition-all shadow">レシピ集に保存</button>
       </div>
       <!-- レシピ閲覧時のボタン -->
       <div id="recipeViewActions" class="hidden pt-4 flex gap-3 mt-2 border-t border-slate-100">
-        <button onclick="closeAiPreviewModal()" class="flex-1 bg-slate-100 text-slate-600 font-black py-4 rounded-2xl hover:bg-slate-200 transition-all">閉じる</button>
-        <button onclick="openEditorFromViewer()" class="flex-[2] bg-indigo-600 text-white font-black py-4 rounded-2xl hover:bg-indigo-700 transition-all shadow-xl">編集する</button>
+        <button onclick="closeAiPreviewModal()" class="flex-1 bg-slate-100 text-slate-600 font-medium py-4 rounded-xl hover:bg-slate-200 transition-all">閉じる</button>
+        <button onclick="openEditorFromViewer()" class="flex-[2] bg-indigo-600 text-white font-medium py-4 rounded-xl hover:bg-indigo-700 transition-all shadow">編集する</button>
       </div>
     </div>
   </div>
 
   <!-- モーダル: 献立レシピ選択 -->
   <div id="scheduleRecipeModal" onclick="if(event.target===this) closeScheduleRecipeModal()" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
-    <div onclick="event.stopPropagation()" class="bg-white w-full max-w-lg rounded-[2.5rem] p-6 shadow-2xl transform scale-95 transition-transform duration-300 border border-slate-100 max-h-[85vh] overflow-y-auto">
+    <div onclick="event.stopPropagation()" class="bg-white w-full max-w-lg rounded-xl p-6 shadow transform scale-95 transition-transform duration-300 border border-slate-100 max-h-[85vh] overflow-y-auto">
       <div class="flex justify-between items-center mb-5">
-        <h3 class="text-2xl font-black text-slate-800 tracking-tight">レシピを選択</h3>
+        <h3 class="text-2xl font-medium text-slate-800 tracking-tight">レシピを選択</h3>
         <button onclick="closeScheduleRecipeModal()" class="text-slate-300 hover:text-slate-600 bg-slate-100 p-2 rounded-full"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg></button>
       </div>
       <div class="mb-4">
-        <input type="text" id="scheduleRecipeSearch" oninput="renderScheduleRecipePickerList()" class="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:border-indigo-500" placeholder="レシピ名で検索...">
+        <input type="text" id="scheduleRecipeSearch" oninput="renderScheduleRecipePickerList()" class="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:border-indigo-500" placeholder="レシピ名で検索...">
       </div>
       <div id="scheduleRecipePickerList" class="space-y-2 max-h-[50vh] overflow-y-auto">
         <!-- JSで動的に挿入 -->
@@ -643,102 +643,102 @@
 
   <!-- モーダル: 献立スロット操作メニュー -->
   <div id="scheduleSlotMenu" onclick="if(event.target===this) closeScheduleSlotMenu()" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
-    <div onclick="event.stopPropagation()" class="bg-white w-full max-w-sm rounded-[2.5rem] p-6 shadow-2xl transform scale-95 transition-transform duration-300 border border-slate-100">
+    <div onclick="event.stopPropagation()" class="bg-white w-full max-w-sm rounded-xl p-6 shadow transform scale-95 transition-transform duration-300 border border-slate-100">
       <div class="flex justify-between items-center mb-5">
-        <h3 id="scheduleSlotMenuTitle" class="text-xl font-black text-slate-800 tracking-tight">献立の操作</h3>
+        <h3 id="scheduleSlotMenuTitle" class="text-xl font-medium text-slate-800 tracking-tight">献立の操作</h3>
         <button onclick="closeScheduleSlotMenu()" class="text-slate-300 hover:text-slate-600 bg-slate-100 p-2 rounded-full"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg></button>
       </div>
       <div class="space-y-3">
-        <button onclick="changeScheduleSlotRecipe()" class="w-full bg-indigo-600 text-white font-black py-4 rounded-2xl shadow-lg hover:bg-indigo-700 active:scale-95 transition-all">別のレシピに変更</button>
-        <button onclick="removeScheduleSlot()" class="w-full bg-rose-500 text-white font-black py-4 rounded-2xl shadow-lg hover:bg-rose-600 active:scale-95 transition-all">削除する</button>
+        <button onclick="changeScheduleSlotRecipe()" class="w-full bg-indigo-600 text-white font-medium py-4 rounded-xl shadow-sm hover:bg-indigo-700 active:scale-95 transition-all">別のレシピに変更</button>
+        <button onclick="removeScheduleSlot()" class="w-full bg-rose-500 text-white font-medium py-4 rounded-xl shadow-sm hover:bg-rose-600 active:scale-95 transition-all">削除する</button>
       </div>
     </div>
   </div>
 
   <!-- モーダル: 献立一括削除確認 -->
   <div id="scheduleBatchDeleteModal" onclick="if(event.target===this) closeScheduleBatchDeleteModal()" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
-    <div onclick="event.stopPropagation()" class="bg-white w-full max-w-sm rounded-[2.5rem] p-6 shadow-2xl transform scale-95 transition-transform duration-300 border border-slate-100">
+    <div onclick="event.stopPropagation()" class="bg-white w-full max-w-sm rounded-xl p-6 shadow transform scale-95 transition-transform duration-300 border border-slate-100">
       <div class="flex justify-between items-center mb-5">
-        <h3 class="text-xl font-black text-slate-800 tracking-tight">献立の削除確認</h3>
+        <h3 class="text-xl font-medium text-slate-800 tracking-tight">献立の削除確認</h3>
         <button onclick="closeScheduleBatchDeleteModal()" class="text-slate-300 hover:text-slate-600 bg-slate-100 p-2 rounded-full"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg></button>
       </div>
       <p class="text-sm font-bold text-slate-600 mb-6">完了済みの献立が含まれています。削除してもよろしいですか？</p>
       <div class="flex gap-3">
-        <button onclick="closeScheduleBatchDeleteModal()" class="flex-1 bg-slate-100 text-slate-600 font-black py-4 rounded-2xl hover:bg-slate-200 transition-all">キャンセル</button>
-        <button onclick="batchDeleteScheduleConfirmed()" class="flex-1 bg-rose-500 text-white font-black py-4 rounded-2xl hover:bg-rose-600 transition-all shadow-lg">削除する</button>
+        <button onclick="closeScheduleBatchDeleteModal()" class="flex-1 bg-slate-100 text-slate-600 font-medium py-4 rounded-xl hover:bg-slate-200 transition-all">キャンセル</button>
+        <button onclick="batchDeleteScheduleConfirmed()" class="flex-1 bg-rose-500 text-white font-medium py-4 rounded-xl hover:bg-rose-600 transition-all shadow-sm">削除する</button>
       </div>
     </div>
   </div>
 
   <!-- モーダル: 消費量調整 -->
   <div id="consumptionModal" onclick="if(event.target===this) closeConsumptionModal()" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
-    <div onclick="event.stopPropagation()" class="bg-white w-full max-w-lg rounded-[2.5rem] p-6 shadow-2xl transform scale-95 transition-transform duration-300 border border-slate-100 max-h-[90vh] overflow-y-auto">
+    <div onclick="event.stopPropagation()" class="bg-white w-full max-w-lg rounded-xl p-6 shadow transform scale-95 transition-transform duration-300 border border-slate-100 max-h-[90vh] overflow-y-auto">
       <div class="flex justify-between items-center mb-5">
-        <h3 class="text-2xl font-black text-slate-800 tracking-tight">実際の消費量を調整</h3>
+        <h3 class="text-2xl font-medium text-slate-800 tracking-tight">実際の消費量を調整</h3>
         <button onclick="closeConsumptionModal()" class="text-slate-300 hover:text-slate-600 bg-slate-100 p-2 rounded-full"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg></button>
       </div>
       <div id="consumptionList" class="space-y-3 mb-6">
         <!-- JSで動的に挿入 -->
       </div>
-      <div id="consumptionWarning" class="hidden mb-4 bg-rose-50 border border-rose-200 rounded-2xl p-4">
+      <div id="consumptionWarning" class="hidden mb-4 bg-rose-50 border border-rose-200 rounded-xl p-4">
         <p class="text-sm font-bold text-rose-600">在庫が不足しています。実際の在庫を確認してください。</p>
       </div>
       <div class="flex gap-3">
-        <button onclick="closeConsumptionModal()" class="flex-1 bg-slate-100 text-slate-600 font-black py-4 rounded-2xl hover:bg-slate-200 transition-all">キャンセル</button>
-        <button id="btnConsumptionConfirm" onclick="confirmConsumption()" class="flex-[2] bg-emerald-600 text-white font-black py-4 rounded-2xl hover:bg-emerald-700 transition-all shadow-xl">確定</button>
+        <button onclick="closeConsumptionModal()" class="flex-1 bg-slate-100 text-slate-600 font-medium py-4 rounded-xl hover:bg-slate-200 transition-all">キャンセル</button>
+        <button id="btnConsumptionConfirm" onclick="confirmConsumption()" class="flex-[2] bg-emerald-600 text-white font-medium py-4 rounded-xl hover:bg-emerald-700 transition-all shadow">確定</button>
       </div>
     </div>
   </div>
 
   <!-- モーダル: 料理の記録 -->
   <div id="cookingRecordModal" onclick="if(event.target===this) closeCookingRecordModal()" class="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
-    <div onclick="event.stopPropagation()" class="bg-white w-full max-w-lg rounded-[2.5rem] p-6 shadow-2xl transform scale-95 transition-transform duration-300 border border-slate-100 max-h-[90vh] overflow-y-auto">
+    <div onclick="event.stopPropagation()" class="bg-white w-full max-w-lg rounded-xl p-6 shadow transform scale-95 transition-transform duration-300 border border-slate-100 max-h-[90vh] overflow-y-auto">
       <div class="flex justify-between items-center mb-5">
-        <h3 class="text-2xl font-black text-slate-800 tracking-tight">料理の記録</h3>
+        <h3 class="text-2xl font-medium text-slate-800 tracking-tight">料理の記録</h3>
         <button onclick="closeCookingRecordModal()" class="text-slate-300 hover:text-slate-600 bg-slate-100 p-2 rounded-full"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg></button>
       </div>
 
       <div class="space-y-5">
         <!-- 写真アップロード -->
         <div>
-          <label class="block text-[11px] font-black text-slate-400 uppercase mb-1.5 ml-1">完成写真</label>
+          <label class="block text-[11px] font-medium text-slate-400 uppercase mb-1.5 ml-1">完成写真</label>
           <div id="photoUploadArea" class="relative">
             <input type="file" id="cookingPhotoInput" accept="image/*" onchange="handlePhotoSelect(event)" class="hidden">
-            <label for="cookingPhotoInput" id="photoDropzone" class="flex flex-col items-center justify-center gap-2 w-full h-40 bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl cursor-pointer hover:bg-slate-100 hover:border-indigo-300 transition-all">
-              <span class="text-3xl">📷</span>
+            <label for="cookingPhotoInput" id="photoDropzone" class="flex flex-col items-center justify-center gap-2 w-full h-40 bg-slate-50 border border-dashed border-slate-200 rounded-xl cursor-pointer hover:bg-slate-100 hover:border-indigo-300 transition-all">
+              <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h3l2-3h6l2 3h3v11H4V8Zm8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/></svg>
               <span class="text-xs font-bold text-slate-400">タップして写真を選択</span>
             </label>
             <div id="photoPreviewContainer" class="hidden relative">
-              <img id="photoPreview" class="w-full h-48 object-cover rounded-2xl border border-slate-200">
-              <button onclick="clearCookingPhoto()" class="absolute top-2 right-2 bg-slate-800/80 text-white text-xs font-black px-3 py-1.5 rounded-full hover:bg-slate-700 transition-all">変更</button>
+              <img id="photoPreview" class="w-full h-48 object-cover rounded-xl border border-slate-200">
+              <button onclick="clearCookingPhoto()" class="absolute top-2 right-2 bg-slate-800/80 text-white text-xs font-medium px-3 py-1.5 rounded-full hover:bg-slate-700 transition-all">変更</button>
             </div>
           </div>
         </div>
 
         <!-- 評価 -->
         <div>
-          <label class="block text-[11px] font-black text-slate-400 uppercase mb-1.5 ml-1">評価</label>
+          <label class="block text-[11px] font-medium text-slate-400 uppercase mb-1.5 ml-1">評価</label>
           <div id="cookingStarRating" class="flex gap-1" data-rating="0"></div>
         </div>
 
         <!-- 感想 -->
         <div>
-          <label class="block text-[11px] font-black text-slate-400 uppercase mb-1.5 ml-1">感想</label>
-          <textarea id="cookingRecordNote" rows="3" class="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:border-indigo-500 resize-none" placeholder="今回の調理の感想、次回の改善点など（任意）"></textarea>
+          <label class="block text-[11px] font-medium text-slate-400 uppercase mb-1.5 ml-1">感想</label>
+          <textarea id="cookingRecordNote" rows="3" class="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:border-indigo-500 resize-none" placeholder="今回の調理の感想、次回の改善点など（任意）"></textarea>
         </div>
       </div>
 
       <div class="pt-4 flex gap-3 mt-2 border-t border-slate-100">
-        <button onclick="closeCookingRecordModal()" class="flex-1 bg-slate-100 text-slate-600 font-black py-4 rounded-2xl hover:bg-slate-200 transition-all">スキップ</button>
-        <button onclick="saveCookingRecord()" class="flex-[2] bg-emerald-600 text-white font-black py-4 rounded-2xl hover:bg-emerald-700 transition-all shadow-xl">記録を保存</button>
+        <button onclick="closeCookingRecordModal()" class="flex-1 bg-slate-100 text-slate-600 font-medium py-4 rounded-xl hover:bg-slate-200 transition-all">スキップ</button>
+        <button onclick="saveCookingRecord()" class="flex-[2] bg-emerald-600 text-white font-medium py-4 rounded-xl hover:bg-emerald-700 transition-all shadow">記録を保存</button>
       </div>
     </div>
   </div>
 
   <input type="file" accept="image/*" capture="environment" id="imageScanInput" onchange="handleImageScan(event)" hidden>
 
-  <button id="geminiCopyBtn" onclick="majinCopy()" style="display:none;" class="fixed bottom-24 left-4 z-[70] bg-slate-900 text-white text-[10px] font-black py-2.5 px-5 rounded-full shadow-2xl flex items-center gap-2 hover:scale-105 transition-all border border-slate-700">
-    <span class="animate-slide-left text-lg">⬅️</span> GEMINIへ共有
+  <button id="geminiCopyBtn" onclick="majinCopy()" style="display:none;" class="fixed bottom-24 left-4 z-[70] bg-slate-900 text-white text-[10px] font-medium py-2.5 px-5 rounded-full shadow flex items-center gap-2 hover:scale-105 transition-all border border-slate-700">
+    <svg class="animate-slide-left w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 12H5m6-6-6 6 6 6"/></svg> GEMINIへ共有
   </button>
 
   <iframe name="gas" class="hidden"></iframe>
@@ -840,7 +840,7 @@
       bar.dataset.state = type === 'done' ? 'done' : 'busy';
       spinner.className = type === 'done'
         ? 'w-3 h-3 rounded-full bg-emerald-500 shrink-0 transition-opacity duration-200'
-        : 'w-3 h-3 border-2 border-indigo-100 border-t-indigo-600 rounded-full animate-spin shrink-0 transition-opacity duration-200';
+        : 'w-3 h-3 border border-indigo-100 border-t-indigo-600 rounded-full animate-spin shrink-0 transition-opacity duration-200';
       return token;
     }
 
@@ -861,7 +861,7 @@
             bar.dataset.state = 'idle';
             title.textContent = '待機中';
             sub.textContent = 'バックグラウンド処理はありません';
-            spinner.className = 'w-3 h-3 border-2 border-indigo-100 border-t-indigo-600 rounded-full animate-spin shrink-0 transition-opacity duration-200';
+            spinner.className = 'w-3 h-3 border border-indigo-100 border-t-indigo-600 rounded-full animate-spin shrink-0 transition-opacity duration-200';
             state.activityStatusToken = null;
           }
         }, 1600);
@@ -869,7 +869,7 @@
         bar.dataset.state = 'idle';
         title.textContent = '待機中';
         sub.textContent = 'バックグラウンド処理はありません';
-        spinner.className = 'w-3 h-3 border-2 border-indigo-100 border-t-indigo-600 rounded-full animate-spin shrink-0 transition-opacity duration-200';
+        spinner.className = 'w-3 h-3 border border-indigo-100 border-t-indigo-600 rounded-full animate-spin shrink-0 transition-opacity duration-200';
         state.activityStatusToken = null;
       }
     }
@@ -878,7 +878,7 @@
       const existing = document.querySelector('.app-toast');
       if (existing) existing.remove();
       const toast = document.createElement('div');
-      toast.className = 'app-toast fixed top-6 left-1/2 z-[80] px-6 py-3.5 rounded-2xl shadow-2xl font-black text-sm toast-in max-w-[90%] text-center';
+      toast.className = 'app-toast fixed top-6 left-1/2 z-[80] px-6 py-3.5 rounded-xl shadow font-medium text-sm toast-in max-w-[90%] text-center';
       if (type === 'error') {
         toast.classList.add('bg-rose-500', 'text-white');
       } else if (type === 'success') {
@@ -899,8 +899,8 @@
       const existing = document.querySelector('.app-toast');
       if (existing) existing.remove();
       const toast = document.createElement('div');
-      toast.className = 'app-toast fixed top-6 left-1/2 z-[80] px-6 py-4 rounded-2xl shadow-2xl font-black text-sm toast-in max-w-[90%] text-center bg-slate-800 text-white';
-      toast.innerHTML = `<div class="mb-2">${message}</div><button class="px-4 py-2 rounded-xl bg-emerald-500 text-white text-xs font-black hover:bg-emerald-600 transition-all">${actionLabel}</button>`;
+      toast.className = 'app-toast fixed top-6 left-1/2 z-[80] px-6 py-4 rounded-xl shadow font-medium text-sm toast-in max-w-[90%] text-center bg-slate-800 text-white';
+      toast.innerHTML = `<div class="mb-2">${message}</div><button class="px-4 py-2 rounded-xl bg-emerald-500 text-white text-xs font-medium hover:bg-emerald-600 transition-all">${actionLabel}</button>`;
       toast.querySelector('button').onclick = () => {
         actionFn();
         toast.classList.remove('toast-in');
@@ -1201,21 +1201,21 @@
       if (!item || !item._syncStatus) return '';
       const label = item._syncStatus === 'created' ? '未同期' : '変更あり';
       const cls = item._syncStatus === 'created' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700';
-      return `<span class="text-[9px] font-black px-1.5 py-0.5 ${cls} rounded-full">${label}</span>`;
+      return `<span class="text-[9px] font-medium px-1.5 py-0.5 ${cls} rounded-full">${label}</span>`;
     }
 
     function getRecipeSyncBadge(recipe) {
       if (!recipe || !recipe._syncStatus) return '';
       const label = recipe._syncStatus === 'created' ? '未同期' : '変更あり';
       const cls = recipe._syncStatus === 'created' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700';
-      return `<span class="text-[9px] font-black px-2 py-0.5 ${cls} rounded-full">${label}</span>`;
+      return `<span class="text-[9px] font-medium px-2 py-0.5 ${cls} rounded-full">${label}</span>`;
     }
 
     function getShoppingSyncBadge(item) {
       if (!item || !item._syncStatus) return '';
       const label = item._syncStatus === 'created' ? '未同期' : '変更あり';
       const cls = item._syncStatus === 'created' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700';
-      return `<span class="text-[9px] font-black px-1.5 py-0.5 ${cls} rounded-full">${label}</span>`;
+      return `<span class="text-[9px] font-medium px-1.5 py-0.5 ${cls} rounded-full">${label}</span>`;
     }
 
     function getShoppingSourceText(item) {
@@ -1265,7 +1265,7 @@
             view: 'p-4 max-w-2xl mx-auto transition-colors',
             header: 'sticky top-0 z-40 bg-slate-50/95 backdrop-blur-md pt-4 pb-3 border-b border-slate-100',
             label: 'text-xs text-slate-400 font-bold uppercase tracking-widest mt-1',
-            shell: 'bg-white/80 border border-slate-200 rounded-2xl p-1 flex items-center gap-1 shadow-sm',
+            shell: 'bg-white/80 border border-slate-200 rounded-xl p-1 flex items-center gap-1 shadow-sm',
             active: 'bg-amber-500 text-white shadow-sm',
             inactive: 'bg-white/70 text-amber-700 hover:bg-amber-100'
           }
@@ -1274,7 +1274,7 @@
               view: 'p-4 max-w-2xl mx-auto transition-colors',
               header: 'sticky top-0 z-40 bg-slate-50/95 backdrop-blur-md pt-4 pb-3 border-b border-slate-100',
               label: 'text-xs text-slate-400 font-bold uppercase tracking-widest mt-1',
-              shell: 'bg-white/80 border border-slate-200 rounded-2xl p-1 flex items-center gap-1 shadow-sm',
+              shell: 'bg-white/80 border border-slate-200 rounded-xl p-1 flex items-center gap-1 shadow-sm',
               active: 'bg-emerald-600 text-white shadow-sm',
               inactive: 'bg-white/70 text-emerald-700 hover:bg-emerald-100'
             }
@@ -1282,7 +1282,7 @@
               view: 'p-4 max-w-2xl mx-auto transition-colors',
               header: 'sticky top-0 z-40 bg-slate-50/95 backdrop-blur-md pt-4 pb-3 border-b border-slate-100',
               label: 'text-xs text-slate-400 font-bold uppercase tracking-widest mt-1',
-              shell: 'bg-white/80 border border-slate-200 rounded-2xl p-1 flex items-center gap-1 shadow-sm',
+              shell: 'bg-white/80 border border-slate-200 rounded-xl p-1 flex items-center gap-1 shadow-sm',
               active: 'bg-slate-900 text-white shadow-sm',
               inactive: 'bg-white/60 text-slate-500 hover:bg-slate-100 hover:text-slate-800'
             };
@@ -1300,7 +1300,7 @@
         if (!el) return;
         const base = tab.id === 'registrationTopTab'
           ? 'relative w-10 h-10 rounded-xl flex items-center justify-center transition-all active:scale-95'
-          : 'px-3 py-2 rounded-xl text-[11px] font-black transition-all active:scale-95 whitespace-nowrap';
+          : 'px-3 py-2 rounded-xl text-[11px] font-medium transition-all active:scale-95 whitespace-nowrap';
         el.className = `${base} ${tab.active ? viewTone.active : viewTone.inactive}`;
       });
     }
@@ -1333,7 +1333,7 @@
       return `
         <div class="flex items-center gap-2 px-1 h-8">
           <input type="checkbox" id="${id}" onchange="toggleSelectAll(this)" class="w-5 h-5 rounded border-slate-300 text-${color}-600 focus:ring-${color}-500">
-          <label for="${id}" class="text-xs font-black text-slate-500 uppercase tracking-widest cursor-pointer">すべて選択</label>
+          <label for="${id}" class="text-xs font-medium text-slate-500 uppercase tracking-widest cursor-pointer">すべて選択</label>
         </div>
       `;
     }
@@ -1350,7 +1350,7 @@
         return `
           <button onclick="filterByLocation(this.dataset.loc)" class="${getLocationTabClass(loc)}" data-loc="${escapeHtml(loc)}">
             ${escapeHtml(loc)}
-            <span class="ml-1 text-[10px] font-black px-1.5 py-0.5 rounded-full ${badgeClass}">${count}</span>
+            <span class="ml-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full ${badgeClass}">${count}</span>
           </button>
         `;
       }).join('');
@@ -1359,10 +1359,10 @@
         <div class="flex gap-2 overflow-x-auto pb-1">
           <button onclick="filterByLocation(this.dataset.loc)" class="${getLocationTabClass('すべて')}" data-loc="すべて">
             すべて
-            <span class="ml-1 text-[10px] font-black px-1.5 py-0.5 rounded-full ${allBadgeClass}">${allCount}</span>
+            <span class="ml-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full ${allBadgeClass}">${allCount}</span>
           </button>
           ${storageTabs}
-          <button onclick="openLocationManager()" class="bg-slate-800 text-white px-4 py-2.5 rounded-xl text-sm font-black whitespace-nowrap transition-all active:scale-95 shrink-0">＋ 管理</button>
+          <button onclick="openLocationManager()" class="bg-slate-800 text-white px-4 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-all active:scale-95 shrink-0">＋ 管理</button>
         </div>
       `;
     }
@@ -1379,10 +1379,10 @@
         if (label) label.textContent = 'REGISTRATION HUB';
         primary.innerHTML = `
           <div class="grid grid-cols-2 gap-2">
-            <button onclick="document.getElementById('imageScanInput').click()" class="h-12 bg-rose-50 text-rose-700 border border-rose-100 px-3 rounded-xl font-black text-[11px] flex items-center justify-center gap-2 active:scale-95 transition-all">
-              <span class="text-base">📷</span><span>画像スキャン</span>
+            <button onclick="document.getElementById('imageScanInput').click()" class="h-12 bg-rose-50 text-rose-700 border border-rose-100 px-3 rounded-xl font-medium text-[11px] flex items-center justify-center gap-2 active:scale-95 transition-all">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h3l2-3h6l2 3h3v11H4V8Zm8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/></svg><span>画像スキャン</span>
             </button>
-            <button onclick="openHubManualAdd()" class="h-12 bg-amber-50 text-amber-700 border border-amber-100 px-3 rounded-xl font-black text-[11px] flex items-center justify-center gap-2 active:scale-95 transition-all">
+            <button onclick="openHubManualAdd()" class="h-12 bg-amber-50 text-amber-700 border border-amber-100 px-3 rounded-xl font-medium text-[11px] flex items-center justify-center gap-2 active:scale-95 transition-all">
               <span class="text-base">＋</span><span>手動で追加</span>
             </button>
           </div>
@@ -1406,12 +1406,12 @@
         primary.innerHTML = `
           <div class="h-12 flex items-center justify-between gap-3 px-3 bg-emerald-50 border border-emerald-100 rounded-xl">
             <div>
-              <div class="text-[10px] font-black text-emerald-600 uppercase tracking-widest leading-none">SHOPPING</div>
-              <div class="text-sm font-black text-slate-800 mt-1">買い物リスト</div>
+              <div class="text-[10px] font-medium text-emerald-600 uppercase tracking-widest leading-none">SHOPPING</div>
+              <div class="text-sm font-medium text-slate-800 mt-1">買い物リスト</div>
             </div>
             <div class="bg-emerald-100 rounded-xl p-1 flex gap-1 shrink-0">
-              <button onclick="setShoppingView('source')" class="shopping-view-btn px-3 py-1.5 rounded-lg text-[10px] font-black ${state.shoppingView === 'source' ? 'bg-white text-emerald-700 shadow-sm' : 'text-emerald-700'}">出自別</button>
-              <button onclick="setShoppingView('grouped')" class="shopping-view-btn px-3 py-1.5 rounded-lg text-[10px] font-black ${state.shoppingView === 'grouped' ? 'bg-white text-emerald-700 shadow-sm' : 'text-emerald-700'}">材料まとめ</button>
+              <button onclick="setShoppingView('source')" class="shopping-view-btn px-3 py-1.5 rounded-lg text-[10px] font-medium ${state.shoppingView === 'source' ? 'bg-white text-emerald-700 shadow-sm' : 'text-emerald-700'}">出自別</button>
+              <button onclick="setShoppingView('grouped')" class="shopping-view-btn px-3 py-1.5 rounded-lg text-[10px] font-medium ${state.shoppingView === 'grouped' ? 'bg-white text-emerald-700 shadow-sm' : 'text-emerald-700'}">材料まとめ</button>
             </div>
           </div>
         `;
@@ -1448,11 +1448,11 @@
       if (!container) return;
       const base = 'space-y-3 mt-3 transition-colors';
       if (state.currentLoc === '買い物リスト') {
-        container.className = `${base} bg-emerald-50 p-3 rounded-2xl border border-emerald-100`;
+        container.className = `${base} bg-emerald-50 p-3 rounded-xl border border-emerald-100`;
       } else if (state.currentLoc === '登録待ち') {
-        container.className = `${base} bg-amber-50 p-3 rounded-2xl border border-amber-100`;
+        container.className = `${base} bg-amber-50 p-3 rounded-xl border border-amber-100`;
       } else {
-        container.className = `${base} bg-slate-100 p-3 rounded-2xl border border-slate-200`;
+        container.className = `${base} bg-slate-100 p-3 rounded-xl border border-slate-200`;
       }
     }
 
@@ -1495,7 +1495,7 @@
             <div class="text-[10px] text-slate-400 font-bold truncate">${escapeHtml(source)}</div>
           </div>
           <div class="${qtyCls} font-bold text-slate-700 w-16 text-right shrink-0">${item.qty}<span class="text-[10px]">${escapeHtml(item.unit || '')}</span></div>
-          <button onclick="deleteShoppingItem('${item.id}')" class="p-2 text-slate-400 hover:text-rose-500 transition-colors text-lg leading-none shrink-0">🗑</button>
+          <button onclick="deleteShoppingItem('${item.id}')" class="p-2 text-slate-400 hover:text-rose-500 transition-colors text-lg leading-none shrink-0"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6h18M8 6V4h8v2m-9 0 1 14h8l1-14M10 10v6M14 10v6"/></svg></button>
         </div>
       `;
     }
@@ -1525,11 +1525,11 @@
           <div class="bg-emerald-50 p-3 rounded-xl shadow-sm border border-emerald-100">
             <div class="flex items-center gap-3">
               <input type="checkbox" class="shop-group-cb w-5 h-5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 shrink-0" data-ids="${ids}" onchange="toggleShoppingGroupSelection(this)">
-              <button onclick="toggleShoppingGroup(decodeURIComponent('${encodedKey}'))" class="w-7 h-7 bg-slate-100 rounded-lg text-slate-600 font-black flex items-center justify-center active:scale-90 transition-all shrink-0">${expanded ? '−' : '＋'}</button>
+              <button onclick="toggleShoppingGroup(decodeURIComponent('${encodedKey}'))" class="w-7 h-7 bg-slate-100 rounded-lg text-slate-600 font-medium flex items-center justify-center active:scale-90 transition-all shrink-0">${expanded ? '−' : '＋'}</button>
               <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-2 mb-0.5">
                   <span class="font-bold text-slate-800 text-sm truncate">${escapeHtml(group.name)}</span>
-                  <span class="text-[9px] font-black px-1.5 py-0.5 bg-emerald-100 text-emerald-700 rounded-full">${group.items.length}件</span>
+                  <span class="text-[9px] font-medium px-1.5 py-0.5 bg-emerald-100 text-emerald-700 rounded-full">${group.items.length}件</span>
                 </div>
                 <div class="text-[10px] text-slate-400 font-bold truncate">${escapeHtml(group.items.map(getShoppingSourceText).join(' / '))}</div>
               </div>
@@ -1587,7 +1587,7 @@
       if (loc === '買い物リスト') {
         tone = active ? 'active bg-emerald-50 text-emerald-600 shadow-sm border border-emerald-100' : 'bg-emerald-50 text-emerald-600 border border-emerald-100';
       }
-      return `location-tab ${tone} px-5 py-2.5 rounded-xl text-sm font-black whitespace-nowrap transition-all relative shrink-0`;
+      return `location-tab ${tone} px-5 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-all relative shrink-0`;
     }
 
     function renderLocationTabs() {
@@ -1661,23 +1661,23 @@
           .map(other => `<option value="${escapeHtml(other)}">${escapeHtml(other)}</option>`)
           .join('');
         return `
-          <div class="bg-slate-50 border border-slate-100 rounded-2xl p-4 space-y-3">
+          <div class="bg-slate-50 border border-slate-100 rounded-xl p-4 space-y-3">
             <div class="flex items-start justify-between gap-3">
               <div class="min-w-0">
-                <div class="font-black text-slate-800 truncate">${escapeHtml(loc)}</div>
+                <div class="font-medium text-slate-800 truncate">${escapeHtml(loc)}</div>
                 <div class="text-[10px] font-bold text-slate-400 mt-0.5">在庫 ${counts.inventoryCount}件 / 登録待ち ${counts.stagingCount}件</div>
               </div>
-              <button onclick="deleteEmptyLocation(this.dataset.loc)" data-loc="${escapeHtml(loc)}" class="${canDelete ? 'text-rose-500 hover:bg-rose-50' : 'text-slate-300 cursor-not-allowed'} text-xs font-black px-3 py-2 rounded-xl transition-all" ${canDelete ? '' : 'disabled'}>削除</button>
+              <button onclick="deleteEmptyLocation(this.dataset.loc)" data-loc="${escapeHtml(loc)}" class="${canDelete ? 'text-rose-500 hover:bg-rose-50' : 'text-slate-300 cursor-not-allowed'} text-xs font-medium px-3 py-2 rounded-xl transition-all" ${canDelete ? '' : 'disabled'}>削除</button>
             </div>
             <div class="flex gap-2">
-              <input type="text" value="${escapeHtml(loc)}" class="location-rename-input min-w-0 flex-1 bg-white border-2 border-slate-100 rounded-xl px-3 py-2 text-sm font-bold outline-none focus:border-indigo-500">
-              <button onclick="renameLocation(this.dataset.loc, this.previousElementSibling.value)" data-loc="${escapeHtml(loc)}" class="bg-white text-indigo-600 border border-indigo-100 text-xs font-black px-3 py-2 rounded-xl active:scale-95 transition-all">名称変更</button>
+              <input type="text" value="${escapeHtml(loc)}" class="location-rename-input min-w-0 flex-1 bg-white border border-slate-100 rounded-xl px-3 py-2 text-sm font-bold outline-none focus:border-indigo-500">
+              <button onclick="renameLocation(this.dataset.loc, this.previousElementSibling.value)" data-loc="${escapeHtml(loc)}" class="bg-white text-indigo-600 border border-indigo-100 text-xs font-medium px-3 py-2 rounded-xl active:scale-95 transition-all">名称変更</button>
             </div>
             <div class="flex gap-2">
-              <select class="location-merge-select min-w-0 flex-1 bg-white border-2 border-slate-100 rounded-xl px-3 py-2 text-sm font-bold outline-none focus:border-indigo-500 ${mergeOptions ? '' : 'hidden'}">
+              <select class="location-merge-select min-w-0 flex-1 bg-white border border-slate-100 rounded-xl px-3 py-2 text-sm font-bold outline-none focus:border-indigo-500 ${mergeOptions ? '' : 'hidden'}">
                 ${mergeOptions}
               </select>
-              <button onclick="mergeLocation(this.dataset.loc, this.previousElementSibling.value)" data-loc="${escapeHtml(loc)}" class="bg-slate-700 text-white text-xs font-black px-3 py-2 rounded-xl active:scale-95 transition-all ${mergeOptions ? '' : 'hidden'}">統合</button>
+              <button onclick="mergeLocation(this.dataset.loc, this.previousElementSibling.value)" data-loc="${escapeHtml(loc)}" class="bg-slate-700 text-white text-xs font-medium px-3 py-2 rounded-xl active:scale-95 transition-all ${mergeOptions ? '' : 'hidden'}">統合</button>
             </div>
           </div>
         `;
@@ -2446,16 +2446,16 @@
         sortStaging(state.staging.map((item, idx) => ({ item, idx }))).forEach(({ item, idx }) => {
           const aiClass = item._newAi ? 'ai-highlight' : '';
           container.insertAdjacentHTML('beforeend', `
-            <div class="bg-amber-50 p-5 rounded-[2rem] shadow-sm border border-amber-100 staged-item flex items-center gap-4 group ${aiClass}" onclick="openStagingEditor(${idx})">
+            <div class="bg-amber-50 p-5 rounded-xl shadow-sm border border-amber-100 staged-item flex items-center gap-4 group ${aiClass}" onclick="openStagingEditor(${idx})">
               <input type="checkbox" class="staging-cb w-6 h-6 rounded-lg border-slate-300 text-amber-500 focus:ring-amber-400" data-idx="${idx}" onclick="event.stopPropagation()" ${item._selected ? 'checked' : ''}>
               <div class="flex-1">
                 <div class="flex items-center gap-2 mb-1">
-                  <h4 class="font-black text-slate-800 text-lg">${item.name}</h4>
-                  ${item.limit2 ? `<span class="text-[9px] font-black px-2 py-0.5 bg-indigo-600 text-white rounded-full">AI期限: ${item.limit2}</span>` : ''}
+                  <h4 class="font-medium text-slate-800 text-lg">${item.name}</h4>
+                  ${item.limit2 ? `<span class="text-[9px] font-medium px-2 py-0.5 bg-indigo-600 text-white rounded-full">AI期限: ${item.limit2}</span>` : ''}
                 </div>
                 <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">${item.qty} ${item.unit} | ${item.loc}</p>
               </div>
-              <button onclick="event.stopPropagation(); removeStaging(${idx})" class="p-3 bg-slate-50 rounded-2xl text-slate-300 hover:text-rose-500 transition-all"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button>
+              <button onclick="event.stopPropagation(); removeStaging(${idx})" class="p-3 bg-slate-50 rounded-xl text-slate-300 hover:text-rose-500 transition-all"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button>
             </div>
           `);
         });
@@ -2499,12 +2499,12 @@
           const dStr = `${limit.getMonth()+1}/${limit.getDate()}`;
           if (diff <= 0) {
             rowClass = 'border-rose-200 bg-rose-50';
-            badge = `<span class="text-[9px] font-black px-1.5 py-0.5 bg-rose-600 text-white rounded-full">${dStr} 期限切</span>`;
+            badge = `<span class="text-[9px] font-medium px-1.5 py-0.5 bg-rose-600 text-white rounded-full">${dStr} 期限切</span>`;
           } else if (diff <= 3) {
             rowClass = 'border-amber-200 bg-amber-50';
-            badge = `<span class="text-[9px] font-black px-1.5 py-0.5 bg-amber-500 text-white rounded-full">あと${diff}日 ${dStr}</span>`;
+            badge = `<span class="text-[9px] font-medium px-1.5 py-0.5 bg-amber-500 text-white rounded-full">あと${diff}日 ${dStr}</span>`;
           } else {
-            badge = `<span class="text-[9px] font-black px-1.5 py-0.5 bg-slate-200 text-slate-600 rounded-full">${dStr}</span>`;
+            badge = `<span class="text-[9px] font-medium px-1.5 py-0.5 bg-slate-200 text-slate-600 rounded-full">${dStr}</span>`;
           }
         }
         const delta = (item.unit === 'g' || item.unit === 'ml') ? 50 : 1;
@@ -2524,8 +2524,8 @@
               <span class="text-sm font-bold w-12 text-center">${item.qty}<span class="text-[10px]">${item.unit}</span></span>
               <button onclick="adjustInventoryQty('${item.id}', ${delta})" class="w-7 h-7 bg-slate-100 rounded-lg text-slate-600 font-bold flex items-center justify-center active:scale-90 transition-all">+</button>
             </div>
-            <button onclick="openInventoryEditor('${item.id}')" class="p-2 text-slate-400 hover:text-indigo-600 transition-colors text-lg leading-none">✎</button>
-            <button onclick="deleteInventoryItem('${item.id}')" class="p-2 text-slate-400 hover:text-rose-500 transition-colors text-lg leading-none">🗑</button>
+            <button onclick="openInventoryEditor('${item.id}')" class="p-2 text-slate-400 hover:text-indigo-600 transition-colors text-lg leading-none"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m16.9 4.1 3 3L8 19H5v-3L16.9 4.1Z"/></svg></button>
+            <button onclick="deleteInventoryItem('${item.id}')" class="p-2 text-slate-400 hover:text-rose-500 transition-colors text-lg leading-none"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6h18M8 6V4h8v2m-9 0 1 14h8l1-14M10 10v6M14 10v6"/></svg></button>
           </div>
         `);
       });
@@ -2588,7 +2588,7 @@
       document.querySelectorAll('#bottomNav button').forEach(btn => {
         const isActive = btn.dataset.mode === mode;
         btn.className = `flex-1 py-3 flex flex-col items-center gap-0.5 transition-all ${isActive ? 'text-indigo-600' : 'text-slate-400'}`;
-        btn.querySelector('span:last-child').className = `text-[10px] ${isActive ? 'font-black' : 'font-bold'}`;
+        btn.querySelector('span:last-child').className = `text-[10px] ${isActive ? 'font-medium' : 'font-bold'}`;
       });
       if (mode === 'A') renderList();
       if (mode === 'B') renderRecipeMode();
@@ -2606,21 +2606,21 @@
         label: 'AI RECIPE',
         active: 'bg-violet-600 text-white shadow-sm border border-violet-200',
         inactive: 'bg-white text-violet-600 border border-violet-100 hover:bg-violet-50',
-        list: 'space-y-3 mt-3 transition-colors bg-violet-50 p-3 rounded-2xl border border-violet-100 overflow-hidden'
+        list: 'space-y-3 mt-3 transition-colors bg-violet-50 p-3 rounded-xl border border-violet-100 overflow-hidden'
       };
       if (tab === 'schedule') return {
         key: 'sky',
         label: 'MEAL SCHEDULE',
         active: 'bg-sky-600 text-white shadow-sm border border-sky-200',
         inactive: 'bg-white text-sky-600 border border-sky-100 hover:bg-sky-50',
-        list: 'space-y-3 mt-3 transition-colors bg-sky-50 p-3 rounded-2xl border border-sky-100 overflow-hidden'
+        list: 'space-y-3 mt-3 transition-colors bg-sky-50 p-3 rounded-xl border border-sky-100 overflow-hidden'
       };
       return {
         key: 'indigo',
         label: 'RECIPE COLLECTION',
         active: 'bg-indigo-600 text-white shadow-sm border border-indigo-200',
         inactive: 'bg-white text-indigo-600 border border-indigo-100 hover:bg-indigo-50',
-        list: 'space-y-3 mt-3 transition-colors bg-indigo-50 p-3 rounded-2xl border border-indigo-100 overflow-hidden'
+        list: 'space-y-3 mt-3 transition-colors bg-indigo-50 p-3 rounded-xl border border-indigo-100 overflow-hidden'
       };
     }
 
@@ -2628,7 +2628,7 @@
       document.querySelectorAll('.b-tab').forEach(btn => {
         const isActive = btn.dataset.tab === state.currentBTab;
         const tone = getRecipeTabTone(btn.dataset.tab);
-        btn.className = `b-tab ${isActive ? tone.active : tone.inactive} px-5 py-2.5 rounded-xl text-sm font-black whitespace-nowrap snap-start transition-all`;
+        btn.className = `b-tab ${isActive ? tone.active : tone.inactive} px-5 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap snap-start transition-all`;
       });
       const label = document.getElementById('recipeModeLabel');
       if (label) label.textContent = getRecipeTabTone().label;
@@ -2659,11 +2659,11 @@
       if (state.currentBTab === 'ai') {
         primary.innerHTML = `
           <div class="grid grid-cols-2 gap-2">
-            <button onclick="generatePriorityRecipe()" class="h-12 bg-rose-50 text-rose-700 border border-rose-100 px-3 rounded-xl font-black text-[11px] flex items-center justify-center gap-2 active:scale-95 transition-all">
-              <span class="text-base">🚨</span><span>優先消費レシピ</span>
+            <button onclick="generatePriorityRecipe()" class="h-12 bg-rose-50 text-rose-700 border border-rose-100 px-3 rounded-xl font-medium text-[11px] flex items-center justify-center gap-2 active:scale-95 transition-all">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3 2 20h20L12 3Zm0 6v5m0 3h.01"/></svg><span>優先消費レシピ</span>
             </button>
-            <button onclick="openAiIngredientSelector()" class="h-12 bg-violet-600 text-white px-3 rounded-xl font-black text-[11px] flex items-center justify-center gap-2 active:scale-95 transition-all shadow-sm">
-              <span class="text-base">🎯</span><span>指定食材から</span>
+            <button onclick="openAiIngredientSelector()" class="h-12 bg-violet-600 text-white px-3 rounded-xl font-medium text-[11px] flex items-center justify-center gap-2 active:scale-95 transition-all shadow-sm">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm0-4a5 5 0 1 0 0-10 5 5 0 0 0 0 10Zm0-3a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z"/></svg><span>指定食材から</span>
             </button>
           </div>
         `;
@@ -2689,23 +2689,23 @@
         const selectCount = state.scheduleSelectedIds.length;
         primary.innerHTML = `
           <div class="grid grid-cols-[1fr_auto_1fr] gap-2 w-full min-w-0">
-            <button onclick="changeScheduleWeek(-1)" class="min-w-0 overflow-hidden h-12 bg-sky-50 text-sky-700 border border-sky-100 px-2 rounded-xl font-black text-[11px] flex items-center justify-center gap-1 active:scale-95 transition-all">
+            <button onclick="changeScheduleWeek(-1)" class="min-w-0 overflow-hidden h-12 bg-sky-50 text-sky-700 border border-sky-100 px-2 rounded-xl font-medium text-[11px] flex items-center justify-center gap-1 active:scale-95 transition-all">
               <span class="shrink-0">←</span><span class="min-w-0 truncate">前の週</span>
             </button>
-            <div class="min-w-0 overflow-hidden h-12 bg-sky-600 text-white px-3 rounded-xl font-black text-[12px] flex items-center justify-center shadow-sm">
+            <div class="min-w-0 overflow-hidden h-12 bg-sky-600 text-white px-3 rounded-xl font-medium text-[12px] flex items-center justify-center shadow-sm">
               <span id="scheduleWeekLabel" class="min-w-0 truncate">${weekLabel}</span>
             </div>
-            <button onclick="changeScheduleWeek(1)" class="min-w-0 overflow-hidden h-12 bg-sky-50 text-sky-700 border border-sky-100 px-2 rounded-xl font-black text-[11px] flex items-center justify-center gap-1 active:scale-95 transition-all">
+            <button onclick="changeScheduleWeek(1)" class="min-w-0 overflow-hidden h-12 bg-sky-50 text-sky-700 border border-sky-100 px-2 rounded-xl font-medium text-[11px] flex items-center justify-center gap-1 active:scale-95 transition-all">
               <span class="min-w-0 truncate">次の週</span><span class="shrink-0">→</span>
             </button>
           </div>
         `;
         secondary.innerHTML = `
           <div class="h-20 flex items-start gap-2 px-1 pt-2">
-            <button onclick="toggleScheduleSelectMode()" class="h-8 px-3 rounded-lg ${state.scheduleSelectMode ? 'bg-sky-600 text-white' : 'bg-white text-sky-600 border border-sky-200'} text-[11px] font-black flex items-center gap-1 active:scale-95 transition-all">
-              <span>${state.scheduleSelectMode ? '✓' : '☐'}</span> 選択モード
+            <button onclick="toggleScheduleSelectMode()" class="h-8 px-3 rounded-lg ${state.scheduleSelectMode ? 'bg-sky-600 text-white' : 'bg-white text-sky-600 border border-sky-200'} text-[11px] font-medium flex items-center gap-1 active:scale-95 transition-all">
+              ${state.scheduleSelectMode ? '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m5 12 4 4L19 6"/></svg>' : '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="2" stroke-width="2"/></svg>'} 選択モード
             </button>
-            ${state.scheduleSelectMode && selectCount > 0 ? `<span class="h-8 px-2 rounded-lg bg-sky-100 text-sky-700 text-[11px] font-black flex items-center">${selectCount} 件選択中</span>` : ''}
+            ${state.scheduleSelectMode && selectCount > 0 ? `<span class="h-8 px-2 rounded-lg bg-sky-100 text-sky-700 text-[11px] font-medium flex items-center">${selectCount} 件選択中</span>` : ''}
           </div>
         `;
         select.innerHTML = renderRecipeCountLine(getWeekDates(state.scheduleWeekOffset).length, '日分');
@@ -2714,11 +2714,11 @@
 
       primary.innerHTML = `
         <div class="grid grid-cols-2 gap-2">
-          <button onclick="openRecipeEditor()" class="h-12 bg-indigo-600 text-white px-3 rounded-xl font-black text-[11px] flex items-center justify-center gap-2 active:scale-95 transition-all shadow-sm">
+          <button onclick="openRecipeEditor()" class="h-12 bg-indigo-600 text-white px-3 rounded-xl font-medium text-[11px] flex items-center justify-center gap-2 active:scale-95 transition-all shadow-sm">
             <span class="text-base">＋</span><span>新規レシピ</span>
           </button>
-          <button onclick="openRecipeTextModal()" class="h-12 bg-amber-50 text-amber-700 border border-amber-100 px-3 rounded-xl font-black text-[11px] flex items-center justify-center gap-2 active:scale-95 transition-all">
-            <span class="text-base">📋</span><span>テキストから追加</span>
+          <button onclick="openRecipeTextModal()" class="h-12 bg-amber-50 text-amber-700 border border-amber-100 px-3 rounded-xl font-medium text-[11px] flex items-center justify-center gap-2 active:scale-95 transition-all">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 4h6l1 2h3v15H5V6h3l1-2Zm0 7h6M9 15h6"/></svg><span>テキストから追加</span>
           </button>
         </div>
       `;
@@ -2726,9 +2726,9 @@
         <div class="h-20 space-y-2">
           <div class="grid grid-cols-[auto_1fr] gap-2 items-center">
             <div class="bg-indigo-100 rounded-xl p-1 flex gap-1">
-              <button onclick="setRecipeSearchMode('name')" class="recipe-search-mode-btn px-3 py-1.5 rounded-lg text-[10px] font-black ${state.recipeSearchMode === 'name' ? 'bg-white text-indigo-700 shadow-sm' : 'text-indigo-700'}" data-mode="name">レシピ名</button>
-              <button onclick="setRecipeSearchMode('ingredient')" class="recipe-search-mode-btn px-3 py-1.5 rounded-lg text-[10px] font-black ${state.recipeSearchMode === 'ingredient' ? 'bg-white text-indigo-700 shadow-sm' : 'text-indigo-700'}" data-mode="ingredient">食材</button>
-              <button onclick="setRecipeSearchMode('all')" class="recipe-search-mode-btn px-3 py-1.5 rounded-lg text-[10px] font-black ${state.recipeSearchMode === 'all' ? 'bg-white text-indigo-700 shadow-sm' : 'text-indigo-700'}" data-mode="all">すべて</button>
+              <button onclick="setRecipeSearchMode('name')" class="recipe-search-mode-btn px-3 py-1.5 rounded-lg text-[10px] font-medium ${state.recipeSearchMode === 'name' ? 'bg-white text-indigo-700 shadow-sm' : 'text-indigo-700'}" data-mode="name">レシピ名</button>
+              <button onclick="setRecipeSearchMode('ingredient')" class="recipe-search-mode-btn px-3 py-1.5 rounded-lg text-[10px] font-medium ${state.recipeSearchMode === 'ingredient' ? 'bg-white text-indigo-700 shadow-sm' : 'text-indigo-700'}" data-mode="ingredient">食材</button>
+              <button onclick="setRecipeSearchMode('all')" class="recipe-search-mode-btn px-3 py-1.5 rounded-lg text-[10px] font-medium ${state.recipeSearchMode === 'all' ? 'bg-white text-indigo-700 shadow-sm' : 'text-indigo-700'}" data-mode="all">すべて</button>
             </div>
             <input type="text" id="recipeSearchInput" value="${escapeHtml(state.recipeSearchQuery || '')}" oninput="state.recipeSearchQuery=this.value; renderRecipeList()" class="min-w-0 w-full bg-white border border-indigo-100 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:border-indigo-500" placeholder="検索...">
           </div>
@@ -2750,7 +2750,7 @@
     function renderRecipeCountLine(count, label) {
       return `
         <div class="flex items-center justify-between px-1 h-8">
-          <span class="text-xs font-black text-slate-500 uppercase tracking-widest">${count} ${label}</span>
+          <span class="text-xs font-medium text-slate-500 uppercase tracking-widest">${count} ${label}</span>
           <span class="text-[10px] font-bold text-slate-400">同期は上部の同期ボタンで一括反映</span>
         </div>
       `;
@@ -2860,10 +2860,10 @@
                 <div class="shrink-0 text-sky-300 cursor-grab active:cursor-grabbing select-none" onmousedown="event.stopPropagation()" ontouchstart="event.stopPropagation()">≡</div>
                 ${cbHtml}
                 <div class="flex-1 min-w-0 flex flex-col justify-center">
-                  <p class="text-xs font-black text-sky-800 truncate">${escapeHtml(item.recipeName)}</p>
+                  <p class="text-xs font-medium text-sky-800 truncate">${escapeHtml(item.recipeName)}</p>
                   ${isDone ? '<p class="text-[9px] font-bold text-emerald-600">完了</p>' : ''}
                 </div>
-                <button onclick="event.stopPropagation(); openCookingViewer('${item.recipeId}')" class="shrink-0 w-12 h-6 rounded bg-sky-600 text-white text-[10px] font-black hover:bg-sky-700 active:scale-95 transition-all flex items-center justify-center gap-0.5">
+                <button onclick="event.stopPropagation(); openCookingViewer('${item.recipeId}')" class="shrink-0 w-12 h-6 rounded bg-sky-600 text-white text-[10px] font-medium hover:bg-sky-700 active:scale-95 transition-all flex items-center justify-center gap-0.5">
                   <span class="shrink-0">▶</span><span class="min-w-0 truncate">開始</span>
                 </button>
               </div>
@@ -2875,14 +2875,14 @@
               ondragover="handleScheduleDragOver(event)" ondragleave="handleScheduleDragLeave(event)" ondrop="handleScheduleDrop(event, '${date}', '${meal}')">
               <p class="text-[10px] font-bold ${isEmpty ? 'text-slate-400' : 'text-sky-500'} text-center leading-none mb-1">${meal}</p>
               ${cardsHtml}
-              <button onclick="openScheduleRecipePicker('${date}', '${meal}')" class="w-full h-8 rounded-lg ${isEmpty ? 'bg-white text-slate-300 hover:bg-slate-50' : 'bg-sky-50 text-sky-400 hover:bg-sky-100'} text-lg font-black flex items-center justify-center transition-all active:scale-95 border border-dashed ${isEmpty ? 'border-slate-200' : 'border-sky-200'}">＋</button>
+              <button onclick="openScheduleRecipePicker('${date}', '${meal}')" class="w-full h-8 rounded-lg ${isEmpty ? 'bg-white text-slate-300 hover:bg-slate-50' : 'bg-sky-50 text-sky-400 hover:bg-sky-100'} text-lg font-medium flex items-center justify-center transition-all active:scale-95 border border-dashed ${isEmpty ? 'border-slate-200' : 'border-sky-200'}">＋</button>
             </div>
           `;
         });
         container.insertAdjacentHTML('beforeend', `
-          <div class="w-full max-w-full min-w-0 overflow-hidden bg-white/80 rounded-2xl p-3 shadow-sm border border-sky-100 flex items-stretch gap-3">
+          <div class="w-full max-w-full min-w-0 overflow-hidden bg-white/80 rounded-xl p-3 shadow-sm border border-sky-100 flex items-stretch gap-3">
             <div class="w-16 shrink-0 rounded-xl bg-sky-100 text-sky-800 flex flex-col items-center justify-center px-2 text-center">
-              <p class="text-xs font-black leading-tight">${formatScheduleDate(date)}</p>
+              <p class="text-xs font-medium leading-tight">${formatScheduleDate(date)}</p>
             </div>
             <div class="min-w-0 flex-1 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)] gap-2">${slotsHtml}</div>
           </div>
@@ -2891,8 +2891,8 @@
       if (state.scheduleSelectMode && state.scheduleSelectedIds.length > 0) {
         container.insertAdjacentHTML('beforeend', `
           <div class="mt-4">
-            <button onclick="batchDeleteSchedule()" class="w-full bg-rose-600 text-white font-black py-4 rounded-2xl shadow-lg shadow-rose-200 hover:bg-rose-700 active:scale-95 transition-all flex items-center justify-center gap-2">
-              <span>🗑</span> チェックした献立を一括削除 (${state.scheduleSelectedIds.length}件)
+            <button onclick="batchDeleteSchedule()" class="w-full bg-rose-600 text-white font-medium py-4 rounded-xl shadow-sm hover:bg-rose-700 active:scale-95 transition-all flex items-center justify-center gap-2">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6h18M8 6V4h8v2m-9 0 1 14h8l1-14M10 10v6M14 10v6"/></svg> チェックした献立を一括削除 (${state.scheduleSelectedIds.length}件)
             </button>
           </div>
         `);
@@ -3009,13 +3009,13 @@
           const today = new Date(); today.setHours(0,0,0,0);
           const ld = new Date(limit); ld.setHours(0,0,0,0);
           const diff = Math.ceil((ld - today) / (1000*60*60*24));
-          if (diff < 0) badge = '<span class="text-[10px] font-black text-rose-500 bg-rose-100 px-2 py-0.5 rounded-full">期限切れ</span>';
-          else if (diff <= 3) badge = `<span class="text-[10px] font-black text-amber-600 bg-amber-100 px-2 py-0.5 rounded-full">あと${diff}日</span>`;
+          if (diff < 0) badge = '<span class="text-[10px] font-medium text-rose-500 bg-rose-100 px-2 py-0.5 rounded-full">期限切れ</span>';
+          else if (diff <= 3) badge = `<span class="text-[10px] font-medium text-amber-600 bg-amber-100 px-2 py-0.5 rounded-full">あと${diff}日</span>`;
         }
         container.insertAdjacentHTML('beforeend', `
           <div class="bg-white/80 p-3 rounded-xl shadow-sm border border-violet-100 flex items-center gap-3 transition-colors hover:bg-violet-50">
             <div class="w-10 h-10 bg-violet-100 rounded-xl flex items-center justify-center shrink-0">
-              <span class="text-lg">🥕</span>
+              <svg class="w-5 h-5 text-violet-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5c4 0 8 4 8 8l-6 6c-4 0-8-4-8-8l6-6Zm8-2 1 4m4-1-4 1m1-5-2 4"/></svg>
             </div>
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2 mb-0.5 min-w-0">
@@ -3024,7 +3024,7 @@
               </div>
               <div class="text-[10px] text-slate-400 font-bold truncate">${escapeHtml(item.loc || '冷蔵庫')} · ${item.qty}${escapeHtml(item.unit || '')} · 期限 ${escapeHtml(limit || '未設定')}</div>
             </div>
-            <button onclick="openAiRequestModal([state.inventory.find(i => i.id === '${item.id}')].filter(Boolean), 'priority')" class="px-3 py-2 rounded-xl bg-violet-600 text-white text-[10px] font-black hover:bg-violet-700 active:scale-95 transition-all shrink-0">考案</button>
+            <button onclick="openAiRequestModal([state.inventory.find(i => i.id === '${item.id}')].filter(Boolean), 'priority')" class="px-3 py-2 rounded-xl bg-violet-600 text-white text-[10px] font-medium hover:bg-violet-700 active:scale-95 transition-all shrink-0">考案</button>
           </div>
         `);
       });
@@ -3087,7 +3087,7 @@
       }
       document.querySelectorAll('.ai-sort-btn').forEach(btn => {
         const isActive = btn.dataset.aiSort === aiIngredientSort;
-        btn.className = 'ai-sort-btn flex-1 text-xs font-black py-2 rounded-lg transition-all' + (isActive ? ' bg-white text-indigo-600 shadow-sm' : ' text-slate-500 hover:text-slate-700');
+        btn.className = 'ai-sort-btn flex-1 text-xs font-medium py-2 rounded-lg transition-all' + (isActive ? ' bg-white text-indigo-600 shadow-sm' : ' text-slate-500 hover:text-slate-700');
       });
       renderAiIngredientList();
     }
@@ -3550,12 +3550,12 @@ ${plan ? '\n提案方針: ' + plan : ''}
         container.insertAdjacentHTML('beforeend', `
           <div class="bg-white p-3 rounded-xl shadow-sm border border-slate-100 flex items-center gap-3 cursor-pointer hover:bg-indigo-50 transition-all" onclick="openRecipeEditor('${recipe.id}')">
             <div class="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center flex-shrink-0">
-              <span class="text-lg">🍳</span>
+              <svg class="w-5 h-5 text-indigo-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 3v18M10 3v18M6 8h4M17 3v8a3 3 0 0 1-3 3h0v7"/></svg>
             </div>
             <div class="flex-1 min-w-0">
               <p class="font-bold text-slate-800 text-sm truncate">${escapeHtml(recipe.name)}</p>
             </div>
-            <button onclick="event.stopPropagation(); assignScheduleRecipe('${recipe.id}', '${escapeHtml(recipe.name).replace(/'/g, "\\'")}')" class="px-3 py-2 rounded-xl bg-indigo-600 text-white text-xs font-black hover:bg-indigo-700 active:scale-95 transition-all flex-shrink-0">献立に追加</button>
+            <button onclick="event.stopPropagation(); assignScheduleRecipe('${recipe.id}', '${escapeHtml(recipe.name).replace(/'/g, "\\'")}')" class="px-3 py-2 rounded-xl bg-indigo-600 text-white text-xs font-medium hover:bg-indigo-700 active:scale-95 transition-all flex-shrink-0">献立に追加</button>
           </div>
         `);
       });
@@ -3837,20 +3837,20 @@ ${plan ? '\n提案方針: ' + plan : ''}
           ingCount = Array.isArray(ing) ? ing.length : 0;
         } catch(e) { ingCount = 0; }
         container.insertAdjacentHTML('beforeend', `
-          <div class="bg-white/80 p-5 rounded-[2rem] shadow-sm border border-indigo-100 flex items-center gap-4 group cursor-pointer hover:bg-indigo-50 transition-colors" onclick="openRecipeViewer('${recipe.id}')">
-            <div class="w-12 h-12 bg-indigo-100 rounded-2xl flex items-center justify-center flex-shrink-0">
-              <span class="text-xl">🍳</span>
+          <div class="bg-white/80 p-5 rounded-xl shadow-sm border border-indigo-100 flex items-center gap-4 group cursor-pointer hover:bg-indigo-50 transition-colors" onclick="openRecipeViewer('${recipe.id}')">
+            <div class="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center flex-shrink-0">
+              <svg class="w-6 h-6 text-indigo-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 3v18M10 3v18M6 8h4M17 3v8a3 3 0 0 1-3 3h0v7"/></svg>
             </div>
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2">
-                <h4 class="font-black text-slate-800 text-lg truncate">${escapeHtml(recipe.name)}</h4>
+                <h4 class="font-medium text-slate-800 text-lg truncate">${escapeHtml(recipe.name)}</h4>
                 ${syncBadge}
               </div>
               <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">材料 ${ingCount} 品目 | 調理回数 ${recipe.count || 0} | 登録 ${escapeHtml(getRecipeDateValue(recipe, 'createdAt') || '—')}</p>
             </div>
             <div class="flex items-center gap-1">
               <button onclick="event.stopPropagation(); openCookingViewer('${recipe.id}')" class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 hover:bg-emerald-100 flex items-center justify-center transition-all" title="料理する">
-                <span class="text-lg">🍽️</span>
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 3v18M10 3v18M6 8h4M17 3v8a3 3 0 0 1-3 3h0v7"/></svg>
               </button>
               <button onclick="event.stopPropagation(); openRecipeEditor('${recipe.id}')" class="w-10 h-10 rounded-xl bg-slate-50 text-slate-500 hover:bg-indigo-50 hover:text-indigo-600 flex items-center justify-center transition-all">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
@@ -4190,9 +4190,9 @@ ${plan ? '\n提案方針: ' + plan : ''}
       items.forEach((item, idx) => {
         container.insertAdjacentHTML('beforeend', `
           <div class="flex gap-2 items-center ingredient-row">
-            <input type="text" placeholder="品名" class="r-ing-name flex-1 bg-slate-50 border-2 border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-indigo-500" value="${escapeHtml(item.name || '')}">
-            <input type="text" placeholder="数量" class="r-ing-amount w-16 bg-slate-50 border-2 border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-indigo-500" value="${escapeHtml(String(item.amount || ''))}">
-            <input type="text" placeholder="単位" class="r-ing-unit w-16 bg-slate-50 border-2 border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-indigo-500" value="${escapeHtml(item.unit || '')}">
+            <input type="text" placeholder="品名" class="r-ing-name flex-1 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-indigo-500" value="${escapeHtml(item.name || '')}">
+            <input type="text" placeholder="数量" class="r-ing-amount w-16 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-indigo-500" value="${escapeHtml(String(item.amount || ''))}">
+            <input type="text" placeholder="単位" class="r-ing-unit w-16 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-indigo-500" value="${escapeHtml(item.unit || '')}">
             <button type="button" onclick="this.closest('.ingredient-row').remove()" class="w-9 h-9 rounded-xl bg-rose-50 text-rose-500 hover:bg-rose-100 flex items-center justify-center flex-shrink-0">×</button>
           </div>
         `);
@@ -4203,9 +4203,9 @@ ${plan ? '\n提案方針: ' + plan : ''}
       const container = document.getElementById('ingredientList');
       container.insertAdjacentHTML('beforeend', `
         <div class="flex gap-2 items-center ingredient-row">
-          <input type="text" placeholder="品名" class="r-ing-name flex-1 bg-slate-50 border-2 border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-indigo-500">
-          <input type="text" placeholder="数量" class="r-ing-amount w-16 bg-slate-50 border-2 border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-indigo-500">
-          <input type="text" placeholder="単位" class="r-ing-unit w-16 bg-slate-50 border-2 border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-indigo-500">
+          <input type="text" placeholder="品名" class="r-ing-name flex-1 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-indigo-500">
+          <input type="text" placeholder="数量" class="r-ing-amount w-16 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-indigo-500">
+          <input type="text" placeholder="単位" class="r-ing-unit w-16 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-indigo-500">
           <button type="button" onclick="this.closest('.ingredient-row').remove()" class="w-9 h-9 rounded-xl bg-rose-50 text-rose-500 hover:bg-rose-100 flex items-center justify-center flex-shrink-0">×</button>
         </div>
       `);
@@ -4220,8 +4220,8 @@ ${plan ? '\n提案方針: ' + plan : ''}
       items.forEach((step, idx) => {
         container.insertAdjacentHTML('beforeend', `
           <div class="flex gap-2 items-start step-row">
-            <span class="w-7 h-7 bg-indigo-100 text-indigo-600 rounded-lg flex items-center justify-center text-xs font-black flex-shrink-0 mt-1">${idx + 1}</span>
-            <textarea placeholder="手順を入力" class="r-step flex-1 bg-slate-50 border-2 border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-indigo-500 resize-none" rows="2">${escapeHtml(String(step || ''))}</textarea>
+            <span class="w-7 h-7 bg-indigo-100 text-indigo-600 rounded-lg flex items-center justify-center text-xs font-medium flex-shrink-0 mt-1">${idx + 1}</span>
+            <textarea placeholder="手順を入力" class="r-step flex-1 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-indigo-500 resize-none" rows="2">${escapeHtml(String(step || ''))}</textarea>
             <button type="button" onclick="this.closest('.step-row').remove(); renumberSteps();" class="w-9 h-9 rounded-xl bg-rose-50 text-rose-500 hover:bg-rose-100 flex items-center justify-center flex-shrink-0 mt-1">×</button>
           </div>
         `);
@@ -4233,8 +4233,8 @@ ${plan ? '\n提案方針: ' + plan : ''}
       const num = container.querySelectorAll('.step-row').length + 1;
       container.insertAdjacentHTML('beforeend', `
         <div class="flex gap-2 items-start step-row">
-          <span class="step-num w-7 h-7 bg-indigo-100 text-indigo-600 rounded-lg flex items-center justify-center text-xs font-black flex-shrink-0 mt-1">${num}</span>
-          <textarea placeholder="手順を入力" class="r-step flex-1 bg-slate-50 border-2 border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-indigo-500 resize-none" rows="2"></textarea>
+          <span class="step-num w-7 h-7 bg-indigo-100 text-indigo-600 rounded-lg flex items-center justify-center text-xs font-medium flex-shrink-0 mt-1">${num}</span>
+          <textarea placeholder="手順を入力" class="r-step flex-1 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-indigo-500 resize-none" rows="2"></textarea>
           <button type="button" onclick="this.closest('.step-row').remove(); renumberSteps();" class="w-9 h-9 rounded-xl bg-rose-50 text-rose-500 hover:bg-rose-100 flex items-center justify-center flex-shrink-0 mt-1">×</button>
         </div>
       `);
@@ -4436,12 +4436,12 @@ ${text}`;
       overlay.id = 'purchaseConfirmOverlay';
       overlay.className = 'fixed inset-0 z-[75] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4';
       overlay.innerHTML = `
-        <div class="bg-white w-full max-w-sm rounded-[2rem] p-6 shadow-2xl border border-slate-100">
-          <h3 class="text-lg font-black text-slate-800 mb-2">同名の在庫が見つかりました</h3>
+        <div class="bg-white w-full max-w-sm rounded-xl p-6 shadow border border-slate-100">
+          <h3 class="text-lg font-medium text-slate-800 mb-2">同名の在庫が見つかりました</h3>
           <p class="text-sm text-slate-500 mb-4">${duplicates.map(d => d.name).join('、')} は既に在庫にあります。</p>
           <div class="space-y-2">
-            <button id="btnMergePurchase" class="w-full bg-indigo-600 text-white font-black py-3 rounded-xl hover:bg-indigo-700 active:scale-95 transition-all">数量を加算する</button>
-            <button id="btnNewPurchase" class="w-full bg-slate-100 text-slate-600 font-black py-3 rounded-xl hover:bg-slate-200 active:scale-95 transition-all">すべて新規登録する</button>
+            <button id="btnMergePurchase" class="w-full bg-indigo-600 text-white font-medium py-3 rounded-xl hover:bg-indigo-700 active:scale-95 transition-all">数量を加算する</button>
+            <button id="btnNewPurchase" class="w-full bg-slate-100 text-slate-600 font-medium py-3 rounded-xl hover:bg-slate-200 active:scale-95 transition-all">すべて新規登録する</button>
             <button id="btnCancelPurchase" class="w-full text-slate-400 font-bold py-2 text-sm">キャンセル</button>
           </div>
         </div>
@@ -4749,13 +4749,13 @@ ${text}`;
         label: 'COOKING HISTORY',
         active: 'bg-amber-600 text-white shadow-sm border border-amber-200',
         inactive: 'bg-white text-amber-600 border border-amber-100 hover:bg-amber-50',
-        list: 'space-y-3 mt-3 transition-colors bg-amber-50 p-3 rounded-2xl border border-amber-100 overflow-hidden'
+        list: 'space-y-3 mt-3 transition-colors bg-amber-50 p-3 rounded-xl border border-amber-100 overflow-hidden'
       };
       return {
         label: 'COOKING CHECK',
         active: 'bg-emerald-600 text-white shadow-sm border border-emerald-200',
         inactive: 'bg-white text-emerald-600 border border-emerald-100 hover:bg-emerald-50',
-        list: 'space-y-3 mt-3 transition-colors bg-emerald-50 p-3 rounded-2xl border border-emerald-100 overflow-hidden'
+        list: 'space-y-3 mt-3 transition-colors bg-emerald-50 p-3 rounded-xl border border-emerald-100 overflow-hidden'
       };
     }
 
@@ -4763,7 +4763,7 @@ ${text}`;
       document.querySelectorAll('.c-tab').forEach(btn => {
         const isActive = btn.dataset.tab === state.currentCTab;
         const tone = getCookingTabTone(btn.dataset.tab);
-        btn.className = `c-tab ${isActive ? tone.active : tone.inactive} px-5 py-2.5 rounded-xl text-sm font-black whitespace-nowrap snap-start transition-all`;
+        btn.className = `c-tab ${isActive ? tone.active : tone.inactive} px-5 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap snap-start transition-all`;
       });
       const label = document.getElementById('cookingModeLabel');
       if (label) label.textContent = getCookingTabTone().label;
@@ -4796,11 +4796,11 @@ ${text}`;
       if (!controls || !container) return;
       controls.innerHTML = `
         <div class="h-12 grid grid-cols-2 gap-2">
-          <button onclick="switchMode('B'); switchBTab('schedule');" class="h-12 bg-sky-50 text-sky-700 border border-sky-100 px-3 rounded-xl font-black text-[11px] flex items-center justify-center gap-2 active:scale-95 transition-all">
-            <span class="text-base">📅</span><span>献立を見る</span>
+          <button onclick="switchMode('B'); switchBTab('schedule');" class="h-12 bg-sky-50 text-sky-700 border border-sky-100 px-3 rounded-xl font-medium text-[11px] flex items-center justify-center gap-2 active:scale-95 transition-all">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14H3V6a2 2 0 0 1 2-2Z"/></svg><span>献立を見る</span>
           </button>
-          <button onclick="switchMode('B'); switchBTab('recipes');" class="h-12 bg-indigo-50 text-indigo-700 border border-indigo-100 px-3 rounded-xl font-black text-[11px] flex items-center justify-center gap-2 active:scale-95 transition-all">
-            <span class="text-base">🍳</span><span>レシピ集へ</span>
+          <button onclick="switchMode('B'); switchBTab('recipes');" class="h-12 bg-indigo-50 text-indigo-700 border border-indigo-100 px-3 rounded-xl font-medium text-[11px] flex items-center justify-center gap-2 active:scale-95 transition-all">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 3v18M10 3v18M6 8h4M17 3v8a3 3 0 0 1-3 3h0v7"/></svg><span>レシピ集へ</span>
           </button>
         </div>
       `;
@@ -4818,9 +4818,9 @@ ${text}`;
         .slice(0, 6);
 
       container.insertAdjacentHTML('beforeend', `
-        <section class="bg-white/80 rounded-2xl p-4 shadow-sm border border-emerald-100">
+        <section class="bg-white/80 rounded-xl p-4 shadow-sm border border-emerald-100">
           <div class="flex items-center justify-between mb-3">
-            <h3 class="text-sm font-black text-slate-800">今日の献立</h3>
+            <h3 class="text-sm font-medium text-slate-800">今日の献立</h3>
             <span class="text-[10px] font-bold text-slate-400">${todaySchedules.length} 件</span>
           </div>
           <div class="space-y-2" id="todayCookingScheduleList"></div>
@@ -4839,18 +4839,18 @@ ${text}`;
 
       if (nextSchedule && (!todaySchedules.some(s => s.date === nextSchedule.date && s.meal === nextSchedule.meal))) {
         container.insertAdjacentHTML('beforeend', `
-          <section class="bg-white/80 rounded-2xl p-4 shadow-sm border border-emerald-100">
-            <h3 class="text-sm font-black text-slate-800 mb-3">次の未完了献立</h3>
+          <section class="bg-white/80 rounded-xl p-4 shadow-sm border border-emerald-100">
+            <h3 class="text-sm font-medium text-slate-800 mb-3">次の未完了献立</h3>
             ${renderCookingScheduleCard(nextSchedule)}
           </section>
         `);
       }
 
       container.insertAdjacentHTML('beforeend', `
-        <section class="bg-white/80 rounded-2xl p-4 shadow-sm border border-emerald-100">
+        <section class="bg-white/80 rounded-xl p-4 shadow-sm border border-emerald-100">
           <div class="flex items-center justify-between mb-3">
-            <h3 class="text-sm font-black text-slate-800">レシピ集から開始</h3>
-            <button onclick="switchMode('B'); switchBTab('recipes');" class="text-[10px] font-black text-indigo-600">すべて見る</button>
+            <h3 class="text-sm font-medium text-slate-800">レシピ集から開始</h3>
+            <button onclick="switchMode('B'); switchBTab('recipes');" class="text-[10px] font-medium text-indigo-600">すべて見る</button>
           </div>
           <div class="space-y-2" id="cookingRecipeShortcutList"></div>
         </section>
@@ -4863,12 +4863,12 @@ ${text}`;
           recipeShortcuts.forEach(recipe => {
             recipeList.insertAdjacentHTML('beforeend', `
               <div class="bg-emerald-50 border border-emerald-100 rounded-xl p-3 flex items-center gap-3">
-                <div class="w-10 h-10 rounded-xl bg-white text-emerald-600 flex items-center justify-center shrink-0">🍽️</div>
+                <div class="w-10 h-10 rounded-xl bg-white text-emerald-600 flex items-center justify-center shrink-0"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 3v18M10 3v18M6 8h4M17 3v8a3 3 0 0 1-3 3h0v7"/></svg></div>
                 <div class="min-w-0 flex-1">
-                  <p class="text-sm font-black text-slate-800 truncate">${escapeHtml(recipe.name || '（名称未設定）')}</p>
+                  <p class="text-sm font-medium text-slate-800 truncate">${escapeHtml(recipe.name || '（名称未設定）')}</p>
                   <p class="text-[10px] font-bold text-slate-400">調理回数 ${Number(recipe.count) || 0} 回</p>
                 </div>
-                <button onclick="openCookingViewer('${recipe.id}')" class="shrink-0 px-3 py-2 rounded-xl bg-emerald-600 text-white text-xs font-black active:scale-95 transition-all">開始</button>
+                <button onclick="openCookingViewer('${recipe.id}')" class="shrink-0 px-3 py-2 rounded-xl bg-emerald-600 text-white text-xs font-medium active:scale-95 transition-all">開始</button>
               </div>
             `);
           });
@@ -4881,17 +4881,17 @@ ${text}`;
       return `
         <div class="bg-emerald-50 border border-emerald-100 rounded-xl p-3 flex items-center gap-3">
           <div class="w-14 shrink-0 rounded-xl bg-white text-emerald-800 flex flex-col items-center justify-center px-2 py-2">
-            <span class="text-[10px] font-black">${escapeHtml(formatScheduleDate(item.date))}</span>
-            <span class="text-xs font-black">${escapeHtml(item.meal || '')}</span>
+            <span class="text-[10px] font-medium">${escapeHtml(formatScheduleDate(item.date))}</span>
+            <span class="text-xs font-medium">${escapeHtml(item.meal || '')}</span>
           </div>
           <div class="min-w-0 flex-1">
             <div class="flex items-center gap-2 mb-0.5">
-              <p class="text-sm font-black text-slate-800 truncate">${escapeHtml(item.recipeName || '（レシピ名なし）')}</p>
-              <span class="shrink-0 text-[9px] font-black px-2 py-0.5 rounded-full ${statusClass}">${escapeHtml(item.status || '未完了')}</span>
+              <p class="text-sm font-medium text-slate-800 truncate">${escapeHtml(item.recipeName || '（レシピ名なし）')}</p>
+              <span class="shrink-0 text-[9px] font-medium px-2 py-0.5 rounded-full ${statusClass}">${escapeHtml(item.status || '未完了')}</span>
             </div>
             <p class="text-[10px] font-bold text-slate-400">材料と手順を大きく表示</p>
           </div>
-          <button onclick="openCookingViewer('${item.recipeId}')" class="shrink-0 px-3 py-2 rounded-xl bg-emerald-600 text-white text-xs font-black active:scale-95 transition-all">開始</button>
+          <button onclick="openCookingViewer('${item.recipeId}')" class="shrink-0 px-3 py-2 rounded-xl bg-emerald-600 text-white text-xs font-medium active:scale-95 transition-all">開始</button>
         </div>
       `;
     }
@@ -4967,30 +4967,30 @@ ${text}`;
       const comment = item.comment ? escapeHtml(item.comment) : '<span class="text-slate-300">感想なし</span>';
       const photoSrc = getCookingHistoryPhotoSrc(item.photoUrl);
       const photoHtml = hasPhoto ? `
-        <div class="w-20 h-20 rounded-2xl bg-slate-100 overflow-hidden shrink-0 relative">
+        <div class="w-20 h-20 rounded-xl bg-slate-100 overflow-hidden shrink-0 relative">
           ${photoSrc
             ? `<img src="${escapeHtml(photoSrc)}" alt="完成写真" class="w-full h-full object-cover" onerror="handleCookingHistoryImageError(this)">`
-            : '<div class="absolute inset-0 bg-amber-50 text-amber-600 text-[10px] font-black flex flex-col items-center justify-center text-center px-2 gap-2"><span class="w-5 h-5 border-2 border-amber-100 border-t-amber-500 rounded-full animate-spin"></span><span>写真を取得中</span></div>'}
-          <a href="${escapeHtml(item.photoUrl)}" target="_blank" rel="noopener noreferrer" class="${photoSrc ? 'hidden' : ''} absolute inset-0 bg-amber-50 text-amber-700 text-[10px] font-black items-center justify-center text-center px-2 ${photoSrc ? '' : 'opacity-0 hover:opacity-100 transition-opacity'}">写真を開く</a>
+            : '<div class="absolute inset-0 bg-amber-50 text-amber-600 text-[10px] font-medium flex flex-col items-center justify-center text-center px-2 gap-2"><span class="w-5 h-5 border border-amber-100 border-t-amber-500 rounded-full animate-spin"></span><span>写真を取得中</span></div>'}
+          <a href="${escapeHtml(item.photoUrl)}" target="_blank" rel="noopener noreferrer" class="${photoSrc ? 'hidden' : ''} absolute inset-0 bg-amber-50 text-amber-700 text-[10px] font-medium items-center justify-center text-center px-2 ${photoSrc ? '' : 'opacity-0 hover:opacity-100 transition-opacity'}">写真を開く</a>
         </div>
       ` : `
-        <div class="w-20 h-20 rounded-2xl bg-amber-50 text-amber-200 border border-amber-100 flex items-center justify-center shrink-0 text-2xl">📷</div>
+        <div class="w-20 h-20 rounded-xl bg-amber-50 text-amber-300 border border-amber-100 flex items-center justify-center shrink-0"><svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h3l2-3h6l2 3h3v11H4V8Zm8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/></svg></div>
       `;
       return `
-        <article class="bg-white/85 rounded-2xl p-4 shadow-sm border border-amber-100 flex gap-3">
+        <article class="bg-white/85 rounded-xl p-4 shadow-sm border border-amber-100 flex gap-3">
           ${photoHtml}
           <div class="min-w-0 flex-1">
             <div class="flex items-start justify-between gap-2 mb-1">
               <div class="min-w-0">
-                <p class="text-[10px] font-black text-amber-500">${escapeHtml(item.cookingDate || '日付なし')}</p>
-                <h3 class="text-base font-black text-slate-800 truncate">${escapeHtml(item.recipeName || '（レシピ名なし）')}</h3>
+                <p class="text-[10px] font-medium text-amber-500">${escapeHtml(item.cookingDate || '日付なし')}</p>
+                <h3 class="text-base font-medium text-slate-800 truncate">${escapeHtml(item.recipeName || '（レシピ名なし）')}</h3>
               </div>
               <div class="shrink-0 text-xs leading-none">${renderHistoryStars(item.rating)}</div>
             </div>
             <p class="text-xs font-bold text-slate-500 leading-relaxed line-clamp-2 mb-3">${comment}</p>
             <div class="flex items-center justify-end gap-2">
-              ${hasPhoto ? `<a href="${escapeHtml(item.photoUrl)}" target="_blank" rel="noopener noreferrer" class="px-3 py-2 rounded-xl bg-amber-50 text-amber-700 text-[10px] font-black">写真を開く</a>` : ''}
-              <button onclick="openCookingViewer('${recipeId}')" class="px-3 py-2 rounded-xl bg-emerald-600 text-white text-[10px] font-black active:scale-95 transition-all ${canCookAgain ? '' : 'opacity-40 cursor-not-allowed'}" ${canCookAgain ? '' : 'disabled'}>もう一度作る</button>
+              ${hasPhoto ? `<a href="${escapeHtml(item.photoUrl)}" target="_blank" rel="noopener noreferrer" class="px-3 py-2 rounded-xl bg-amber-50 text-amber-700 text-[10px] font-medium">写真を開く</a>` : ''}
+              <button onclick="openCookingViewer('${recipeId}')" class="px-3 py-2 rounded-xl bg-emerald-600 text-white text-[10px] font-medium active:scale-95 transition-all ${canCookAgain ? '' : 'opacity-40 cursor-not-allowed'}" ${canCookAgain ? '' : 'disabled'}>もう一度作る</button>
             </div>
           </div>
         </article>
@@ -5134,13 +5134,13 @@ ${text}`;
       const ingPanel = document.getElementById('cookingIngredientsPanel');
       const stepPanel = document.getElementById('cookingStepsPanel');
       if (tab === 'ingredients') {
-        ingBtn.className = 'flex-1 py-3 rounded-xl text-sm font-black bg-indigo-600 text-white shadow-md transition-all';
+        ingBtn.className = 'flex-1 py-3 rounded-xl text-sm font-medium bg-indigo-600 text-white shadow-sm transition-all';
         stepBtn.className = 'flex-1 py-3 rounded-xl text-sm font-bold bg-slate-100 text-slate-500 transition-all';
         ingPanel.classList.remove('hidden');
         stepPanel.classList.add('hidden');
       } else {
         ingBtn.className = 'flex-1 py-3 rounded-xl text-sm font-bold bg-slate-100 text-slate-500 transition-all';
-        stepBtn.className = 'flex-1 py-3 rounded-xl text-sm font-black bg-indigo-600 text-white shadow-md transition-all';
+        stepBtn.className = 'flex-1 py-3 rounded-xl text-sm font-medium bg-indigo-600 text-white shadow-sm transition-all';
         ingPanel.classList.add('hidden');
         stepPanel.classList.remove('hidden');
       }
@@ -5149,18 +5149,18 @@ ${text}`;
     function getIngredientCategoryBadge(type, unit, name) {
       const isSeasoning = type === '調味料' || /大さじ|小さじ/.test(unit || '') || /醤油|塩|砂糖|みりん|酒|酢|油|だし|ソース|マヨ|ケチャップ|胡椒|ガラム|カレー粉|味噌|コンソメ|わさび|からし|マスタード/.test(name || '');
       if (isSeasoning) {
-        return '<span class="text-xs font-black px-2 py-1 rounded-full bg-yellow-100 text-yellow-800">調味料</span>';
+        return '<span class="text-xs font-medium px-2 py-1 rounded-full bg-yellow-100 text-yellow-800">調味料</span>';
       }
-      return '<span class="text-xs font-black px-2 py-1 rounded-full bg-green-100 text-green-800">食材</span>';
+      return '<span class="text-xs font-medium px-2 py-1 rounded-full bg-green-100 text-green-800">食材</span>';
     }
 
     function getAmountBadge(unit) {
       const u = unit || '';
       if (u.includes('大さじ')) {
-        return '<span class="text-xs font-black px-2 py-1 rounded-full bg-red-100 text-red-800">大さじ</span>';
+        return '<span class="text-xs font-medium px-2 py-1 rounded-full bg-red-100 text-red-800">大さじ</span>';
       }
       if (u.includes('小さじ')) {
-        return '<span class="text-xs font-black px-2 py-1 rounded-full bg-blue-100 text-blue-800">小さじ</span>';
+        return '<span class="text-xs font-medium px-2 py-1 rounded-full bg-blue-100 text-blue-800">小さじ</span>';
       }
       return '';
     }
@@ -5194,9 +5194,9 @@ ${text}`;
         const stockText = `在庫: ${stockQty}${escapeHtml(unit)} / 必要: ${required > 0 ? required : '—'}${escapeHtml(unit)}`;
         const stockClass = isShortage ? 'text-rose-500' : 'text-emerald-600';
         const cardClass = isShortage ? 'bg-rose-50 border-rose-200' : 'bg-white border-slate-100';
-        const shortageBadge = isShortage ? '<span class="text-xs font-black px-2 py-1 rounded-full bg-rose-100 text-rose-700">⚠️ 不足</span>' : '<span class="text-xs font-black px-2 py-1 rounded-full bg-emerald-100 text-emerald-700">在庫あり</span>';
+        const shortageBadge = isShortage ? '<span class="text-xs font-medium px-2 py-1 rounded-full bg-rose-100 text-rose-700 inline-flex items-center gap-1"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3 2 20h20L12 3Zm0 6v5m0 3h.01"/></svg>不足</span>' : '<span class="text-xs font-medium px-2 py-1 rounded-full bg-emerald-100 text-emerald-700">在庫あり</span>';
         container.insertAdjacentHTML('beforeend', `
-          <div class="${cardClass} p-5 rounded-2xl shadow-sm border flex items-center justify-between gap-3">
+          <div class="${cardClass} p-5 rounded-xl shadow-sm border flex items-center justify-between gap-3">
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2 flex-wrap mb-1">
                 <span class="text-xl font-bold text-slate-800">${escapeHtml(ing.name || '')}</span>
@@ -5241,8 +5241,8 @@ ${text}`;
       steps.forEach((step, idx) => {
         const highlighted = highlightAmounts(String(step));
         container.insertAdjacentHTML('beforeend', `
-          <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex gap-4">
-            <div class="w-10 h-10 bg-indigo-100 text-indigo-700 rounded-xl flex items-center justify-center text-lg font-black flex-shrink-0">
+          <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-100 flex gap-4">
+            <div class="w-10 h-10 bg-indigo-100 text-indigo-700 rounded-xl flex items-center justify-center text-lg font-medium flex-shrink-0">
               ${idx + 1}
             </div>
             <div class="text-lg font-bold text-slate-700 leading-relaxed flex-1 pt-1">
@@ -5292,9 +5292,9 @@ ${text}`;
           const isShortage = amount > 0 && stockQty < amount;
           const stockClass = isShortage ? 'text-rose-500' : 'text-emerald-600';
           const rowClass = isShortage ? 'bg-rose-50 border-rose-200' : 'bg-slate-50 border-transparent';
-          const shortageBadge = isShortage ? '<span class="text-[10px] font-black px-1.5 py-0.5 rounded-full bg-rose-100 text-rose-700">不足</span>' : '';
+          const shortageBadge = isShortage ? '<span class="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-rose-100 text-rose-700">不足</span>' : '';
           container.insertAdjacentHTML('beforeend', `
-            <div class="${rowClass} rounded-2xl p-4 flex items-center gap-3 border" data-idx="${idx}">
+            <div class="${rowClass} rounded-xl p-4 flex items-center gap-3 border" data-idx="${idx}">
               <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-2 mb-0.5">
                   <p class="font-bold text-slate-800 text-sm">${escapeHtml(ing.name || '')}</p>
@@ -5302,7 +5302,7 @@ ${text}`;
                 </div>
                 <p class="text-[10px] text-slate-400 font-bold">規定量: ${amount > 0 ? amount : '—'}${escapeHtml(unit)} / <span class="${stockClass}">在庫: ${stockQty}${escapeHtml(unit)}</span></p>
               </div>
-              <input type="number" min="0" step="0.1" value="${amount > 0 ? amount : ''}" placeholder="0" data-ing-name="${escapeHtml(ing.name || '')}" data-ing-unit="${escapeHtml(unit)}" data-ing-amount="${amount}" class="cons-qty w-20 bg-white border-2 border-slate-100 rounded-xl px-3 py-2 text-sm font-bold text-right outline-none focus:border-indigo-500">
+              <input type="number" min="0" step="0.1" value="${amount > 0 ? amount : ''}" placeholder="0" data-ing-name="${escapeHtml(ing.name || '')}" data-ing-unit="${escapeHtml(unit)}" data-ing-amount="${amount}" class="cons-qty w-20 bg-white border border-slate-100 rounded-xl px-3 py-2 text-sm font-bold text-right outline-none focus:border-indigo-500">
               <span class="text-xs font-bold text-slate-500 w-10">${escapeHtml(unit)}</span>
             </div>
           `);

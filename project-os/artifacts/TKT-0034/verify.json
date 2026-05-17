@@ -1,0 +1,26 @@
+{
+  "ticket": "TKT-0034-saas-ui-cleanup",
+  "status": "passed",
+  "checks": [
+    {
+      "name": "standard_verify",
+      "command": "python3 -c \"import html.parser; html.parser.HTMLParser().feed(open('app.html').read())\" && grep -q 'executeGAS' app.html && grep -q 'GAS_URL' app.html && echo 'VERIFY_PASSED'",
+      "result": "VERIFY_PASSED"
+    },
+    {
+      "name": "diff_check",
+      "command": "git diff --check",
+      "result": "passed"
+    },
+    {
+      "name": "ui_class_policy",
+      "command": "rg -n \"font-black|rounded-3xl|rounded-2xl|rounded-\\\\[2\\\\.5rem\\\\]|rounded-\\\\[2rem\\\\]|rounded-\\\\[1\\\\.5rem\\\\]|border-2|shadow-2xl|shadow-xl|shadow-lg|shadow-md|focus:ring-4\" app.html",
+      "result": "no matches"
+    },
+    {
+      "name": "emoji_policy",
+      "command": "rg -n \"[\\\\x{1F300}-\\\\x{1FAFF}\\\\x{2600}-\\\\x{27BF}]|✎\" app.html",
+      "result": "only star rating glyphs remain"
+    }
+  ]
+}
