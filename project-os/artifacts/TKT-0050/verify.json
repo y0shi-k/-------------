@@ -1,0 +1,21 @@
+{
+  "ticket": "TKT-0050-ai-step-amount-notation",
+  "verified_at": "2026-05-17",
+  "results": [
+    {
+      "name": "standard_verify",
+      "command": "python3 -c \"import html.parser; html.parser.HTMLParser().feed(open('app.html').read())\" && grep -q 'executeGAS' app.html && grep -q 'GAS_URL' app.html && echo 'VERIFY_PASSED'",
+      "result": "VERIFY_PASSED"
+    },
+    {
+      "name": "prompt_rule_presence",
+      "command": "rg -n \"分量不明|名称（分量）|複数工程|勝手に按分\" app.html project-os/specs/SPEC-0050-ai-step-amount-notation.md project-os/tickets/TKT-0050-ai-step-amount-notation.md",
+      "result": "AI考案・テキスト解析プロンプトの両方に工程内分量ルールが存在"
+    },
+    {
+      "name": "canvas_constraint",
+      "command": "rg -n \"alert\\(|confirm\\(|prompt\\(\" app.html",
+      "result": "no matches"
+    }
+  ]
+}
