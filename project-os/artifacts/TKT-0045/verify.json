@@ -1,0 +1,10 @@
+{
+  "ticket_id": "TKT-0045-recipe-editor-drag-drop-reorder",
+  "status": "passed",
+  "command": "python3 -c \"import html.parser; html.parser.HTMLParser().feed(open('app.html').read())\" && grep -q 'executeGAS' app.html && grep -q 'GAS_URL' app.html && echo 'VERIFY_PASSED'",
+  "result": "VERIFY_PASSED",
+  "checked_at": "2026-05-17T00:00:00+09:00",
+  "artifacts": [
+    "project-os/artifacts/TKT-0045/report.md"
+  ]
+}

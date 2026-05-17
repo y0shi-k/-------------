@@ -27,6 +27,9 @@
     @keyframes toastSlideOut { from { opacity: 1; transform: translateX(-50%) translateY(0); } to { opacity: 0; transform: translateX(-50%) translateY(-20px); } }
     .sync-bar-hidden { transform: translateY(-100%); }
     .sync-bar-visible { transform: translateY(0); }
+    .dragging { opacity: 0.4; }
+    .drag-over-top { border-top: 2px solid #6366f1; margin-top: -2px; }
+    .drag-handle { touch-action: none; }
     #app { padding-bottom: calc(6rem + var(--activity-status-height) + env(safe-area-inset-bottom)); }
     #bottomNav { bottom: calc(var(--activity-status-height) + env(safe-area-inset-bottom)); }
     #activityStatusBar {
@@ -2539,6 +2542,10 @@
         document.getElementById('bottomNav').classList.remove('hidden');
         switchMode('A');
         scheduleCookingHistoryImagePrefetch();
+        initRecipeDragDrop('ingredientList', '.ingredient-row');
+        initRecipeDragDrop('seasoningList', '.seasoning-row');
+        initRecipeDragDrop('cookStepList', '.cook-step-row', renumberCookSteps);
+        initRecipeDragDrop('prepStepList', '.prep-step-row', renumberPrepSteps);
         console.log('Loaded inventory count:', state.inventory.length, 'shopping count:', state.shopping.length, 'recipes count:', state.recipes.length, 'schedule count:', state.schedule.length, 'cooking history count:', state.cookingHistory.length);
       } else {
         showToast('データの読み込みに失敗しました。GASの実行権限を確認してください。', 'error');
@@ -3633,8 +3640,9 @@ ${plan ? '\n提案方針: ' + plan : ''}
 }
 
 注意事項:
-- ingredients は「材料」（野菜・肉・魚・豆腐・卵など）のみを含む
-- seasonings は「調味料」（醤油・塩・砂糖・味噌・酢・酒・コンソメ・だしの素など）のみを含む
+- ingredients は主材料（野菜・肉・魚・豆腐・卵・麺・米・パンなど）のみを含む
+- seasonings は調味料（醤油・塩・砂糖・味噌・酢・酒・コンソメ・だしの素・オイスターソース・豆板醤・ごま油・味ぽん・鶏がらスープの素など）と、テキスト中で「合わせ調味料」「下味」「たれ」「衣」「薬味」などの見出しでまとめられている項目も含む
+- 「合わせ調味料」にまとめられている項目（料理酒・砂糖・オイスターソース・醤油・スープの素など）は必ず seasonings に含める
 - group は「A」「B」「合わせ調味料」「衣」「たれ」など、手順内で参照しやすいまとまりがなければ空文字
 - order はそれぞれの配列内で調理手順に登場する順番を0から採番
 - prepSteps は「下ごしらえ」（切る・揉む・下味をつける・水洗い・塩もみ・浸すなど）を含む
@@ -4552,10 +4560,9 @@ ${plan ? '\n提案方針: ' + plan : ''}
       if (!Array.isArray(items) || items.length === 0) items = [{ name: '', amount: '', unit: '' }];
       items.forEach((item, idx) => {
         container.insertAdjacentHTML('beforeend', `
-          <div class="flex flex-wrap gap-2 items-center ingredient-row" data-order="${idx}">
-            <div class="flex flex-col gap-1 shrink-0">
-              <button type="button" onclick="moveRecipeItemRow(this, -1)" class="w-7 h-7 rounded-lg bg-white border border-slate-100 text-slate-400 hover:text-indigo-600">↑</button>
-              <button type="button" onclick="moveRecipeItemRow(this, 1)" class="w-7 h-7 rounded-lg bg-white border border-slate-100 text-slate-400 hover:text-indigo-600">↓</button>
+          <div class="flex flex-wrap gap-2 items-center ingredient-row" draggable="true" data-order="${idx}">
+            <div class="drag-handle cursor-grab active:cursor-grabbing p-1 text-slate-300 hover:text-slate-500 flex items-center justify-center" draggable="true">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16"/></svg>
             </div>
             <input type="text" placeholder="品名" class="r-ing-name flex-1 min-w-[9rem] bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-indigo-500" value="${escapeHtml(item.name || '')}">
             <input type="text" placeholder="数量" class="r-ing-amount w-16 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-indigo-500" value="${escapeHtml(String(item.amount || ''))}">
@@ -4570,10 +4577,9 @@ ${plan ? '\n提案方針: ' + plan : ''}
     function addIngredientRow() {
       const container = document.getElementById('ingredientList');
       container.insertAdjacentHTML('beforeend', `
-        <div class="flex flex-wrap gap-2 items-center ingredient-row">
-          <div class="flex flex-col gap-1 shrink-0">
-            <button type="button" onclick="moveRecipeItemRow(this, -1)" class="w-7 h-7 rounded-lg bg-white border border-slate-100 text-slate-400 hover:text-indigo-600">↑</button>
-            <button type="button" onclick="moveRecipeItemRow(this, 1)" class="w-7 h-7 rounded-lg bg-white border border-slate-100 text-slate-400 hover:text-indigo-600">↓</button>
+        <div class="flex flex-wrap gap-2 items-center ingredient-row" draggable="true">
+          <div class="drag-handle cursor-grab active:cursor-grabbing p-1 text-slate-300 hover:text-slate-500 flex items-center justify-center" draggable="true">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16"/></svg>
           </div>
           <input type="text" placeholder="品名" class="r-ing-name flex-1 min-w-[9rem] bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-indigo-500">
           <input type="text" placeholder="数量" class="r-ing-amount w-16 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-indigo-500">
@@ -4593,10 +4599,9 @@ ${plan ? '\n提案方針: ' + plan : ''}
       if (!Array.isArray(items) || items.length === 0) items = [{ name: '', amount: '', unit: '' }];
       items.forEach((item, idx) => {
         container.insertAdjacentHTML('beforeend', `
-          <div class="flex flex-wrap gap-2 items-center seasoning-row" data-order="${idx}">
-            <div class="flex flex-col gap-1 shrink-0">
-              <button type="button" onclick="moveRecipeItemRow(this, -1)" class="w-7 h-7 rounded-lg bg-white border border-slate-100 text-slate-400 hover:text-amber-600">↑</button>
-              <button type="button" onclick="moveRecipeItemRow(this, 1)" class="w-7 h-7 rounded-lg bg-white border border-slate-100 text-slate-400 hover:text-amber-600">↓</button>
+          <div class="flex flex-wrap gap-2 items-center seasoning-row" draggable="true" data-order="${idx}">
+            <div class="drag-handle cursor-grab active:cursor-grabbing p-1 text-slate-300 hover:text-slate-500 flex items-center justify-center" draggable="true">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16"/></svg>
             </div>
             <input type="text" placeholder="調味料名" class="r-sea-name flex-1 min-w-[9rem] bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-amber-500" value="${escapeHtml(item.name || '')}">
             <input type="text" placeholder="数量" class="r-sea-amount w-16 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-amber-500" value="${escapeHtml(String(item.amount || ''))}">
@@ -4611,10 +4616,9 @@ ${plan ? '\n提案方針: ' + plan : ''}
     function addSeasoningRow() {
       const container = document.getElementById('seasoningList');
       container.insertAdjacentHTML('beforeend', `
-        <div class="flex flex-wrap gap-2 items-center seasoning-row">
-          <div class="flex flex-col gap-1 shrink-0">
-            <button type="button" onclick="moveRecipeItemRow(this, -1)" class="w-7 h-7 rounded-lg bg-white border border-slate-100 text-slate-400 hover:text-amber-600">↑</button>
-            <button type="button" onclick="moveRecipeItemRow(this, 1)" class="w-7 h-7 rounded-lg bg-white border border-slate-100 text-slate-400 hover:text-amber-600">↓</button>
+        <div class="flex flex-wrap gap-2 items-center seasoning-row" draggable="true">
+          <div class="drag-handle cursor-grab active:cursor-grabbing p-1 text-slate-300 hover:text-slate-500 flex items-center justify-center" draggable="true">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16"/></svg>
           </div>
           <input type="text" placeholder="調味料名" class="r-sea-name flex-1 min-w-[9rem] bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-amber-500">
           <input type="text" placeholder="数量" class="r-sea-amount w-16 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-amber-500">
@@ -4625,16 +4629,58 @@ ${plan ? '\n提案方針: ' + plan : ''}
       `);
     }
 
-    function moveRecipeItemRow(button, direction) {
-      const row = button.closest('.ingredient-row, .seasoning-row');
-      if (!row || !direction) return;
-      const sibling = direction < 0 ? row.previousElementSibling : row.nextElementSibling;
-      if (!sibling) return;
-      if (direction < 0) {
-        row.parentNode.insertBefore(row, sibling);
-      } else {
-        row.parentNode.insertBefore(sibling, row);
-      }
+    function initRecipeDragDrop(containerId, rowSelector, afterDrop) {
+      const container = document.getElementById(containerId);
+      if (!container) return;
+      if (container._dragInited) return;
+      container._dragInited = true;
+
+      container.addEventListener('dragstart', e => {
+        const row = e.target.closest(rowSelector);
+        if (!row) return;
+        row.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', '');
+      });
+
+      container.addEventListener('dragend', e => {
+        const row = e.target.closest(rowSelector);
+        if (row) row.classList.remove('dragging');
+        container.querySelectorAll('.drag-over-top').forEach(el => el.classList.remove('drag-over-top'));
+      });
+
+      container.addEventListener('dragover', e => {
+        e.preventDefault();
+        const dragging = container.querySelector('.dragging');
+        if (!dragging) return;
+        const rows = [...container.querySelectorAll(rowSelector)];
+        const afterRow = rows.find(row => {
+          if (row === dragging) return false;
+          const rect = row.getBoundingClientRect();
+          return e.clientY < rect.top + rect.height / 2;
+        });
+        rows.forEach(r => r.classList.remove('drag-over-top'));
+        if (afterRow) afterRow.classList.add('drag-over-top');
+      });
+
+      container.addEventListener('drop', e => {
+        e.preventDefault();
+        const dragging = container.querySelector('.dragging');
+        if (!dragging) return;
+        const rows = [...container.querySelectorAll(rowSelector)];
+        const afterRow = rows.find(row => {
+          if (row === dragging) return false;
+          const rect = row.getBoundingClientRect();
+          return e.clientY < rect.top + rect.height / 2;
+        });
+        if (afterRow) {
+          container.insertBefore(dragging, afterRow);
+        } else {
+          container.appendChild(dragging);
+        }
+        rows.forEach(r => r.classList.remove('drag-over-top'));
+        if (afterDrop) afterDrop();
+      });
     }
 
     function renderCookStepInputs(stepsJson) {
@@ -4645,8 +4691,8 @@ ${plan ? '\n提案方針: ' + plan : ''}
       if (!Array.isArray(items) || items.length === 0) items = [''];
       items.forEach((step, idx) => {
         container.insertAdjacentHTML('beforeend', `
-          <div class="flex gap-2 items-center cook-step-row">
-            <span class="w-6 h-6 bg-indigo-100 text-indigo-700 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">${idx + 1}</span>
+          <div class="flex gap-2 items-center cook-step-row" draggable="true">
+            <span class="w-6 h-6 bg-indigo-100 text-indigo-700 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 cursor-grab active:cursor-grabbing drag-handle" draggable="true">${idx + 1}</span>
             <input type="text" placeholder="工程を入力" class="r-cook-step flex-1 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-indigo-500" value="${escapeHtml(String(step || ''))}">
             <button type="button" onclick="this.closest('.cook-step-row').remove(); renumberCookSteps();" class="w-9 h-9 rounded-xl bg-rose-50 text-rose-500 hover:bg-rose-100 flex items-center justify-center flex-shrink-0">×</button>
           </div>
@@ -4658,8 +4704,8 @@ ${plan ? '\n提案方針: ' + plan : ''}
       const container = document.getElementById('cookStepList');
       const count = container.querySelectorAll('.cook-step-row').length;
       container.insertAdjacentHTML('beforeend', `
-        <div class="flex gap-2 items-center cook-step-row">
-          <span class="w-6 h-6 bg-indigo-100 text-indigo-700 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 cook-step-num">${count + 1}</span>
+        <div class="flex gap-2 items-center cook-step-row" draggable="true">
+          <span class="w-6 h-6 bg-indigo-100 text-indigo-700 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 cook-step-num cursor-grab active:cursor-grabbing drag-handle" draggable="true">${count + 1}</span>
           <input type="text" placeholder="工程を入力" class="r-cook-step flex-1 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-indigo-500">
           <button type="button" onclick="this.closest('.cook-step-row').remove(); renumberCookSteps();" class="w-9 h-9 rounded-xl bg-rose-50 text-rose-500 hover:bg-rose-100 flex items-center justify-center flex-shrink-0">×</button>
         </div>
@@ -4680,8 +4726,8 @@ ${plan ? '\n提案方針: ' + plan : ''}
       if (!Array.isArray(items) || items.length === 0) items = [''];
       items.forEach((step, idx) => {
         container.insertAdjacentHTML('beforeend', `
-          <div class="flex gap-2 items-center prep-step-row">
-            <span class="w-6 h-6 bg-teal-100 text-teal-700 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">${idx + 1}</span>
+          <div class="flex gap-2 items-center prep-step-row" draggable="true">
+            <span class="w-6 h-6 bg-teal-100 text-teal-700 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 cursor-grab active:cursor-grabbing drag-handle" draggable="true">${idx + 1}</span>
             <input type="text" placeholder="下ごしらえを入力" class="r-prep-step flex-1 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-teal-500" value="${escapeHtml(String(step || ''))}">
             <button type="button" onclick="this.closest('.prep-step-row').remove(); renumberPrepSteps();" class="w-9 h-9 rounded-xl bg-rose-50 text-rose-500 hover:bg-rose-100 flex items-center justify-center flex-shrink-0">×</button>
           </div>
@@ -4693,8 +4739,8 @@ ${plan ? '\n提案方針: ' + plan : ''}
       const container = document.getElementById('prepStepList');
       const count = container.querySelectorAll('.prep-step-row').length;
       container.insertAdjacentHTML('beforeend', `
-        <div class="flex gap-2 items-center prep-step-row">
-          <span class="w-6 h-6 bg-teal-100 text-teal-700 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 prep-step-num">${count + 1}</span>
+        <div class="flex gap-2 items-center prep-step-row" draggable="true">
+          <span class="w-6 h-6 bg-teal-100 text-teal-700 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 prep-step-num cursor-grab active:cursor-grabbing drag-handle" draggable="true">${count + 1}</span>
           <input type="text" placeholder="下ごしらえを入力" class="r-prep-step flex-1 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-teal-500">
           <button type="button" onclick="this.closest('.prep-step-row').remove(); renumberPrepSteps();" class="w-9 h-9 rounded-xl bg-rose-50 text-rose-500 hover:bg-rose-100 flex items-center justify-center flex-shrink-0">×</button>
         </div>
@@ -4815,8 +4861,9 @@ ${plan ? '\n提案方針: ' + plan : ''}
 }
 
 注意事項:
-- ingredients は「材料」（野菜・肉・魚・豆腐・卵など）のみを含む
-- seasonings は「調味料」（醤油・塩・砂糖・味噌・酢・酒・コンソメ・だしの素など）のみを含む
+- ingredients は主材料（野菜・肉・魚・豆腐・卵・麺・米・パンなど）のみを含む
+- seasonings は調味料（醤油・塩・砂糖・味噌・酢・酒・コンソメ・だしの素・オイスターソース・豆板醤・ごま油・味ぽん・鶏がらスープの素など）と、テキスト中で「合わせ調味料」「下味」「たれ」「衣」「薬味」などの見出しでまとめられている項目も含む
+- 「合わせ調味料」にまとめられている項目（料理酒・砂糖・オイスターソース・醤油・スープの素など）は必ず seasonings に含める
 - group は「A」「B」「合わせ調味料」「衣」「たれ」など、手順内で参照しやすいまとまりがなければ空文字
 - order はそれぞれの配列内で調理手順に登場する順番を0から採番
 - prepSteps は「下ごしらえ」（切る・揉む・下味をつける・水洗い・塩もみ・浸すなど）を含む。テキストに「下ごしらえ」「下準備」「準備」などの見出しがある場合はその内容を抽出
@@ -5210,7 +5257,9 @@ ${text}`;
         id: createClientId('recipe'),
         name: data.name,
         ingredients: data.ingredients,
+        seasonings: data.seasonings,
         steps: data.steps,
+        prepSteps: data.prepSteps,
         source: data.source,
         count: 0,
         history: '[]'

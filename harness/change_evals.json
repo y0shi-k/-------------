@@ -284,6 +284,54 @@
         "コード行数が無闇に肥大化していないか（既存パターンの再利用確認）"
       ],
       "notes": "Canvasのsandbox制約はフリーズの直接原因になる。コード肥大化も単一ファイル維持の観点から厳密にレビューする。"
+    },
+    {
+      "id": "ai_prompt_change",
+      "change_scope": "AIプロンプト（Gemini API への指示文）の改変",
+      "match_paths": [
+        "app.html"
+      ],
+      "match_rules": {
+        "paths_any": [
+          "app.html"
+        ],
+        "diff_regex_any": [
+          "ingredients.*含む",
+          "seasonings.*含む",
+          "合わせ調味料",
+          "generateContent",
+          "responseMimeType",
+          "generateAiRecipeFromPlan",
+          "parseRecipeTextWithAI"
+        ]
+      },
+      "required_verify": [
+        "html_syntax",
+        "canvas_constraint_marker"
+      ],
+      "required_manual_smokes": [
+        "canvas_notification",
+        "gemini_api_key_handling"
+      ],
+      "phase_gate_tags": [
+        "verify_passed",
+        "manual_smokes_done",
+        "review_ready",
+        "report_ready"
+      ],
+      "artifact_requirements": [
+        "verify_summary",
+        "manual_smoke_report",
+        "review_record",
+        "user_report_draft"
+      ],
+      "review_focus": [
+        "プロンプト変更が JSON 構造を壊していないか",
+        "ingredients / seasonings / prepSteps / steps の定義が矛盾していないか",
+        "既存のプロンプトパターン（テキスト解析・AI考案）両方に反映されているか",
+        "JSON出力指示（responseMimeType: application/json）が維持されているか"
+      ],
+      "notes": "AIプロンプトは 'jsonで出力' 指示と実際の出力の間で微妙な齟齬が起きやすい。プロンプト変更後は必ず実際のAI通信で構造化結果を検証すること。"
     }
   ]
 }
