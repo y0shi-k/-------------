@@ -64,7 +64,7 @@
     </div>
   </div>
 
-  <div id="activityStatusBar" data-state="idle" class="fixed left-0 right-0 bottom-0 z-[55] pointer-events-none bg-white/95 border-t border-slate-200">
+  <div id="activityStatusBar" data-state="idle" class="fixed left-0 right-0 bottom-0 z-[90] pointer-events-none bg-white/95 border-t border-slate-200">
     <div class="activity-status-content h-[var(--activity-status-height)] max-w-2xl mx-auto px-3 flex items-center gap-2 text-[11px] leading-none transition-opacity duration-200">
       <div id="activitySpinner" class="w-3 h-3 border border-indigo-100 border-t-indigo-600 rounded-full animate-spin shrink-0 transition-opacity duration-200"></div>
       <p id="activityStatusLabel" class="font-medium text-slate-600 truncate">待機中</p>
@@ -220,6 +220,7 @@
             <h2 id="cookingRecipeName" class="text-2xl font-bold text-slate-800 truncate flex-1 mx-3 text-center"></h2>
             <div class="w-10"></div>
           </div>
+          <div id="cookingSource" class="mb-4 space-y-1 text-center"></div>
 
           <!-- タブ -->
           <div class="flex gap-2 mb-4">
@@ -431,7 +432,7 @@
         </div>
         <div>
           <label class="block text-[11px] font-medium text-slate-400 uppercase mb-1.5 ml-1">出典</label>
-          <input type="text" id="r-source" class="w-full bg-slate-50 border border-slate-100 rounded-xl px-5 py-4 text-sm focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none font-bold transition-all" placeholder="例: https://... または本の名前">
+          <textarea id="r-source" rows="2" class="w-full bg-slate-50 border border-slate-100 rounded-xl px-5 py-4 text-sm focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none font-bold transition-all resize-none" placeholder="例: https://... または本の名前"></textarea>
         </div>
 
         <!-- 材料セクション -->
@@ -630,6 +631,7 @@
         <div>
           <p class="text-[11px] font-medium text-slate-400 uppercase mb-1.5 ml-1">レシピ名</p>
           <h4 id="aiPreviewName" class="text-xl font-medium text-slate-800"></h4>
+          <div id="aiPreviewSource" class="mt-1.5 space-y-1"></div>
         </div>
         <div>
           <div class="flex justify-between items-center mb-2">
@@ -3600,6 +3602,20 @@ ${plan ? '\n提案方針: ' + plan : ''}
       document.getElementById('aiPreviewActions').classList.add('hidden');
       document.getElementById('recipeViewActions').classList.remove('hidden');
       document.getElementById('aiPreviewName').textContent = recipe.name || '（名称未設定）';
+      // source URL 表示
+      const sourceContainer = document.getElementById('aiPreviewSource');
+      sourceContainer.innerHTML = '';
+      const sourceUrls = (recipe.source || '').split(/\n+/).map(s => s.trim()).filter(Boolean);
+      if (sourceUrls.length > 0) {
+        sourceUrls.forEach(url => {
+          const isUrl = /^https?:\/\//.test(url);
+          if (isUrl) {
+            sourceContainer.insertAdjacentHTML('beforeend', `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-xs text-indigo-600 font-bold hover:underline break-all"><svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>${escapeHtml(url)}</a>`);
+          } else {
+            sourceContainer.insertAdjacentHTML('beforeend', `<span class="text-xs text-slate-500 font-bold">${escapeHtml(url)}</span>`);
+          }
+        });
+      }
       const ingContainer = document.getElementById('aiPreviewIngredients');
       ingContainer.innerHTML = '';
       let ingredients = [];
@@ -4458,7 +4474,7 @@ ${plan ? '\n提案方針: ' + plan : ''}
       const text = document.getElementById('r-text-input').value.trim();
       if (!text) { showToast('テキストを入力してください。', 'error'); return; }
       setStatus(true, 'AIがレシピを解析中...<br><span class="text-[10px] font-bold opacity-50 uppercase tracking-widest">Recipe Structuring</span>');
-      const prompt = `あなたはレシピ構造化アシスタントです。以下のレシピテキストから、レシピ名・材料一覧・手順リストを抽出し、以下の厳密なJSON形式で出力してください。
+      const prompt = `あなたはレシピ構造化アシスタントです。以下のレシピテキストから、レシピ名・材料一覧・手順リスト・出典URLを抽出し、以下の厳密なJSON形式で出力してください。
 
 出力形式:
 {
@@ -4471,12 +4487,14 @@ ${plan ? '\n提案方針: ' + plan : ''}
     "手順1",
     "手順2",
     ...
-  ]
+  ],
+  "source": "テキスト内に動画や参考URLがあればそのURL。複数ある場合は改行で区切って出力。なければ空文字"
 }
 
 注意事項:
 - amount は文字列として出力（数値と単位が混在する場合があるため）
 - 材料がない場合は空配列、手順がない場合は空配列
+- source はテキスト中に含まれる YouTube URL、ブログ URL、SNS URL などを改行区切りで出力
 - JSON以外の説明文は一切出力しないでください
 - レシピ名が不明確な場合は「不明なレシピ」とする
 
@@ -4499,9 +4517,16 @@ ${text}`;
         const data = await res.json();
         const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
         const parsed = parseAIJsonResponse(raw, 'RecipeAI');
+        // source: AIが返したものを優先。なければ入力テキストからURL抽出
+        let source = (parsed.source || '').trim();
+        if (!source) {
+          const urlMatches = text.match(/https?:\/\/[^\s]+/g);
+          source = urlMatches ? urlMatches.join('\n') : '';
+        }
         closeRecipeTextModal();
         openRecipeEditor();
         document.getElementById('r-name').value = parsed.name || '';
+        document.getElementById('r-source').value = source;
         renderIngredientInputs(JSON.stringify(parsed.ingredients || []));
         renderStepInputs(JSON.stringify(parsed.steps || []));
         setStatus(false);
@@ -5256,6 +5281,20 @@ ${text}`;
       }
       currentCookingRecipeId = recipeId;
       document.getElementById('cookingRecipeName').textContent = recipe.name || '（名称未設定）';
+      // source URL 表示
+      const sourceContainer = document.getElementById('cookingSource');
+      sourceContainer.innerHTML = '';
+      const sourceUrls = (recipe.source || '').split(/\n+/).map(s => s.trim()).filter(Boolean);
+      if (sourceUrls.length > 0) {
+        sourceUrls.forEach(url => {
+          const isUrl = /^https?:\/\//.test(url);
+          if (isUrl) {
+            sourceContainer.insertAdjacentHTML('beforeend', `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-xs text-indigo-600 font-bold hover:underline break-all"><svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>${escapeHtml(url)}</a>`);
+          } else {
+            sourceContainer.insertAdjacentHTML('beforeend', `<span class="text-xs text-slate-500 font-bold">${escapeHtml(url)}</span>`);
+          }
+        });
+      }
       renderCookingIngredients(recipe);
       renderCookingSteps(recipe);
       switchCookingTab('ingredients');
