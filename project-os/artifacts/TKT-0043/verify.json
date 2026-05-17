@@ -1,0 +1,26 @@
+{
+  "ticket": "TKT-0043-cooking-viewer-layout-polish",
+  "spec": "SPEC-0043-cooking-viewer-layout-polish",
+  "status": "passed",
+  "checks": [
+    {
+      "name": "standard_verify",
+      "command": "python3 -c \"import html.parser; html.parser.HTMLParser().feed(open('app.html').read())\" && grep -q 'executeGAS' app.html && grep -q 'GAS_URL' app.html && echo 'VERIFY_PASSED'",
+      "result": "VERIFY_PASSED"
+    },
+    {
+      "name": "forbidden_dialogs",
+      "command": "rg -n \"alert\\(|confirm\\(|prompt\\(\" app.html",
+      "result": "no_matches"
+    },
+    {
+      "name": "script_syntax",
+      "command": "node --check /tmp/stock-master-app-script.js",
+      "result": "passed"
+    },
+    {
+      "name": "executeGAS_review",
+      "result": "no new per-operation recipe write calls; existing sync/init/schedule/photo-read calls remain"
+    }
+  ]
+}

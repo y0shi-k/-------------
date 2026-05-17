@@ -19,6 +19,8 @@
     .staged-item:hover { background-color: #fffbeb; transform: translateX(4px); }
     .ai-highlight { animation: highlight 2.5s ease-out; }
     @keyframes highlight { 0% { background-color: #e0e7ff; } 100% { background-color: transparent; } }
+    .cooking-ingredient-focus { animation: cookingIngredientFocus 1.8s ease-out; }
+    @keyframes cookingIngredientFocus { 0% { box-shadow: 0 0 0 4px rgba(99,102,241,0.18); transform: translateY(-1px); } 100% { box-shadow: none; transform: translateY(0); } }
     .toast-in { animation: toastSlideIn 0.3s ease forwards; }
     .toast-out { animation: toastSlideOut 0.3s ease forwards; }
     @keyframes toastSlideIn { from { opacity: 0; transform: translateX(-50%) translateY(-20px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
@@ -211,9 +213,9 @@
     <div id="modeCView" class="hidden">
       <!-- クッキングビューア -->
       <div id="cookingViewer" class="hidden">
-        <div class="p-4 max-w-2xl mx-auto pb-32">
+        <div class="p-4 max-w-6xl mx-auto pb-32">
           <!-- ヘッダー -->
-          <div class="flex items-center justify-between mb-4">
+          <div class="flex items-center justify-between mb-3">
             <button onclick="closeCookingViewer()" class="p-2 bg-slate-100 rounded-xl text-slate-600 hover:bg-slate-200 transition-all">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
             </button>
@@ -222,20 +224,26 @@
           </div>
           <div id="cookingSource" class="mb-4 space-y-1 text-center"></div>
 
-          <!-- タブ -->
-          <div class="flex gap-2 mb-4">
-            <button onclick="switchCookingTab('ingredients')" id="cookingTabIngredients" class="flex-1 py-3 rounded-xl text-sm font-medium bg-indigo-600 text-white shadow-sm transition-all">材料</button>
-            <button onclick="switchCookingTab('steps')" id="cookingTabSteps" class="flex-1 py-3 rounded-xl text-sm font-bold bg-slate-100 text-slate-500 transition-all">手順</button>
-          </div>
+          <div class="grid lg:grid-cols-[minmax(280px,38%)_1fr] gap-4 lg:items-start">
+            <aside class="bg-emerald-50/80 border border-emerald-100 rounded-xl p-3 lg:sticky lg:top-4">
+              <div class="flex items-center justify-between gap-3 mb-3">
+                <p class="text-[11px] font-medium text-emerald-700 uppercase tracking-widest">材料</p>
+                <p id="cookingIngredientSummary" class="text-[10px] font-bold text-emerald-600"></p>
+              </div>
+              <div id="cookingIngredientsPanel" class="space-y-3 max-h-none lg:max-h-[calc(100vh-13rem)] lg:overflow-y-auto lg:pr-1">
+                <!-- JSで動的に挿入 -->
+              </div>
+            </aside>
 
-          <!-- 材料タブ -->
-          <div id="cookingIngredientsPanel" class="space-y-3">
-            <!-- JSで動的に挿入 -->
-          </div>
-
-          <!-- 手順タブ -->
-          <div id="cookingStepsPanel" class="hidden space-y-4">
-            <!-- JSで動的に挿入 -->
+            <section class="bg-indigo-50/70 border border-indigo-100 rounded-xl p-3">
+              <div class="flex items-center justify-between gap-3 mb-3">
+                <p class="text-[11px] font-medium text-indigo-700 uppercase tracking-widest">手順</p>
+                <p class="text-[10px] font-bold text-indigo-500">文中の材料をタップで照合</p>
+              </div>
+              <div id="cookingStepsPanel" class="space-y-4">
+                <!-- JSで動的に挿入 -->
+              </div>
+            </section>
           </div>
         </div>
 
@@ -418,7 +426,7 @@
 
   <!-- モーダル: レシピの追加/編集 -->
   <div id="recipeModal" onclick="if(event.target===this) closeRecipeModal()" class="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
-    <div onclick="event.stopPropagation()" class="bg-white w-full max-w-lg rounded-xl p-6 shadow transform scale-95 transition-transform duration-300 border border-slate-100 max-h-[90vh] overflow-y-auto">
+    <div onclick="event.stopPropagation()" class="bg-white w-full max-w-2xl rounded-xl p-6 shadow transform scale-95 transition-transform duration-300 border border-slate-100 max-h-[90vh] overflow-y-auto">
       <div class="flex justify-between items-center mb-5">
         <h3 id="recipeModalTitle" class="text-2xl font-medium text-slate-800 tracking-tight">レシピを追加</h3>
         <button onclick="closeRecipeModal()" class="text-slate-300 hover:text-slate-600 bg-slate-100 p-2 rounded-full"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg></button>
@@ -1138,6 +1146,50 @@
       return `${prefix}_tmp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     }
 
+    function parseJsonArray(value) {
+      try {
+        const parsed = JSON.parse(value || '[]');
+        return Array.isArray(parsed) ? parsed : [];
+      } catch (e) {
+        return [];
+      }
+    }
+
+    function inferRecipeItemType(item, fallbackType) {
+      if (item && (item.type === '食材' || item.type === '調味料')) return item.type;
+      if (fallbackType) return fallbackType;
+      const text = `${item?.name || ''} ${item?.unit || ''}`;
+      return /大さじ|小さじ|醤油|しょうゆ|塩|砂糖|みりん|酒|酢|油|だし|ソース|マヨ|ケチャップ|胡椒|こしょう|味噌|コンソメ|わさび|からし|マスタード/.test(text) ? '調味料' : '食材';
+    }
+
+    function normalizeRecipeItems(items, fallbackType) {
+      const arr = Array.isArray(items) ? items : [];
+      return arr.map((item, idx) => ({
+        name: item && item.name ? String(item.name) : '',
+        amount: item && item.amount !== undefined ? String(item.amount) : '',
+        unit: item && item.unit ? String(item.unit) : '',
+        type: inferRecipeItemType(item, fallbackType),
+        group: item && item.group ? String(item.group).trim() : '',
+        order: Number.isFinite(Number(item && item.order)) ? Number(item.order) : idx
+      })).filter(item => item.name);
+    }
+
+    function normalizeRecipeItemsJson(value, fallbackType) {
+      return JSON.stringify(normalizeRecipeItems(parseJsonArray(value), fallbackType));
+    }
+
+    function sortRecipeItems(items) {
+      return [...(Array.isArray(items) ? items : [])].sort((a, b) => {
+        const ao = Number.isFinite(Number(a.order)) ? Number(a.order) : 9999;
+        const bo = Number.isFinite(Number(b.order)) ? Number(b.order) : 9999;
+        return ao - bo;
+      });
+    }
+
+    function getRecipeItems(recipe, key, fallbackType) {
+      return sortRecipeItems(normalizeRecipeItems(parseJsonArray(recipe && recipe[key]), fallbackType));
+    }
+
     function isTempId(id) {
       return String(id || '').indexOf('_tmp_') !== -1;
     }
@@ -1162,8 +1214,8 @@
       return {
         id: recipe.id || '',
         name: recipe.name || '',
-        ingredients: recipe.ingredients || '[]',
-        seasonings: recipe.seasonings || '[]',
+        ingredients: normalizeRecipeItemsJson(recipe.ingredients, '食材'),
+        seasonings: normalizeRecipeItemsJson(recipe.seasonings, '調味料'),
         steps: recipe.steps || '[]',
         prepSteps: recipe.prepSteps || '[]',
         source: recipe.source || '',
@@ -3410,7 +3462,7 @@ ${requiredBlock}${optionalBlock}
 {
   "name": "レシピ名",
   "ingredients": [
-    {"name": "材料名", "amount": "数量", "unit": "単位"},
+    {"name": "材料名", "amount": "数量", "unit": "単位", "type": "食材", "group": "A", "order": 0},
     ...
   ],
   "steps": [
@@ -3421,6 +3473,8 @@ ${requiredBlock}${optionalBlock}
 }
 注意:
 - amount は文字列として出力（数値と単位が混在する場合があるため）
+- type は ingredients では必ず「食材」、group は合わせ調味料・衣・たれ等のまとまりがなければ空文字
+- order は調理手順に出る順番で0から採番してください
 - 材料がない場合は空配列、手順がない場合は空配列
 - JSON以外の説明文は一切出力しないでください`;
       }
@@ -3436,7 +3490,7 @@ ${names.map(n => `- ${n}`).join('\n')}
 {
   "name": "レシピ名",
   "ingredients": [
-    {"name": "材料名", "amount": "数量", "unit": "単位"},
+    {"name": "材料名", "amount": "数量", "unit": "単位", "type": "食材", "group": "A", "order": 0},
     ...
   ],
   "steps": [
@@ -3447,6 +3501,8 @@ ${names.map(n => `- ${n}`).join('\n')}
 }
 注意:
 - amount は文字列として出力（数値と単位が混在する場合があるため）
+- type は ingredients では必ず「食材」、group は合わせ調味料・衣・たれ等のまとまりがなければ空文字
+- order は調理手順に出る順番で0から採番してください
 - 材料がない場合は空配列、手順がない場合は空配列
 - JSON以外の説明文は一切出力しないでください`;
     }
@@ -3561,10 +3617,10 @@ ${plan ? '\n提案方針: ' + plan : ''}
 {
   "name": "レシピ名",
   "ingredients": [
-    {"name": "材料名", "amount": "数量", "unit": "単位"}
+    {"name": "材料名", "amount": "数量", "unit": "単位", "type": "食材", "group": "A", "order": 0}
   ],
   "seasonings": [
-    {"name": "調味料名", "amount": "数量", "unit": "単位"}
+    {"name": "調味料名", "amount": "数量", "unit": "単位", "type": "調味料", "group": "A", "order": 0}
   ],
   "prepSteps": [
     "下ごしらえ1",
@@ -3579,6 +3635,8 @@ ${plan ? '\n提案方針: ' + plan : ''}
 注意事項:
 - ingredients は「材料」（野菜・肉・魚・豆腐・卵など）のみを含む
 - seasonings は「調味料」（醤油・塩・砂糖・味噌・酢・酒・コンソメ・だしの素など）のみを含む
+- group は「A」「B」「合わせ調味料」「衣」「たれ」など、手順内で参照しやすいまとまりがなければ空文字
+- order はそれぞれの配列内で調理手順に登場する順番を0から採番
 - prepSteps は「下ごしらえ」（切る・揉む・下味をつける・水洗い・塩もみ・浸すなど）を含む
 - steps は「調理工程」（火を通す・煮る・炒める・蒸す・盛り付けなど）のみを含む
 - amount は文字列として出力（数値と単位が混在する場合があるため）
@@ -3814,8 +3872,8 @@ ${plan ? '\n提案方針: ' + plan : ''}
       const recipe = {
         id: createClientId('recipe'),
         name: data.name || '（名称未設定）',
-        ingredients: JSON.stringify(data.ingredients || []),
-        seasonings: JSON.stringify(data.seasonings || []),
+        ingredients: JSON.stringify(normalizeRecipeItems(data.ingredients || [], '食材')),
+        seasonings: JSON.stringify(normalizeRecipeItems(data.seasonings || [], '調味料')),
         prepSteps: JSON.stringify(data.prepSteps || []),
         steps: JSON.stringify(data.steps || []),
         source: 'AI生成',
@@ -4490,13 +4548,19 @@ ${plan ? '\n提案方針: ' + plan : ''}
       container.innerHTML = '';
       let items = [];
       try { items = JSON.parse(ingredientsJson || '[]'); } catch(e) { items = []; }
+      items = normalizeRecipeItems(items, '食材');
       if (!Array.isArray(items) || items.length === 0) items = [{ name: '', amount: '', unit: '' }];
-      items.forEach((item) => {
+      items.forEach((item, idx) => {
         container.insertAdjacentHTML('beforeend', `
-          <div class="flex gap-2 items-center ingredient-row">
-            <input type="text" placeholder="品名" class="r-ing-name flex-1 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-indigo-500" value="${escapeHtml(item.name || '')}">
+          <div class="flex flex-wrap gap-2 items-center ingredient-row" data-order="${idx}">
+            <div class="flex flex-col gap-1 shrink-0">
+              <button type="button" onclick="moveRecipeItemRow(this, -1)" class="w-7 h-7 rounded-lg bg-white border border-slate-100 text-slate-400 hover:text-indigo-600">↑</button>
+              <button type="button" onclick="moveRecipeItemRow(this, 1)" class="w-7 h-7 rounded-lg bg-white border border-slate-100 text-slate-400 hover:text-indigo-600">↓</button>
+            </div>
+            <input type="text" placeholder="品名" class="r-ing-name flex-1 min-w-[9rem] bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-indigo-500" value="${escapeHtml(item.name || '')}">
             <input type="text" placeholder="数量" class="r-ing-amount w-16 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-indigo-500" value="${escapeHtml(String(item.amount || ''))}">
             <input type="text" placeholder="単位" class="r-ing-unit w-16 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-indigo-500" value="${escapeHtml(item.unit || '')}">
+            <input type="text" placeholder="A/下準備" class="r-ing-group w-24 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-xs font-bold outline-none focus:border-indigo-500" value="${escapeHtml(item.group || '')}">
             <button type="button" onclick="this.closest('.ingredient-row').remove()" class="w-9 h-9 rounded-xl bg-rose-50 text-rose-500 hover:bg-rose-100 flex items-center justify-center flex-shrink-0">×</button>
           </div>
         `);
@@ -4506,10 +4570,15 @@ ${plan ? '\n提案方針: ' + plan : ''}
     function addIngredientRow() {
       const container = document.getElementById('ingredientList');
       container.insertAdjacentHTML('beforeend', `
-        <div class="flex gap-2 items-center ingredient-row">
-          <input type="text" placeholder="品名" class="r-ing-name flex-1 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-indigo-500">
+        <div class="flex flex-wrap gap-2 items-center ingredient-row">
+          <div class="flex flex-col gap-1 shrink-0">
+            <button type="button" onclick="moveRecipeItemRow(this, -1)" class="w-7 h-7 rounded-lg bg-white border border-slate-100 text-slate-400 hover:text-indigo-600">↑</button>
+            <button type="button" onclick="moveRecipeItemRow(this, 1)" class="w-7 h-7 rounded-lg bg-white border border-slate-100 text-slate-400 hover:text-indigo-600">↓</button>
+          </div>
+          <input type="text" placeholder="品名" class="r-ing-name flex-1 min-w-[9rem] bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-indigo-500">
           <input type="text" placeholder="数量" class="r-ing-amount w-16 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-indigo-500">
           <input type="text" placeholder="単位" class="r-ing-unit w-16 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-indigo-500">
+          <input type="text" placeholder="A/下準備" class="r-ing-group w-24 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-xs font-bold outline-none focus:border-indigo-500">
           <button type="button" onclick="this.closest('.ingredient-row').remove()" class="w-9 h-9 rounded-xl bg-rose-50 text-rose-500 hover:bg-rose-100 flex items-center justify-center flex-shrink-0">×</button>
         </div>
       `);
@@ -4520,13 +4589,19 @@ ${plan ? '\n提案方針: ' + plan : ''}
       container.innerHTML = '';
       let items = [];
       try { items = JSON.parse(seasoningsJson || '[]'); } catch(e) { items = []; }
+      items = normalizeRecipeItems(items, '調味料');
       if (!Array.isArray(items) || items.length === 0) items = [{ name: '', amount: '', unit: '' }];
-      items.forEach((item) => {
+      items.forEach((item, idx) => {
         container.insertAdjacentHTML('beforeend', `
-          <div class="flex gap-2 items-center seasoning-row">
-            <input type="text" placeholder="調味料名" class="r-sea-name flex-1 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-amber-500" value="${escapeHtml(item.name || '')}">
+          <div class="flex flex-wrap gap-2 items-center seasoning-row" data-order="${idx}">
+            <div class="flex flex-col gap-1 shrink-0">
+              <button type="button" onclick="moveRecipeItemRow(this, -1)" class="w-7 h-7 rounded-lg bg-white border border-slate-100 text-slate-400 hover:text-amber-600">↑</button>
+              <button type="button" onclick="moveRecipeItemRow(this, 1)" class="w-7 h-7 rounded-lg bg-white border border-slate-100 text-slate-400 hover:text-amber-600">↓</button>
+            </div>
+            <input type="text" placeholder="調味料名" class="r-sea-name flex-1 min-w-[9rem] bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-amber-500" value="${escapeHtml(item.name || '')}">
             <input type="text" placeholder="数量" class="r-sea-amount w-16 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-amber-500" value="${escapeHtml(String(item.amount || ''))}">
             <input type="text" placeholder="単位" class="r-sea-unit w-16 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-amber-500" value="${escapeHtml(item.unit || '')}">
+            <input type="text" placeholder="A/たれ" class="r-sea-group w-24 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-xs font-bold outline-none focus:border-amber-500" value="${escapeHtml(item.group || '')}">
             <button type="button" onclick="this.closest('.seasoning-row').remove()" class="w-9 h-9 rounded-xl bg-rose-50 text-rose-500 hover:bg-rose-100 flex items-center justify-center flex-shrink-0">×</button>
           </div>
         `);
@@ -4536,13 +4611,30 @@ ${plan ? '\n提案方針: ' + plan : ''}
     function addSeasoningRow() {
       const container = document.getElementById('seasoningList');
       container.insertAdjacentHTML('beforeend', `
-        <div class="flex gap-2 items-center seasoning-row">
-          <input type="text" placeholder="調味料名" class="r-sea-name flex-1 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-amber-500">
+        <div class="flex flex-wrap gap-2 items-center seasoning-row">
+          <div class="flex flex-col gap-1 shrink-0">
+            <button type="button" onclick="moveRecipeItemRow(this, -1)" class="w-7 h-7 rounded-lg bg-white border border-slate-100 text-slate-400 hover:text-amber-600">↑</button>
+            <button type="button" onclick="moveRecipeItemRow(this, 1)" class="w-7 h-7 rounded-lg bg-white border border-slate-100 text-slate-400 hover:text-amber-600">↓</button>
+          </div>
+          <input type="text" placeholder="調味料名" class="r-sea-name flex-1 min-w-[9rem] bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-amber-500">
           <input type="text" placeholder="数量" class="r-sea-amount w-16 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-amber-500">
           <input type="text" placeholder="単位" class="r-sea-unit w-16 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-amber-500">
+          <input type="text" placeholder="A/たれ" class="r-sea-group w-24 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-xs font-bold outline-none focus:border-amber-500">
           <button type="button" onclick="this.closest('.seasoning-row').remove()" class="w-9 h-9 rounded-xl bg-rose-50 text-rose-500 hover:bg-rose-100 flex items-center justify-center flex-shrink-0">×</button>
         </div>
       `);
+    }
+
+    function moveRecipeItemRow(button, direction) {
+      const row = button.closest('.ingredient-row, .seasoning-row');
+      if (!row || !direction) return;
+      const sibling = direction < 0 ? row.previousElementSibling : row.nextElementSibling;
+      if (!sibling) return;
+      if (direction < 0) {
+        row.parentNode.insertBefore(row, sibling);
+      } else {
+        row.parentNode.insertBefore(sibling, row);
+      }
     }
 
     function renderCookStepInputs(stepsJson) {
@@ -4622,18 +4714,20 @@ ${plan ? '\n提案方針: ' + plan : ''}
       const name = document.getElementById('r-name').value.trim();
       const source = document.getElementById('r-source').value.trim();
       const ingredients = [];
-      document.querySelectorAll('#ingredientList .ingredient-row').forEach(row => {
+      document.querySelectorAll('#ingredientList .ingredient-row').forEach((row, idx) => {
         const n = row.querySelector('.r-ing-name').value.trim();
         const a = row.querySelector('.r-ing-amount').value.trim();
         const u = row.querySelector('.r-ing-unit').value.trim();
-        if (n) ingredients.push({ name: n, amount: a || '', unit: u || '' });
+        const g = row.querySelector('.r-ing-group') ? row.querySelector('.r-ing-group').value.trim() : '';
+        if (n) ingredients.push({ name: n, amount: a || '', unit: u || '', type: '食材', group: g, order: idx });
       });
       const seasonings = [];
-      document.querySelectorAll('#seasoningList .seasoning-row').forEach(row => {
+      document.querySelectorAll('#seasoningList .seasoning-row').forEach((row, idx) => {
         const n = row.querySelector('.r-sea-name').value.trim();
         const a = row.querySelector('.r-sea-amount').value.trim();
         const u = row.querySelector('.r-sea-unit').value.trim();
-        if (n) seasonings.push({ name: n, amount: a || '', unit: u || '' });
+        const g = row.querySelector('.r-sea-group') ? row.querySelector('.r-sea-group').value.trim() : '';
+        if (n) seasonings.push({ name: n, amount: a || '', unit: u || '', type: '調味料', group: g, order: idx });
       });
       const prepSteps = [];
       document.querySelectorAll('#prepStepList .r-prep-step').forEach(ta => {
@@ -4705,10 +4799,10 @@ ${plan ? '\n提案方針: ' + plan : ''}
 {
   "name": "レシピ名",
   "ingredients": [
-    {"name": "材料名", "amount": "数量", "unit": "単位"}
+    {"name": "材料名", "amount": "数量", "unit": "単位", "type": "食材", "group": "A", "order": 0}
   ],
   "seasonings": [
-    {"name": "調味料名", "amount": "数量", "unit": "単位"}
+    {"name": "調味料名", "amount": "数量", "unit": "単位", "type": "調味料", "group": "A", "order": 0}
   ],
   "prepSteps": [
     "下ごしらえ1",
@@ -4723,6 +4817,8 @@ ${plan ? '\n提案方針: ' + plan : ''}
 注意事項:
 - ingredients は「材料」（野菜・肉・魚・豆腐・卵など）のみを含む
 - seasonings は「調味料」（醤油・塩・砂糖・味噌・酢・酒・コンソメ・だしの素など）のみを含む
+- group は「A」「B」「合わせ調味料」「衣」「たれ」など、手順内で参照しやすいまとまりがなければ空文字
+- order はそれぞれの配列内で調理手順に登場する順番を0から採番
 - prepSteps は「下ごしらえ」（切る・揉む・下味をつける・水洗い・塩もみ・浸すなど）を含む。テキストに「下ごしらえ」「下準備」「準備」などの見出しがある場合はその内容を抽出
 - steps は「調理工程」（火を通す・煮る・炒める・蒸す・盛り付けなど）のみを含む
 - amount は文字列として出力（数値と単位が混在する場合があるため）
@@ -5531,7 +5627,6 @@ ${text}`;
       }
       renderCookingIngredients(recipe);
       renderCookingSteps(recipe);
-      switchCookingTab('ingredients');
       document.getElementById('cookingViewer').classList.remove('hidden');
       document.getElementById('cookingGuide').classList.add('hidden');
       switchMode('C');
@@ -5549,6 +5644,7 @@ ${text}`;
       const stepBtn = document.getElementById('cookingTabSteps');
       const ingPanel = document.getElementById('cookingIngredientsPanel');
       const stepPanel = document.getElementById('cookingStepsPanel');
+      if (!ingBtn || !stepBtn || !ingPanel || !stepPanel) return;
       if (tab === 'ingredients') {
         ingBtn.className = 'flex-1 py-3 rounded-xl text-sm font-medium bg-indigo-600 text-white shadow-sm transition-all';
         stepBtn.className = 'flex-1 py-3 rounded-xl text-sm font-bold bg-slate-100 text-slate-500 transition-all';
@@ -5581,7 +5677,45 @@ ${text}`;
       return '';
     }
 
-    function renderCookingIngredientCard(ing, labelBadge, labelColor) {
+    function escapeRegExp(value) {
+      return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+
+    function groupRecipeItems(items) {
+      const groups = [];
+      const index = new Map();
+      sortRecipeItems(items).forEach(item => {
+        const group = item.group || '';
+        if (!index.has(group)) {
+          index.set(group, groups.length);
+          groups.push({ name: group, items: [] });
+        }
+        groups[index.get(group)].items.push(item);
+      });
+      return groups;
+    }
+
+    function getCookingReferenceItems(recipe) {
+      return [
+        ...getRecipeItems(recipe, 'ingredients', '食材'),
+        ...getRecipeItems(recipe, 'seasonings', '調味料')
+      ];
+    }
+
+    function jsStringForHtmlAttribute(value) {
+      return JSON.stringify(String(value || '')).replace(/"/g, '&quot;');
+    }
+
+    function highlightIngredientInCooking(name) {
+      const target = Array.from(document.querySelectorAll('[data-cooking-ing]')).find(el => el.dataset.cookingIng === String(name || ''));
+      if (!target) return;
+      target.classList.remove('cooking-ingredient-focus');
+      void target.offsetWidth;
+      target.classList.add('cooking-ingredient-focus');
+      target.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    function renderCookingIngredientCard(ing, labelBadge) {
       const amtBadge = getAmountBadge(ing.unit);
       const amountText = [ing.amount, ing.unit].filter(Boolean).join('');
       const required = parseFloat(ing.amount) || 0;
@@ -5594,12 +5728,14 @@ ${text}`;
       const stockClass = isShortage ? 'text-rose-500' : 'text-emerald-600';
       const cardClass = isShortage ? 'bg-rose-50 border-rose-200' : 'bg-white border-slate-100';
       const shortageBadge = isShortage ? '<span class="text-xs font-medium px-2 py-1 rounded-full bg-rose-100 text-rose-700 inline-flex items-center gap-1"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3 2 20h20L12 3Zm0 6v5m0 3h.01"/></svg>不足</span>' : '<span class="text-xs font-medium px-2 py-1 rounded-full bg-emerald-100 text-emerald-700">在庫あり</span>';
+      const attrName = escapeHtml(ing.name || '').replace(/"/g, '&quot;');
       return `
-        <div class="${cardClass} p-5 rounded-xl shadow-sm border flex items-center justify-between gap-3">
+        <div data-cooking-ing="${attrName}" class="${cardClass} p-4 rounded-xl shadow-sm border flex items-center justify-between gap-3 transition-all">
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-2 flex-wrap mb-1">
-              <span class="text-xl font-bold text-slate-800">${escapeHtml(ing.name || '')}</span>
+              <span class="text-lg lg:text-xl font-bold text-slate-800">${escapeHtml(ing.name || '')}</span>
               ${labelBadge}
+              ${ing.group ? `<span class="text-[10px] font-bold px-2 py-1 rounded-full bg-slate-100 text-slate-500">${escapeHtml(ing.group)}</span>` : ''}
               ${shortageBadge}
             </div>
             <p class="text-xs font-bold ${stockClass}">${stockText}</p>
@@ -5626,38 +5762,65 @@ ${text}`;
         container.innerHTML = '<div class="py-10 text-center text-slate-400 font-bold">材料データを読み込めません</div>';
         return;
       }
-      const hasIngredients = Array.isArray(ingredients) && ingredients.length > 0;
-      const hasSeasonings = Array.isArray(seasonings) && seasonings.length > 0;
+      ingredients = normalizeRecipeItems(ingredients, '食材');
+      seasonings = normalizeRecipeItems(seasonings, '調味料');
+      const hasIngredients = ingredients.length > 0;
+      const hasSeasonings = seasonings.length > 0;
+      const summary = document.getElementById('cookingIngredientSummary');
+      if (summary) summary.textContent = `${ingredients.length + seasonings.length} 件`;
       if (!hasIngredients && !hasSeasonings) {
         container.innerHTML = '<div class="py-10 text-center text-slate-400 font-bold">材料・調味料は登録されていません</div>';
         return;
       }
       if (hasIngredients) {
-        container.insertAdjacentHTML('beforeend', `<p class="text-[11px] font-medium text-slate-400 uppercase tracking-widest mb-2">材料</p>`);
-        ingredients.forEach(ing => {
-          const labelBadge = `<span class="text-xs font-medium px-2 py-1 rounded-full bg-green-100 text-green-800">材料</span>`;
-          container.insertAdjacentHTML('beforeend', renderCookingIngredientCard(ing, labelBadge));
+        groupRecipeItems(ingredients).forEach(group => {
+          container.insertAdjacentHTML('beforeend', `<p class="text-[11px] font-medium text-emerald-700 uppercase tracking-widest mb-2 ${group.name ? 'mt-3' : ''}">${group.name ? escapeHtml(group.name) : '材料'}</p>`);
+          group.items.forEach(ing => {
+            const labelBadge = `<span class="text-xs font-medium px-2 py-1 rounded-full bg-green-100 text-green-800">食材</span>`;
+            container.insertAdjacentHTML('beforeend', renderCookingIngredientCard(ing, labelBadge));
+          });
         });
       }
       if (hasSeasonings) {
-        container.insertAdjacentHTML('beforeend', `<p class="text-[11px] font-medium text-slate-400 uppercase tracking-widest mb-2 mt-4">調味料</p>`);
-        seasonings.forEach(sea => {
-          const labelBadge = `<span class="text-xs font-medium px-2 py-1 rounded-full bg-amber-100 text-amber-800">調味料</span>`;
-          container.insertAdjacentHTML('beforeend', renderCookingIngredientCard(sea, labelBadge));
+        groupRecipeItems(seasonings).forEach(group => {
+          container.insertAdjacentHTML('beforeend', `<p class="text-[11px] font-medium text-amber-700 uppercase tracking-widest mb-2 mt-4">${group.name ? escapeHtml(group.name) : '調味料'}</p>`);
+          group.items.forEach(sea => {
+            const labelBadge = `<span class="text-xs font-medium px-2 py-1 rounded-full bg-amber-100 text-amber-800">調味料</span>`;
+            container.insertAdjacentHTML('beforeend', renderCookingIngredientCard(sea, labelBadge));
+          });
         });
       }
     }
 
-    function highlightAmounts(text) {
-      const pattern = /([一-龠々ぁ-んァ-ンa-zA-Z・]+)\s*(大さじ|小さじ)\s*([0-9０-９]+(?:[\/／．.][0-9０-９]+)?)/g;
-      return escapeHtml(text).replace(pattern, (match, name, unit, num) => {
-        const colorClass = unit === '大さじ' ? 'text-red-600' : 'text-blue-600';
-        return `<span class="${colorClass} font-bold">${escapeHtml(name)} <span class="bg-gray-100 px-1 rounded">${escapeHtml(unit + num)}</span></span>`;
+    function chipifyCookingText(text, recipe) {
+      let html = escapeHtml(text);
+      const items = getCookingReferenceItems(recipe).filter(item => item.name);
+      const tokens = [];
+      const putToken = (markup) => {
+        const token = `@@COOK_CHIP_${tokens.length}@@`;
+        tokens.push({ token, markup });
+        return token;
+      };
+      const groupNames = Array.from(new Set(items.map(item => item.group).filter(Boolean)));
+      groupNames.sort((a, b) => String(b).length - String(a).length).forEach(group => {
+        const label = escapeHtml(group);
+        html = html.replace(new RegExp(`([（(]?${escapeRegExp(label)}[）)]?)`, 'g'), (match) => putToken(`<span class="inline-flex items-center align-baseline px-2 py-0.5 mx-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 text-sm font-bold">${match}</span>`));
       });
+      items.sort((a, b) => String(b.name).length - String(a.name).length).forEach(item => {
+        const cls = item.type === '調味料'
+          ? 'bg-amber-100 text-amber-800 border-amber-200'
+          : 'bg-emerald-100 text-emerald-800 border-emerald-200';
+        const chip = `<button type="button" onclick="highlightIngredientInCooking(${jsStringForHtmlAttribute(item.name)})" class="inline-flex items-center align-baseline px-2 py-0.5 mx-0.5 rounded-full border ${cls} text-sm font-bold">${escapeHtml(item.name)}</button>`;
+        html = html.replace(new RegExp(escapeRegExp(escapeHtml(item.name)), 'g'), () => putToken(chip));
+      });
+      html = html.replace(/(大さじ)\s*([0-9０-９]+(?:[\/／．.][0-9０-９]+)?)/g, (match, unit, num) => putToken(`<span class="inline-flex items-center align-baseline px-2 py-0.5 mx-0.5 rounded-full bg-red-100 text-red-800 border border-red-200 text-sm font-bold">${unit}${num}</span>`));
+      html = html.replace(/(小さじ)\s*([0-9０-９]+(?:[\/／．.][0-9０-９]+)?)/g, (match, unit, num) => putToken(`<span class="inline-flex items-center align-baseline px-2 py-0.5 mx-0.5 rounded-full bg-blue-100 text-blue-800 border border-blue-200 text-sm font-bold">${unit}${num}</span>`));
+      tokens.forEach(item => { html = html.replaceAll(item.token, item.markup); });
+      return html;
     }
 
-    function renderCookingStepCard(step, idx, colorClass) {
-      const highlighted = highlightAmounts(String(step));
+    function renderCookingStepCard(step, idx, colorClass, recipe) {
+      const highlighted = chipifyCookingText(String(step), recipe);
       return `
         <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-100 flex gap-4">
           <div class="w-10 h-10 ${colorClass} rounded-xl flex items-center justify-center text-lg font-medium flex-shrink-0">
@@ -5693,13 +5856,13 @@ ${text}`;
       if (hasPrep) {
         container.insertAdjacentHTML('beforeend', `<p class="text-[11px] font-medium text-slate-400 uppercase tracking-widest mb-2">下ごしらえ</p>`);
         prepSteps.forEach((step, idx) => {
-          container.insertAdjacentHTML('beforeend', renderCookingStepCard(step, idx, 'bg-teal-100 text-teal-700'));
+          container.insertAdjacentHTML('beforeend', renderCookingStepCard(step, idx, 'bg-teal-100 text-teal-700', recipe));
         });
       }
       if (hasCook) {
         container.insertAdjacentHTML('beforeend', `<p class="text-[11px] font-medium text-slate-400 uppercase tracking-widest mb-2 mt-4">調理工程</p>`);
         cookSteps.forEach((step, idx) => {
-          container.insertAdjacentHTML('beforeend', renderCookingStepCard(step, idx, 'bg-indigo-100 text-indigo-700'));
+          container.insertAdjacentHTML('beforeend', renderCookingStepCard(step, idx, 'bg-indigo-100 text-indigo-700', recipe));
         });
       }
     }
@@ -5728,8 +5891,8 @@ ${text}`;
         showToast('レシピデータの読み込みに失敗しました', 'error');
         return;
       }
-      if (!Array.isArray(ingredients)) ingredients = [];
-      if (!Array.isArray(seasonings)) seasonings = [];
+      ingredients = normalizeRecipeItems(ingredients, '食材');
+      seasonings = normalizeRecipeItems(seasonings, '調味料');
       _consumptionIngredients = [...ingredients, ...seasonings];
 
       const container = document.getElementById('consumptionList');
