@@ -1,0 +1,63 @@
+{
+  "ticket_id": "TKT-0058-consumption-substitution-tabs",
+  "verify_timestamp": "2026-05-17T00:00:00Z",
+  "checks": [
+    {
+      "name": "html_syntax",
+      "command": "python3 -c \"import html.parser; html.parser.HTMLParser().feed(open('app.html').read())\" && echo 'VERIFY_PASSED'",
+      "result": "VERIFY_PASSED"
+    },
+    {
+      "name": "gas_url_exists",
+      "command": "grep -q 'GAS_URL' app.html && echo 'PASS' || echo 'FAIL'",
+      "result": "PASS"
+    },
+    {
+      "name": "executegas_exists",
+      "command": "grep -q 'executeGAS' app.html && echo 'PASS' || echo 'FAIL'",
+      "result": "PASS"
+    },
+    {
+      "name": "showtoast_exists",
+      "command": "grep -q 'function showToast' app.html && echo 'PASS' || echo 'FAIL'",
+      "result": "PASS"
+    },
+    {
+      "name": "no_native_dialogs",
+      "command": "grep -En '\\\\b(alert|confirm|prompt)\\(' app.html | grep -v '//' | grep -v 'showToast' || echo 'PASS'",
+      "result": "PASS"
+    },
+    {
+      "name": "no_new_individual_gas_write",
+      "command": "grep -n 'executeGAS' app.html | wc -l",
+      "result": "5 (既存5件、新規追加なし)"
+    },
+    {
+      "name": "new_modal_html",
+      "command": "grep -q 'substitutionModal' app.html && echo 'PASS' || echo 'FAIL'",
+      "result": "PASS"
+    },
+    {
+      "name": "tab_buttons_html",
+      "command": "grep -q 'consumptionTabs' app.html && grep -q 'setConsumptionTab' app.html && echo 'PASS' || echo 'FAIL'",
+      "result": "PASS"
+    },
+    {
+      "name": "substitution_functions_js",
+      "command": "grep -q 'openSubstitutionModal' app.html && grep -q 'selectSubstitution' app.html && grep -q 'clearSubstitution' app.html && echo 'PASS' || echo 'FAIL'",
+      "result": "PASS"
+    },
+    {
+      "name": "confirm_consumption_substitute_support",
+      "command": "grep -q 'ing.substitute' app.html && echo 'PASS' || echo 'FAIL'",
+      "result": "PASS"
+    }
+  ],
+  "overall": "PASS",
+  "notes": [
+    "HTML構文エラーなし",
+    "新規GAS通信（executeGAS呼び出し）は追加していない",
+    "スプシ書き込みは既存の queueInventoryUpdate / queueInventoryDelete を利用",
+    "showToast関数は既存のものを流用"
+  ]
+}

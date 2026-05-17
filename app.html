@@ -833,6 +833,11 @@
         <h3 class="text-2xl font-medium text-slate-800 tracking-tight">実際の消費量を調整</h3>
         <button onclick="closeConsumptionModal()" class="text-slate-300 hover:text-slate-600 bg-slate-100 p-2 rounded-full"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg></button>
       </div>
+      <div id="consumptionTabs" class="grid grid-cols-3 gap-1 bg-slate-100 border border-slate-100 rounded-xl p-1 mb-4">
+        <button type="button" onclick="setConsumptionTab('all')" data-consumption-tab="all" class="consumption-tab-btn px-3 py-2 rounded-lg text-xs font-medium transition-all">All</button>
+        <button type="button" onclick="setConsumptionTab('seasoning')" data-consumption-tab="seasoning" class="consumption-tab-btn px-3 py-2 rounded-lg text-xs font-medium transition-all">調味料</button>
+        <button type="button" onclick="setConsumptionTab('ingredient')" data-consumption-tab="ingredient" class="consumption-tab-btn px-3 py-2 rounded-lg text-xs font-medium transition-all">材料</button>
+      </div>
       <div id="consumptionList" class="space-y-3 mb-6">
         <!-- JSで動的に挿入 -->
       </div>
@@ -842,6 +847,46 @@
       <div class="flex gap-3">
         <button onclick="closeConsumptionModal()" class="flex-1 bg-slate-100 text-slate-600 font-medium py-4 rounded-xl hover:bg-slate-200 transition-all">キャンセル</button>
         <button id="btnConsumptionConfirm" onclick="confirmConsumption()" class="flex-[2] bg-emerald-600 text-white font-medium py-4 rounded-xl hover:bg-emerald-700 transition-all shadow">確定</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- モーダル: 代替品選択 -->
+  <div id="substitutionModal" onclick="if(event.target===this) closeSubstitutionModal()" class="fixed inset-0 z-[55] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
+    <div onclick="event.stopPropagation()" class="bg-white w-full max-w-lg rounded-xl p-6 shadow transform scale-95 transition-transform duration-300 border border-slate-100 max-h-[90vh] overflow-y-auto">
+      <div class="flex justify-between items-center mb-4">
+        <div>
+          <h3 class="text-2xl font-medium text-slate-800 tracking-tight">代替品を選択</h3>
+          <p class="text-xs text-slate-400 font-bold mt-1" id="substitutionTargetLabel">元の材料名</p>
+        </div>
+        <button onclick="closeSubstitutionModal()" class="text-slate-300 hover:text-slate-600 bg-slate-100 p-2 rounded-full"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+      </div>
+      <div class="space-y-3 mb-4">
+        <input type="text" id="substitutionSearch" oninput="renderSubstitutionList()" class="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:border-indigo-500" placeholder="食材名で検索...">
+        <div class="flex gap-2">
+          <select id="substitutionLocFilter" onchange="renderSubstitutionList()" class="flex-1 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:border-indigo-500 appearance-none cursor-pointer">
+            <option value="すべて">すべての場所</option>
+          </select>
+          <select id="substitutionTypeFilter" onchange="renderSubstitutionList()" class="flex-1 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:border-indigo-500 appearance-none cursor-pointer">
+            <option value="すべて">すべての分類</option>
+            <option value="食材">食材</option>
+            <option value="野菜">野菜</option>
+            <option value="肉">肉</option>
+            <option value="魚">魚</option>
+            <option value="乳製品">乳製品</option>
+            <option value="穀物">穀物</option>
+            <option value="調味料">調味料</option>
+            <option value="その他">その他</option>
+          </select>
+        </div>
+        <div class="flex bg-slate-100 rounded-xl p-1 gap-1">
+          <button type="button" onclick="setSubstitutionSort('limit2')" data-subst-sort="limit2" class="subst-sort-btn flex-1 text-xs font-medium py-2 rounded-lg transition-all bg-white text-indigo-600 shadow-sm">期限</button>
+          <button type="button" onclick="setSubstitutionSort('name')" data-subst-sort="name" class="subst-sort-btn flex-1 text-xs font-medium py-2 rounded-lg transition-all">名前</button>
+          <button type="button" onclick="setSubstitutionSort('buy')" data-subst-sort="buy" class="subst-sort-btn flex-1 text-xs font-medium py-2 rounded-lg transition-all">購入日</button>
+        </div>
+      </div>
+      <div id="substitutionList" class="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
+        <!-- JSで動的に挿入 -->
       </div>
     </div>
   </div>
@@ -4564,10 +4609,12 @@ ${plan ? '\n提案方針: ' + plan : ''}
       return div.innerHTML;
     }
 
-    function sortInventory(list) {
+    function sortInventory(list, sortBy, sortOrder) {
+      const key = sortBy || state.sortBy;
+      const order = sortOrder || state.sortOrder;
       const sorted = [...list].sort((a, b) => {
-        if (state.sortBy === 'name') return a.name.localeCompare(b.name, 'ja');
-        if (state.sortBy === 'buy') {
+        if (key === 'name') return a.name.localeCompare(b.name, 'ja');
+        if (key === 'buy') {
           if (!a.buy && !b.buy) return 0;
           if (!a.buy) return 1;
           if (!b.buy) return -1;
@@ -4578,7 +4625,7 @@ ${plan ? '\n提案方針: ' + plan : ''}
         if (!b.limit2) return -1;
         return a.limit2.localeCompare(b.limit2);
       });
-      return state.sortOrder === 'desc' ? sorted.reverse() : sorted;
+      return order === 'desc' ? sorted.reverse() : sorted;
     }
 
     function sortShopping(list) {
@@ -6347,6 +6394,10 @@ ${text}`;
 
     let _consumptionRecipeId = null;
     let _consumptionIngredients = [];
+    let _consumptionTabFilter = 'all';
+    let _substitutionTargetIdx = -1;
+    let _substitutionSortBy = 'limit2';
+    let _substitutionSortOrder = 'asc';
 
     function openConsumptionAdjustmentModal(recipeId) {
       const recipe = state.recipes.find(r => r.id === recipeId);
@@ -6355,6 +6406,7 @@ ${text}`;
         return;
       }
       _consumptionRecipeId = recipeId;
+      _consumptionTabFilter = 'all';
       let ingredients = [];
       let seasonings = [];
       try {
@@ -6366,42 +6418,13 @@ ${text}`;
       }
       ingredients = normalizeRecipeItems(ingredients, '食材');
       seasonings = normalizeRecipeItems(seasonings, '調味料');
+      // 元の分類情報を保持
+      ingredients.forEach(i => i._category = 'ingredient');
+      seasonings.forEach(i => i._category = 'seasoning');
       _consumptionIngredients = [...ingredients, ...seasonings];
 
-      const container = document.getElementById('consumptionList');
-      container.innerHTML = '';
-      if (_consumptionIngredients.length === 0) {
-        container.innerHTML = '<div class="py-6 text-center text-slate-400 font-bold">材料・調味料は登録されていません</div>';
-      } else {
-        _consumptionIngredients.forEach((ing, idx) => {
-          const amount = parseFloat(ing.amount) || 0;
-          const unit = ing.unit || '';
-          const stockQty = state.inventory
-            .filter(i => i.name === ing.name && i.unit === unit && Number(i.qty) > 0)
-            .reduce((sum, item) => sum + (Number(item.qty) || 0), 0);
-          const isShortage = amount > 0 && stockQty < amount;
-          const stockClass = isShortage ? 'text-rose-500' : 'text-emerald-600';
-          const rowClass = isShortage ? 'bg-rose-50 border-rose-200' : 'bg-slate-50 border-transparent';
-          const shortageBadge = isShortage ? '<span class="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-rose-100 text-rose-700">不足</span>' : '';
-          const labelBadge = seasonings.includes(ing)
-            ? '<span class="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700">調味料</span>'
-            : '<span class="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-green-100 text-green-700">材料</span>';
-          container.insertAdjacentHTML('beforeend', `
-            <div class="${rowClass} rounded-xl p-4 flex items-center gap-3 border" data-idx="${idx}">
-              <div class="flex-1 min-w-0">
-                <div class="flex items-center gap-2 mb-0.5">
-                  <p class="font-bold text-slate-800 text-sm">${escapeHtml(ing.name || '')}</p>
-                  ${labelBadge}
-                  ${shortageBadge}
-                </div>
-                <p class="text-[10px] text-slate-400 font-bold">規定量: ${amount > 0 ? amount : '—'}${escapeHtml(unit)} / <span class="${stockClass}">在庫: ${stockQty}${escapeHtml(unit)}</span></p>
-              </div>
-              <input type="number" min="0" step="0.1" value="${amount > 0 ? amount : ''}" placeholder="0" data-ing-name="${escapeHtml(ing.name || '')}" data-ing-unit="${escapeHtml(unit)}" data-ing-amount="${amount}" class="cons-qty w-20 bg-white border border-slate-100 rounded-xl px-3 py-2 text-sm font-bold text-right outline-none focus:border-indigo-500">
-              <span class="text-xs font-bold text-slate-500 w-10">${escapeHtml(unit)}</span>
-            </div>
-          `);
-        });
-      }
+      renderConsumptionTabs();
+      renderConsumptionList();
       document.getElementById('consumptionWarning').classList.add('hidden');
       document.getElementById('btnConsumptionConfirm').disabled = false;
       document.getElementById('btnConsumptionConfirm').classList.remove('opacity-50', 'cursor-not-allowed');
@@ -6415,6 +6438,91 @@ ${text}`;
       setTimeout(() => m.classList.remove('opacity-0'), 10);
     }
 
+    function renderConsumptionTabs() {
+      document.querySelectorAll('.consumption-tab-btn').forEach(btn => {
+        const isActive = btn.dataset.consumptionTab === _consumptionTabFilter;
+        btn.className = `consumption-tab-btn px-3 py-2 rounded-lg text-xs font-medium transition-all ${isActive ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`;
+      });
+    }
+
+    function setConsumptionTab(tab) {
+      if (!['all', 'seasoning', 'ingredient'].includes(tab)) return;
+      _consumptionTabFilter = tab;
+      renderConsumptionTabs();
+      renderConsumptionList();
+    }
+
+    function renderConsumptionList() {
+      const container = document.getElementById('consumptionList');
+      container.innerHTML = '';
+
+      // 既存の入力値を保存して復元するためのマップ
+      const existingValues = {};
+      document.querySelectorAll('.cons-qty').forEach(input => {
+        const idx = input.closest('[data-idx]')?.dataset.idx;
+        if (idx !== undefined) existingValues[idx] = input.value;
+      });
+
+      const filtered = _consumptionIngredients.filter((ing, idx) => {
+        if (_consumptionTabFilter === 'all') return true;
+        if (_consumptionTabFilter === 'seasoning') return ing._category === 'seasoning';
+        if (_consumptionTabFilter === 'ingredient') return ing._category === 'ingredient';
+        return true;
+      });
+
+      if (filtered.length === 0) {
+        container.innerHTML = '<div class="py-6 text-center text-slate-400 font-bold">該当する材料・調味料はありません</div>';
+        return;
+      }
+
+      const today = new Date(); today.setHours(0,0,0,0);
+
+      filtered.forEach((ing) => {
+        const idx = _consumptionIngredients.indexOf(ing);
+        const amount = parseFloat(ing.amount) || 0;
+        const unit = ing.unit || '';
+        const targetName = ing.substitute ? ing.substitute.name : ing.name;
+        const stockQty = state.inventory
+          .filter(i => i.name === targetName && i.unit === unit && Number(i.qty) > 0)
+          .reduce((sum, item) => sum + (Number(item.qty) || 0), 0);
+        const isShortage = amount > 0 && stockQty < amount;
+        const stockClass = isShortage ? 'text-rose-500' : 'text-emerald-600';
+        const rowClass = isShortage ? 'bg-rose-50 border-rose-200' : 'bg-slate-50 border-transparent';
+        const shortageBadge = isShortage ? '<span class="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-rose-100 text-rose-700">不足</span>' : '';
+        const labelBadge = ing._category === 'seasoning'
+          ? '<span class="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700">調味料</span>'
+          : '<span class="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-green-100 text-green-700">材料</span>';
+
+        let nameHtml = `<p class="font-bold text-slate-800 text-sm">${escapeHtml(ing.name || '')}</p>`;
+        let subHtml = '';
+        if (ing.substitute) {
+          nameHtml = `<p class="font-bold text-slate-800 text-sm">${escapeHtml(ing.substitute.name)}</p>`;
+          subHtml = `<p class="text-[10px] text-slate-400 font-bold">元: ${escapeHtml(ing.name)} <button type="button" onclick="clearSubstitution(${idx})" class="text-indigo-600 hover:text-indigo-800 ml-1">元に戻す</button></p>`;
+        }
+
+        const savedValue = existingValues[idx] !== undefined ? existingValues[idx] : (amount > 0 ? amount : '');
+
+        container.insertAdjacentHTML('beforeend', `
+          <div class="${rowClass} rounded-xl p-4 flex items-center gap-3 border" data-idx="${idx}">
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 mb-0.5 flex-wrap">
+                ${nameHtml}
+                ${labelBadge}
+                ${shortageBadge}
+              </div>
+              ${subHtml}
+              <p class="text-[10px] text-slate-400 font-bold">規定量: ${amount > 0 ? amount : '—'}${escapeHtml(unit)} / <span class="${stockClass}">在庫: ${stockQty}${escapeHtml(unit)}</span></p>
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+              <button type="button" onclick="openSubstitutionModal(${idx})" class="text-[10px] font-medium text-indigo-600 bg-indigo-50 px-2 py-1 rounded-lg hover:bg-indigo-100 active:scale-95 transition-all whitespace-nowrap">代替</button>
+              <input type="number" min="0" step="0.1" value="${savedValue}" placeholder="0" data-ing-name="${escapeHtml(ing.name || '')}" data-ing-unit="${escapeHtml(unit)}" data-ing-amount="${amount}" data-idx="${idx}" class="cons-qty w-20 bg-white border border-slate-100 rounded-xl px-3 py-2 text-sm font-bold text-right outline-none focus:border-indigo-500">
+              <span class="text-xs font-bold text-slate-500 w-10">${escapeHtml(unit)}</span>
+            </div>
+          </div>
+        `);
+      });
+    }
+
     function closeConsumptionModal() {
       const m = document.getElementById('consumptionModal');
       m.classList.add('opacity-0');
@@ -6422,6 +6530,8 @@ ${text}`;
       updateSyncBar();
       _consumptionRecipeId = null;
       _consumptionIngredients = [];
+      _consumptionTabFilter = 'all';
+      _substitutionTargetIdx = -1;
     }
 
     function validateConsumptionInputs() {
@@ -6429,16 +6539,19 @@ ${text}`;
       let hasShortage = false;
       let shortageNames = [];
       inputs.forEach(input => {
-        const name = input.dataset.ingName;
+        const idx = parseInt(input.dataset.idx);
+        const ing = _consumptionIngredients[idx];
+        if (!ing) return;
+        const targetName = ing.substitute ? ing.substitute.name : ing.name;
         const unit = input.dataset.ingUnit;
         const consumed = parseFloat(input.value) || 0;
         if (consumed <= 0) return;
         const stockQty = state.inventory
-          .filter(i => i.name === name && i.unit === unit && Number(i.qty) > 0)
+          .filter(i => i.name === targetName && i.unit === unit && Number(i.qty) > 0)
           .reduce((sum, item) => sum + (Number(item.qty) || 0), 0);
         if (stockQty < consumed) {
           hasShortage = true;
-          if (!shortageNames.includes(name)) shortageNames.push(name);
+          if (!shortageNames.includes(targetName)) shortageNames.push(targetName);
         }
       });
       const warning = document.getElementById('consumptionWarning');
@@ -6457,18 +6570,21 @@ ${text}`;
       const inputs = document.querySelectorAll('.cons-qty');
       const consumedMap = [];
       inputs.forEach(input => {
-        const name = input.dataset.ingName;
+        const idx = parseInt(input.dataset.idx);
+        const ing = _consumptionIngredients[idx];
+        if (!ing) return;
+        const targetName = ing.substitute ? ing.substitute.name : ing.name;
         const unit = input.dataset.ingUnit;
         const consumed = parseFloat(input.value) || 0;
         if (consumed > 0) {
-          consumedMap.push({ name, unit, consumed });
+          consumedMap.push({ name: targetName, unit, consumed, originalName: ing.name });
         }
       });
 
       const results = [];
       let updatedCount = 0;
       let deletedCount = 0;
-      consumedMap.forEach(({ name, unit, consumed }) => {
+      consumedMap.forEach(({ name, unit, consumed, originalName }) => {
         const stockQty = state.inventory
           .filter(i => i.name === name && i.unit === unit && Number(i.qty) > 0)
           .reduce((sum, item) => sum + (Number(item.qty) || 0), 0);
@@ -6492,10 +6608,11 @@ ${text}`;
             updatedCount++;
           }
         }
+        const displayName = originalName !== name ? `${originalName}→${name}` : name;
         if (isShortage) {
-          results.push(`${name} は在庫不足（${stockQty}${unit}しかない）のため、全在庫を消費しました`);
+          results.push(`${displayName} は在庫不足（${stockQty}${unit}しかない）のため、全在庫を消費しました`);
         } else {
-          results.push(`${name} を ${actualConsumed}${unit} 消費しました`);
+          results.push(`${displayName} を ${actualConsumed}${unit} 消費しました`);
         }
       });
 
@@ -6512,6 +6629,140 @@ ${text}`;
 
       // 料理の記録モーダルを自動で開く
       setTimeout(() => openCookingRecordModal(recipeId), 500);
+    }
+
+    // --- Substitution Modal ---
+    function openSubstitutionModal(idx) {
+      const ing = _consumptionIngredients[idx];
+      if (!ing) return;
+      _substitutionTargetIdx = idx;
+      document.getElementById('substitutionTargetLabel').textContent = `元の材料: ${ing.name} (${ing.unit || ''})`;
+      document.getElementById('substitutionSearch').value = '';
+      document.getElementById('substitutionTypeFilter').value = 'すべて';
+      _substitutionSortBy = 'limit2';
+      _substitutionSortOrder = 'asc';
+
+      // 保存場所フィルタを構築
+      const locSelect = document.getElementById('substitutionLocFilter');
+      const currentLocVal = locSelect.value;
+      const allLocs = getStorageLocations();
+      locSelect.innerHTML = '<option value="すべて">すべての場所</option>' +
+        allLocs.map(loc => `<option value="${escapeHtml(loc)}">${escapeHtml(loc)}</option>`).join('');
+      if (Array.from(locSelect.options).some(o => o.value === currentLocVal)) {
+        locSelect.value = currentLocVal;
+      } else {
+        locSelect.value = 'すべて';
+      }
+
+      renderSubstitutionSortButtons();
+      renderSubstitutionList();
+
+      const m = document.getElementById('substitutionModal');
+      m.classList.remove('hidden');
+      setTimeout(() => m.classList.remove('opacity-0'), 10);
+    }
+
+    function closeSubstitutionModal() {
+      const m = document.getElementById('substitutionModal');
+      m.classList.add('opacity-0');
+      setTimeout(() => m.classList.add('hidden'), 300);
+      _substitutionTargetIdx = -1;
+    }
+
+    function renderSubstitutionSortButtons() {
+      document.querySelectorAll('.subst-sort-btn').forEach(btn => {
+        const isActive = btn.dataset.substSort === _substitutionSortBy;
+        btn.className = `subst-sort-btn flex-1 text-xs font-medium py-2 rounded-lg transition-all ${isActive ? 'bg-white text-indigo-600 shadow-sm' : ''}`;
+      });
+    }
+
+    function setSubstitutionSort(sortBy) {
+      if (_substitutionSortBy === sortBy) {
+        _substitutionSortOrder = _substitutionSortOrder === 'asc' ? 'desc' : 'asc';
+      } else {
+        _substitutionSortBy = sortBy;
+        _substitutionSortOrder = 'asc';
+      }
+      renderSubstitutionSortButtons();
+      renderSubstitutionList();
+    }
+
+    function renderSubstitutionList() {
+      const container = document.getElementById('substitutionList');
+      const search = (document.getElementById('substitutionSearch').value || '').toLowerCase().trim();
+      const locFilter = document.getElementById('substitutionLocFilter').value;
+      const typeFilter = document.getElementById('substitutionTypeFilter').value;
+
+      let filtered = state.inventory.filter(item => {
+        if (search && !item.name.toLowerCase().includes(search)) return false;
+        if (locFilter !== 'すべて' && item.loc !== locFilter) return false;
+        if (typeFilter !== 'すべて' && item.type !== typeFilter) return false;
+        return true;
+      });
+
+      filtered = sortInventory(filtered, _substitutionSortBy, _substitutionSortOrder);
+
+      if (filtered.length === 0) {
+        container.innerHTML = '<div class="py-6 text-center text-slate-400 font-bold text-sm">該当する在庫がありません</div>';
+        return;
+      }
+
+      const today = new Date(); today.setHours(0,0,0,0);
+      container.innerHTML = '';
+      filtered.forEach(item => {
+        let rowClass = 'bg-slate-50 border-slate-200';
+        let badge = '';
+        if (item.limit2) {
+          const limit = new Date(item.limit2); limit.setHours(0,0,0,0);
+          const diff = Math.ceil((limit - today) / 86400000);
+          const dStr = `${limit.getMonth()+1}/${limit.getDate()}`;
+          if (diff <= 0) {
+            rowClass = 'bg-rose-50 border-rose-200';
+            badge = `<span class="text-[9px] font-medium px-1.5 py-0.5 bg-rose-600 text-white rounded-full">${dStr} 期限切</span>`;
+          } else if (diff <= 3) {
+            rowClass = 'bg-amber-50 border-amber-200';
+            badge = `<span class="text-[9px] font-medium px-1.5 py-0.5 bg-amber-500 text-white rounded-full">あと${diff}日 ${dStr}</span>`;
+          } else {
+            badge = `<span class="text-[9px] font-medium px-1.5 py-0.5 bg-slate-200 text-slate-600 rounded-full">${dStr}</span>`;
+          }
+        }
+        container.insertAdjacentHTML('beforeend', `
+          <button type="button" onclick="selectSubstitution('${escapeHtml(item.id)}', '${escapeHtml(item.name)}')" class="w-full text-left ${rowClass} rounded-xl p-3 flex items-center gap-3 border hover:shadow-sm active:scale-[0.98] transition-all">
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 mb-0.5">
+                <span class="font-bold text-slate-800 text-sm truncate">${escapeHtml(item.name)}</span>
+                ${badge}
+              </div>
+              <div class="text-[10px] text-slate-400 font-bold">${escapeHtml(item.loc)} · 購入 ${item.buy || '—'}</div>
+            </div>
+            <div class="text-right shrink-0">
+              <span class="text-sm font-bold text-slate-700">${item.qty}<span class="text-[10px]">${escapeHtml(item.unit)}</span></span>
+            </div>
+          </button>
+        `);
+      });
+    }
+
+    function selectSubstitution(inventoryId, inventoryName) {
+      const idx = _substitutionTargetIdx;
+      if (idx < 0 || idx >= _consumptionIngredients.length) return;
+      const item = state.inventory.find(i => i.id === inventoryId);
+      if (!item) return;
+      _consumptionIngredients[idx].substitute = {
+        name: item.name,
+        id: item.id,
+        originalName: _consumptionIngredients[idx].name
+      };
+      closeSubstitutionModal();
+      renderConsumptionList();
+      validateConsumptionInputs();
+    }
+
+    function clearSubstitution(idx) {
+      if (idx < 0 || idx >= _consumptionIngredients.length) return;
+      delete _consumptionIngredients[idx].substitute;
+      renderConsumptionList();
+      validateConsumptionInputs();
     }
 
     document.getElementById('consumptionModal').addEventListener('input', (e) => {
