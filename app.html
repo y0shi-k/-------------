@@ -3716,7 +3716,11 @@ ${request ? '\nユーザーの追加要望: ' + request : ''}
       } catch (err) {
         console.error('[AI Consult] error:', err);
         setStatus(false);
-        showToast('相談中にエラーが発生しました。' + (err.message || ''), 'error');
+        if (err.message && err.message.includes('401')) {
+          showToast('APIの利用制限に達した可能性があります。しばらくしてから実行してください。', 'error');
+        } else {
+          showToast('相談中にエラーが発生しました。' + (err.message || ''), 'error');
+        }
       }
     }
 
@@ -3798,7 +3802,11 @@ ${plan ? '\n提案方針: ' + plan : ''}
       } catch (err) {
         console.error('[AI Recipe] error:', err);
         setStatus(false);
-        showToast('レシピの生成中にエラーが発生しました。' + (err.message || ''), 'error');
+        if (err.message && err.message.includes('401')) {
+          showToast('APIの利用制限に達した可能性があります。しばらくしてから実行してください。', 'error');
+        } else {
+          showToast('レシピの生成中にエラーが発生しました。' + (err.message || ''), 'error');
+        }
       }
     }
 
@@ -4555,6 +4563,11 @@ ${plan ? '\n提案方針: ' + plan : ''}
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseMimeType: "application/json" } })
         });
+        if (!res.ok) {
+          let errMsg = `APIエラー: ${res.status}`;
+          try { const errData = await res.json(); if(errData.error&&errData.error.message) errMsg += '\n'+errData.error.message; } catch(e){}
+          throw new Error(errMsg);
+        }
         const data = await res.json();
         const parsedResults = parseAIJsonResponse(data.candidates?.[0]?.content?.parts?.[0]?.text || '', 'Shelf Life AI');
         const results = Array.isArray(parsedResults) ? parsedResults : ((parsedResults && (parsedResults.items || parsedResults.results)) || []);
@@ -4572,7 +4585,13 @@ ${plan ? '\n提案方針: ' + plan : ''}
         if (!quiet) showToast(`${results.length} 件の期限をAI解析しました`, 'success');
       } catch(e) {
         console.error(e);
-        if (!quiet) showToast('AI解析中にエラーが発生しました。', 'error');
+        if (!quiet) {
+          if (e.message && e.message.includes('401')) {
+            showToast('APIの利用制限に達した可能性があります。しばらくしてから実行してください。', 'error');
+          } else {
+            showToast('AI解析中にエラーが発生しました。', 'error');
+          }
+        }
       }
       setStatus(false);
       renderList();
@@ -5117,7 +5136,11 @@ ${text}`;
       } catch (err) {
         console.error('[RecipeAI] error:', err);
         setStatus(false);
-        showToast('レシピの解析中にエラーが発生しました。' + (err.message || ''), 'error');
+        if (err.message && err.message.includes('401')) {
+          showToast('APIの利用制限に達した可能性があります。しばらくしてから実行してください。', 'error');
+        } else {
+          showToast('レシピの解析中にエラーが発生しました。' + (err.message || ''), 'error');
+        }
       }
     }
 
@@ -5441,7 +5464,11 @@ ${text}`;
       } catch (err) {
         console.error('[ImageScan] scan error:', err);
         setStatus(false);
-        showToast('画像の解析中にエラーが発生しました。' + (err.message || ''), 'error');
+        if (err.message && err.message.includes('401')) {
+          showToast('APIの利用制限に達した可能性があります。しばらくしてから実行してください。', 'error');
+        } else {
+          showToast('画像の解析中にエラーが発生しました。' + (err.message || ''), 'error');
+        }
       }
     }
 
