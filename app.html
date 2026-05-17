@@ -109,10 +109,13 @@
           </div>
           <div id="inventoryTopTabs" class="bg-white/80 border border-slate-200 rounded-xl p-1 flex items-center gap-1 shadow-sm">
             <button id="inventoryTopTab" onclick="filterByLocation('すべて')" class="px-3 py-2 rounded-xl text-[11px] font-medium transition-all active:scale-95 whitespace-nowrap">食材管理</button>
-            <button id="shoppingTopTab" onclick="filterByLocation('買い物リスト')" class="px-3 py-2 rounded-xl text-[11px] font-medium transition-all active:scale-95 whitespace-nowrap">買い物リスト</button>
+            <button id="shoppingTopTab" onclick="filterByLocation('買い物リスト')" class="relative px-3 py-2 rounded-xl text-[11px] font-medium transition-all active:scale-95 whitespace-nowrap">
+              買い物リスト
+              <span id="shoppingBadge" class="absolute -top-1 -right-1 bg-rose-600 text-white text-[10px] font-medium px-1.5 py-0.5 rounded-full ring-2 ring-white hidden">0</span>
+            </button>
             <button id="registrationTopTab" onclick="openRegistrationHub()" class="relative w-10 h-10 rounded-xl flex items-center justify-center transition-all active:scale-95" aria-label="在庫登録を開く">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"></path></svg>
-              <span id="stagingBadge" class="absolute -top-1 -right-1 bg-amber-500 text-white text-[10px] font-medium px-1.5 py-0.5 rounded-full hidden">0</span>
+              <span id="stagingBadge" class="absolute -top-1 -right-1 bg-rose-600 text-white text-[10px] font-medium px-1.5 py-0.5 rounded-full ring-2 ring-white hidden">0</span>
             </button>
           </div>
         </header>
@@ -189,7 +192,6 @@
 
         <div id="recipeModeTopTabs" class="flex gap-2 overflow-x-auto no-scrollbar pb-3 mb-2 snap-x">
           <button onclick="switchBTab('recipes')" class="b-tab active bg-indigo-600 text-white shadow-sm border border-indigo-100 px-5 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap snap-start transition-all" data-tab="recipes">レシピ集</button>
-          <button onclick="switchBTab('ai')" class="b-tab bg-white text-violet-600 border border-violet-100 px-5 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap snap-start transition-all" data-tab="ai">AI考案</button>
           <button onclick="switchBTab('schedule')" class="b-tab bg-white text-sky-600 border border-sky-100 px-5 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap snap-start transition-all" data-tab="schedule">スケジュール</button>
         </div>
 
@@ -478,6 +480,40 @@
         <button onclick="parseRecipeTextWithAI()" class="w-full bg-indigo-600 text-white font-medium py-4 rounded-xl shadow-sm hover:bg-indigo-700 active:scale-95 transition-all flex items-center justify-center gap-2">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m12 3 1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6L12 3ZM19 14l.8 2.2L22 17l-2.2.8L19 20l-.8-2.2L16 17l2.2-.8L19 14ZM5 14l.8 2.2L8 17l-2.2.8L5 20l-.8-2.2L2 17l2.2-.8L5 14Z"/></svg> AIで構造化
         </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- モーダル: AI考案メニュー -->
+  <div id="aiAddMenuModal" onclick="if(event.target===this) closeAiAddMenuModal()" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
+    <div onclick="event.stopPropagation()" class="bg-white w-full max-w-lg rounded-xl p-6 shadow transform scale-95 transition-transform duration-300 border border-slate-100 max-h-[90vh] overflow-y-auto">
+      <div class="flex justify-between items-center mb-5">
+        <div>
+          <h3 class="text-2xl font-medium text-slate-800 tracking-tight">AI考案で追加</h3>
+          <p class="text-[11px] font-bold text-slate-400 uppercase tracking-widest mt-1">ADD RECIPE WITH AI</p>
+        </div>
+        <button onclick="closeAiAddMenuModal()" class="text-slate-300 hover:text-slate-600 bg-slate-100 p-2 rounded-full"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <button onclick="startPriorityAiRecipe()" class="min-h-24 bg-rose-50 text-rose-700 border border-rose-100 px-4 py-4 rounded-xl font-medium text-sm flex flex-col items-start justify-center gap-2 active:scale-95 transition-all hover:bg-rose-100">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3 2 20h20L12 3Zm0 6v5m0 3h.01"/></svg>
+          <span>優先消費レシピ</span>
+          <span class="text-[11px] font-bold text-rose-400 text-left leading-snug">期限が近い食材から考案</span>
+        </button>
+        <button onclick="startSelectedIngredientAiRecipe()" class="min-h-24 bg-violet-600 text-white px-4 py-4 rounded-xl font-medium text-sm flex flex-col items-start justify-center gap-2 active:scale-95 transition-all shadow-sm hover:bg-violet-700">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm0-4a5 5 0 1 0 0-10 5 5 0 0 0 0 10Zm0-3a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z"/></svg>
+          <span>指定食材から</span>
+          <span class="text-[11px] font-bold text-violet-200 text-left leading-snug">使いたい食材を選んで考案</span>
+        </button>
+      </div>
+      <div class="mt-5">
+        <div class="flex items-center justify-between mb-2">
+          <p class="text-[11px] font-medium text-slate-400 uppercase tracking-widest">期限が近い食材</p>
+          <span id="aiAddExpiringCount" class="text-[10px] font-bold text-slate-400"></span>
+        </div>
+        <div id="aiAddExpiringList" class="space-y-2">
+          <!-- JSで動的に挿入 -->
+        </div>
       </div>
     </div>
   </div>
@@ -1300,6 +1336,8 @@
         if (!el) return;
         const base = tab.id === 'registrationTopTab'
           ? 'relative w-10 h-10 rounded-xl flex items-center justify-center transition-all active:scale-95'
+          : tab.id === 'shoppingTopTab'
+            ? 'relative px-3 pr-5 py-2 rounded-xl text-[11px] font-medium transition-all active:scale-95 whitespace-nowrap'
           : 'px-3 py-2 rounded-xl text-[11px] font-medium transition-all active:scale-95 whitespace-nowrap';
         el.className = `${base} ${tab.active ? viewTone.active : viewTone.inactive}`;
       });
@@ -1340,26 +1378,23 @@
 
     function renderInventoryPrimaryRow() {
       const allCount = state.inventory.length;
-      const allActive = state.currentLoc === 'すべて';
-      const allBadgeClass = allActive ? 'bg-indigo-100 text-indigo-700' : 'bg-white/60 text-slate-500';
+      const countBadgeClass = 'absolute -top-1 -right-1 min-w-[1.25rem] h-5 px-1 rounded-full bg-rose-600 text-white ring-2 ring-white flex items-center justify-center text-[10px] font-medium';
 
       const storageTabs = getStorageLocations().map(loc => {
         const count = state.inventory.filter(item => item.loc === loc).length;
-        const active = state.currentLoc === loc;
-        const badgeClass = active ? 'bg-indigo-100 text-indigo-700' : 'bg-white/60 text-slate-500';
         return `
           <button onclick="filterByLocation(this.dataset.loc)" class="${getLocationTabClass(loc)}" data-loc="${escapeHtml(loc)}">
             ${escapeHtml(loc)}
-            <span class="ml-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full ${badgeClass}">${count}</span>
+            <span class="${countBadgeClass}">${count}</span>
           </button>
         `;
       }).join('');
 
       return `
-        <div class="flex gap-2 overflow-x-auto pb-1">
+        <div class="flex gap-2 overflow-x-auto pt-2 px-1 pb-1">
           <button onclick="filterByLocation(this.dataset.loc)" class="${getLocationTabClass('すべて')}" data-loc="すべて">
             すべて
-            <span class="ml-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full ${allBadgeClass}">${allCount}</span>
+            <span class="${countBadgeClass}">${allCount}</span>
           </button>
           ${storageTabs}
           <button onclick="openLocationManager()" class="bg-slate-800 text-white px-4 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-all active:scale-95 shrink-0">＋ 管理</button>
@@ -1587,7 +1622,7 @@
       if (loc === '買い物リスト') {
         tone = active ? 'active bg-emerald-50 text-emerald-600 shadow-sm border border-emerald-100' : 'bg-emerald-50 text-emerald-600 border border-emerald-100';
       }
-      return `location-tab ${tone} px-5 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-all relative shrink-0`;
+      return `location-tab ${tone} pl-5 pr-7 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-all relative shrink-0`;
     }
 
     function renderLocationTabs() {
@@ -2434,6 +2469,17 @@
         if (badge) badge.classList.add('hidden');
       }
 
+      const shoppingBadge = document.getElementById('shoppingBadge');
+      const openShoppingCount = (state.shopping || []).filter(item => item.status === '未購入').length;
+      if (openShoppingCount > 0) {
+        if (shoppingBadge) {
+          shoppingBadge.textContent = openShoppingCount;
+          shoppingBadge.classList.remove('hidden');
+        }
+      } else if (shoppingBadge) {
+        shoppingBadge.classList.add('hidden');
+      }
+
       if (state.currentLoc === '登録待ち') {
         stagingActions.classList.remove('hidden');
         inventoryActions.classList.add('hidden');
@@ -2596,18 +2642,11 @@
     }
 
     function switchBTab(tab) {
-      state.currentBTab = ['recipes', 'ai', 'schedule'].includes(tab) ? tab : 'recipes';
+      state.currentBTab = ['recipes', 'schedule'].includes(tab) ? tab : 'recipes';
       renderRecipeMode();
     }
 
     function getRecipeTabTone(tab = state.currentBTab) {
-      if (tab === 'ai') return {
-        key: 'violet',
-        label: 'AI RECIPE',
-        active: 'bg-violet-600 text-white shadow-sm border border-violet-200',
-        inactive: 'bg-white text-violet-600 border border-violet-100 hover:bg-violet-50',
-        list: 'space-y-3 mt-3 transition-colors bg-violet-50 p-3 rounded-xl border border-violet-100 overflow-hidden'
-      };
       if (tab === 'schedule') return {
         key: 'sky',
         label: 'MEAL SCHEDULE',
@@ -2656,34 +2695,6 @@
       if (!primary || !secondary || !select) return;
       updateRecipeTopTabs();
 
-      if (state.currentBTab === 'ai') {
-        primary.innerHTML = `
-          <div class="grid grid-cols-2 gap-2">
-            <button onclick="generatePriorityRecipe()" class="h-12 bg-rose-50 text-rose-700 border border-rose-100 px-3 rounded-xl font-medium text-[11px] flex items-center justify-center gap-2 active:scale-95 transition-all">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3 2 20h20L12 3Zm0 6v5m0 3h.01"/></svg><span>優先消費レシピ</span>
-            </button>
-            <button onclick="openAiIngredientSelector()" class="h-12 bg-violet-600 text-white px-3 rounded-xl font-medium text-[11px] flex items-center justify-center gap-2 active:scale-95 transition-all shadow-sm">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm0-4a5 5 0 1 0 0-10 5 5 0 0 0 0 10Zm0-3a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z"/></svg><span>指定食材から</span>
-            </button>
-          </div>
-        `;
-        secondary.innerHTML = `
-          <div class="h-20 space-y-2">
-            <div class="h-8 flex items-center gap-2 overflow-x-auto px-1">
-              <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider shrink-0">並び</span>
-              ${renderSortButtons([
-                { key: 'limit', label: '期限順' },
-                { key: 'name', label: '名前順' },
-                { key: 'loc', label: '保存場所順' }
-              ], state.aiExpiringSortBy, state.aiExpiringSortOrder, 'setAiExpiringSort', 'violet')}
-            </div>
-            <div class="h-8 flex items-center px-1 text-[10px] font-bold text-slate-400">期限3日以内または期限切れの食材を表示</div>
-          </div>
-        `;
-        select.innerHTML = renderRecipeCountLine(getSortedExpiringItems().length, '期限食材');
-        return;
-      }
-
       if (state.currentBTab === 'schedule') {
         const weekLabel = getScheduleWeekLabel();
         const selectCount = state.scheduleSelectedIds.length;
@@ -2713,12 +2724,15 @@
       }
 
       primary.innerHTML = `
-        <div class="grid grid-cols-2 gap-2">
-          <button onclick="openRecipeEditor()" class="h-12 bg-indigo-600 text-white px-3 rounded-xl font-medium text-[11px] flex items-center justify-center gap-2 active:scale-95 transition-all shadow-sm">
+        <div class="grid grid-cols-3 gap-2">
+          <button onclick="openRecipeEditor()" class="h-12 min-w-0 bg-indigo-600 text-white px-2 rounded-xl font-medium text-[10px] sm:text-[11px] flex items-center justify-center gap-1.5 active:scale-95 transition-all shadow-sm">
             <span class="text-base">＋</span><span>新規レシピ</span>
           </button>
-          <button onclick="openRecipeTextModal()" class="h-12 bg-amber-50 text-amber-700 border border-amber-100 px-3 rounded-xl font-medium text-[11px] flex items-center justify-center gap-2 active:scale-95 transition-all">
+          <button onclick="openRecipeTextModal()" class="h-12 min-w-0 bg-amber-50 text-amber-700 border border-amber-100 px-2 rounded-xl font-medium text-[10px] sm:text-[11px] flex items-center justify-center gap-1.5 active:scale-95 transition-all">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 4h6l1 2h3v15H5V6h3l1-2Zm0 7h6M9 15h6"/></svg><span>テキストから追加</span>
+          </button>
+          <button onclick="openAiAddMenuModal()" class="h-12 min-w-0 bg-violet-50 text-violet-700 border border-violet-100 px-2 rounded-xl font-medium text-[10px] sm:text-[11px] flex items-center justify-center gap-1.5 active:scale-95 transition-all">
+            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m12 3 1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6L12 3ZM19 14l.8 2.2L22 17l-2.2.8L19 20l-.8-2.2L16 17l2.2-.8L19 14Z"/></svg><span>AI考案</span>
           </button>
         </div>
       `;
@@ -2762,11 +2776,6 @@
       if (!container) return;
       container.className = getRecipeTabTone().list;
       container.innerHTML = '';
-      if (state.currentBTab === 'ai') {
-        renderAiTab();
-        resetHorizontalScroll();
-        return;
-      }
       if (state.currentBTab === 'schedule') {
         renderSchedule();
         return;
@@ -2993,16 +3002,34 @@
       return state.aiExpiringSortOrder === 'desc' ? sorted.reverse() : sorted;
     }
 
-    function renderAiTab() {
-      const container = document.getElementById('recipeListContainer');
+    function openAiAddMenuModal() {
+      document.getElementById('syncBar').classList.add('sync-bar-hidden');
+      document.getElementById('syncBar').classList.remove('sync-bar-visible');
+      const m = document.getElementById('aiAddMenuModal');
+      m.classList.remove('hidden');
+      setTimeout(() => m.classList.remove('opacity-0'), 10);
+      renderAiAddExpiringList();
+    }
+
+    function closeAiAddMenuModal(restoreSyncBar = true) {
+      const m = document.getElementById('aiAddMenuModal');
+      m.classList.add('opacity-0');
+      setTimeout(() => m.classList.add('hidden'), 300);
+      if (restoreSyncBar) updateSyncBar();
+    }
+
+    function renderAiAddExpiringList() {
+      const container = document.getElementById('aiAddExpiringList');
+      const countLabel = document.getElementById('aiAddExpiringCount');
       if (!container) return;
-      container.innerHTML = '';
       const expiring = getSortedExpiringItems();
+      if (countLabel) countLabel.textContent = `${expiring.length} 件`;
+      container.innerHTML = '';
       if (expiring.length === 0) {
-        container.innerHTML = '<div class="py-20 text-center text-slate-300 font-bold">期限が近い食材はありません。</div>';
+        container.innerHTML = '<div class="py-6 text-center text-slate-300 text-sm font-bold bg-slate-50 rounded-xl border border-slate-100">期限が近い食材はありません。</div>';
         return;
       }
-      expiring.forEach(item => {
+      expiring.slice(0, 5).forEach(item => {
         const limit = getItemLimitValue(item);
         let badge = '';
         if (limit) {
@@ -3013,10 +3040,7 @@
           else if (diff <= 3) badge = `<span class="text-[10px] font-medium text-amber-600 bg-amber-100 px-2 py-0.5 rounded-full">あと${diff}日</span>`;
         }
         container.insertAdjacentHTML('beforeend', `
-          <div class="bg-white/80 p-3 rounded-xl shadow-sm border border-violet-100 flex items-center gap-3 transition-colors hover:bg-violet-50">
-            <div class="w-10 h-10 bg-violet-100 rounded-xl flex items-center justify-center shrink-0">
-              <svg class="w-5 h-5 text-violet-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5c4 0 8 4 8 8l-6 6c-4 0-8-4-8-8l6-6Zm8-2 1 4m4-1-4 1m1-5-2 4"/></svg>
-            </div>
+          <div class="bg-slate-50 p-3 rounded-xl border border-slate-100 flex items-center gap-3">
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2 mb-0.5 min-w-0">
                 <span class="font-bold text-slate-800 text-sm truncate">${escapeHtml(item.name || '')}</span>
@@ -3024,10 +3048,38 @@
               </div>
               <div class="text-[10px] text-slate-400 font-bold truncate">${escapeHtml(item.loc || '冷蔵庫')} · ${item.qty}${escapeHtml(item.unit || '')} · 期限 ${escapeHtml(limit || '未設定')}</div>
             </div>
-            <button onclick="openAiRequestModal([state.inventory.find(i => i.id === '${item.id}')].filter(Boolean), 'priority')" class="px-3 py-2 rounded-xl bg-violet-600 text-white text-[10px] font-medium hover:bg-violet-700 active:scale-95 transition-all shrink-0">考案</button>
+            <button onclick="startAiRecipeFromExpiringItem('${item.id}')" class="px-3 py-2 rounded-xl bg-violet-600 text-white text-[10px] font-medium hover:bg-violet-700 active:scale-95 transition-all shrink-0">考案</button>
           </div>
         `);
       });
+      if (expiring.length > 5) {
+        container.insertAdjacentHTML('beforeend', `<p class="text-[10px] font-bold text-slate-400 px-1">ほか ${expiring.length - 5} 件は「優先消費レシピ」でまとめて考案できます。</p>`);
+      }
+    }
+
+    function startPriorityAiRecipe() {
+      if (getExpiringItems().length === 0) {
+        closeAiAddMenuModal(true);
+        showToast('期限が近い食材がありません。', 'info');
+        return;
+      }
+      closeAiAddMenuModal(false);
+      generatePriorityRecipe();
+    }
+
+    function startSelectedIngredientAiRecipe() {
+      closeAiAddMenuModal(false);
+      openAiIngredientSelector();
+    }
+
+    function startAiRecipeFromExpiringItem(id) {
+      const item = state.inventory.find(i => i.id === id);
+      if (!item) {
+        showToast('食材が見つかりません。', 'error');
+        return;
+      }
+      closeAiAddMenuModal(false);
+      openAiRequestModal([item], 'priority');
     }
 
     async function generatePriorityRecipe() {

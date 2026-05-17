@@ -1,0 +1,26 @@
+{
+  "ticket": "TKT-0035-ai-recipe-add-entrypoint",
+  "status": "passed",
+  "checks": [
+    {
+      "name": "standard_verify",
+      "command": "python3 -c \"import html.parser; html.parser.HTMLParser().feed(open('app.html').read())\" && grep -q 'executeGAS' app.html && grep -q 'GAS_URL' app.html && echo 'VERIFY_PASSED'",
+      "result": "VERIFY_PASSED"
+    },
+    {
+      "name": "diff_check",
+      "command": "git diff --check",
+      "result": "passed"
+    },
+    {
+      "name": "forbidden_dialog_api_and_old_ai_tab",
+      "command": "rg -n \"alert\\\\(|confirm\\\\(|prompt\\\\(|data-tab=\\\\\\\"ai\\\\\\\"|switchBTab\\\\('ai'\\\\)|currentBTab === 'ai'|renderAiTab\\\\(\" app.html",
+      "result": "no matches"
+    },
+    {
+      "name": "script_syntax",
+      "command": "perl -0777 -ne 'print $1 if /<script>(.*)<\\\\/script>/s' app.html > /tmp/stock-master-app-script.js && node --check /tmp/stock-master-app-script.js",
+      "result": "passed"
+    }
+  ]
+}
