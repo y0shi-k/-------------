@@ -267,13 +267,8 @@
           </div>
         </header>
 
-        <div id="cookingModeTopTabs" class="flex gap-2 overflow-x-auto no-scrollbar pb-3 mb-2 snap-x">
-          <button onclick="switchCTab('check')" class="c-tab active bg-emerald-600 text-white shadow-sm border border-emerald-100 px-5 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap snap-start transition-all" data-tab="check">レシピ確認</button>
-          <button onclick="switchCTab('history')" class="c-tab bg-white text-amber-600 border border-amber-100 px-5 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap snap-start transition-all" data-tab="history">料理履歴</button>
-        </div>
-
         <div id="cookingControlsPanel" class="space-y-2 pb-2"></div>
-        <div id="cookingContentContainer" class="space-y-3 mt-3 transition-colors bg-emerald-50 p-3 rounded-xl border border-emerald-100 overflow-hidden">
+        <div id="cookingContentContainer" class="space-y-3 mt-3 transition-colors bg-amber-50 p-3 rounded-xl border border-amber-100 overflow-hidden">
           <!-- JSで動的に挿入 -->
         </div>
       </div>
@@ -851,7 +846,7 @@
       currentLoc: 'すべて',
       currentMode: 'A',
       currentBTab: 'recipes',
-      currentCTab: 'check',
+      currentCTab: 'history',
       isProcessing: false,
       sortBy: 'limit2',
       sortOrder: 'asc',
@@ -5286,161 +5281,16 @@ ${text}`;
     }
 
     /* --- Cooking Mode Home --- */
-    function switchCTab(tab) {
-      state.currentCTab = ['check', 'history'].includes(tab) ? tab : 'check';
-      renderCookingMode();
-    }
-
-    function getCookingTabTone(tab = state.currentCTab) {
-      if (tab === 'history') return {
-        label: 'COOKING HISTORY',
-        active: 'bg-amber-600 text-white shadow-sm border border-amber-200',
-        inactive: 'bg-white text-amber-600 border border-amber-100 hover:bg-amber-50',
-        list: 'space-y-3 mt-3 transition-colors bg-amber-50 p-3 rounded-xl border border-amber-100 overflow-hidden'
-      };
-      return {
-        label: 'COOKING CHECK',
-        active: 'bg-emerald-600 text-white shadow-sm border border-emerald-200',
-        inactive: 'bg-white text-emerald-600 border border-emerald-100 hover:bg-emerald-50',
-        list: 'space-y-3 mt-3 transition-colors bg-emerald-50 p-3 rounded-xl border border-emerald-100 overflow-hidden'
-      };
-    }
-
-    function updateCookingTopTabs() {
-      document.querySelectorAll('.c-tab').forEach(btn => {
-        const isActive = btn.dataset.tab === state.currentCTab;
-        const tone = getCookingTabTone(btn.dataset.tab);
-        btn.className = `c-tab ${isActive ? tone.active : tone.inactive} px-5 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap snap-start transition-all`;
-      });
-      const label = document.getElementById('cookingModeLabel');
-      if (label) label.textContent = getCookingTabTone().label;
-    }
-
-    function getLocalDateString(date = new Date()) {
-      return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-    }
-
     function renderCookingMode() {
       const guide = document.getElementById('cookingGuide');
       const viewer = document.getElementById('cookingViewer');
-      const container = document.getElementById('cookingContentContainer');
-      if (!guide || !viewer || !container) return;
+      if (!guide || !viewer) return;
       if (currentCookingRecipeId) return;
       viewer.classList.add('hidden');
       guide.classList.remove('hidden');
-      updateCookingTopTabs();
-      container.className = getCookingTabTone().list;
-      if (state.currentCTab === 'history') {
-        renderCookingHistoryTab();
-      } else {
-        renderCookingCheckTab();
-      }
-    }
-
-    function renderCookingCheckTab() {
-      const controls = document.getElementById('cookingControlsPanel');
-      const container = document.getElementById('cookingContentContainer');
-      if (!controls || !container) return;
-      controls.innerHTML = `
-        <div class="h-12 grid grid-cols-2 gap-2">
-          <button onclick="switchMode('B'); switchBTab('schedule');" class="h-12 bg-sky-50 text-sky-700 border border-sky-100 px-3 rounded-xl font-medium text-[11px] flex items-center justify-center gap-2 active:scale-95 transition-all">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14H3V6a2 2 0 0 1 2-2Z"/></svg><span>献立を見る</span>
-          </button>
-          <button onclick="switchMode('B'); switchBTab('recipes');" class="h-12 bg-indigo-50 text-indigo-700 border border-indigo-100 px-3 rounded-xl font-medium text-[11px] flex items-center justify-center gap-2 active:scale-95 transition-all">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 3v18M10 3v18M6 8h4M17 3v8a3 3 0 0 1-3 3h0v7"/></svg><span>レシピ集へ</span>
-          </button>
-        </div>
-      `;
-      container.innerHTML = '';
-
-      const today = getLocalDateString();
-      const todaySchedules = state.schedule
-        .filter(s => s.date === today && s.recipeId)
-        .sort((a, b) => ['朝','昼','晩'].indexOf(a.meal) - ['朝','昼','晩'].indexOf(b.meal));
-      const nextSchedule = state.schedule
-        .filter(s => s.recipeId && s.status !== '完了' && s.date >= today)
-        .sort((a, b) => a.date.localeCompare(b.date) || ['朝','昼','晩'].indexOf(a.meal) - ['朝','昼','晩'].indexOf(b.meal))[0];
-      const recipeShortcuts = [...state.recipes]
-        .sort((a, b) => (b.updatedAt || b.createdAt || '').localeCompare(a.updatedAt || a.createdAt || ''))
-        .slice(0, 6);
-
-      container.insertAdjacentHTML('beforeend', `
-        <section class="bg-white/80 rounded-xl p-4 shadow-sm border border-emerald-100">
-          <div class="flex items-center justify-between mb-3">
-            <h3 class="text-sm font-medium text-slate-800">今日の献立</h3>
-            <span class="text-[10px] font-bold text-slate-400">${todaySchedules.length} 件</span>
-          </div>
-          <div class="space-y-2" id="todayCookingScheduleList"></div>
-        </section>
-      `);
-      const todayList = document.getElementById('todayCookingScheduleList');
-      if (todayList) {
-        if (todaySchedules.length === 0) {
-          todayList.innerHTML = '<div class="py-6 text-center text-slate-300 text-sm font-bold">今日の献立は未設定です。</div>';
-        } else {
-          todaySchedules.forEach(item => {
-            todayList.insertAdjacentHTML('beforeend', renderCookingScheduleCard(item));
-          });
-        }
-      }
-
-      if (nextSchedule && (!todaySchedules.some(s => s.date === nextSchedule.date && s.meal === nextSchedule.meal))) {
-        container.insertAdjacentHTML('beforeend', `
-          <section class="bg-white/80 rounded-xl p-4 shadow-sm border border-emerald-100">
-            <h3 class="text-sm font-medium text-slate-800 mb-3">次の未完了献立</h3>
-            ${renderCookingScheduleCard(nextSchedule)}
-          </section>
-        `);
-      }
-
-      container.insertAdjacentHTML('beforeend', `
-        <section class="bg-white/80 rounded-xl p-4 shadow-sm border border-emerald-100">
-          <div class="flex items-center justify-between mb-3">
-            <h3 class="text-sm font-medium text-slate-800">レシピ集から開始</h3>
-            <button onclick="switchMode('B'); switchBTab('recipes');" class="text-[10px] font-medium text-indigo-600">すべて見る</button>
-          </div>
-          <div class="space-y-2" id="cookingRecipeShortcutList"></div>
-        </section>
-      `);
-      const recipeList = document.getElementById('cookingRecipeShortcutList');
-      if (recipeList) {
-        if (recipeShortcuts.length === 0) {
-          recipeList.innerHTML = '<div class="py-6 text-center text-slate-300 text-sm font-bold">レシピが登録されていません。</div>';
-        } else {
-          recipeShortcuts.forEach(recipe => {
-            recipeList.insertAdjacentHTML('beforeend', `
-              <div class="bg-emerald-50 border border-emerald-100 rounded-xl p-3 flex items-center gap-3">
-                <div class="w-10 h-10 rounded-xl bg-white text-emerald-600 flex items-center justify-center shrink-0"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 3v18M10 3v18M6 8h4M17 3v8a3 3 0 0 1-3 3h0v7"/></svg></div>
-                <div class="min-w-0 flex-1">
-                  <p class="text-sm font-medium text-slate-800 truncate">${escapeHtml(recipe.name || '（名称未設定）')}</p>
-                  <p class="text-[10px] font-bold text-slate-400">調理回数 ${Number(recipe.count) || 0} 回</p>
-                </div>
-                <button onclick="openCookingViewer('${recipe.id}')" class="shrink-0 px-3 py-2 rounded-xl bg-emerald-600 text-white text-xs font-medium active:scale-95 transition-all">開始</button>
-              </div>
-            `);
-          });
-        }
-      }
-    }
-
-    function renderCookingScheduleCard(item) {
-      const statusClass = item.status === '完了' ? 'bg-slate-100 text-slate-500' : 'bg-emerald-100 text-emerald-700';
-      return `
-        <div class="bg-emerald-50 border border-emerald-100 rounded-xl p-3 flex items-center gap-3">
-          <div class="w-14 shrink-0 rounded-xl bg-white text-emerald-800 flex flex-col items-center justify-center px-2 py-2">
-            <span class="text-[10px] font-medium">${escapeHtml(formatScheduleDate(item.date))}</span>
-            <span class="text-xs font-medium">${escapeHtml(item.meal || '')}</span>
-          </div>
-          <div class="min-w-0 flex-1">
-            <div class="flex items-center gap-2 mb-0.5">
-              <p class="text-sm font-medium text-slate-800 truncate">${escapeHtml(item.recipeName || '（レシピ名なし）')}</p>
-              <span class="shrink-0 text-[9px] font-medium px-2 py-0.5 rounded-full ${statusClass}">${escapeHtml(item.status || '未完了')}</span>
-            </div>
-            <p class="text-[10px] font-bold text-slate-400">材料と手順を大きく表示</p>
-          </div>
-          <button onclick="openCookingViewer('${item.recipeId}')" class="shrink-0 px-3 py-2 rounded-xl bg-emerald-600 text-white text-xs font-medium active:scale-95 transition-all">開始</button>
-        </div>
-      `;
+      const label = document.getElementById('cookingModeLabel');
+      if (label) label.textContent = 'COOKING HISTORY';
+      renderCookingHistoryTab();
     }
 
     function renderCookingHistoryTab() {
@@ -5588,7 +5438,7 @@ ${text}`;
 
     async function loadCookingHistoryImages(history, options = {}) {
       const background = !!options.background;
-      if (!background && (state.currentMode !== 'C' || state.currentCTab !== 'history')) return;
+      if (!background && state.currentMode !== 'C') return;
       const targets = [];
       const seen = new Set();
       history.forEach(item => {
@@ -5635,7 +5485,7 @@ ${text}`;
       } catch (e) {
         batch.forEach(item => { delete state.cookingHistoryImageLoading[item.fileId]; });
       }
-      if (options.rerender !== false && state.currentMode === 'C' && state.currentCTab === 'history' && !currentCookingRecipeId) {
+      if (options.rerender !== false && state.currentMode === 'C' && !currentCookingRecipeId) {
         renderCookingHistoryTab();
       }
     }
