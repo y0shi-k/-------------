@@ -29,6 +29,46 @@
       "file": "app.html",
       "type": "addition",
       "description": "setRecipeSearchLogic(logic) 関数を追加"
+    },
+    {
+      "file": "app.html",
+      "type": "addition",
+      "description": "clearRecipeSearch() 関数を追加"
+    },
+    {
+      "file": "app.html",
+      "type": "modification",
+      "description": "renderRecipeModeControls: 検索入力欄右端に × クリアボタンを追加"
+    },
+    {
+      "file": "app.html",
+      "type": "modification",
+      "description": "scheduleRecipeModal: 検索入力欄右端に × クリアボタンを追加"
+    },
+    {
+      "file": "app.html",
+      "type": "addition",
+      "description": "clearScheduleRecipeSearch() 関数を追加"
+    },
+    {
+      "file": "app.html",
+      "type": "modification",
+      "description": "scheduleRecipeModal: 親を items-center → items-start pt-12 に変更し上辺を固定"
+    },
+    {
+      "file": "app.html",
+      "type": "modification",
+      "description": "scheduleRecipeModal: 内部を flex flex-col に変更しリストを flex-1 min-h-0 overflow-y-auto に"
+    },
+    {
+      "file": "app.html",
+      "type": "modification",
+      "description": "scheduleRecipeModal: transform-origin を center → top に修正（scale-95 で高さ変動時に上辺がずれる問題を解決）"
+    },
+    {
+      "file": "app.html",
+      "type": "modification",
+      "description": "scheduleRecipeModal: max-h を固定高さ h-[calc(100vh-6rem)] に変更して高さ変動を防止"
     }
   ],
   "notes": "UI/フィルタリングのみの変更。GAS通信・スプシ書き込みは一切未変更。"

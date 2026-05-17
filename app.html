@@ -729,14 +729,17 @@
   </div>
 
   <!-- モーダル: 献立レシピ選択 -->
-  <div id="scheduleRecipeModal" onclick="if(event.target===this) closeScheduleRecipeModal()" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
-    <div onclick="event.stopPropagation()" class="bg-white w-full max-w-lg rounded-xl p-6 shadow transform scale-95 transition-transform duration-300 border border-slate-100 max-h-[85vh] overflow-y-auto">
+  <div id="scheduleRecipeModal" onclick="if(event.target===this) closeScheduleRecipeModal()" class="fixed inset-0 z-50 flex items-start justify-center pt-12 p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
+    <div onclick="event.stopPropagation()" class="bg-white w-full max-w-lg rounded-xl p-6 shadow transform scale-95 origin-top transition-transform duration-300 border border-slate-100 h-[calc(100vh-6rem)] flex flex-col">
       <div class="flex justify-between items-center mb-5">
         <h3 class="text-2xl font-medium text-slate-800 tracking-tight">レシピを選択</h3>
         <button onclick="closeScheduleRecipeModal()" class="text-slate-300 hover:text-slate-600 bg-slate-100 p-2 rounded-full"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg></button>
       </div>
       <div class="mb-4">
-        <input type="text" id="scheduleRecipeSearch" oninput="renderScheduleRecipePickerList()" class="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:border-indigo-500" placeholder="レシピ名・材料名で検索...">
+        <div class="relative">
+          <input type="text" id="scheduleRecipeSearch" oninput="renderScheduleRecipePickerList()" class="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 pr-8 text-sm font-bold outline-none focus:border-indigo-500" placeholder="レシピ名・材料名で検索...">
+          <button onclick="clearScheduleRecipeSearch()" class="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-slate-200 text-slate-500 hover:bg-slate-300 hover:text-slate-700 flex items-center justify-center text-[10px] font-bold transition-all">×</button>
+        </div>
         <div class="flex gap-2 mt-2">
           <div class="flex-1 flex bg-slate-100 rounded-xl p-1 gap-1">
             <button type="button" onclick="setScheduleRecipePickerSort('name')" data-schedule-picker-sort="name" class="schedule-picker-sort-btn flex-1 text-xs font-medium py-2 rounded-lg transition-all">名前</button>
@@ -746,7 +749,7 @@
           </div>
         </div>
       </div>
-      <div id="scheduleRecipePickerList" class="space-y-2 max-h-[50vh] overflow-y-auto">
+      <div id="scheduleRecipePickerList" class="space-y-2 flex-1 min-h-0 overflow-y-auto">
         <!-- JSで動的に挿入 -->
       </div>
     </div>
@@ -3036,7 +3039,10 @@
               <button onclick="setRecipeSearchLogic('and')" class="recipe-search-logic-btn px-3 py-1.5 rounded-lg text-[10px] font-medium ${state.recipeSearchLogic === 'and' ? 'bg-white text-slate-700 shadow-sm' : 'text-slate-500'}" data-logic="and">AND</button>
               <button onclick="setRecipeSearchLogic('or')" class="recipe-search-logic-btn px-3 py-1.5 rounded-lg text-[10px] font-medium ${state.recipeSearchLogic === 'or' ? 'bg-white text-slate-700 shadow-sm' : 'text-slate-500'}" data-logic="or">OR</button>
             </div>
-            <input type="text" id="recipeSearchInput" value="${escapeHtml(state.recipeSearchQuery || '')}" oninput="state.recipeSearchQuery=this.value; renderRecipeList()" class="min-w-0 w-full bg-white border border-indigo-100 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:border-indigo-500" placeholder="検索...">
+            <div class="relative min-w-0 w-full">
+              <input type="text" id="recipeSearchInput" value="${escapeHtml(state.recipeSearchQuery || '')}" oninput="state.recipeSearchQuery=this.value; renderRecipeList()" class="w-full bg-white border border-indigo-100 rounded-xl px-3 py-2 pr-8 text-xs font-bold outline-none focus:border-indigo-500" placeholder="検索...">
+              <button onclick="clearRecipeSearch()" class="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-slate-200 text-slate-500 hover:bg-slate-300 hover:text-slate-700 flex items-center justify-center text-[10px] font-bold transition-all">×</button>
+            </div>
           </div>
           <div class="h-8 flex items-center gap-2 overflow-x-auto px-1">
             <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider shrink-0">並び</span>
@@ -4507,6 +4513,19 @@ ${plan ? '\n提案方針: ' + plan : ''}
     function setRecipeSearchLogic(logic) {
       state.recipeSearchLogic = ['and', 'or'].includes(logic) ? logic : 'and';
       renderRecipeMode();
+    }
+
+    function clearRecipeSearch() {
+      state.recipeSearchQuery = '';
+      const input = document.getElementById('recipeSearchInput');
+      if (input) input.value = '';
+      renderRecipeList();
+    }
+
+    function clearScheduleRecipeSearch() {
+      const input = document.getElementById('scheduleRecipeSearch');
+      if (input) input.value = '';
+      renderScheduleRecipePickerList();
     }
 
     function setRecipeSort(key) {
