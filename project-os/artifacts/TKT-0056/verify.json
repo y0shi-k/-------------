@@ -1,0 +1,32 @@
+{
+  "ticket_id": "TKT-0056",
+  "status": "passed",
+  "checks": [
+    {
+      "name": "html_parse_executeGAS_GAS_URL",
+      "command": "python3 -c \"import html.parser; html.parser.HTMLParser().feed(open('app.html').read())\" && grep -q 'executeGAS' app.html && grep -q 'GAS_URL' app.html && echo 'VERIFY_PASSED'",
+      "result": "VERIFY_PASSED"
+    },
+    {
+      "name": "no_alert_confirm_prompt",
+      "command": "rg -n \"alert\\(|confirm\\(|prompt\\(\" app.html",
+      "result": "No matches"
+    },
+    {
+      "name": "showToast_and_executeGAS_scan",
+      "command": "rg -n \"function showToast|executeGAS\\(payload\" app.html",
+      "result": "showToast exists. executeGAS(payload...) calls remain limited to existing sync/load paths."
+    },
+    {
+      "name": "schedule_start_button_removed",
+      "command": "rg -n \"<span class=\\\"min-w-0 truncate\\\">開始|openCookingViewer\\('\\$\\{item\\.recipeId\\}'|startScheduleSlotCooking|scheduleSlotDeleteModal\" app.html",
+      "result": "Inline schedule card start button removed. Action menu start handler and delete modal exist."
+    }
+  ],
+  "manual_smokes": [
+    "スケジュール画面で献立カードに開始ボタンが表示されないことをコード上で確認",
+    "献立カードクリックで操作メニューが開き、調理を開始、別のレシピに変更、削除するが表示されることをコード上で確認",
+    "調理を開始が openCookingViewer(recipeId, { returnTo: 'schedule' }) を呼ぶことを確認",
+    "削除するが確認モーダルを開き、確認後だけ queueScheduleDelete() することを確認"
+  ]
+}

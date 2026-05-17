@@ -760,8 +760,25 @@
         <button onclick="closeScheduleSlotMenu()" class="text-slate-300 hover:text-slate-600 bg-slate-100 p-2 rounded-full"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg></button>
       </div>
       <div class="space-y-3">
+        <button onclick="startScheduleSlotCooking()" class="w-full bg-sky-600 text-white font-medium py-4 rounded-xl shadow-sm hover:bg-sky-700 active:scale-95 transition-all">調理を開始</button>
         <button onclick="changeScheduleSlotRecipe()" class="w-full bg-indigo-600 text-white font-medium py-4 rounded-xl shadow-sm hover:bg-indigo-700 active:scale-95 transition-all">別のレシピに変更</button>
         <button onclick="removeScheduleSlot()" class="w-full bg-rose-500 text-white font-medium py-4 rounded-xl shadow-sm hover:bg-rose-600 active:scale-95 transition-all">削除する</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- モーダル: 献立単体削除確認 -->
+  <div id="scheduleSlotDeleteModal" onclick="if(event.target===this) closeScheduleSlotDeleteModal()" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
+    <div onclick="event.stopPropagation()" class="bg-white w-full max-w-sm rounded-xl p-6 shadow transform scale-95 transition-transform duration-300 border border-slate-100">
+      <div class="flex justify-between items-center mb-5">
+        <h3 class="text-xl font-medium text-slate-800 tracking-tight">献立の削除確認</h3>
+        <button onclick="closeScheduleSlotDeleteModal()" class="text-slate-300 hover:text-slate-600 bg-slate-100 p-2 rounded-full"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+      </div>
+      <p class="text-sm font-bold text-slate-600 mb-2">この献立を削除してもよろしいですか？</p>
+      <p id="scheduleSlotDeleteName" class="text-sm font-bold text-sky-700 bg-sky-50 border border-sky-100 rounded-xl px-3 py-3 mb-6 truncate"></p>
+      <div class="flex gap-3">
+        <button onclick="closeScheduleSlotDeleteModal()" class="flex-1 bg-slate-100 text-slate-600 font-medium py-4 rounded-xl hover:bg-slate-200 transition-all">キャンセル</button>
+        <button onclick="confirmScheduleSlotDelete()" class="flex-1 bg-rose-500 text-white font-medium py-4 rounded-xl hover:bg-rose-600 transition-all shadow-sm">削除する</button>
       </div>
     </div>
   </div>
@@ -3160,9 +3177,6 @@
                   <p class="text-xs font-medium text-sky-800 truncate">${escapeHtml(item.recipeName)}</p>
                   ${isDone ? '<p class="text-[9px] font-bold text-emerald-600">完了</p>' : ''}
                 </div>
-                <button onclick="event.stopPropagation(); openCookingViewer('${item.recipeId}', { returnTo: 'schedule' })" class="shrink-0 w-12 h-6 rounded bg-sky-600 text-white text-[10px] font-medium hover:bg-sky-700 active:scale-95 transition-all flex items-center justify-center gap-0.5">
-                  <span class="shrink-0">▶</span><span class="min-w-0 truncate">開始</span>
-                </button>
               </div>
             `;
           });
@@ -4231,13 +4245,42 @@ ${plan ? '\n提案方針: ' + plan : ''}
       renderScheduleRecipePickerList();
     }
 
+    function startScheduleSlotCooking() {
+      const item = state.schedule.find(s => s.id === _schedulePendingId);
+      if (!item || !item.recipeId) return;
+      closeScheduleSlotMenu();
+      openCookingViewer(item.recipeId, { returnTo: 'schedule' });
+    }
+
     function removeScheduleSlot() {
       const item = state.schedule.find(s => s.id === _schedulePendingId);
       if (!item) return;
-      queueScheduleDelete(item);
+      const nameEl = document.getElementById('scheduleSlotDeleteName');
+      if (nameEl) nameEl.textContent = item.recipeName || '（名称未設定）';
       closeScheduleSlotMenu();
+      openScheduleSlotDeleteModal();
+    }
+
+    function confirmScheduleSlotDelete() {
+      const item = state.schedule.find(s => s.id === _schedulePendingId);
+      if (!item) return;
+      queueScheduleDelete(item);
+      closeScheduleSlotDeleteModal();
       renderRecipeMode();
       showToast('献立を削除しました。同期するまでスプシ未反映です。', 'info');
+    }
+
+    function openScheduleSlotDeleteModal() {
+      const m = document.getElementById('scheduleSlotDeleteModal');
+      m.classList.remove('hidden');
+      setTimeout(() => m.classList.remove('opacity-0'), 10);
+    }
+
+    function closeScheduleSlotDeleteModal() {
+      const m = document.getElementById('scheduleSlotDeleteModal');
+      m.classList.add('opacity-0');
+      setTimeout(() => m.classList.add('hidden'), 300);
+      updateSyncBar();
     }
 
     /* --- Schedule Drag & Drop --- */
