@@ -890,24 +890,28 @@
   </div>
 
   <!-- モーダル: 消費量調整 -->
-  <div id="consumptionModal" onclick="if(event.target===this) closeConsumptionModal()" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
-    <div onclick="event.stopPropagation()" class="bg-white w-full max-w-lg rounded-xl p-6 shadow transform scale-95 transition-transform duration-300 border border-slate-100 max-h-[90vh] overflow-y-auto">
+  <div id="consumptionModal" onclick="if(event.target===this) closeConsumptionModal()" class="fixed inset-0 z-50 flex items-start justify-center pt-12 p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
+    <div onclick="event.stopPropagation()" class="bg-white w-full max-w-lg rounded-xl p-6 shadow transform scale-95 origin-top transition-transform duration-300 border border-slate-100 h-[calc(100vh-6rem)] flex flex-col">
       <div class="flex justify-between items-center mb-5">
         <h3 class="text-2xl font-medium text-slate-800 tracking-tight">実際の消費量を調整</h3>
         <button onclick="closeConsumptionModal()" class="text-slate-300 hover:text-slate-600 bg-slate-100 p-2 rounded-full"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg></button>
       </div>
-      <div id="consumptionTabs" class="grid grid-cols-3 gap-1 bg-slate-100 border border-slate-100 rounded-xl p-1 mb-4">
+      <div id="consumptionTabs" class="grid grid-cols-3 gap-1 bg-slate-100 border border-slate-100 rounded-xl p-1 mb-3">
         <button type="button" onclick="setConsumptionTab('all')" data-consumption-tab="all" class="consumption-tab-btn px-3 py-2 rounded-lg text-xs font-medium transition-all">All</button>
         <button type="button" onclick="setConsumptionTab('seasoning')" data-consumption-tab="seasoning" class="consumption-tab-btn px-3 py-2 rounded-lg text-xs font-medium transition-all">調味料</button>
         <button type="button" onclick="setConsumptionTab('ingredient')" data-consumption-tab="ingredient" class="consumption-tab-btn px-3 py-2 rounded-lg text-xs font-medium transition-all">材料</button>
       </div>
-      <div id="consumptionList" class="space-y-3 mb-6">
+      <div class="flex items-center justify-end gap-2 mb-3">
+        <button type="button" onclick="toggleAllConsumptionChecks(true)" class="text-[11px] font-bold text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-lg hover:bg-indigo-100 active:scale-95 transition-all">すべて選択</button>
+        <button type="button" onclick="toggleAllConsumptionChecks(false)" class="text-[11px] font-bold text-slate-500 bg-slate-100 px-3 py-1.5 rounded-lg hover:bg-slate-200 active:scale-95 transition-all">すべて解除</button>
+      </div>
+      <div id="consumptionList" class="space-y-3 flex-1 min-h-0 overflow-y-auto">
         <!-- JSで動的に挿入 -->
       </div>
-      <div id="consumptionWarning" class="hidden mb-4 bg-rose-50 border border-rose-200 rounded-xl p-4">
+      <div id="consumptionWarning" class="hidden mt-4 bg-rose-50 border border-rose-200 rounded-xl p-4">
         <p class="text-sm font-bold text-rose-600">在庫が不足しています。実際の在庫を確認してください。</p>
       </div>
-      <div class="flex gap-3">
+      <div class="flex gap-3 mt-4">
         <button onclick="closeConsumptionModal()" class="flex-1 bg-slate-100 text-slate-600 font-medium py-4 rounded-xl hover:bg-slate-200 transition-all">キャンセル</button>
         <button id="btnConsumptionConfirm" onclick="confirmConsumption()" class="flex-[2] bg-emerald-600 text-white font-medium py-4 rounded-xl hover:bg-emerald-700 transition-all shadow">確定</button>
       </div>
@@ -3803,11 +3807,11 @@
             const checked = state.scheduleSelectedIds.includes(item.id || '') ? 'checked' : '';
             const cbHtml = state.scheduleSelectMode ? `<input type="checkbox" class="schedule-cb w-4 h-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500 shrink-0" data-id="${item.id || ''}" onclick="event.stopPropagation(); toggleScheduleSelection('${item.id || ''}')" ${checked}>` : '';
             cardsHtml += `
-              <div class="w-full max-w-full min-w-0 h-12 bg-sky-50 border border-sky-100 rounded-lg px-2 flex items-center gap-2 cursor-pointer hover:bg-sky-100 transition-all ${isDone ? 'opacity-60' : ''}" draggable="true" data-schedule-id="${item.id || ''}" ondragstart="handleScheduleDragStart(event, '${item.id || ''}')" onclick="${state.scheduleSelectMode ? `toggleScheduleSelection('${item.id || ''}')` : `openScheduleSlotMenu('${item.id || ''}')`}">
-                <div class="shrink-0 text-sky-300 cursor-grab active:cursor-grabbing select-none" onmousedown="event.stopPropagation()" ontouchstart="event.stopPropagation()">≡</div>
+              <div class="w-full max-w-full min-w-0 h-12 ${isDone ? 'bg-emerald-50 border-emerald-100 hover:bg-emerald-100' : 'bg-sky-50 border-sky-100 hover:bg-sky-100'} rounded-lg px-2 flex items-center gap-2 cursor-pointer transition-all" draggable="true" data-schedule-id="${item.id || ''}" ondragstart="handleScheduleDragStart(event, '${item.id || ''}')" onclick="${state.scheduleSelectMode ? `toggleScheduleSelection('${item.id || ''}')` : `openScheduleSlotMenu('${item.id || ''}')`}">
+                <div class="shrink-0 ${isDone ? 'text-emerald-300' : 'text-sky-300'} cursor-grab active:cursor-grabbing select-none" onmousedown="event.stopPropagation()" ontouchstart="event.stopPropagation()">≡</div>
                 ${cbHtml}
                 <div class="flex-1 min-w-0 flex flex-col justify-center">
-                  <p class="text-xs font-medium text-sky-800 truncate">${escapeHtml(item.recipeName)}</p>
+                  <p class="text-xs font-medium ${isDone ? 'text-emerald-800' : 'text-sky-800'} truncate">${escapeHtml(item.recipeName)}</p>
                   ${isDone ? '<p class="text-[9px] font-bold text-emerald-600">完了</p>' : ''}
                 </div>
               </div>
@@ -5019,7 +5023,8 @@ ${plan ? '\n提案方針: ' + plan : ''}
       const item = state.schedule.find(s => s.id === _schedulePendingId);
       if (!item || !item.recipeId) return;
       closeScheduleSlotMenu();
-      openCookingViewer(item.recipeId, { returnTo: 'schedule' });
+      _cookingScheduleItemId = item.id || null;
+      openCookingViewer(item.recipeId, { returnTo: 'schedule', scheduleItemId: item.id || null });
     }
 
     function removeScheduleSlot() {
@@ -6663,6 +6668,9 @@ ${text}`;
         return;
       }
       currentCookingRecipeId = recipeId;
+      if (options.scheduleItemId) {
+        _cookingScheduleItemId = options.scheduleItemId;
+      }
       state.cookingReturnContext = getCookingReturnContext(options);
       setDefaultCookingViewerState(recipe);
       document.getElementById('cookingRecipeName').textContent = recipe.name || '（名称未設定）';
@@ -6690,6 +6698,7 @@ ${text}`;
     function closeCookingViewer() {
       const returnContext = state.cookingReturnContext;
       currentCookingRecipeId = null;
+      _cookingScheduleItemId = null;
       state.cookingReturnContext = null;
       document.getElementById('cookingViewer').classList.add('hidden');
       document.getElementById('cookingGuide').classList.remove('hidden');
@@ -7150,6 +7159,7 @@ ${text}`;
     let _consumptionRecipeId = null;
     let _consumptionIngredients = [];
     let _consumptionTabFilter = 'all';
+    let _cookingScheduleItemId = null;
     let _substitutionTargetIdx = -1;
     let _substitutionSortBy = 'limit2';
     let _substitutionSortOrder = 'asc';
@@ -7408,8 +7418,11 @@ ${text}`;
         `;
 
         container.insertAdjacentHTML('beforeend', `
-          <div class="${rowClass} rounded-xl p-4 flex ${ing.substitute ? 'flex-col' : 'items-center'} gap-3 border" data-idx="${idx}">
-            ${ing.substitute ? substituteBodyHtml : normalBodyHtml}
+          <div class="${rowClass} rounded-xl p-4 flex items-start gap-3 border" data-idx="${idx}">
+            <input type="checkbox" class="cons-check w-5 h-5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 shrink-0 mt-0.5" data-idx="${idx}" onchange="validateConsumptionInputs()">
+            <div class="flex-1 min-w-0">
+              ${ing.substitute ? substituteBodyHtml : normalBodyHtml}
+            </div>
           </div>
         `);
       });
@@ -7434,6 +7447,8 @@ ${text}`;
         const idx = parseInt(input.dataset.idx);
         const ing = _consumptionIngredients[idx];
         if (!ing) return;
+        const check = document.querySelector(`.cons-check[data-idx="${idx}"]`);
+        if (!check || !check.checked) return;
         const targetName = getConsumptionTargetName(ing);
         const consumed = parseFloat(input.value) || 0;
         if (consumed <= 0) return;
@@ -7458,6 +7473,12 @@ ${text}`;
       return true;
     }
 
+    function toggleAllConsumptionChecks(checked) {
+      const checks = document.querySelectorAll('.cons-check');
+      checks.forEach(ch => ch.checked = checked);
+      validateConsumptionInputs();
+    }
+
     function confirmConsumption() {
       const recipeId = _consumptionRecipeId;
       if (!recipeId) return;
@@ -7467,6 +7488,8 @@ ${text}`;
         const idx = parseInt(input.dataset.idx);
         const ing = _consumptionIngredients[idx];
         if (!ing) return;
+        const check = document.querySelector(`.cons-check[data-idx="${idx}"]`);
+        if (!check || !check.checked) return;
         const name = getConsumptionTargetName(ing);
         const recipeUnit = input.dataset.ingUnit;
         const recipeConsumed = parseFloat(input.value) || 0;
@@ -7532,6 +7555,9 @@ ${text}`;
         }
       });
 
+      // スケジュールIDをcloseCookingViewerでクリアされる前に保存
+      const savedScheduleItemId = _cookingScheduleItemId;
+
       closeConsumptionModal();
       closeCookingViewer();
 
@@ -7544,7 +7570,7 @@ ${text}`;
       updateSyncBar();
 
       // 料理の記録モーダルを自動で開く
-      setTimeout(() => openCookingRecordModal(recipeId), 500);
+      setTimeout(() => openCookingRecordModal(recipeId, savedScheduleItemId), 500);
     }
 
     // --- Substitution Modal ---
@@ -7689,8 +7715,11 @@ ${text}`;
 
     let _cookingRecordRecipeId = null;
 
-    function openCookingRecordModal(recipeId) {
+    function openCookingRecordModal(recipeId, scheduleItemId) {
       _cookingRecordRecipeId = recipeId;
+      if (scheduleItemId) {
+        _cookingScheduleItemId = scheduleItemId;
+      }
       // リセット
       state._tempCookingPhotoBase64 = '';
       state._tempCookingPhotoUrl = '';
@@ -7716,6 +7745,7 @@ ${text}`;
       setTimeout(() => m.classList.add('hidden'), 300);
       updateSyncBar();
       _cookingRecordRecipeId = null;
+      _cookingScheduleItemId = null;
     }
 
     function handlePhotoSelect(event) {
@@ -7834,10 +7864,16 @@ ${text}`;
 
       // 在庫更新は confirmConsumption で既に pendingSync に積まれている → クリアしない
 
-      // 今日の献立スケジュールから該当レシピを探す
+      // スケジュールアイテムを特定（クッキングビューア開始時に保持したIDを優先、なければ今日の日付でフォールバック）
       const today = new Date();
       const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-      const scheduleItem = state.schedule.find(s => s.date === todayStr && s.recipeId === recipeId && s.status !== '完了');
+      let scheduleItem = null;
+      if (_cookingScheduleItemId) {
+        scheduleItem = state.schedule.find(s => s.id === _cookingScheduleItemId && s.status !== '完了');
+      }
+      if (!scheduleItem) {
+        scheduleItem = state.schedule.find(s => s.date === todayStr && s.recipeId === recipeId && s.status !== '完了');
+      }
       const cookingDate = `${todayStr} ${String(today.getHours()).padStart(2, '0')}:${String(today.getMinutes()).padStart(2, '0')}:${String(today.getSeconds()).padStart(2, '0')}`;
 
       // レシピ名を取得

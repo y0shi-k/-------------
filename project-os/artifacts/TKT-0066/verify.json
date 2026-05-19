@@ -1,5 +1,5 @@
 {
-  "ticket": "TKT-0020",
+  "ticket": "TKT-0066",
   "spec": "SPEC-0020-consumption-adjustment",
   "verify_result": "PASSED",
   "timestamp": "2026-05-19T00:00:00+09:00",
@@ -12,9 +12,7 @@
     "no_prompt": true,
     "showToast_exists": true,
     "no_individual_gas_write": true,
-    "modal_top_edge_fixed": true,
-    "consumption_checkbox_default_off": true,
-    "select_all_none_buttons": true,
-    "checked_only_consumption": true
+    "schedule_completion_fix": true,
+    "schedule_completed_card_style": true
   }
 }
