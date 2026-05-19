@@ -1,0 +1,42 @@
+{
+  "ticket": "TKT-0060",
+  "status": "passed",
+  "checks": [
+    {
+      "name": "standard_verify",
+      "command": "python3 -c \"import html.parser; html.parser.HTMLParser().feed(open('app.html').read())\" && grep -q 'executeGAS' app.html && grep -q 'GAS_URL' app.html && echo 'VERIFY_PASSED'",
+      "status": "passed",
+      "output": "VERIFY_PASSED"
+    },
+    {
+      "name": "inline_js_parse",
+      "command": "node -e \"const fs=require('fs'); const html=fs.readFileSync('app.html','utf8'); const m=html.match(/<script>([\\\\s\\\\S]*)<\\\\/script>/); new Function(m[1]); console.log('JS_PARSE_PASSED')\"",
+      "status": "passed",
+      "output": "JS_PARSE_PASSED"
+    },
+    {
+      "name": "diff_check",
+      "command": "git diff --check",
+      "status": "passed",
+      "output": ""
+    },
+    {
+      "name": "canvas_modal_api_check",
+      "command": "rg -n 'alert\\\\(|confirm\\\\(|prompt\\\\(' app.html",
+      "status": "passed",
+      "notes": "No matches."
+    },
+    {
+      "name": "execute_gas_payload_policy",
+      "command": "rg -n 'executeGAS\\\\(payload' app.html",
+      "status": "passed",
+      "notes": "Matches are existing sync/init/read paths: syncPendingChanges, executeGAS definition, handleInit, loadScheduleForCurrentWeek. No new per-operation write executeGAS call was added."
+    },
+    {
+      "name": "spreadsheet_write_policy",
+      "command": "rg -n 'appendRow|deleteRow|setValue|setValues|SpreadsheetApp' app.html",
+      "status": "passed",
+      "notes": "Spreadsheet writes remain inside syncPendingChanges and handleInit. loadScheduleForCurrentWeek is read-only."
+    }
+  ]
+}

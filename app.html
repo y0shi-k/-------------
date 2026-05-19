@@ -449,17 +449,36 @@
 
   <!-- モーダル: レシピの追加/編集 -->
   <div id="recipeModal" onclick="if(event.target===this) closeRecipeModal()" class="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
-    <div onclick="event.stopPropagation()" class="bg-white w-full max-w-2xl rounded-xl p-6 shadow transform scale-95 transition-transform duration-300 border border-slate-100 max-h-[90vh] overflow-y-auto">
-      <div class="flex justify-between items-center mb-5">
+    <div onclick="event.stopPropagation()" class="bg-white w-full max-w-2xl rounded-xl shadow transform scale-95 transition-transform duration-300 border border-slate-100 max-h-[90vh] overflow-hidden flex flex-col">
+      <div class="shrink-0 flex justify-between items-center p-6 pb-5">
         <h3 id="recipeModalTitle" class="text-2xl font-medium text-slate-800 tracking-tight">レシピを追加</h3>
         <button onclick="closeRecipeModal()" class="text-slate-300 hover:text-slate-600 bg-slate-100 p-2 rounded-full"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg></button>
       </div>
 
-      <form id="recipeForm" onsubmit="handleRecipeSave(event)" class="space-y-5">
+      <form id="recipeForm" onsubmit="handleRecipeSave(event)" class="flex-1 min-h-0 flex flex-col">
         <input type="hidden" id="r-id" value="">
+        <div class="flex-1 min-h-0 overflow-y-auto px-6 pb-5 space-y-5">
         <div>
           <label class="block text-[11px] font-medium text-slate-400 uppercase mb-1.5 ml-1">レシピ名</label>
           <input type="text" id="r-name" required class="w-full bg-slate-50 border border-slate-100 rounded-xl px-5 py-4 text-base focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none font-bold transition-all" placeholder="例: カレーライス">
+        </div>
+        <div>
+          <div class="flex items-center justify-between gap-2 mb-1.5">
+            <label class="block text-[11px] font-medium text-slate-400 uppercase ml-1">ジャンル</label>
+          </div>
+          <input type="hidden" id="r-genres" value="[]">
+          <div id="recipeGenreField" class="relative bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 flex items-center gap-2 min-h-[3.25rem]">
+            <div id="recipeGenreSelectedTags" class="flex-1 min-w-0 flex flex-wrap gap-2 items-center">
+              <!-- JSで動的に挿入 -->
+            </div>
+            <div id="recipeGenreInputWrap" class="hidden min-w-[8rem] flex-1">
+              <input type="text" id="recipeGenreInlineInput" oninput="renderRecipeGenreSuggestions()" onkeydown="handleRecipeGenreInputKeydown(event)" class="w-full bg-white border border-indigo-100 rounded-xl px-3 py-2 text-sm font-bold outline-none focus:border-indigo-500" placeholder="#ジャンル">
+            </div>
+            <button id="recipeGenreAddBtn" type="button" onclick="startRecipeGenreInput()" class="w-10 h-10 rounded-xl bg-white border border-indigo-100 text-indigo-600 hover:bg-indigo-50 flex items-center justify-center text-xl font-medium shrink-0 active:scale-95 transition-all" title="ジャンルを追加">＋</button>
+            <div id="recipeGenreSuggestPopover" class="hidden absolute left-3 right-3 top-[calc(100%+0.5rem)] z-[75] bg-white border border-slate-100 rounded-xl shadow-lg p-3 space-y-3">
+              <!-- JSで動的に挿入 -->
+            </div>
+          </div>
         </div>
         <div>
           <label class="block text-[11px] font-medium text-slate-400 uppercase mb-1.5 ml-1">出典</label>
@@ -509,8 +528,9 @@
             <!-- JSで動的に挿入 -->
           </div>
         </div>
+        </div>
 
-        <div class="pt-2 flex gap-3">
+        <div class="shrink-0 p-6 pt-4 flex gap-3 border-t border-slate-100 bg-white">
           <button type="button" onclick="closeRecipeModal()" class="flex-1 bg-slate-100 text-slate-600 font-medium py-4 rounded-xl hover:bg-slate-200 transition-all">キャンセル</button>
           <button type="button" onclick="addCurrentRecipeToShopping()" class="flex-1 bg-emerald-100 text-emerald-700 font-medium py-4 rounded-xl hover:bg-emerald-200 transition-all flex items-center justify-center gap-1"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l2.2 11h9.6L19 6H6M8 21a1 1 0 1 0 0-2 1 1 0 0 0 0 2ZM17 21a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z"/></svg> 買い物へ</button>
           <button type="submit" id="btnRecipeSubmit" class="flex-[2] bg-slate-900 text-white font-medium py-4 rounded-xl hover:bg-black transition-all shadow">保存</button>
@@ -766,6 +786,36 @@
     </div>
   </div>
 
+  <!-- モーダル: 買い物候補選択 -->
+  <div id="shoppingShortageSelectModal" onclick="if(event.target===this) closeShoppingShortageSelectModal()" class="fixed inset-0 z-[70] flex items-start justify-center pt-12 p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
+    <div onclick="event.stopPropagation()" class="bg-white w-full max-w-lg rounded-xl p-6 shadow transform scale-95 origin-top transition-transform duration-300 border border-slate-100 h-[calc(100vh-6rem)] flex flex-col">
+      <div class="flex justify-between items-start gap-3 mb-4">
+        <div>
+          <h3 class="text-2xl font-medium text-slate-800 tracking-tight">買い物に追加するもの</h3>
+          <p id="shoppingShortageSelectMeta" class="text-xs text-slate-400 font-bold mt-1"></p>
+        </div>
+        <button onclick="closeShoppingShortageSelectModal()" class="text-slate-300 hover:text-slate-600 bg-slate-100 p-2 rounded-full"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+      </div>
+      <div id="shoppingShortageTabs" class="grid grid-cols-3 gap-1 bg-slate-100 rounded-xl p-1 mb-3">
+        <!-- JSで動的に挿入 -->
+      </div>
+      <label class="flex items-center gap-2 px-1 mb-3 text-xs font-bold text-slate-500">
+        <input type="checkbox" id="shoppingShortageSelectAll" onchange="toggleShoppingShortageSelectAll(this.checked)" class="w-5 h-5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500">
+        表示中をすべて選択
+      </label>
+      <div id="shoppingShortageSelectList" class="space-y-2 flex-1 min-h-0 overflow-y-auto">
+        <!-- JSで動的に挿入 -->
+      </div>
+      <div class="pt-4 flex gap-3 border-t border-slate-100 mt-4">
+        <button onclick="closeShoppingShortageSelectModal()" class="flex-1 bg-slate-100 text-slate-600 font-medium py-4 rounded-xl hover:bg-slate-200 transition-all">あとで</button>
+        <button id="shoppingShortageConfirmBtn" onclick="confirmShoppingShortageSelection()" class="relative flex-[2] bg-emerald-600 text-white font-medium py-4 rounded-xl hover:bg-emerald-700 transition-all shadow">
+          選択したものを追加
+          <span id="shoppingShortageSelectedBadge" class="absolute -top-1 -right-1 min-w-[1.25rem] h-5 px-1 rounded-full bg-rose-600 text-white ring-2 ring-white flex items-center justify-center text-[10px] font-medium">0</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- モーダル: 献立スロット操作メニュー -->
   <div id="scheduleSlotMenu" onclick="if(event.target===this) closeScheduleSlotMenu()" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
     <div onclick="event.stopPropagation()" class="bg-white w-full max-w-sm rounded-xl p-6 shadow transform scale-95 transition-transform duration-300 border border-slate-100">
@@ -960,6 +1010,7 @@
     const GEMINI_API_KEY = "";
     const convId = "CONV-RECIPE-P1-FINAL-BATCH-FIX";
     const DEFAULT_STORAGE_LOCATIONS = ['冷蔵庫', '冷凍庫', 'パントリー', 'ベランダ', 'その他'];
+    const DEFAULT_RECIPE_GENRES = ['和食', '洋食', '中華', '韓国', 'イタリアン', 'エスニック', 'その他'];
     const SYSTEM_LOCATIONS = ['すべて', '登録待ち', '買い物リスト'];
     let state = {
       inventory: [],
@@ -1019,7 +1070,10 @@
       scheduleRecipePickerSortOrder: 'asc',
       _scheduleAddRecipeId: null,
       _scheduleAddRecipeName: '',
-      _scheduleAddSelectedDate: null
+      _scheduleAddSelectedDate: null,
+      shortageSelectionTab: 'all',
+      shortageSelectionItems: [],
+      shortageSelectionMeta: null
     };
 
     /* --- Core --- */
@@ -1395,6 +1449,7 @@
         steps: recipe.steps || '[]',
         prepSteps: recipe.prepSteps || '[]',
         source: recipe.source || '',
+        genre: serializeRecipeGenres(recipe.genre || []),
         count: Number(recipe.count) || 0,
         history: recipe.history || '[]',
         createdAt: recipe.createdAt || recipe.updatedAt || '',
@@ -1945,13 +2000,74 @@
     }
 
     function normalizeLocationName(name) {
+      return normalizeCategoryName(name);
+    }
+
+    function normalizeCategoryName(name) {
       return String(name || '').trim();
     }
 
+    function addUniqueCategory(list, name, reserved = []) {
+      const value = normalizeCategoryName(name);
+      if (!value || reserved.includes(value)) return;
+      if (!list.includes(value)) list.push(value);
+    }
+
+    function parseRecipeGenres(value) {
+      if (Array.isArray(value)) {
+        const list = [];
+        value.forEach(genre => addUniqueCategory(list, genre));
+        return list;
+      }
+      const raw = normalizeCategoryName(value);
+      if (!raw) return [];
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return parseRecipeGenres(parsed);
+      } catch(e) {}
+      return [raw];
+    }
+
+    function serializeRecipeGenres(value) {
+      return JSON.stringify(parseRecipeGenres(value));
+    }
+
+    function getRecipeGenreLabels(recipeOrValue) {
+      if (recipeOrValue && typeof recipeOrValue === 'object' && !Array.isArray(recipeOrValue)) {
+        return parseRecipeGenres(recipeOrValue.genre);
+      }
+      return parseRecipeGenres(recipeOrValue);
+    }
+
+    function getGenreTagClass(genre) {
+      const palettes = [
+        'bg-indigo-50 text-indigo-700 border-indigo-100',
+        'bg-emerald-50 text-emerald-700 border-emerald-100',
+        'bg-amber-50 text-amber-700 border-amber-100',
+        'bg-rose-50 text-rose-700 border-rose-100',
+        'bg-sky-50 text-sky-700 border-sky-100',
+        'bg-violet-50 text-violet-700 border-violet-100',
+        'bg-teal-50 text-teal-700 border-teal-100'
+      ];
+      const key = String(genre || '');
+      const sum = Array.from(key).reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
+      return palettes[sum % palettes.length];
+    }
+
+    function renderGenreTag(genre, options = {}) {
+      const removable = !!options.removable;
+      const cls = getGenreTagClass(genre);
+      const encoded = encodeURIComponent(genre);
+      return `
+        <span class="inline-flex items-center gap-1 border ${cls} text-[11px] font-bold px-2.5 py-1 rounded-full max-w-full">
+          <span class="truncate">#${escapeHtml(genre)}</span>
+          ${removable ? `<button type="button" onclick="removeRecipeGenreFromForm('${encoded}')" class="w-4 h-4 rounded-full bg-white/70 hover:bg-white flex items-center justify-center text-[10px] leading-none">×</button>` : ''}
+        </span>
+      `;
+    }
+
     function addUniqueLocation(list, name) {
-      const loc = normalizeLocationName(name);
-      if (!loc || SYSTEM_LOCATIONS.includes(loc)) return;
-      if (!list.includes(loc)) list.push(loc);
+      addUniqueCategory(list, name, SYSTEM_LOCATIONS);
     }
 
     function getStorageLocations() {
@@ -2171,6 +2287,135 @@
       showToast(`${loc} を保存場所候補に追加しました。`, 'success');
     }
 
+    function getRecipeGenres() {
+      const genres = [];
+      DEFAULT_RECIPE_GENRES.forEach(genre => addUniqueCategory(genres, genre));
+      (state.recipes || []).forEach(recipe => {
+        getRecipeGenreLabels(recipe).forEach(genre => addUniqueCategory(genres, genre));
+      });
+      return genres;
+    }
+
+    function ensureCustomRecipeGenre(name) {
+      const genre = normalizeCategoryName(name);
+      return genre || '';
+    }
+
+    function renderRecipeGenreOptions(selected) {
+      const hidden = document.getElementById('r-genres');
+      const tags = document.getElementById('recipeGenreSelectedTags');
+      if (!hidden || !tags) return;
+      const current = parseRecipeGenres(selected !== undefined ? selected : hidden.value);
+      current.forEach(genre => ensureCustomRecipeGenre(genre));
+      hidden.value = serializeRecipeGenres(current);
+      tags.innerHTML = current.length
+        ? current.map(genre => renderGenreTag(genre, { removable: true })).join('')
+        : '<span class="text-xs font-bold text-slate-300">ジャンル未設定</span>';
+      renderRecipeGenreSuggestions();
+    }
+
+    function startRecipeGenreInput() {
+      const wrap = document.getElementById('recipeGenreInputWrap');
+      const input = document.getElementById('recipeGenreInlineInput');
+      const btn = document.getElementById('recipeGenreAddBtn');
+      if (!wrap || !input || !btn) return;
+      wrap.classList.remove('hidden');
+      btn.classList.add('hidden');
+      input.value = '';
+      renderRecipeGenreSuggestions();
+      setTimeout(() => input.focus(), 0);
+    }
+
+    function closeRecipeGenreInput() {
+      const wrap = document.getElementById('recipeGenreInputWrap');
+      const input = document.getElementById('recipeGenreInlineInput');
+      const btn = document.getElementById('recipeGenreAddBtn');
+      const popover = document.getElementById('recipeGenreSuggestPopover');
+      if (wrap) wrap.classList.add('hidden');
+      if (btn) btn.classList.remove('hidden');
+      if (input) input.value = '';
+      if (popover) popover.classList.add('hidden');
+    }
+
+    function handleRecipeGenreOutsidePointerDown(e) {
+      const wrap = document.getElementById('recipeGenreInputWrap');
+      if (!wrap || wrap.classList.contains('hidden')) return;
+      const field = document.getElementById('recipeGenreField');
+      if (field && field.contains(e.target)) return;
+      closeRecipeGenreInput();
+    }
+
+    function getAvailableRecipeGenreSuggestions(query = '') {
+      const current = parseRecipeGenres(document.getElementById('r-genres')?.value || '[]');
+      const q = normalizeCategoryName(query).toLowerCase();
+      return getRecipeGenres()
+        .filter(genre => !current.includes(genre))
+        .filter(genre => !q || genre.toLowerCase().includes(q))
+        .slice(0, 8);
+    }
+
+    function renderRecipeGenreSuggestions() {
+      const popover = document.getElementById('recipeGenreSuggestPopover');
+      const input = document.getElementById('recipeGenreInlineInput');
+      const wrap = document.getElementById('recipeGenreInputWrap');
+      if (!popover || !input || !wrap || wrap.classList.contains('hidden')) return;
+      const query = normalizeCategoryName(input.value);
+      const suggestions = getAvailableRecipeGenreSuggestions(query);
+      const current = parseRecipeGenres(document.getElementById('r-genres')?.value || '[]');
+      const canCreate = query && !current.includes(query) && !getRecipeGenres().includes(query);
+      const suggestionHtml = suggestions.length
+        ? `<div><p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">候補</p><div class="flex flex-wrap gap-2">${suggestions.map(genre => `<button type="button" onclick="commitRecipeGenreInput('${encodeURIComponent(genre)}')" class="text-left">${renderGenreTag(genre)}</button>`).join('')}</div></div>`
+        : '';
+      const createHtml = canCreate
+        ? `<div><p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">新規作成</p><button type="button" onclick="commitRecipeGenreInput('${encodeURIComponent(query)}')" class="text-left">${renderGenreTag(query)}</button></div>`
+        : '';
+      popover.innerHTML = suggestionHtml || createHtml
+        ? suggestionHtml + createHtml
+        : '<div class="py-2 text-xs font-bold text-slate-300">追加できるジャンルはありません</div>';
+      popover.classList.remove('hidden');
+    }
+
+    function handleRecipeGenreInputKeydown(e) {
+      const value = normalizeCategoryName(e.target.value);
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const first = getAvailableRecipeGenreSuggestions(value)[0];
+        commitRecipeGenreInput(encodeURIComponent(first || value));
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        closeRecipeGenreInput();
+      } else if (e.key === 'Backspace' && !value) {
+        const current = parseRecipeGenres(document.getElementById('r-genres')?.value || '[]');
+        if (current.length) {
+          current.pop();
+          renderRecipeGenreOptions(current);
+        }
+      }
+    }
+
+    function commitRecipeGenreInput(encodedValue) {
+      const value = normalizeCategoryName(decodeURIComponent(encodedValue || ''));
+      if (!value) return;
+      addRecipeGenreToForm(value);
+    }
+
+    function addRecipeGenreToForm(name) {
+      const genre = ensureCustomRecipeGenre(name);
+      if (!genre) return;
+      const hidden = document.getElementById('r-genres');
+      const current = parseRecipeGenres(hidden ? hidden.value : []);
+      addUniqueCategory(current, genre);
+      renderRecipeGenreOptions(current);
+      closeRecipeGenreInput();
+    }
+
+    function removeRecipeGenreFromForm(encodedGenre) {
+      const genre = decodeURIComponent(encodedGenre);
+      const hidden = document.getElementById('r-genres');
+      const current = parseRecipeGenres(hidden ? hidden.value : []).filter(item => item !== genre);
+      renderRecipeGenreOptions(current);
+    }
+
     function discardPendingChanges() {
       state.inventory = clonePlain(state.syncedSnapshot.inventory);
       state.shopping = clonePlain(state.syncedSnapshot.shopping);
@@ -2237,7 +2482,7 @@
         ensureInventoryHeader(sStock);
         ensureSheetColumns(sShop, ['リストID', '品名', '必要数量', '単位', 'ステータス', '紐づくレシピ名', '出自種別', '予定日', '食事区分', '最終編集日時']);
         function ensureRecipeHeader(sheet) {
-          var headers = ['レシピID', 'レシピ名', '材料JSON', '手順JSON', '出典', '調理回数', '調理日履歴', '登録日時', '最終編集日時', '調味料JSON', '下ごしらえJSON'];
+          var headers = ['レシピID', 'レシピ名', '材料JSON', '手順JSON', '出典', '調理回数', '調理日履歴', '登録日時', '最終編集日時', '調味料JSON', '下ごしらえJSON', 'ジャンル'];
           var current = sheet.getRange(1, 1, 1, Math.max(headers.length, sheet.getLastColumn() || 1)).getValues()[0];
           if(!current[0]) {
             sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
@@ -2286,7 +2531,7 @@
             if(!r[1]) continue;
             var created = f(r[7]) || f(r[8]);
             var updated = f(r[8]) || created;
-            list.push({ id:f(r[0]), name:f(r[1]), ingredients:f(r[2]), steps:f(r[3]), source:f(r[4]), count:Number(r[5])||0, history:f(r[6]), createdAt:created, updatedAt:updated, seasonings:f(r[9]), prepSteps:f(r[10]) });
+            list.push({ id:f(r[0]), name:f(r[1]), ingredients:f(r[2]), steps:f(r[3]), source:f(r[4]), count:Number(r[5])||0, history:f(r[6]), createdAt:created, updatedAt:updated, seasonings:f(r[9]), prepSteps:f(r[10]), genre:f(r[11]) });
           }
           return list;
         }
@@ -2407,7 +2652,7 @@
               var existingCreated = f(recipeData[ru][7]) || f(recipeData[ru][8]) || rd.createdAt || now;
               sRecipes.getRange(ru+1, 2, 1, 4).setValues([[rd.name, rd.ingredients, rd.steps, rd.source || '']]);
               sRecipes.getRange(ru+1, 8, 1, 2).setValues([[existingCreated, now]]);
-              sRecipes.getRange(ru+1, 10, 1, 2).setValues([[rd.seasonings || '[]', rd.prepSteps || '[]']]);
+              sRecipes.getRange(ru+1, 10, 1, 3).setValues([[rd.seasonings || '[]', rd.prepSteps || '[]', rd.genre || '']]);
             }
           }
         }
@@ -2418,7 +2663,7 @@
 
         (pending.recipeCreates || []).forEach(function(d) {
           var createdAt = d.createdAt || now;
-          sRecipes.appendRow([Utilities.getUuid(), d.name, d.ingredients || '[]', d.steps || '[]', d.source || '', Number(d.count)||0, d.history || '[]', createdAt, now, d.seasonings || '[]', d.prepSteps || '[]']);
+          sRecipes.appendRow([Utilities.getUuid(), d.name, d.ingredients || '[]', d.steps || '[]', d.source || '', Number(d.count)||0, d.history || '[]', createdAt, now, d.seasonings || '[]', d.prepSteps || '[]', d.genre || '']);
         });
 
         var purchases = pending.shoppingPurchases || [];
@@ -2676,7 +2921,7 @@
           sheet.setFrozenRows(1);
         }
         ensureInventoryHeader();
-        ensureHeader('レシピ集', ['レシピID', 'レシピ名', '材料JSON', '手順JSON', '出典', '調理回数', '調理日履歴', '登録日時', '最終編集日時'], 'レシピID');
+        ensureHeader('レシピ集', ['レシピID', 'レシピ名', '材料JSON', '手順JSON', '出典', '調理回数', '調理日履歴', '登録日時', '最終編集日時', '調味料JSON', '下ごしらえJSON', 'ジャンル'], 'レシピID');
         ensureHeader('献立スケジュール', ['ID', '予定日', '食事区分', 'レシピID', 'レシピ名', 'ステータス', '表示順', '最終編集日時'], 'ID');
         // 献立スケジュール: 旧6列構造→新8列構造への自動移行
         var sScheduleMigrate = ss.getSheetByName('献立スケジュール');
@@ -2739,7 +2984,7 @@
             recipes.push({
               id: f(rr[0]), name: f(rr[1]), ingredients: f(rr[2]), steps: f(rr[3]),
               source: f(rr[4]), count: Number(rr[5])||0, history: f(rr[6]), createdAt: created, updatedAt: updated,
-              seasonings: f(rr[9]), prepSteps: f(rr[10])
+              seasonings: f(rr[9]), prepSteps: f(rr[10]), genre: f(rr[11])
             });
           }
         }
@@ -3369,7 +3614,7 @@
       if (!Array.isArray(allItems) || allItems.length === 0) return [];
 
       const shortages = [];
-      allItems.forEach(ing => {
+      allItems.forEach((ing, idx) => {
         const name = ing.name || '';
         const amount = parseFloat(ing.amount) || 0;
         const unit = ing.unit || '';
@@ -3380,9 +3625,11 @@
 
         if (totalStock < amount) {
           shortages.push({
+            key: `${name}|${unit}|${idx}`,
             name: name,
             qty: amount - totalStock,
             unit: unit,
+            type: inferRecipeItemType(ing),
             recipeName: recipe.name || ''
           });
         }
@@ -3409,6 +3656,138 @@
         state.shopping.push(row);
       });
       return shortages.length;
+    }
+
+    function getShortageItemKey(item, idx) {
+      return item.key || `${item.name || ''}|${item.unit || ''}|${idx}`;
+    }
+
+    function openShoppingShortageSelectModal(shortages, sourceMeta = {}) {
+      state.shortageSelectionTab = 'all';
+      state.shortageSelectionMeta = sourceMeta || {};
+      state.shortageSelectionItems = (shortages || []).map((item, idx) => ({
+        ...item,
+        key: getShortageItemKey(item, idx),
+        type: item.type || inferRecipeItemType(item),
+        selected: false
+      }));
+      const meta = document.getElementById('shoppingShortageSelectMeta');
+      if (meta) {
+        const parts = [];
+        if (sourceMeta.recipeName) parts.push(sourceMeta.recipeName);
+        if (sourceMeta.scheduleDate || sourceMeta.meal) parts.push([sourceMeta.scheduleDate, sourceMeta.meal].filter(Boolean).join(' '));
+        meta.textContent = parts.join(' · ') || '不足分を確認してください';
+      }
+      const m = document.getElementById('shoppingShortageSelectModal');
+      m.classList.remove('hidden');
+      setTimeout(() => m.classList.remove('opacity-0'), 10);
+      renderShoppingShortageSelectModal();
+    }
+
+    function closeShoppingShortageSelectModal() {
+      const m = document.getElementById('shoppingShortageSelectModal');
+      m.classList.add('opacity-0');
+      setTimeout(() => m.classList.add('hidden'), 300);
+      state.shortageSelectionItems = [];
+      state.shortageSelectionMeta = null;
+      updateSyncBar();
+    }
+
+    function getFilteredShortageSelectionItems() {
+      const tab = state.shortageSelectionTab || 'all';
+      return (state.shortageSelectionItems || []).filter(item => {
+        if (tab === 'ingredients') return item.type !== '調味料';
+        if (tab === 'seasonings') return item.type === '調味料';
+        return true;
+      });
+    }
+
+    function setShoppingShortageTab(tab) {
+      state.shortageSelectionTab = ['all', 'ingredients', 'seasonings'].includes(tab) ? tab : 'all';
+      renderShoppingShortageSelectModal();
+    }
+
+    function renderShoppingShortageSelectModal() {
+      const tabWrap = document.getElementById('shoppingShortageTabs');
+      const list = document.getElementById('shoppingShortageSelectList');
+      if (!tabWrap || !list) return;
+      const items = state.shortageSelectionItems || [];
+      const counts = {
+        all: items.length,
+        ingredients: items.filter(item => item.type !== '調味料').length,
+        seasonings: items.filter(item => item.type === '調味料').length
+      };
+      tabWrap.innerHTML = [
+        { value: 'all', label: 'ALL', count: counts.all },
+        { value: 'ingredients', label: '食材', count: counts.ingredients },
+        { value: 'seasonings', label: '調味料', count: counts.seasonings }
+      ].map(tab => {
+        const active = state.shortageSelectionTab === tab.value;
+        return `<button type="button" onclick="setShoppingShortageTab('${tab.value}')" class="px-3 py-2 rounded-lg text-xs font-medium transition-all ${active ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500'}">${tab.label} <span class="text-[10px]">${tab.count}</span></button>`;
+      }).join('');
+
+      const filtered = getFilteredShortageSelectionItems();
+      const selectedCount = items.filter(item => item.selected).length;
+      const selectedBadge = document.getElementById('shoppingShortageSelectedBadge');
+      if (selectedBadge) {
+        selectedBadge.textContent = selectedCount;
+      }
+      const selectAll = document.getElementById('shoppingShortageSelectAll');
+      if (selectAll) {
+        selectAll.checked = filtered.length > 0 && filtered.every(item => item.selected);
+        selectAll.indeterminate = filtered.some(item => item.selected) && !filtered.every(item => item.selected);
+      }
+      if (filtered.length === 0) {
+        list.innerHTML = '<div class="py-10 text-center text-slate-300 font-bold">該当する候補はありません。</div>';
+        return;
+      }
+      list.innerHTML = filtered.map(item => {
+        const badge = item.type === '調味料'
+          ? '<span class="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800 shrink-0">調味料</span>'
+          : '<span class="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-green-100 text-green-800 shrink-0">食材</span>';
+        return `
+          <label class="bg-white p-3 rounded-xl shadow-sm border border-slate-100 flex items-center gap-3 cursor-pointer hover:bg-emerald-50 transition-all">
+            <input type="checkbox" class="shopping-shortage-cb w-5 h-5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 shrink-0" data-key="${escapeHtml(item.key)}" ${item.selected ? 'checked' : ''} onchange="toggleShoppingShortageSelection(this.dataset.key, this.checked)">
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 mb-0.5">
+                <span class="font-bold text-slate-800 text-sm truncate">${escapeHtml(item.name)}</span>
+                ${badge}
+              </div>
+              <div class="text-[10px] text-slate-400 font-bold">不足 ${formatQty(item.qty)}${escapeHtml(item.unit || '')}</div>
+            </div>
+          </label>
+        `;
+      }).join('');
+    }
+
+    function toggleShoppingShortageSelection(key, checked) {
+      const item = (state.shortageSelectionItems || []).find(row => row.key === key);
+      if (item) item.selected = !!checked;
+      renderShoppingShortageSelectModal();
+    }
+
+    function toggleShoppingShortageSelectAll(checked) {
+      const keys = new Set(getFilteredShortageSelectionItems().map(item => item.key));
+      (state.shortageSelectionItems || []).forEach(item => {
+        if (keys.has(item.key)) item.selected = !!checked;
+      });
+      renderShoppingShortageSelectModal();
+    }
+
+    function confirmShoppingShortageSelection() {
+      const selected = (state.shortageSelectionItems || []).filter(item => item.selected);
+      const meta = state.shortageSelectionMeta || {};
+      closeShoppingShortageSelectModal();
+      if (selected.length === 0) {
+        showToast('献立を設定しました。買い物リストには追加していません。', 'info');
+        return;
+      }
+      addShortagesToShopping(selected, meta);
+      showToastWithAction(
+        `${selected.length} 件の不足材料を買い物リストに追加しました。`,
+        '買い物リストを確認',
+        () => { switchMode('A'); filterByLocation('買い物リスト'); }
+      );
     }
 
     /* --- AI Recipe Suggestion --- */
@@ -4071,6 +4450,10 @@ ${plan ? '\n提案方針: ' + plan : ''}
       // source URL 表示
       const sourceContainer = document.getElementById('aiPreviewSource');
       sourceContainer.innerHTML = '';
+      const genreTags = getRecipeGenreLabels(recipe);
+      if (genreTags.length) {
+        sourceContainer.insertAdjacentHTML('beforeend', `<div class="flex flex-wrap justify-center gap-1.5">${genreTags.map(genre => renderGenreTag(genre)).join('')}</div>`);
+      }
       const sourceUrls = (recipe.source || '').split(/\n+/).map(s => s.trim()).filter(Boolean);
       if (sourceUrls.length > 0) {
         sourceUrls.forEach(url => {
@@ -4178,6 +4561,7 @@ ${plan ? '\n提案方針: ' + plan : ''}
         prepSteps: JSON.stringify(data.prepSteps || []),
         steps: JSON.stringify(data.steps || []),
         source: 'AI生成',
+        genre: '[]',
         count: 0,
         history: '[]'
       };
@@ -4249,6 +4633,7 @@ ${plan ? '\n提案方針: ' + plan : ''}
       let list = state.recipes.filter(r => {
         if (!q) return true;
         const nameMatch = (r.name || '').toLowerCase().includes(q);
+        const genreMatch = getRecipeGenreLabels(r).some(genre => genre.toLowerCase().includes(q));
         let ingMatch = false;
         try {
           const ings = JSON.parse(r.ingredients || '[]');
@@ -4256,7 +4641,7 @@ ${plan ? '\n提案方針: ' + plan : ''}
           if (Array.isArray(ings)) ingMatch = ings.some(ing => (ing.name || '').toLowerCase().includes(q));
           if (!ingMatch && Array.isArray(seas)) ingMatch = seas.some(s => (s.name || '').toLowerCase().includes(q));
         } catch(e) {}
-        return nameMatch || ingMatch;
+        return nameMatch || genreMatch || ingMatch;
       });
       const sortBy = state.scheduleRecipePickerSortBy;
       const sortOrder = state.scheduleRecipePickerSortOrder;
@@ -4302,7 +4687,8 @@ ${plan ? '\n提案方針: ' + plan : ''}
           metaText = `調理回数 ${recipe.count || 0} 回`;
         } else {
           const ingCount = getRecipeIngredientCount(recipe);
-          metaText = `材料 ${ingCount} 品目 | 調理回数 ${recipe.count || 0} | 登録 ${escapeHtml(getRecipeDateValue(recipe, 'createdAt') || '—')}`;
+          const genrePart = getRecipeGenreLabels(recipe).length ? `${getRecipeGenreLabels(recipe).map(genre => `#${escapeHtml(genre)}`).join(' ')} | ` : '';
+          metaText = `${genrePart}材料 ${ingCount} 品目 | 調理回数 ${recipe.count || 0} | 登録 ${escapeHtml(getRecipeDateValue(recipe, 'createdAt') || '—')}`;
         }
         container.insertAdjacentHTML('beforeend', `
           <div class="bg-white p-3 rounded-xl shadow-sm border border-slate-100 flex items-center gap-3 cursor-pointer hover:bg-indigo-50 transition-all" onclick="openRecipeEditor('${recipe.id}')">
@@ -4350,12 +4736,7 @@ ${plan ? '\n提案方針: ' + plan : ''}
 
       const shortages = compareRecipeWithInventory(recipeId);
       if (shortages.length > 0) {
-        addShortagesToShopping(shortages, { sourceType: '献立スケジュール', scheduleDate: date, meal, recipeName });
-        showToastWithAction(
-          `${shortages.length} 件の不足材料を買い物リストに追加しました。`,
-          '買い物リストを確認',
-          () => { switchMode('A'); filterByLocation('買い物リスト'); }
-        );
+        openShoppingShortageSelectModal(shortages, { sourceType: '献立スケジュール', scheduleDate: date, meal, recipeName });
       } else {
         showToast(`${meal}の献立を設定しました。`, 'success');
       }
@@ -4552,6 +4933,7 @@ ${plan ? '\n提案方針: ' + plan : ''}
         recipesToRender = state.recipes.filter(r => {
           const name = (r.name || '').toLowerCase();
           const source = (r.source || '').toLowerCase();
+          const genreNames = getRecipeGenreLabels(r).map(genre => genre.toLowerCase());
           let ingredients = [];
           let seasonings = [];
           try {
@@ -4567,10 +4949,11 @@ ${plan ? '\n提案方針: ' + plan : ''}
           const keywordMatches = keywords.map(k => {
             const nameMatch = name.includes(k);
             const sourceMatch = source.includes(k);
+            const genreMatch = genreNames.some(genre => genre.includes(k));
             const ingMatch = ingNames.some(n => n.includes(k));
-            if (searchMode === 'name') return nameMatch || sourceMatch;
+            if (searchMode === 'name') return nameMatch || sourceMatch || genreMatch;
             if (searchMode === 'ingredient') return ingMatch;
-            return nameMatch || sourceMatch || ingMatch;
+            return nameMatch || sourceMatch || genreMatch || ingMatch;
           });
 
           return searchLogic === 'and'
@@ -4614,6 +4997,7 @@ ${plan ? '\n提案方針: ' + plan : ''}
       recipesToRender.forEach((recipe) => {
         const ingCount = getRecipeIngredientCount(recipe);
         const syncBadge = getRecipeSyncBadge(recipe);
+        const genreBadge = getRecipeGenreLabels(recipe).map(genre => renderGenreTag(genre)).join('');
         container.insertAdjacentHTML('beforeend', `
           <div class="bg-white/80 p-5 rounded-xl shadow-sm border border-indigo-100 flex items-center gap-4 group cursor-pointer hover:bg-indigo-50 transition-colors" onclick="openRecipeViewer('${recipe.id}')">
             <div class="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center flex-shrink-0">
@@ -4622,6 +5006,7 @@ ${plan ? '\n提案方針: ' + plan : ''}
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2">
                 <h4 class="font-medium text-slate-800 text-lg truncate">${escapeHtml(recipe.name)}</h4>
+                <div class="flex items-center gap-1 flex-wrap">${genreBadge}</div>
                 ${syncBadge}
               </div>
               <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">材料 ${ingCount} 品目 | 調理回数 ${recipe.count || 0} | 登録 ${escapeHtml(getRecipeDateValue(recipe, 'createdAt') || '—')}</p>
@@ -4995,6 +5380,8 @@ ${plan ? '\n提案方針: ' + plan : ''}
         const recipe = state.recipes.find(r => r.id === recipeId);
         if (recipe) {
           document.getElementById('r-name').value = recipe.name || '';
+          renderRecipeGenreOptions(recipe.genre || '');
+          closeRecipeGenreInput();
           document.getElementById('r-source').value = recipe.source || '';
           renderIngredientInputs(recipe.ingredients);
           renderSeasoningInputs(recipe.seasonings);
@@ -5005,6 +5392,8 @@ ${plan ? '\n提案方針: ' + plan : ''}
         }
       }
       document.getElementById('r-name').value = '';
+      renderRecipeGenreOptions('');
+      closeRecipeGenreInput();
       document.getElementById('r-source').value = '';
       renderIngredientInputs();
       renderSeasoningInputs();
@@ -5227,6 +5616,7 @@ ${plan ? '\n提案方針: ' + plan : ''}
 
     function getRecipeFormData() {
       const name = document.getElementById('r-name').value.trim();
+      const genre = serializeRecipeGenres(document.getElementById('r-genres')?.value || '[]');
       const source = document.getElementById('r-source').value.trim();
       const ingredients = [];
       document.querySelectorAll('#ingredientList .ingredient-row').forEach((row, idx) => {
@@ -5254,12 +5644,13 @@ ${plan ? '\n提案方針: ' + plan : ''}
         const s = ta.value.trim();
         if (s) cookSteps.push(s);
       });
-      return { name, source, ingredients: JSON.stringify(ingredients), seasonings: JSON.stringify(seasonings), prepSteps: JSON.stringify(prepSteps), steps: JSON.stringify(cookSteps) };
+      return { name, genre, source, ingredients: JSON.stringify(ingredients), seasonings: JSON.stringify(seasonings), prepSteps: JSON.stringify(prepSteps), steps: JSON.stringify(cookSteps) };
     }
 
     async function handleRecipeSave(e) {
       e.preventDefault();
       const data = getRecipeFormData();
+      if (data.error) { showToast(data.error, 'error'); return; }
       if (!data.name) { showToast('レシピ名を入力してください。', 'error'); return; }
       const recipeId = document.getElementById('r-id').value;
       if (recipeId) {
@@ -5748,6 +6139,7 @@ ${text}`;
         steps: data.steps,
         prepSteps: data.prepSteps,
         source: data.source,
+        genre: data.genre || '',
         count: 0,
         history: '[]'
       };
@@ -6163,12 +6555,7 @@ ${text}`;
       switchMode('B');
       const shortages = compareRecipeWithInventory(recipeId);
       if (shortages.length > 0) {
-        addShortagesToShopping(shortages, { sourceType: '献立スケジュール', scheduleDate: date, meal, recipeName: recipe.name });
-        showToastWithAction(
-          `${shortages.length} 件の不足材料を買い物リストに追加しました。`,
-          '買い物リストを確認',
-          () => { switchMode('A'); filterByLocation('買い物リスト'); }
-        );
+        openShoppingShortageSelectModal(shortages, { sourceType: '献立スケジュール', scheduleDate: date, meal, recipeName: recipe.name });
       } else {
         showToast(`${date} ${meal}の献立を追加しました`, 'success');
       }
@@ -7287,6 +7674,8 @@ ${text}`;
       document.body.append(t); t.select(); document.execCommand('copy'); t.remove();
       showToast('システム状況をコピーしました。Geminiのチャット欄に貼り付けて共有してください。', 'success');
     }
+
+    document.addEventListener('pointerdown', handleRecipeGenreOutsidePointerDown, true);
   </script>
 </body>
 </html>
