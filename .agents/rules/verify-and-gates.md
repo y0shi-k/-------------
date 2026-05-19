@@ -37,6 +37,24 @@
 - `review_ready` は `project-os/artifacts/TKT-xxxx/review.md` が存在し、`checked_diff_paths` が ticket.changed_paths と対応するまで閉じない
 - `report_ready` は `project-os/artifacts/TKT-xxxx/report.md` が存在し、status が `ready` になるまで閉じない
 
+## 軽量UI調整時の gate 集約
+- 同一セッションで同一画面・同一目的の小さなUI調整を繰り返す場合、新規 `TKT-*` / `SPEC-*` / artifact ディレクトリを小修正ごとに作らない。
+- 直近の関連 ticket/spec があり、目的・scope・acceptance が引き続き妥当なら、それを更新または追記して使う。
+- artifact は同じ `project-os/artifacts/TKT-xxxx/` の `verify.json` / `manual-smokes.md` / `review.md` / `report.md` を最後にまとめて更新する。
+- 途中の小修正ごとに full verify を実行しなくてよい。ただし HTML/JS 構文破損が疑われる大きめの編集後は、軽い構文チェックをその場で実行してよい。
+- ユーザーがブラウザテストを実施すると明示した場合、AI は静的 verify と manual smoke 手順記録まででよい。
+- 以下は軽量UI調整に含めてよい:
+  - 同一画面内のレイアウト調整
+  - 表示件数、折り返し、省略、tooltip、hover 表示の調整
+  - 文言、ラベル、CSSクラス、Tailwindクラスの調整
+  - 既存 state / 保存形式を変えない描画ロジックの小変更
+- 以下は軽量集約の対象外で、従来どおり個別 ticket と full gate を使う:
+  - Spreadsheet スキーマ変更
+  - GAS通信方式や `executeGAS` 周辺変更
+  - `pendingSync` / `syncPendingChanges()` / 保存形式の変更
+  - データ削除、移行、破壊的変更
+  - 複数画面にまたがる機能追加や契約変更
+
 ## スプシ同期 policy check
 - Google Spreadsheet の追加・更新・削除を含む変更では、`required_evals` に `manual_bulk_sync_policy` を含める
 - `rg -n 'executeGAS\\(payload' app.html` で、書き込み系の個別通信が増えていないことを確認する
