@@ -1,0 +1,38 @@
+{
+  "ticket_id": "TKT-0061-recipe-genre-appsheet-picker",
+  "status": "passed",
+  "checked_at": "2026-05-19",
+  "commands": [
+    {
+      "name": "standard_verify",
+      "command": "python3 -c \"import html.parser; html.parser.HTMLParser().feed(open('app.html').read())\" && grep -q 'executeGAS' app.html && grep -q 'GAS_URL' app.html && echo 'VERIFY_PASSED'",
+      "status": "passed",
+      "output": "VERIFY_PASSED"
+    },
+    {
+      "name": "javascript_syntax",
+      "command": "node -e \"extract script tags from app.html and new Function each script\"",
+      "status": "passed",
+      "output": "JS_SYNTAX_PASSED 2"
+    },
+    {
+      "name": "canvas_environment_static_checks",
+      "command": "rg -n \"alert\\(|confirm\\(|prompt\\(|recipeGenreInputWrap|executeGAS\\(payload|function showToast|GAS_URL\" app.html",
+      "status": "passed",
+      "output": "No native dialogs or stale recipeGenreInputWrap references. showToast and GAS_URL remain present. Existing executeGAS(payload) call sites unchanged."
+    },
+    {
+      "name": "headless_chrome_genre_picker",
+      "command": "Playwright with local Google Chrome against file://app.html",
+      "status": "passed",
+      "output": "{\"afterSelect\":{\"value\":\"[\\\"和食\\\",\\\"中華\\\"]\",\"open\":true},\"afterCreate\":\"[\\\"和食\\\",\\\"中華\\\",\\\"発酵\\\"]\",\"afterBackspace\":\"[\\\"和食\\\",\\\"中華\\\"]\",\"closed\":true,\"errors\":[]}"
+    }
+  ],
+  "result": {
+    "html_valid": true,
+    "gas_url_present": true,
+    "execute_gas_present": true,
+    "js_syntax_valid": true,
+    "genre_picker_behavior_verified": true
+  }
+}
