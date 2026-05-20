@@ -1,0 +1,18 @@
+{
+  "ticket": "TKT-0073-schedule-day-shift-controls",
+  "status": "passed",
+  "commands": [
+    {
+      "command": "python3 -c \"import html.parser; html.parser.HTMLParser().feed(open('app.html').read())\" && grep -q 'executeGAS' app.html && grep -q 'GAS_URL' app.html && echo 'VERIFY_PASSED'",
+      "result": "VERIFY_PASSED"
+    },
+    {
+      "command": "rg -n \"alert\\(|confirm\\(|prompt\\(|GEMINI_API_KEY|showToast|executeGAS\\(payload\" app.html",
+      "result": "No alert/confirm/prompt matches. showToast exists. GEMINI_API_KEY remains a constant without added empty-key validation. No new write-path executeGAS(payload...) was added."
+    }
+  ],
+  "notes": [
+    "Spreadsheet schema, GAS write behavior, pendingSync, and syncPendingChanges were not changed.",
+    "Browser display testing remains a Gemini Canvas manual check."
+  ]
+}

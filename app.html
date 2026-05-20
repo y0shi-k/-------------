@@ -1032,6 +1032,7 @@
       schedule: [],
       cookingHistory: [],
       scheduleWeekOffset: 0,
+      scheduleDayOffset: 0,
       shoppingView: 'source',
       shoppingExpandedGroups: {},
       recipeSearchQuery: '',
@@ -3337,7 +3338,7 @@
     }
 
     async function loadSchedule() {
-      const dates = getWeekDates(state.scheduleWeekOffset);
+      const dates = getWeekDates();
       const startDate = dates[0];
       const endDate = dates[6];
       const payload = `(function(){
@@ -3768,11 +3769,23 @@
       return date;
     }
 
+    function getScheduleDayOffset() {
+      if (Number.isFinite(Number(state.scheduleDayOffset))) return Number(state.scheduleDayOffset);
+      return (Number(state.scheduleWeekOffset) || 0) * 7;
+    }
+
+    function setScheduleDayOffset(offset) {
+      const value = Number(offset) || 0;
+      state.scheduleDayOffset = value;
+      state.scheduleWeekOffset = Math.trunc(value / 7);
+    }
+
     function getWeekDates(offset) {
       const today = new Date();
       today.setHours(0,0,0,0);
       const startDate = new Date(today);
-      startDate.setDate(today.getDate() + ((offset || 0) * 7) - 3);
+      const dayOffset = offset == null ? getScheduleDayOffset() : Number(offset) || 0;
+      startDate.setDate(today.getDate() + dayOffset - 3);
       const dates = [];
       for (let i = 0; i < 7; i++) {
         const d = new Date(startDate);
@@ -3782,13 +3795,15 @@
       return dates;
     }
 
-    function getScheduleWeekOffsetForDate(dateStr) {
+    function getScheduleDayOffsetForDate(dateStr) {
       const target = parseLocalDate(dateStr);
-      if (!target) return state.scheduleWeekOffset || 0;
+      if (!target) return getScheduleDayOffset();
       const today = new Date();
       today.setHours(0,0,0,0);
       const diffDays = Math.round((target - today) / 86400000);
-      return Math.floor((diffDays + 3) / 7);
+      if (diffDays < -3) return diffDays + 3;
+      if (diffDays > 3) return diffDays - 3;
+      return 0;
     }
 
     function formatScheduleDate(dateStr) {
@@ -3799,7 +3814,13 @@
     }
 
     function getScheduleWeekLabel() {
-      return state.scheduleWeekOffset === 0 ? '今週' : `${state.scheduleWeekOffset > 0 ? '+' : ''}${state.scheduleWeekOffset}週`;
+      const dayOffset = getScheduleDayOffset();
+      if (dayOffset === 0) return '今週';
+      if (dayOffset % 7 === 0) {
+        const weekOffset = dayOffset / 7;
+        return `${weekOffset > 0 ? '+' : ''}${weekOffset}週`;
+      }
+      return `${dayOffset > 0 ? '+' : ''}${dayOffset}日`;
     }
 
     function getScheduleDateTone(dateStr) {
@@ -3837,7 +3858,7 @@
     }
 
     function getSortedScheduleDates() {
-      const dates = getWeekDates(state.scheduleWeekOffset);
+      const dates = getWeekDates();
       const sorted = [...dates].sort((a, b) => {
         if (state.scheduleSortBy === 'open') {
           const diff = getScheduleDaySummary(b).openCount - getScheduleDaySummary(a).openCount;
@@ -3860,6 +3881,10 @@
       const weekLabel = getScheduleWeekLabel();
       const labelEl = document.getElementById('scheduleWeekLabel');
       if (labelEl) labelEl.textContent = weekLabel;
+
+      container.insertAdjacentHTML('beforeend', `
+        <button onclick="shiftScheduleDays(-1)" class="w-full h-8 rounded-xl bg-white text-sky-600 border border-sky-100 hover:bg-sky-50 flex items-center justify-center text-sm font-bold shadow-sm active:scale-95 transition-all" title="1日前へ移動" aria-label="スケジュールを1日前へ移動">↑</button>
+      `);
 
       dates.forEach(date => {
         const dateTone = getScheduleDateTone(date);
@@ -3906,17 +3931,26 @@
           </div>
         `);
       });
+      container.insertAdjacentHTML('beforeend', `
+        <button onclick="shiftScheduleDays(1)" class="w-full h-8 rounded-xl bg-white text-sky-600 border border-sky-100 hover:bg-sky-50 flex items-center justify-center text-sm font-bold shadow-sm active:scale-95 transition-all" title="1日後へ移動" aria-label="スケジュールを1日後へ移動">↓</button>
+      `);
       resetHorizontalScroll();
     }
 
     function changeScheduleWeek(delta) {
-      state.scheduleWeekOffset += delta;
+      setScheduleDayOffset(getScheduleDayOffset() + (delta * 7));
+      renderRecipeMode();
+      resetHorizontalScroll();
+    }
+
+    function shiftScheduleDays(delta) {
+      setScheduleDayOffset(getScheduleDayOffset() + delta);
       renderRecipeMode();
       resetHorizontalScroll();
     }
 
     function resetScheduleWeek() {
-      state.scheduleWeekOffset = 0;
+      setScheduleDayOffset(0);
       renderRecipeMode();
       resetHorizontalScroll();
     }
@@ -6737,7 +6771,7 @@ ${text}`;
       if (targetItem) queueScheduleCreate(targetItem);
       closeScheduleAddModal();
       closeAiPreviewModal();
-      state.scheduleWeekOffset = getScheduleWeekOffsetForDate(date);
+      setScheduleDayOffset(getScheduleDayOffsetForDate(date));
       state.currentBTab = 'schedule';
       switchMode('B');
       const shortages = compareRecipeWithInventory(recipeId);
