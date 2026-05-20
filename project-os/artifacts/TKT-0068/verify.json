@@ -1,0 +1,20 @@
+{
+  "ticket_id": "TKT-0068-activity-statusbar-top-relocation",
+  "status": "passed",
+  "command": "python3 -c \"import html.parser; html.parser.HTMLParser().feed(open('app.html').read())\" && grep -q 'executeGAS' app.html && grep -q 'GAS_URL' app.html && echo 'VERIFY_PASSED'",
+  "output": "VERIFY_PASSED",
+  "checks": [
+    {
+      "name": "html_parser",
+      "status": "passed"
+    },
+    {
+      "name": "executeGAS_present",
+      "status": "passed"
+    },
+    {
+      "name": "GAS_URL_present",
+      "status": "passed"
+    }
+  ]
+}
