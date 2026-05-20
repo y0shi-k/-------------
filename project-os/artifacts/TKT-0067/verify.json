@@ -1,0 +1,37 @@
+{
+  "ticket": "TKT-0067-app-html-line-reduction-refactor",
+  "status": "pass",
+  "date": "2026-05-19",
+  "checks": [
+    {
+      "name": "standard_verify",
+      "command": "python3 -c \"import html.parser; html.parser.HTMLParser().feed(open('app.html').read())\" && grep -q 'executeGAS' app.html && grep -q 'GAS_URL' app.html && echo 'VERIFY_PASSED'",
+      "result": "VERIFY_PASSED"
+    },
+    {
+      "name": "js_parse",
+      "command": "node -e \"const fs=require('fs'); const html=fs.readFileSync('app.html','utf8'); for (const m of html.matchAll(/<script[^>]*>([\\\\s\\\\S]*?)<\\\\/script>/g)) new Function(m[1]); console.log('JS_PARSE_PASSED')\"",
+      "result": "JS_PARSE_PASSED"
+    },
+    {
+      "name": "canvas_policy_grep",
+      "command": "rg -n \"alert\\(|confirm\\(|prompt\\(|GEMINI_API_KEY.*(throw|return|alert|showToast)|executeGAS\\(payload\" app.html",
+      "result": "No alert/confirm/prompt or GEMINI_API_KEY validation matches. executeGAS(payload) call sites remain sync/init/load flows."
+    },
+    {
+      "name": "recipe_array_parse_grep",
+      "command": "rg -n \"JSON\\.parse\\([^\\n]*(ingredients|seasonings|prepSteps|steps|history)|py-20 text-center|py-10 text-center|py-6 text-center\" app.html",
+      "result": "Only GAS payload history parsing remains; direct frontend recipe-array parsing and targeted empty-state class strings were removed."
+    },
+    {
+      "name": "diff_check",
+      "command": "git diff --check",
+      "result": "PASS"
+    },
+    {
+      "name": "line_count",
+      "command": "wc -l app.html",
+      "result": "7798 app.html"
+    }
+  ]
+}

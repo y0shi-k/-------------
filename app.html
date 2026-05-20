@@ -1352,6 +1352,13 @@
       }
     }
 
+    function emptyStateHtml(text, options = {}) {
+      const py = options.py || 'py-20';
+      const color = options.color || 'text-slate-300';
+      const extra = options.extraClass || '';
+      return `<div class="${py} text-center ${color} font-bold ${extra}">${escapeHtml(text).replace(/\n/g, '<br>')}</div>`;
+    }
+
     function inferRecipeItemType(item, fallbackType) {
       if (item && (item.type === '食材' || item.type === '調味料')) return item.type;
       if (fallbackType) return fallbackType;
@@ -2275,7 +2282,7 @@
       if (!list) return;
       const locations = getStorageLocations();
       if (locations.length === 0) {
-        list.innerHTML = '<div class="py-10 text-center text-slate-300 font-bold">保存場所はありません。</div>';
+        list.innerHTML = emptyStateHtml('保存場所はありません。', { py: 'py-10' });
         return;
       }
       list.innerHTML = locations.map(loc => {
@@ -2559,7 +2566,7 @@
           </button>`
         : '';
       const emptyHtml = (!rows && !createHtml)
-        ? '<div class="px-4 py-6 text-center text-xs font-bold text-slate-300">該当するジャンルはありません</div>'
+        ? emptyStateHtml('該当するジャンルはありません', { py: 'px-4 py-6', extraClass: 'text-xs' })
         : '';
       popover.innerHTML = `
         <div class="flex items-center justify-between gap-3 px-4 py-3 border-b border-slate-100 bg-white">
@@ -3386,7 +3393,7 @@
         inventoryActions.classList.add('hidden');
         shoppingActions.classList.add('hidden');
         if (state.staging.length === 0) {
-          container.innerHTML = '<div class="py-20 text-center text-slate-300 font-bold">登録待ちリストは空です。上のボタンから追加してください。</div>';
+          container.innerHTML = emptyStateHtml('登録待ちリストは空です。上のボタンから追加してください。');
           stagingActions.classList.add('hidden');
           return;
         }
@@ -3415,7 +3422,7 @@
         shoppingActions.classList.add('hidden');
         const list = sortShopping((state.shopping || []).filter(i => i.status === '未購入'));
         if (list.length === 0) {
-          container.innerHTML = '<div class="py-20 text-center text-slate-300 font-bold">買うものはありません。</div>';
+          container.innerHTML = emptyStateHtml('買うものはありません。');
           shoppingActions.classList.add('hidden');
           updateBulkActionSlot();
           return;
@@ -3432,7 +3439,7 @@
       let filtered = state.currentLoc === 'すべて' ? state.inventory : state.inventory.filter(i => i.loc === state.currentLoc);
       filtered = sortInventory(filtered);
       if (filtered.length === 0) {
-        container.innerHTML = '<div class="py-20 text-center text-slate-300 font-bold">在庫はありません。</div>';
+        container.innerHTML = emptyStateHtml('在庫はありません。');
         inventoryActions.classList.add('hidden');
         updateBulkActionSlot();
         return;
@@ -3591,15 +3598,8 @@
     }
 
     function getRecipeIngredientCount(recipe) {
-      try {
-        const ingredients = JSON.parse(recipe.ingredients || '[]');
-        const seasonings = JSON.parse(recipe.seasonings || '[]');
-        const ingCount = Array.isArray(ingredients) ? ingredients.length : 0;
-        const seaCount = Array.isArray(seasonings) ? seasonings.length : 0;
-        return ingCount + seaCount;
-      } catch(e) {
-        return 0;
-      }
+      return getRecipeItems(recipe, 'ingredients', '食材').length
+        + getRecipeItems(recipe, 'seasonings', '調味料').length;
     }
 
     function renderRecipeModeControls() {
@@ -3848,14 +3848,11 @@
     function compareRecipeWithInventory(recipeId) {
       const recipe = state.recipes.find(r => r.id === recipeId);
       if (!recipe) return [];
-      let ingredients = [];
-      let seasonings = [];
-      try {
-        ingredients = JSON.parse(recipe.ingredients || '[]');
-        seasonings = JSON.parse(recipe.seasonings || '[]');
-      } catch(e) { /* fallback */ }
-      const allItems = [...ingredients, ...seasonings];
-      if (!Array.isArray(allItems) || allItems.length === 0) return [];
+      const allItems = [
+        ...getRecipeItems(recipe, 'ingredients', '食材'),
+        ...getRecipeItems(recipe, 'seasonings', '調味料')
+      ];
+      if (allItems.length === 0) return [];
 
       const shortages = [];
       allItems.forEach((ing, idx) => {
@@ -3982,7 +3979,7 @@
         selectAll.indeterminate = filtered.some(item => item.selected) && !filtered.every(item => item.selected);
       }
       if (filtered.length === 0) {
-        list.innerHTML = '<div class="py-10 text-center text-slate-300 font-bold">該当する候補はありません。</div>';
+        list.innerHTML = emptyStateHtml('該当する候補はありません。', { py: 'py-10' });
         return;
       }
       list.innerHTML = filtered.map(item => {
@@ -4093,7 +4090,7 @@
       if (countLabel) countLabel.textContent = `${expiring.length} 件`;
       container.innerHTML = '';
       if (expiring.length === 0) {
-        container.innerHTML = '<div class="py-6 text-center text-slate-300 text-sm font-bold bg-slate-50 rounded-xl border border-slate-100">期限が近い食材はありません。</div>';
+        container.innerHTML = emptyStateHtml('期限が近い食材はありません。', { py: 'py-6', extraClass: 'text-sm bg-slate-50 rounded-xl border border-slate-100' });
         return;
       }
       expiring.slice(0, 5).forEach(item => {
@@ -4216,7 +4213,7 @@
       if (!container) return;
       container.innerHTML = '';
       if (state.inventory.length === 0) {
-        container.innerHTML = '<div class="py-10 text-center text-slate-300 font-bold">在庫がありません。</div>';
+        container.innerHTML = emptyStateHtml('在庫がありません。', { py: 'py-10' });
         return;
       }
       const searchVal = (document.getElementById('aiIngredientSearch')?.value || '').toLowerCase();
@@ -4229,7 +4226,7 @@
         return true;
       });
       if (filtered.length === 0) {
-        container.innerHTML = '<div class="py-10 text-center text-slate-300 font-bold">該当する食材がありません。</div>';
+        container.innerHTML = emptyStateHtml('該当する食材がありません。', { py: 'py-10' });
         return;
       }
       const sorted = [...filtered].sort((a, b) => {
@@ -4596,6 +4593,36 @@ ${plan ? '\n提案方針: ' + plan : ''}
       }
     }
 
+    function renderAiPreviewItemList(containerId, items, dotClass, emptyText) {
+      const container = document.getElementById(containerId);
+      if (!container) return;
+      const list = Array.isArray(items) ? items : [];
+      container.innerHTML = list.length
+        ? list.map(item => `
+            <li class="text-sm font-bold text-slate-700 flex items-center gap-2">
+              <span class="w-2 h-2 ${dotClass} rounded-full"></span>
+              ${escapeHtml(item.name || '')} ${escapeHtml(String(item.amount || ''))}${escapeHtml(item.unit || '')}
+            </li>
+          `).join('')
+        : `<li class="text-sm text-slate-400 font-bold">${emptyText}</li>`;
+    }
+
+    function renderAiPreviewStepList(containerId, steps, emptyText) {
+      const container = document.getElementById(containerId);
+      if (!container) return;
+      const list = Array.isArray(steps) ? steps : [];
+      container.innerHTML = list.length
+        ? list.map(step => `<li class="text-sm font-bold text-slate-700 pl-1">${escapeHtml(String(step))}</li>`).join('')
+        : `<li class="text-sm text-slate-400 font-bold">${emptyText}</li>`;
+    }
+
+    function renderAiPreviewParts(parts) {
+      renderAiPreviewItemList('aiPreviewIngredients', parts.ingredients, 'bg-indigo-400', '材料が設定されていません');
+      renderAiPreviewItemList('aiPreviewSeasonings', parts.seasonings, 'bg-amber-400', '調味料が設定されていません');
+      renderAiPreviewStepList('aiPreviewPrepSteps', parts.prepSteps, '下ごしらえが設定されていません');
+      renderAiPreviewStepList('aiPreviewSteps', parts.steps || parts.cookSteps, '調理工程が設定されていません');
+    }
+
     function openAiRecipePreview(data) {
       document.getElementById('syncBar').classList.add('sync-bar-hidden');
       document.getElementById('syncBar').classList.remove('sync-bar-visible');
@@ -4608,64 +4635,7 @@ ${plan ? '\n提案方針: ' + plan : ''}
       document.getElementById('recipeHeaderScheduleBtn').classList.add('hidden');
       document.getElementById('aiPreviewName').textContent = data.name || '（名称未設定）';
       document.getElementById('aiPreviewSource').innerHTML = '';
-
-      const ingContainer = document.getElementById('aiPreviewIngredients');
-      ingContainer.innerHTML = '';
-      const ingredients = Array.isArray(data.ingredients) ? data.ingredients : [];
-      if (ingredients.length === 0) {
-        ingContainer.innerHTML = '<li class="text-sm text-slate-400 font-bold">材料が設定されていません</li>';
-      } else {
-        ingredients.forEach(ing => {
-          ingContainer.insertAdjacentHTML('beforeend', `
-            <li class="text-sm font-bold text-slate-700 flex items-center gap-2">
-              <span class="w-2 h-2 bg-indigo-400 rounded-full"></span>
-              ${escapeHtml(ing.name || '')} ${escapeHtml(String(ing.amount || ''))}${escapeHtml(ing.unit || '')}
-            </li>
-          `);
-        });
-      }
-
-      const seaContainer = document.getElementById('aiPreviewSeasonings');
-      seaContainer.innerHTML = '';
-      const seasonings = Array.isArray(data.seasonings) ? data.seasonings : [];
-      if (seasonings.length === 0) {
-        seaContainer.innerHTML = '<li class="text-sm text-slate-400 font-bold">調味料が設定されていません</li>';
-      } else {
-        seasonings.forEach(sea => {
-          seaContainer.insertAdjacentHTML('beforeend', `
-            <li class="text-sm font-bold text-slate-700 flex items-center gap-2">
-              <span class="w-2 h-2 bg-amber-400 rounded-full"></span>
-              ${escapeHtml(sea.name || '')} ${escapeHtml(String(sea.amount || ''))}${escapeHtml(sea.unit || '')}
-            </li>
-          `);
-        });
-      }
-
-      const prepContainer = document.getElementById('aiPreviewPrepSteps');
-      prepContainer.innerHTML = '';
-      const prepSteps = Array.isArray(data.prepSteps) ? data.prepSteps : [];
-      if (prepSteps.length === 0) {
-        prepContainer.innerHTML = '<li class="text-sm text-slate-400 font-bold">下ごしらえが設定されていません</li>';
-      } else {
-        prepSteps.forEach(step => {
-          prepContainer.insertAdjacentHTML('beforeend', `
-            <li class="text-sm font-bold text-slate-700 pl-1">${escapeHtml(String(step))}</li>
-          `);
-        });
-      }
-
-      const stepContainer = document.getElementById('aiPreviewSteps');
-      stepContainer.innerHTML = '';
-      const steps = Array.isArray(data.steps) ? data.steps : [];
-      if (steps.length === 0) {
-        stepContainer.innerHTML = '<li class="text-sm text-slate-400 font-bold">調理工程が設定されていません</li>';
-      } else {
-        steps.forEach(step => {
-          stepContainer.insertAdjacentHTML('beforeend', `
-            <li class="text-sm font-bold text-slate-700 pl-1">${escapeHtml(String(step))}</li>
-          `);
-        });
-      }
+      renderAiPreviewParts(data);
       state._aiPreviewMode = 'generated';
       delete state._viewingRecipeId;
     }
@@ -4710,67 +4680,7 @@ ${plan ? '\n提案方針: ' + plan : ''}
           }
         });
       }
-      const ingContainer = document.getElementById('aiPreviewIngredients');
-      ingContainer.innerHTML = '';
-      let ingredients = [];
-      try { ingredients = JSON.parse(recipe.ingredients || '[]'); } catch(e) { ingredients = []; }
-      if (!Array.isArray(ingredients) || ingredients.length === 0) {
-        ingContainer.innerHTML = '<li class="text-sm text-slate-400 font-bold">材料が設定されていません</li>';
-      } else {
-        ingredients.forEach(ing => {
-          ingContainer.insertAdjacentHTML('beforeend', `
-            <li class="text-sm font-bold text-slate-700 flex items-center gap-2">
-              <span class="w-2 h-2 bg-indigo-400 rounded-full"></span>
-              ${escapeHtml(ing.name || '')} ${escapeHtml(String(ing.amount || ''))}${escapeHtml(ing.unit || '')}
-            </li>
-          `);
-        });
-      }
-
-      const seaContainer = document.getElementById('aiPreviewSeasonings');
-      seaContainer.innerHTML = '';
-      let seasonings = [];
-      try { seasonings = JSON.parse(recipe.seasonings || '[]'); } catch(e) { seasonings = []; }
-      if (!Array.isArray(seasonings) || seasonings.length === 0) {
-        seaContainer.innerHTML = '<li class="text-sm text-slate-400 font-bold">調味料が設定されていません</li>';
-      } else {
-        seasonings.forEach(sea => {
-          seaContainer.insertAdjacentHTML('beforeend', `
-            <li class="text-sm font-bold text-slate-700 flex items-center gap-2">
-              <span class="w-2 h-2 bg-amber-400 rounded-full"></span>
-              ${escapeHtml(sea.name || '')} ${escapeHtml(String(sea.amount || ''))}${escapeHtml(sea.unit || '')}
-            </li>
-          `);
-        });
-      }
-
-      const prepContainer = document.getElementById('aiPreviewPrepSteps');
-      prepContainer.innerHTML = '';
-      let prepSteps = [];
-      try { prepSteps = JSON.parse(recipe.prepSteps || '[]'); } catch(e) { prepSteps = []; }
-      if (!Array.isArray(prepSteps) || prepSteps.length === 0) {
-        prepContainer.innerHTML = '<li class="text-sm text-slate-400 font-bold">下ごしらえが設定されていません</li>';
-      } else {
-        prepSteps.forEach(step => {
-          prepContainer.insertAdjacentHTML('beforeend', `
-            <li class="text-sm font-bold text-slate-700 pl-1">${escapeHtml(String(step))}</li>
-          `);
-        });
-      }
-
-      const stepContainer = document.getElementById('aiPreviewSteps');
-      stepContainer.innerHTML = '';
-      let steps = [];
-      try { steps = JSON.parse(recipe.steps || '[]'); } catch(e) { steps = []; }
-      if (!Array.isArray(steps) || steps.length === 0) {
-        stepContainer.innerHTML = '<li class="text-sm text-slate-400 font-bold">調理工程が設定されていません</li>';
-      } else {
-        steps.forEach(step => {
-          stepContainer.insertAdjacentHTML('beforeend', `
-            <li class="text-sm font-bold text-slate-700 pl-1">${escapeHtml(String(step))}</li>
-          `);
-        });
-      }
+      renderAiPreviewParts(getCookingRecipeParts(recipe));
       state._aiPreviewMode = 'viewing';
       state._viewingRecipeId = recipeId;
     }
@@ -4880,12 +4790,10 @@ ${plan ? '\n提案方針: ' + plan : ''}
         const nameMatch = (r.name || '').toLowerCase().includes(q);
         const genreMatch = getRecipeGenreLabels(r).some(genre => genre.toLowerCase().includes(q));
         let ingMatch = false;
-        try {
-          const ings = JSON.parse(r.ingredients || '[]');
-          const seas = JSON.parse(r.seasonings || '[]');
-          if (Array.isArray(ings)) ingMatch = ings.some(ing => (ing.name || '').toLowerCase().includes(q));
-          if (!ingMatch && Array.isArray(seas)) ingMatch = seas.some(s => (s.name || '').toLowerCase().includes(q));
-        } catch(e) {}
+        const ings = getRecipeItems(r, 'ingredients', '食材');
+        const seas = getRecipeItems(r, 'seasonings', '調味料');
+        ingMatch = ings.some(ing => (ing.name || '').toLowerCase().includes(q));
+        if (!ingMatch) ingMatch = seas.some(s => (s.name || '').toLowerCase().includes(q));
         return nameMatch || genreMatch || ingMatch;
       });
       const sortBy = state.scheduleRecipePickerSortBy;
@@ -4900,8 +4808,8 @@ ${plan ? '\n提案方針: ' + plan : ''}
           return sortOrder === 'asc' ? cmp : -cmp;
         }
         if (sortBy === 'lastCooked') {
-          const ah = Array.isArray(a.history) ? a.history : (a.history ? JSON.parse(a.history) : []);
-          const bh = Array.isArray(b.history) ? b.history : (b.history ? JSON.parse(b.history) : []);
+          const ah = Array.isArray(a.history) ? a.history : parseJsonArray(a.history);
+          const bh = Array.isArray(b.history) ? b.history : parseJsonArray(b.history);
           const av = ah.length ? ah[ah.length - 1] : '';
           const bv = bh.length ? bh[bh.length - 1] : '';
           const cmp = av.localeCompare(bv);
@@ -4913,7 +4821,7 @@ ${plan ? '\n提案方針: ' + plan : ''}
         return sortOrder === 'asc' ? cmp : -cmp;
       });
       if (list.length === 0) {
-        container.innerHTML = '<div class="py-10 text-center text-slate-300 font-bold">レシピが見つかりません。</div>';
+        container.innerHTML = emptyStateHtml('レシピが見つかりません。', { py: 'py-10' });
         return;
       }
       list.forEach(recipe => {
@@ -4923,10 +4831,8 @@ ${plan ? '\n提案方針: ' + plan : ''}
           metaText = `追加日 ${escapeHtml(getRecipeDateValue(recipe, 'createdAt') || '—')}`;
         } else if (sortBy === 'lastCooked') {
           let lastCooked = '—';
-          try {
-            const h = Array.isArray(recipe.history) ? recipe.history : (recipe.history ? JSON.parse(recipe.history) : []);
-            if (h.length) lastCooked = h[h.length - 1];
-          } catch(e) {}
+          const h = Array.isArray(recipe.history) ? recipe.history : parseJsonArray(recipe.history);
+          if (h.length) lastCooked = h[h.length - 1];
           metaText = `調理日 ${escapeHtml(lastCooked)}`;
         } else if (sortBy === 'count') {
           metaText = `調理回数 ${recipe.count || 0} 回`;
@@ -4944,7 +4850,7 @@ ${plan ? '\n提案方針: ' + plan : ''}
               <p class="font-bold text-slate-800 text-sm truncate">${escapeHtml(recipe.name)}</p>
               <p class="text-[10px] font-bold text-slate-400 mt-0.5">${metaText}</p>
             </div>
-            <button onclick="event.stopPropagation(); assignScheduleRecipe('${recipe.id}', '${escapeHtml(recipe.name).replace(/'/g, "\\'")}')" class="px-3 py-2 rounded-xl bg-indigo-600 text-white text-xs font-medium hover:bg-indigo-700 active:scale-95 transition-all flex-shrink-0">献立に追加</button>
+            <button onclick="event.stopPropagation(); assignScheduleRecipe(${jsStringForHtmlAttribute(recipe.id)}, ${jsStringForHtmlAttribute(recipe.name)})" class="px-3 py-2 rounded-xl bg-indigo-600 text-white text-xs font-medium hover:bg-indigo-700 active:scale-95 transition-all flex-shrink-0">献立に追加</button>
           </div>
         `);
       });
@@ -5180,15 +5086,9 @@ ${plan ? '\n提案方針: ' + plan : ''}
           const name = (r.name || '').toLowerCase();
           const source = (r.source || '').toLowerCase();
           const genreNames = getRecipeGenreLabels(r).map(genre => genre.toLowerCase());
-          let ingredients = [];
-          let seasonings = [];
-          try {
-            ingredients = JSON.parse(r.ingredients || '[]');
-            seasonings = JSON.parse(r.seasonings || '[]');
-          } catch(e) {}
           const ingNames = [
-            ...(Array.isArray(ingredients) ? ingredients.map(i => (i.name || '').toLowerCase()) : []),
-            ...(Array.isArray(seasonings) ? seasonings.map(s => (s.name || '').toLowerCase()) : [])
+            ...getRecipeItems(r, 'ingredients', '食材').map(i => (i.name || '').toLowerCase()),
+            ...getRecipeItems(r, 'seasonings', '調味料').map(s => (s.name || '').toLowerCase())
           ];
 
           // キーワードごとのマッチ判定
@@ -5234,9 +5134,9 @@ ${plan ? '\n提案方針: ' + plan : ''}
 
       if (recipesToRender.length === 0) {
         if (state.recipes.length === 0) {
-          container.innerHTML = '<div class="py-20 text-center text-slate-300 font-bold">レシピが登録されていません。<br>「新規レシピ」または「テキストから追加」で登録してください。</div>';
+          container.innerHTML = emptyStateHtml('レシピが登録されていません。\n「新規レシピ」または「テキストから追加」で登録してください。');
         } else {
-          container.innerHTML = '<div class="py-20 text-center text-slate-300 font-bold">該当するレシピが見つかりません。</div>';
+          container.innerHTML = emptyStateHtml('該当するレシピが見つかりません。');
         }
         return;
       }
@@ -5659,82 +5559,57 @@ ${plan ? '\n提案方針: ' + plan : ''}
       updateSyncBar();
     }
 
+    function renderRecipeDragHandle() {
+      return `
+        <div class="drag-handle cursor-grab active:cursor-grabbing p-1 text-slate-300 hover:text-slate-500 flex items-center justify-center" draggable="true">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16"/></svg>
+        </div>
+      `;
+    }
+
+    function renderRecipeItemInputRow(kind, item = {}, idx) {
+      const isSeasoning = kind === 'seasoning';
+      const prefix = isSeasoning ? 'sea' : 'ing';
+      const rowClass = isSeasoning ? 'seasoning-row' : 'ingredient-row';
+      const focusClass = isSeasoning ? 'focus:border-amber-500' : 'focus:border-indigo-500';
+      const namePlaceholder = isSeasoning ? '調味料名' : '品名';
+      const groupPlaceholder = isSeasoning ? 'A/たれ' : 'A/下準備';
+      const orderAttr = Number.isInteger(idx) ? ` data-order="${idx}"` : '';
+      const baseInput = `bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 font-bold outline-none ${focusClass}`;
+      return `
+        <div class="flex flex-wrap gap-2 items-center ${rowClass}" draggable="true"${orderAttr}>
+          ${renderRecipeDragHandle()}
+          <input type="text" placeholder="${namePlaceholder}" class="r-${prefix}-name flex-1 min-w-[9rem] ${baseInput} text-sm" value="${escapeHtml(item.name || '')}">
+          <input type="text" placeholder="数量" class="r-${prefix}-amount w-16 ${baseInput} text-sm" value="${escapeHtml(String(item.amount || ''))}">
+          <input type="text" placeholder="単位" class="r-${prefix}-unit w-16 ${baseInput} text-sm" value="${escapeHtml(item.unit || '')}">
+          <input type="text" placeholder="${groupPlaceholder}" class="r-${prefix}-group w-24 ${baseInput} text-xs" value="${escapeHtml(item.group || '')}">
+          <button type="button" onclick="this.closest('.${rowClass}').remove()" class="w-9 h-9 rounded-xl bg-rose-50 text-rose-500 hover:bg-rose-100 flex items-center justify-center flex-shrink-0">×</button>
+        </div>
+      `;
+    }
+
+    function renderRecipeItemInputs(containerId, kind, value) {
+      const container = document.getElementById(containerId);
+      const type = kind === 'seasoning' ? '調味料' : '食材';
+      let items = normalizeRecipeItems(parseJsonArray(value), type);
+      if (items.length === 0) items = [{ name: '', amount: '', unit: '' }];
+      container.innerHTML = items.map((item, idx) => renderRecipeItemInputRow(kind, item, idx)).join('');
+    }
+
     function renderIngredientInputs(ingredientsJson) {
-      const container = document.getElementById('ingredientList');
-      container.innerHTML = '';
-      let items = [];
-      try { items = JSON.parse(ingredientsJson || '[]'); } catch(e) { items = []; }
-      items = normalizeRecipeItems(items, '食材');
-      if (!Array.isArray(items) || items.length === 0) items = [{ name: '', amount: '', unit: '' }];
-      items.forEach((item, idx) => {
-        container.insertAdjacentHTML('beforeend', `
-          <div class="flex flex-wrap gap-2 items-center ingredient-row" draggable="true" data-order="${idx}">
-            <div class="drag-handle cursor-grab active:cursor-grabbing p-1 text-slate-300 hover:text-slate-500 flex items-center justify-center" draggable="true">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16"/></svg>
-            </div>
-            <input type="text" placeholder="品名" class="r-ing-name flex-1 min-w-[9rem] bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-indigo-500" value="${escapeHtml(item.name || '')}">
-            <input type="text" placeholder="数量" class="r-ing-amount w-16 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-indigo-500" value="${escapeHtml(String(item.amount || ''))}">
-            <input type="text" placeholder="単位" class="r-ing-unit w-16 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-indigo-500" value="${escapeHtml(item.unit || '')}">
-            <input type="text" placeholder="A/下準備" class="r-ing-group w-24 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-xs font-bold outline-none focus:border-indigo-500" value="${escapeHtml(item.group || '')}">
-            <button type="button" onclick="this.closest('.ingredient-row').remove()" class="w-9 h-9 rounded-xl bg-rose-50 text-rose-500 hover:bg-rose-100 flex items-center justify-center flex-shrink-0">×</button>
-          </div>
-        `);
-      });
+      renderRecipeItemInputs('ingredientList', 'ingredient', ingredientsJson);
     }
 
     function addIngredientRow() {
-      const container = document.getElementById('ingredientList');
-      container.insertAdjacentHTML('beforeend', `
-        <div class="flex flex-wrap gap-2 items-center ingredient-row" draggable="true">
-          <div class="drag-handle cursor-grab active:cursor-grabbing p-1 text-slate-300 hover:text-slate-500 flex items-center justify-center" draggable="true">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16"/></svg>
-          </div>
-          <input type="text" placeholder="品名" class="r-ing-name flex-1 min-w-[9rem] bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-indigo-500">
-          <input type="text" placeholder="数量" class="r-ing-amount w-16 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-indigo-500">
-          <input type="text" placeholder="単位" class="r-ing-unit w-16 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-indigo-500">
-          <input type="text" placeholder="A/下準備" class="r-ing-group w-24 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-xs font-bold outline-none focus:border-indigo-500">
-          <button type="button" onclick="this.closest('.ingredient-row').remove()" class="w-9 h-9 rounded-xl bg-rose-50 text-rose-500 hover:bg-rose-100 flex items-center justify-center flex-shrink-0">×</button>
-        </div>
-      `);
+      document.getElementById('ingredientList').insertAdjacentHTML('beforeend', renderRecipeItemInputRow('ingredient'));
     }
 
     function renderSeasoningInputs(seasoningsJson) {
-      const container = document.getElementById('seasoningList');
-      container.innerHTML = '';
-      let items = [];
-      try { items = JSON.parse(seasoningsJson || '[]'); } catch(e) { items = []; }
-      items = normalizeRecipeItems(items, '調味料');
-      if (!Array.isArray(items) || items.length === 0) items = [{ name: '', amount: '', unit: '' }];
-      items.forEach((item, idx) => {
-        container.insertAdjacentHTML('beforeend', `
-          <div class="flex flex-wrap gap-2 items-center seasoning-row" draggable="true" data-order="${idx}">
-            <div class="drag-handle cursor-grab active:cursor-grabbing p-1 text-slate-300 hover:text-slate-500 flex items-center justify-center" draggable="true">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16"/></svg>
-            </div>
-            <input type="text" placeholder="調味料名" class="r-sea-name flex-1 min-w-[9rem] bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-amber-500" value="${escapeHtml(item.name || '')}">
-            <input type="text" placeholder="数量" class="r-sea-amount w-16 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-amber-500" value="${escapeHtml(String(item.amount || ''))}">
-            <input type="text" placeholder="単位" class="r-sea-unit w-16 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-amber-500" value="${escapeHtml(item.unit || '')}">
-            <input type="text" placeholder="A/たれ" class="r-sea-group w-24 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-xs font-bold outline-none focus:border-amber-500" value="${escapeHtml(item.group || '')}">
-            <button type="button" onclick="this.closest('.seasoning-row').remove()" class="w-9 h-9 rounded-xl bg-rose-50 text-rose-500 hover:bg-rose-100 flex items-center justify-center flex-shrink-0">×</button>
-          </div>
-        `);
-      });
+      renderRecipeItemInputs('seasoningList', 'seasoning', seasoningsJson);
     }
 
     function addSeasoningRow() {
-      const container = document.getElementById('seasoningList');
-      container.insertAdjacentHTML('beforeend', `
-        <div class="flex flex-wrap gap-2 items-center seasoning-row" draggable="true">
-          <div class="drag-handle cursor-grab active:cursor-grabbing p-1 text-slate-300 hover:text-slate-500 flex items-center justify-center" draggable="true">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16"/></svg>
-          </div>
-          <input type="text" placeholder="調味料名" class="r-sea-name flex-1 min-w-[9rem] bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-amber-500">
-          <input type="text" placeholder="数量" class="r-sea-amount w-16 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-amber-500">
-          <input type="text" placeholder="単位" class="r-sea-unit w-16 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-amber-500">
-          <input type="text" placeholder="A/たれ" class="r-sea-group w-24 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-xs font-bold outline-none focus:border-amber-500">
-          <button type="button" onclick="this.closest('.seasoning-row').remove()" class="w-9 h-9 rounded-xl bg-rose-50 text-rose-500 hover:bg-rose-100 flex items-center justify-center flex-shrink-0">×</button>
-        </div>
-      `);
+      document.getElementById('seasoningList').insertAdjacentHTML('beforeend', renderRecipeItemInputRow('seasoning'));
     }
 
     function initRecipeDragDrop(containerId, rowSelector, afterDrop) {
@@ -5791,33 +5666,37 @@ ${plan ? '\n提案方針: ' + plan : ''}
       });
     }
 
+    function renderRecipeStepInputRow(kind, step = '', idx = 0) {
+      const isPrep = kind === 'prep';
+      const rowClass = isPrep ? 'prep-step-row' : 'cook-step-row';
+      const numClass = isPrep ? 'prep-step-num bg-teal-100 text-teal-700' : 'cook-step-num bg-indigo-100 text-indigo-700';
+      const inputClass = isPrep ? 'r-prep-step focus:border-teal-500' : 'r-cook-step focus:border-indigo-500';
+      const placeholder = isPrep ? '下ごしらえを入力' : '工程を入力';
+      const renumber = isPrep ? 'renumberPrepSteps()' : 'renumberCookSteps()';
+      return `
+        <div class="flex gap-2 items-center ${rowClass}" draggable="true">
+          <span class="w-6 h-6 ${numClass} rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 cursor-grab active:cursor-grabbing drag-handle" draggable="true">${idx + 1}</span>
+          <input type="text" placeholder="${placeholder}" class="${inputClass} flex-1 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none" value="${escapeHtml(String(step || ''))}">
+          <button type="button" onclick="this.closest('.${rowClass}').remove(); ${renumber};" class="w-9 h-9 rounded-xl bg-rose-50 text-rose-500 hover:bg-rose-100 flex items-center justify-center flex-shrink-0">×</button>
+        </div>
+      `;
+    }
+
+    function renderRecipeStepInputs(containerId, kind, value) {
+      const container = document.getElementById(containerId);
+      let items = parseJsonArray(value);
+      if (items.length === 0) items = [''];
+      container.innerHTML = items.map((step, idx) => renderRecipeStepInputRow(kind, step, idx)).join('');
+    }
+
     function renderCookStepInputs(stepsJson) {
-      const container = document.getElementById('cookStepList');
-      container.innerHTML = '';
-      let items = [];
-      try { items = JSON.parse(stepsJson || '[]'); } catch(e) { items = []; }
-      if (!Array.isArray(items) || items.length === 0) items = [''];
-      items.forEach((step, idx) => {
-        container.insertAdjacentHTML('beforeend', `
-          <div class="flex gap-2 items-center cook-step-row" draggable="true">
-            <span class="w-6 h-6 bg-indigo-100 text-indigo-700 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 cursor-grab active:cursor-grabbing drag-handle" draggable="true">${idx + 1}</span>
-            <input type="text" placeholder="工程を入力" class="r-cook-step flex-1 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-indigo-500" value="${escapeHtml(String(step || ''))}">
-            <button type="button" onclick="this.closest('.cook-step-row').remove(); renumberCookSteps();" class="w-9 h-9 rounded-xl bg-rose-50 text-rose-500 hover:bg-rose-100 flex items-center justify-center flex-shrink-0">×</button>
-          </div>
-        `);
-      });
+      renderRecipeStepInputs('cookStepList', 'cook', stepsJson);
     }
 
     function addCookStepRow() {
       const container = document.getElementById('cookStepList');
       const count = container.querySelectorAll('.cook-step-row').length;
-      container.insertAdjacentHTML('beforeend', `
-        <div class="flex gap-2 items-center cook-step-row" draggable="true">
-          <span class="w-6 h-6 bg-indigo-100 text-indigo-700 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 cook-step-num cursor-grab active:cursor-grabbing drag-handle" draggable="true">${count + 1}</span>
-          <input type="text" placeholder="工程を入力" class="r-cook-step flex-1 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-indigo-500">
-          <button type="button" onclick="this.closest('.cook-step-row').remove(); renumberCookSteps();" class="w-9 h-9 rounded-xl bg-rose-50 text-rose-500 hover:bg-rose-100 flex items-center justify-center flex-shrink-0">×</button>
-        </div>
-      `);
+      container.insertAdjacentHTML('beforeend', renderRecipeStepInputRow('cook', '', count));
     }
 
     function renumberCookSteps() {
@@ -5827,32 +5706,13 @@ ${plan ? '\n提案方針: ' + plan : ''}
     }
 
     function renderPrepStepInputs(stepsJson) {
-      const container = document.getElementById('prepStepList');
-      container.innerHTML = '';
-      let items = [];
-      try { items = JSON.parse(stepsJson || '[]'); } catch(e) { items = []; }
-      if (!Array.isArray(items) || items.length === 0) items = [''];
-      items.forEach((step, idx) => {
-        container.insertAdjacentHTML('beforeend', `
-          <div class="flex gap-2 items-center prep-step-row" draggable="true">
-            <span class="w-6 h-6 bg-teal-100 text-teal-700 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 cursor-grab active:cursor-grabbing drag-handle" draggable="true">${idx + 1}</span>
-            <input type="text" placeholder="下ごしらえを入力" class="r-prep-step flex-1 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-teal-500" value="${escapeHtml(String(step || ''))}">
-            <button type="button" onclick="this.closest('.prep-step-row').remove(); renumberPrepSteps();" class="w-9 h-9 rounded-xl bg-rose-50 text-rose-500 hover:bg-rose-100 flex items-center justify-center flex-shrink-0">×</button>
-          </div>
-        `);
-      });
+      renderRecipeStepInputs('prepStepList', 'prep', stepsJson);
     }
 
     function addPrepStepRow() {
       const container = document.getElementById('prepStepList');
       const count = container.querySelectorAll('.prep-step-row').length;
-      container.insertAdjacentHTML('beforeend', `
-        <div class="flex gap-2 items-center prep-step-row" draggable="true">
-          <span class="w-6 h-6 bg-teal-100 text-teal-700 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 prep-step-num cursor-grab active:cursor-grabbing drag-handle" draggable="true">${count + 1}</span>
-          <input type="text" placeholder="下ごしらえを入力" class="r-prep-step flex-1 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-teal-500">
-          <button type="button" onclick="this.closest('.prep-step-row').remove(); renumberPrepSteps();" class="w-9 h-9 rounded-xl bg-rose-50 text-rose-500 hover:bg-rose-100 flex items-center justify-center flex-shrink-0">×</button>
-        </div>
-      `);
+      container.insertAdjacentHTML('beforeend', renderRecipeStepInputRow('prep', '', count));
     }
 
     function renumberPrepSteps() {
@@ -5860,9 +5720,6 @@ ${plan ? '\n提案方針: ' + plan : ''}
         el.textContent = i + 1;
       });
     }
-
-    function addStepRow() { addCookStepRow(); }
-    function renumberSteps() { renumberCookSteps(); }
 
     function getRecipeFormData() {
       const name = document.getElementById('r-name').value.trim();
@@ -6454,8 +6311,8 @@ ${text}`;
       const history = getFilteredCookingHistory();
       if (history.length === 0) {
         container.innerHTML = state.cookingHistory.length === 0
-          ? '<div class="py-20 text-center text-slate-300 font-bold">料理履歴はまだありません。<br>料理完了後に同期すると表示されます。</div>'
-          : '<div class="py-20 text-center text-slate-300 font-bold">条件に一致する料理履歴がありません。</div>';
+          ? emptyStateHtml('料理履歴はまだありません。\n料理完了後に同期すると表示されます。')
+          : emptyStateHtml('条件に一致する料理履歴がありません。');
         return;
       }
       history.forEach(item => {
@@ -6882,14 +6739,6 @@ ${text}`;
       }).join('');
     }
 
-    function getIngredientCategoryBadge(type, unit, name) {
-      const isSeasoning = type === '調味料' || /大さじ|小さじ/.test(unit || '') || /醤油|塩|砂糖|みりん|酒|酢|油|だし|ソース|マヨ|ケチャップ|胡椒|ガラム|カレー粉|味噌|コンソメ|わさび|からし|マスタード/.test(name || '');
-      if (isSeasoning) {
-        return '<span class="text-xs font-medium px-2 py-1 rounded-full bg-yellow-100 text-yellow-800">調味料</span>';
-      }
-      return '<span class="text-xs font-medium px-2 py-1 rounded-full bg-green-100 text-green-800">食材</span>';
-    }
-
     function getAmountBadge(unit) {
       const u = unit || '';
       if (u.includes('大さじ')) {
@@ -7004,7 +6853,7 @@ ${text}`;
       const parts = getCookingRecipeParts(recipe);
       if (!parts) {
         showToast('レシピデータの読み込みに失敗しました', 'error');
-        container.innerHTML = '<div class="py-10 text-center text-slate-400 font-bold">材料データを読み込めません</div>';
+        container.innerHTML = emptyStateHtml('材料データを読み込めません', { py: 'py-10', color: 'text-slate-400' });
         return;
       }
       const ingredients = parts.ingredients;
@@ -7023,7 +6872,7 @@ ${text}`;
         { value: 'seasonings', label: '調味料', count: seasonings.length, disabled: !hasSeasonings, onclick: "setCookingIngredientTab('seasonings')" }
       ], state.cookingIngredientTab, 'emerald');
       if (!hasIngredients && !hasSeasonings) {
-        container.innerHTML = '<div class="py-10 text-center text-slate-400 font-bold">材料・調味料は登録されていません</div>';
+        container.innerHTML = emptyStateHtml('材料・調味料は登録されていません', { py: 'py-10', color: 'text-slate-400' });
         return;
       }
       if (state.cookingIngredientTab === 'all') {
@@ -7042,7 +6891,7 @@ ${text}`;
         ? '<span class="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800 shrink-0">調味料</span>'
         : '<span class="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-green-100 text-green-800 shrink-0">食材</span>';
       if (currentItems.length === 0) {
-        container.innerHTML = `<div class="py-10 text-center text-slate-400 font-bold">${defaultLabel}は登録されていません</div>`;
+        container.innerHTML = emptyStateHtml(`${defaultLabel}は登録されていません`, { py: 'py-10', color: 'text-slate-400' });
         return;
       }
       renderCookingIngredientGroupList(container, currentItems, defaultLabel, headingClass, labelBadge);
@@ -7106,7 +6955,7 @@ ${text}`;
       const parts = getCookingRecipeParts(recipe);
       if (!parts) {
         showToast('レシピデータの読み込みに失敗しました', 'error');
-        container.innerHTML = '<div class="py-10 text-center text-slate-400 font-bold">手順データを読み込めません</div>';
+        container.innerHTML = emptyStateHtml('手順データを読み込めません', { py: 'py-10', color: 'text-slate-400' });
         return;
       }
       const prepSteps = parts.prepSteps;
@@ -7122,7 +6971,7 @@ ${text}`;
         { value: 'cook', label: '調理工程', count: cookSteps.length, disabled: !hasCook, onclick: "setCookingStepTab('cook')" }
       ], state.cookingStepTab, 'indigo');
       if (!hasPrep && !hasCook) {
-        container.innerHTML = '<div class="py-10 text-center text-slate-400 font-bold">手順は登録されていません</div>';
+        container.innerHTML = emptyStateHtml('手順は登録されていません', { py: 'py-10', color: 'text-slate-400' });
         return;
       }
       if (state.cookingStepTab === 'all') {
@@ -7138,7 +6987,7 @@ ${text}`;
       const label = state.cookingStepTab === 'cook' ? '調理工程' : '下ごしらえ';
       const colorClass = state.cookingStepTab === 'cook' ? 'bg-indigo-100 text-indigo-700' : 'bg-teal-100 text-teal-700';
       if (currentSteps.length === 0) {
-        container.innerHTML = `<div class="py-10 text-center text-slate-400 font-bold">${label}は登録されていません</div>`;
+        container.innerHTML = emptyStateHtml(`${label}は登録されていません`, { py: 'py-10', color: 'text-slate-400' });
         return;
       }
       renderCookingStepList(container, currentSteps, label, colorClass, recipe);
@@ -7224,17 +7073,9 @@ ${text}`;
       }
       _consumptionRecipeId = recipeId;
       _consumptionTabFilter = 'all';
-      let ingredients = [];
-      let seasonings = [];
-      try {
-        ingredients = JSON.parse(recipe.ingredients || '[]');
-        seasonings = JSON.parse(recipe.seasonings || '[]');
-      } catch (e) {
-        showToast('レシピデータの読み込みに失敗しました', 'error');
-        return;
-      }
-      ingredients = normalizeRecipeItems(ingredients, '食材');
-      seasonings = normalizeRecipeItems(seasonings, '調味料');
+      const parts = getCookingRecipeParts(recipe);
+      const ingredients = parts.ingredients;
+      const seasonings = parts.seasonings;
       // 元の分類情報を保持
       ingredients.forEach(i => i._category = 'ingredient');
       seasonings.forEach(i => i._category = 'seasoning');
@@ -7293,7 +7134,7 @@ ${text}`;
       });
 
       if (filtered.length === 0) {
-        container.innerHTML = '<div class="py-6 text-center text-slate-400 font-bold">該当する材料・調味料はありません</div>';
+        container.innerHTML = emptyStateHtml('該当する材料・調味料はありません', { py: 'py-6', color: 'text-slate-400' });
         return;
       }
 
@@ -7645,7 +7486,7 @@ ${text}`;
       filtered = sortInventory(filtered, _substitutionSortBy, _substitutionSortOrder);
 
       if (filtered.length === 0) {
-        container.innerHTML = '<div class="py-6 text-center text-slate-400 font-bold text-sm">該当する在庫がありません</div>';
+        container.innerHTML = emptyStateHtml('該当する在庫がありません', { py: 'py-6', color: 'text-slate-400', extraClass: 'text-sm' });
         return;
       }
 
@@ -7900,13 +7741,7 @@ ${text}`;
       // レシピの調理回数・履歴をフロント側stateで更新 + pendingSyncに積む
       if (recipe) {
         recipe.count = (Number(recipe.count) || 0) + 1;
-        let history = [];
-        try {
-          history = JSON.parse(recipe.history || '[]');
-        } catch (e) {
-          history = [];
-        }
-        if (!Array.isArray(history)) history = [];
+        const history = parseJsonArray(recipe.history);
         history.push(todayStr);
         recipe.history = JSON.stringify(history);
         recipe.updatedAt = cookingDate;
