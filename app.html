@@ -1057,9 +1057,15 @@
       scheduleSortOrder: 'asc',
       scheduleSelectMode: false,
       scheduleSelectedIds: [],
+      cookingHistoryView: 'timeline',
       cookingHistorySearchQuery: '',
       cookingHistoryRatingFilter: 'all',
       cookingHistoryPhotoFilter: 'all',
+      cookingHistoryPeriodFilter: 'all',
+      cookingHistoryGenreFilter: 'all',
+      cookingHistoryMealFilter: 'all',
+      cookingCalendarMonth: '',
+      cookingCalendarSelectedDate: '',
       cookingHistoryImageCache: {},
       cookingHistoryImageLoading: {},
       cookingInventoryCheckEnabled: false,
@@ -6390,34 +6396,228 @@ ${text}`;
       viewer.classList.add('hidden');
       guide.classList.remove('hidden');
       const label = document.getElementById('cookingModeLabel');
-      if (label) label.textContent = 'COOKING HISTORY';
-      renderCookingHistoryTab();
+      if (label) label.textContent = 'COOKING RECORD';
+      ensureCookingRecordDefaults();
+      renderCookingRecordDashboard();
     }
 
     function renderCookingHistoryTab() {
+      renderCookingRecordDashboard();
+    }
+
+    function ensureCookingRecordDefaults() {
+      const today = getLocalDateString(new Date());
+      if (!state.cookingCalendarMonth) state.cookingCalendarMonth = today.slice(0, 7);
+      if (!state.cookingCalendarSelectedDate) state.cookingCalendarSelectedDate = today;
+      if (!['calendar', 'timeline', 'insights'].includes(state.cookingHistoryView)) state.cookingHistoryView = 'timeline';
+    }
+
+    function getLocalDateString(date) {
+      const d = date instanceof Date ? date : new Date(date);
+      if (Number.isNaN(d.getTime())) return '';
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
+
+    function getHistoryDateKey(item) {
+      return String(item && item.cookingDate || '').slice(0, 10);
+    }
+
+    function getMonthDateRange(monthKey) {
+      const [year, month] = String(monthKey || '').split('-').map(Number);
+      const base = Number.isFinite(year) && Number.isFinite(month) ? new Date(year, month - 1, 1) : new Date();
+      const start = new Date(base.getFullYear(), base.getMonth(), 1);
+      const end = new Date(base.getFullYear(), base.getMonth() + 1, 0);
+      return { start, end, year: base.getFullYear(), month: base.getMonth() + 1 };
+    }
+
+    function getCookingHistoryEnriched() {
+      return [...state.cookingHistory].map(item => {
+        const dateKey = getHistoryDateKey(item);
+        const recipe = state.recipes.find(r => r.id === item.recipeId) || null;
+        const genres = recipe ? getRecipeGenreLabels(recipe) : [];
+        const mealType = inferCookingHistoryMealType(item, dateKey);
+        const rating = Number(item.rating) || 0;
+        const tags = [
+          ...genres.slice(0, 2),
+          item.photoUrl ? '写真あり' : '',
+          rating >= 4 ? '好評' : '',
+          item.comment ? 'メモあり' : ''
+        ].filter(Boolean);
+        return { ...item, dateKey, recipe, genres, mealType, tags };
+      });
+    }
+
+    function inferCookingHistoryMealType(item, dateKey) {
+      const recipeId = item && item.recipeId;
+      const recipeName = String(item && item.recipeName || '');
+      const sameDay = state.schedule.filter(s => s.date === dateKey);
+      const exact = sameDay.find(s => s.recipeId && s.recipeId === recipeId);
+      if (exact) return normalizeScheduleMeal(exact.meal) || 'その他';
+      const byName = sameDay.find(s => recipeName && s.recipeName === recipeName);
+      return byName ? (normalizeScheduleMeal(byName.meal) || 'その他') : 'その他';
+    }
+
+    function renderCookingRecordDashboard() {
       const controls = document.getElementById('cookingControlsPanel');
       const container = document.getElementById('cookingContentContainer');
       if (!controls || !container) return;
-      controls.innerHTML = `
+      ensureCookingRecordDefaults();
+      controls.innerHTML = renderCookingRecordSummary() + renderCookingRecordTabs() + renderCookingRecordControls();
+      container.innerHTML = '';
+      if (state.cookingHistoryView === 'calendar') {
+        renderCookingCalendarView(container);
+      } else if (state.cookingHistoryView === 'insights') {
+        renderCookingInsightsView(container);
+      } else {
+        renderCookingTimelineView(container);
+      }
+    }
+
+    function renderCookingRecordSummary() {
+      const history = getCookingHistoryEnriched();
+      const today = new Date();
+      const monthKey = getLocalDateString(today).slice(0, 7);
+      const weekStart = new Date(today);
+      weekStart.setDate(today.getDate() - today.getDay());
+      weekStart.setHours(0, 0, 0, 0);
+      const monthCount = history.filter(h => h.dateKey && h.dateKey.slice(0, 7) === monthKey).length;
+      const weekCount = history.filter(h => {
+        const d = new Date(h.dateKey);
+        return !Number.isNaN(d.getTime()) && d >= weekStart;
+      }).length;
+      const photoRate = history.length ? Math.round(history.filter(h => h.photoUrl).length / history.length * 100) : 0;
+      const top = getTopCookingRecipes(history, 1)[0];
+      return `
+        <section class="grid grid-cols-2 lg:grid-cols-4 gap-2">
+          ${renderCookingSummaryTile('今月', `${monthCount}回`, 'text-amber-700')}
+          ${renderCookingSummaryTile('今週', `${weekCount}回`, 'text-emerald-700')}
+          ${renderCookingSummaryTile('写真あり', `${photoRate}%`, 'text-indigo-700')}
+          ${renderCookingSummaryTile('よく作る', top ? top.name : '未集計', 'text-slate-700', true)}
+        </section>
+      `;
+    }
+
+    function renderCookingSummaryTile(label, value, toneClass, compact = false) {
+      return `
+        <div class="bg-white border border-amber-100 rounded-xl px-3 py-3 shadow-sm min-w-0">
+          <p class="text-[10px] font-bold text-slate-400 uppercase">${escapeHtml(label)}</p>
+          <p class="${compact ? 'text-sm truncate' : 'text-xl'} font-bold ${toneClass} mt-0.5">${escapeHtml(value)}</p>
+        </div>
+      `;
+    }
+
+    function renderCookingRecordTabs() {
+      const tabs = [
+        ['calendar', 'カレンダー'],
+        ['timeline', 'タイムライン'],
+        ['insights', '振り返り']
+      ];
+      return `
+        <div class="grid grid-cols-3 gap-1 bg-white border border-amber-100 rounded-xl p-1 shadow-sm">
+          ${tabs.map(([key, label]) => `
+            <button type="button" onclick="setCookingHistoryView('${key}')" class="py-2 rounded-lg text-xs font-bold transition-all ${state.cookingHistoryView === key ? 'bg-amber-500 text-white shadow-sm' : 'text-slate-500 hover:bg-amber-50'}">${label}</button>
+          `).join('')}
+        </div>
+      `;
+    }
+
+    function renderCookingRecordControls() {
+      if (state.cookingHistoryView === 'calendar') {
+        const { year, month } = getMonthDateRange(state.cookingCalendarMonth);
+        return `
+          <div class="flex items-center justify-between gap-2 bg-white border border-amber-100 rounded-xl px-3 py-2 shadow-sm">
+            <button type="button" onclick="shiftCookingCalendarMonth(-1)" class="w-9 h-9 rounded-lg bg-amber-50 text-amber-700 font-bold active:scale-95">‹</button>
+            <div class="text-center min-w-0">
+              <p class="text-sm font-bold text-slate-700">${year}年${month}月</p>
+              <p class="text-[10px] font-bold text-slate-400">日付を選ぶと記録を確認できます</p>
+            </div>
+            <button type="button" onclick="shiftCookingCalendarMonth(1)" class="w-9 h-9 rounded-lg bg-amber-50 text-amber-700 font-bold active:scale-95">›</button>
+          </div>
+        `;
+      }
+      if (state.cookingHistoryView === 'insights') return '';
+      return `
         <div class="space-y-2">
-          <input type="text" id="cookingHistorySearchInput" value="${escapeHtml(state.cookingHistorySearchQuery || '')}" oninput="state.cookingHistorySearchQuery=this.value; renderCookingHistoryTab()" class="w-full bg-white border border-amber-100 rounded-xl px-3 py-2.5 text-xs font-bold outline-none focus:border-amber-500" placeholder="レシピ名で検索...">
-          <div class="grid grid-cols-2 gap-2">
-            <select onchange="state.cookingHistoryRatingFilter=this.value; renderCookingHistoryTab()" class="bg-white border border-amber-100 rounded-xl px-3 py-2.5 text-xs font-bold outline-none focus:border-amber-500">
-              <option value="all" ${state.cookingHistoryRatingFilter === 'all' ? 'selected' : ''}>評価すべて</option>
-              <option value="5" ${state.cookingHistoryRatingFilter === '5' ? 'selected' : ''}>★★★★★</option>
-              <option value="4" ${state.cookingHistoryRatingFilter === '4' ? 'selected' : ''}>★★★★以上</option>
-              <option value="3" ${state.cookingHistoryRatingFilter === '3' ? 'selected' : ''}>★★★以上</option>
-              <option value="1" ${state.cookingHistoryRatingFilter === '1' ? 'selected' : ''}>評価あり</option>
-            </select>
-            <select onchange="state.cookingHistoryPhotoFilter=this.value; renderCookingHistoryTab()" class="bg-white border border-amber-100 rounded-xl px-3 py-2.5 text-xs font-bold outline-none focus:border-amber-500">
-              <option value="all" ${state.cookingHistoryPhotoFilter === 'all' ? 'selected' : ''}>写真すべて</option>
-              <option value="with" ${state.cookingHistoryPhotoFilter === 'with' ? 'selected' : ''}>写真あり</option>
-              <option value="without" ${state.cookingHistoryPhotoFilter === 'without' ? 'selected' : ''}>写真なし</option>
-            </select>
+          <input type="text" id="cookingHistorySearchInput" value="${escapeHtml(state.cookingHistorySearchQuery || '')}" oninput="state.cookingHistorySearchQuery=this.value; renderCookingHistoryTab()" class="w-full bg-white border border-amber-100 rounded-xl px-3 py-2.5 text-xs font-bold outline-none focus:border-amber-500" placeholder="レシピ名・メモで検索...">
+          <div class="grid grid-cols-2 lg:grid-cols-5 gap-2">
+            ${renderCookingHistorySelect('state.cookingHistoryPeriodFilter', state.cookingHistoryPeriodFilter, [['all','期間すべて'],['week','7日以内'],['month','今月'],['quarter','90日以内']])}
+            ${renderCookingHistorySelect('state.cookingHistoryRatingFilter', state.cookingHistoryRatingFilter, [['all','評価すべて'],['5','★★★★★'],['4','★★★★以上'],['3','★★★以上'],['1','評価あり']])}
+            ${renderCookingHistorySelect('state.cookingHistoryPhotoFilter', state.cookingHistoryPhotoFilter, [['all','写真すべて'],['with','写真あり'],['without','写真なし']])}
+            ${renderCookingHistorySelect('state.cookingHistoryGenreFilter', state.cookingHistoryGenreFilter, [['all','ジャンルすべて'], ...getCookingHistoryGenreOptions().map(g => [g, g])])}
+            ${renderCookingHistorySelect('state.cookingHistoryMealFilter', state.cookingHistoryMealFilter, [['all','献立枠すべて'],['朝','朝'],['昼','昼'],['晩','晩'],['その他','その他']])}
           </div>
         </div>
       `;
-      container.innerHTML = '';
+    }
+
+    function renderCookingHistorySelect(stateExpr, selected, options) {
+      return `
+        <select onchange="${stateExpr}=this.value; renderCookingHistoryTab()" class="bg-white border border-amber-100 rounded-xl px-3 py-2.5 text-xs font-bold outline-none focus:border-amber-500 min-w-0">
+          ${options.map(([value, label]) => `<option value="${escapeHtml(value)}" ${selected === value ? 'selected' : ''}>${escapeHtml(label)}</option>`).join('')}
+        </select>
+      `;
+    }
+
+    function getCookingHistoryGenreOptions() {
+      const set = new Set();
+      getCookingHistoryEnriched().forEach(item => item.genres.forEach(g => set.add(g)));
+      return [...set].sort((a, b) => a.localeCompare(b, 'ja'));
+    }
+
+    function setCookingHistoryView(view) {
+      state.cookingHistoryView = view;
+      renderCookingHistoryTab();
+    }
+
+    function shiftCookingCalendarMonth(delta) {
+      const { year, month } = getMonthDateRange(state.cookingCalendarMonth);
+      const next = new Date(year, month - 1 + delta, 1);
+      state.cookingCalendarMonth = getLocalDateString(next).slice(0, 7);
+      state.cookingCalendarSelectedDate = `${state.cookingCalendarMonth}-01`;
+      renderCookingHistoryTab();
+    }
+
+    function selectCookingCalendarDate(dateKey) {
+      state.cookingCalendarSelectedDate = dateKey;
+      renderCookingHistoryTab();
+    }
+
+    function getFilteredCookingHistory() {
+      const query = String(state.cookingHistorySearchQuery || '').trim().toLowerCase();
+      const minRating = state.cookingHistoryRatingFilter === 'all' ? 0 : Number(state.cookingHistoryRatingFilter) || 0;
+      const photoFilter = state.cookingHistoryPhotoFilter || 'all';
+      const period = state.cookingHistoryPeriodFilter || 'all';
+      const genre = state.cookingHistoryGenreFilter || 'all';
+      const meal = state.cookingHistoryMealFilter || 'all';
+      const now = new Date();
+      const monthKey = getLocalDateString(now).slice(0, 7);
+      return getCookingHistoryEnriched()
+        .filter(item => {
+          const name = String(item.recipeName || '').toLowerCase();
+          const comment = String(item.comment || '').toLowerCase();
+          if (query && !name.includes(query) && !comment.includes(query)) return false;
+          const rating = Number(item.rating) || 0;
+          if (minRating > 0 && rating < minRating) return false;
+          const hasPhoto = !!item.photoUrl;
+          if (photoFilter === 'with' && !hasPhoto) return false;
+          if (photoFilter === 'without' && hasPhoto) return false;
+          if (genre !== 'all' && !item.genres.includes(genre)) return false;
+          if (meal !== 'all' && item.mealType !== meal) return false;
+          if (period === 'month' && item.dateKey.slice(0, 7) !== monthKey) return false;
+          if (period === 'week' || period === 'quarter') {
+            const days = period === 'week' ? 7 : 90;
+            const d = new Date(item.dateKey);
+            const threshold = new Date(now);
+            threshold.setDate(now.getDate() - days + 1);
+            threshold.setHours(0, 0, 0, 0);
+            if (Number.isNaN(d.getTime()) || d < threshold) return false;
+          }
+          return true;
+        })
+        .sort((a, b) => String(b.cookingDate || '').localeCompare(String(a.cookingDate || '')));
+    }
+
+    function renderCookingTimelineView(container) {
       const history = getFilteredCookingHistory();
       if (history.length === 0) {
         container.innerHTML = state.cookingHistory.length === 0
@@ -6425,28 +6625,172 @@ ${text}`;
           : emptyStateHtml('条件に一致する料理履歴がありません。');
         return;
       }
-      history.forEach(item => {
-        container.insertAdjacentHTML('beforeend', renderCookingHistoryCard(item));
+      const groups = groupCookingHistoryByDate(history);
+      Object.keys(groups).forEach(dateKey => {
+        container.insertAdjacentHTML('beforeend', `
+          <section class="space-y-2">
+            <div class="flex items-center justify-between px-1">
+              <h3 class="text-xs font-bold text-amber-700">${formatCookingDateLabel(dateKey)}</h3>
+              <span class="text-[10px] font-bold text-slate-400">${groups[dateKey].length}件</span>
+            </div>
+            <div class="space-y-2">${groups[dateKey].map(item => renderCookingHistoryCard(item)).join('')}</div>
+          </section>
+        `);
       });
       setTimeout(() => loadCookingHistoryImages(history), 0);
     }
 
-    function getFilteredCookingHistory() {
-      const query = String(state.cookingHistorySearchQuery || '').trim().toLowerCase();
-      const minRating = state.cookingHistoryRatingFilter === 'all' ? 0 : Number(state.cookingHistoryRatingFilter) || 0;
-      const photoFilter = state.cookingHistoryPhotoFilter || 'all';
-      return [...state.cookingHistory]
-        .filter(item => {
-          const name = String(item.recipeName || '').toLowerCase();
-          if (query && !name.includes(query)) return false;
-          const rating = Number(item.rating) || 0;
-          if (minRating > 0 && rating < minRating) return false;
-          const hasPhoto = !!item.photoUrl;
-          if (photoFilter === 'with' && !hasPhoto) return false;
-          if (photoFilter === 'without' && hasPhoto) return false;
-          return true;
-        })
-        .sort((a, b) => String(b.cookingDate || '').localeCompare(String(a.cookingDate || '')));
+    function groupCookingHistoryByDate(history) {
+      return history.reduce((acc, item) => {
+        const key = item.dateKey || '日付なし';
+        if (!acc[key]) acc[key] = [];
+        acc[key].push(item);
+        return acc;
+      }, {});
+    }
+
+    function formatCookingDateLabel(dateKey) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) return dateKey || '日付なし';
+      const d = new Date(dateKey);
+      const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
+      return `${Number(dateKey.slice(5, 7))}/${Number(dateKey.slice(8, 10))}（${weekdays[d.getDay()]}）`;
+    }
+
+    function renderCookingCalendarView(container) {
+      const history = getCookingHistoryEnriched();
+      const byDate = groupCookingHistoryByDate(history);
+      const scheduledDates = getCookingScheduledDateMap();
+      const { start, end, year, month } = getMonthDateRange(state.cookingCalendarMonth);
+      const first = new Date(start);
+      first.setDate(start.getDate() - start.getDay());
+      const last = new Date(end);
+      last.setDate(end.getDate() + (6 - end.getDay()));
+      const cells = [];
+      for (let d = new Date(first); d <= last; d.setDate(d.getDate() + 1)) {
+        const key = getLocalDateString(d);
+        const items = byDate[key] || [];
+        const inMonth = d.getMonth() === month - 1;
+        const selected = state.cookingCalendarSelectedDate === key;
+        const hasPhoto = items.some(i => i.photoUrl);
+        const highRating = items.some(i => Number(i.rating) >= 4);
+        const scheduled = scheduledDates[key] || 0;
+        const thumb = items.find(i => getCookingHistoryPhotoSrc(i.photoUrl));
+        cells.push(`
+          <button type="button" onclick="selectCookingCalendarDate('${key}')" class="relative min-h-[4.5rem] rounded-xl border p-1.5 text-left transition-all ${selected ? 'bg-amber-500 text-white border-amber-500 shadow' : inMonth ? 'bg-white border-amber-100 text-slate-700' : 'bg-slate-50 border-slate-100 text-slate-300'}">
+            <span class="text-[10px] font-bold">${d.getDate()}</span>
+            ${thumb ? `<img src="${escapeHtml(getCookingHistoryPhotoSrc(thumb.photoUrl))}" alt="" class="absolute inset-x-1.5 bottom-1.5 h-8 rounded-lg object-cover w-[calc(100%-0.75rem)] opacity-90">` : ''}
+            <div class="absolute right-1.5 top-1.5 flex gap-0.5">
+              ${items.length ? `<span class="w-1.5 h-1.5 rounded-full ${selected ? 'bg-white' : 'bg-amber-500'}"></span>` : ''}
+              ${hasPhoto ? `<span class="w-1.5 h-1.5 rounded-full ${selected ? 'bg-white' : 'bg-indigo-500'}"></span>` : ''}
+              ${highRating ? `<span class="w-1.5 h-1.5 rounded-full ${selected ? 'bg-white' : 'bg-emerald-500'}"></span>` : ''}
+            </div>
+            ${scheduled && !items.length ? `<span class="absolute bottom-1.5 left-1.5 text-[9px] font-bold ${selected ? 'text-white' : 'text-sky-500'}">予定${scheduled}</span>` : ''}
+          </button>
+        `);
+      }
+      const selectedItems = byDate[state.cookingCalendarSelectedDate] || [];
+      container.innerHTML = `
+        <div class="grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-slate-400 px-1">
+          ${['日','月','火','水','木','金','土'].map(d => `<div>${d}</div>`).join('')}
+        </div>
+        <div class="grid grid-cols-7 gap-1">${cells.join('')}</div>
+        <div class="flex flex-wrap gap-2 text-[10px] font-bold text-slate-500 px-1">
+          <span class="inline-flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-amber-500"></span>記録</span>
+          <span class="inline-flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-indigo-500"></span>写真</span>
+          <span class="inline-flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-emerald-500"></span>高評価</span>
+          <span class="inline-flex items-center gap-1 text-sky-500">予定のみ</span>
+        </div>
+        <section class="space-y-2">
+          <div class="flex items-center justify-between px-1">
+            <h3 class="text-xs font-bold text-amber-700">${formatCookingDateLabel(state.cookingCalendarSelectedDate)}</h3>
+            <span class="text-[10px] font-bold text-slate-400">${selectedItems.length}件</span>
+          </div>
+          ${selectedItems.length ? selectedItems.map(item => renderCookingHistoryCard(item)).join('') : emptyStateHtml('この日の料理記録はありません。')}
+        </section>
+      `;
+      setTimeout(() => loadCookingHistoryImages(history.filter(h => h.dateKey.slice(0, 7) === `${year}-${String(month).padStart(2, '0')}`)), 0);
+    }
+
+    function getCookingScheduledDateMap() {
+      return state.schedule.reduce((acc, item) => {
+        if (!item.date || item.status === '完了') return acc;
+        acc[item.date] = (acc[item.date] || 0) + 1;
+        return acc;
+      }, {});
+    }
+
+    function renderCookingInsightsView(container) {
+      const history = getCookingHistoryEnriched();
+      if (!history.length) {
+        container.innerHTML = emptyStateHtml('料理履歴が増えると、よく作る料理や写真の振り返りが表示されます。');
+        return;
+      }
+      const topRecipes = getTopCookingRecipes(history, 5);
+      const favorites = history.filter(h => Number(h.rating) >= 4).slice(0, 5);
+      const stale = getStaleCookedRecipes(history, 5);
+      const monthPhotos = history.filter(h => h.photoUrl && h.dateKey.slice(0, 7) === getLocalDateString(new Date()).slice(0, 7)).slice(0, 6);
+      const genreRows = getCookingGenreStats(history);
+      container.innerHTML = `
+        <section class="grid gap-3 lg:grid-cols-2">
+          ${renderCookingInsightPanel('最近よく作った', topRecipes.map(r => `<li class="flex items-center justify-between gap-2"><span class="truncate">${escapeHtml(r.name)}</span><span class="text-amber-600">${r.count}回</span></li>`).join('') || '<li class="text-slate-300">未集計</li>')}
+          ${renderCookingInsightPanel('評価が高い', favorites.map(h => `<li class="flex items-center justify-between gap-2"><span class="truncate">${escapeHtml(h.recipeName || '（レシピ名なし）')}</span><span>${renderHistoryStars(h.rating)}</span></li>`).join('') || '<li class="text-slate-300">評価ありの記録がありません</li>')}
+          ${renderCookingInsightPanel('しばらく作っていない', stale.map(r => `<li class="flex items-center justify-between gap-2"><span class="truncate">${escapeHtml(r.name)}</span><span class="text-slate-400">${escapeHtml(r.lastDate || '日付なし')}</span></li>`).join('') || '<li class="text-slate-300">候補がありません</li>')}
+          ${renderCookingInsightPanel('ジャンル傾向', genreRows.map(g => `<li class="flex items-center justify-between gap-2"><span class="truncate">${escapeHtml(g.genre)}</span><span class="text-emerald-600">${g.count}回</span></li>`).join('') || '<li class="text-slate-300">ジャンル未設定</li>')}
+        </section>
+        <section class="bg-white border border-amber-100 rounded-xl p-4 shadow-sm">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="text-sm font-bold text-slate-700">写真で見る今月</h3>
+            <span class="text-[10px] font-bold text-slate-400">${monthPhotos.length}枚</span>
+          </div>
+          ${monthPhotos.length ? `<div class="grid grid-cols-3 gap-2">${monthPhotos.map(item => {
+            const src = getCookingHistoryPhotoSrc(item.photoUrl);
+            return `<div class="aspect-square rounded-xl overflow-hidden bg-amber-50 border border-amber-100">${src ? `<img src="${escapeHtml(src)}" alt="${escapeHtml(item.recipeName || '')}" class="w-full h-full object-cover">` : '<div class="w-full h-full flex items-center justify-center text-[10px] font-bold text-amber-500">取得中</div>'}</div>`;
+          }).join('')}</div>` : '<p class="text-xs font-bold text-slate-400">今月の写真付き記録はまだありません。</p>'}
+        </section>
+      `;
+      setTimeout(() => loadCookingHistoryImages(monthPhotos), 0);
+    }
+
+    function renderCookingInsightPanel(title, listHtml) {
+      return `
+        <section class="bg-white border border-amber-100 rounded-xl p-4 shadow-sm min-w-0">
+          <h3 class="text-sm font-bold text-slate-700 mb-3">${escapeHtml(title)}</h3>
+          <ul class="space-y-2 text-xs font-bold text-slate-500">${listHtml}</ul>
+        </section>
+      `;
+    }
+
+    function getTopCookingRecipes(history, limit) {
+      const map = new Map();
+      history.forEach(item => {
+        const key = item.recipeId || item.recipeName || 'unknown';
+        const current = map.get(key) || { name: item.recipeName || '（レシピ名なし）', count: 0 };
+        current.count += 1;
+        map.set(key, current);
+      });
+      return [...map.values()].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, 'ja')).slice(0, limit);
+    }
+
+    function getStaleCookedRecipes(history, limit) {
+      const lastByRecipe = new Map();
+      history.forEach(item => {
+        const key = item.recipeId || item.recipeName;
+        if (!key) return;
+        const current = lastByRecipe.get(key);
+        if (!current || String(item.dateKey || '') > String(current.lastDate || '')) {
+          lastByRecipe.set(key, { name: item.recipeName || '（レシピ名なし）', lastDate: item.dateKey || '' });
+        }
+      });
+      return [...lastByRecipe.values()].sort((a, b) => String(a.lastDate).localeCompare(String(b.lastDate))).slice(0, limit);
+    }
+
+    function getCookingGenreStats(history) {
+      const map = new Map();
+      history.forEach(item => {
+        const genres = item.genres.length ? item.genres : ['未設定'];
+        genres.forEach(genre => map.set(genre, (map.get(genre) || 0) + 1));
+      });
+      return [...map.entries()].map(([genre, count]) => ({ genre, count })).sort((a, b) => b.count - a.count || a.genre.localeCompare(b.genre, 'ja')).slice(0, 6);
     }
 
     function renderHistoryStars(rating) {
@@ -6464,6 +6808,8 @@ ${text}`;
       const canCookAgain = !!state.recipes.find(r => r.id === recipeId);
       const comment = item.comment ? escapeHtml(item.comment) : '<span class="text-slate-300">感想なし</span>';
       const photoSrc = getCookingHistoryPhotoSrc(item.photoUrl);
+      const mealBadge = item.mealType ? `<span class="inline-flex items-center rounded-full bg-sky-50 text-sky-600 border border-sky-100 px-2 py-0.5 text-[10px] font-bold">${escapeHtml(item.mealType)}</span>` : '';
+      const tags = (item.tags || []).slice(0, 3).map(tag => `<span class="inline-flex items-center rounded-full bg-slate-50 text-slate-500 border border-slate-100 px-2 py-0.5 text-[10px] font-bold">${escapeHtml(tag)}</span>`).join('');
       const photoHtml = hasPhoto ? `
         <div class="w-20 h-20 rounded-xl bg-slate-100 overflow-hidden shrink-0 relative">
           ${photoSrc
@@ -6485,9 +6831,11 @@ ${text}`;
               </div>
               <div class="shrink-0 text-xs leading-none">${renderHistoryStars(item.rating)}</div>
             </div>
+            <div class="flex flex-wrap gap-1 mb-2">${mealBadge}${tags}</div>
             <p class="text-xs font-bold text-slate-500 leading-relaxed line-clamp-2 mb-3">${comment}</p>
-            <div class="flex items-center justify-end gap-2">
+            <div class="flex flex-wrap items-center justify-end gap-2">
               ${hasPhoto ? `<a href="${escapeHtml(item.photoUrl)}" target="_blank" rel="noopener noreferrer" class="px-3 py-2 rounded-xl bg-amber-50 text-amber-700 text-[10px] font-medium">写真を開く</a>` : ''}
+              <button onclick="openRecipeViewer('${recipeId}')" class="px-3 py-2 rounded-xl bg-slate-100 text-slate-600 text-[10px] font-medium active:scale-95 transition-all ${canCookAgain ? '' : 'opacity-40 cursor-not-allowed'}" ${canCookAgain ? '' : 'disabled'}>レシピを見る</button>
               <button onclick="openCookingViewer('${recipeId}', { returnTo: 'cookingHistory' })" class="px-3 py-2 rounded-xl bg-emerald-600 text-white text-[10px] font-medium active:scale-95 transition-all ${canCookAgain ? '' : 'opacity-40 cursor-not-allowed'}" ${canCookAgain ? '' : 'disabled'}>もう一度作る</button>
             </div>
           </div>

@@ -1,0 +1,34 @@
+{
+  "ticket": "TKT-0074-cooking-record-dashboard",
+  "verified_at": "2026-05-21",
+  "results": [
+    {
+      "name": "standard_verify",
+      "command": "python3 -c \"import html.parser; html.parser.HTMLParser().feed(open('app.html').read())\" && grep -q 'executeGAS' app.html && grep -q 'GAS_URL' app.html && echo 'VERIFY_PASSED'",
+      "status": "passed",
+      "output": "VERIFY_PASSED"
+    },
+    {
+      "name": "javascript_parse",
+      "command": "node -e \"const fs=require('fs'); const html=fs.readFileSync('app.html','utf8'); const scripts=[...html.matchAll(/<script[^>]*>([\\\\s\\\\S]*?)<\\\\/script>/g)].map(m=>m[1]); for (const s of scripts) new Function(s); console.log('JS_PARSE_PASSED')\"",
+      "status": "passed",
+      "output": "JS_PARSE_PASSED"
+    },
+    {
+      "name": "native_dialog_scan",
+      "command": "rg -n \"alert\\\\(|confirm\\\\(|prompt\\\\(\" app.html",
+      "status": "passed",
+      "output": "No matches"
+    },
+    {
+      "name": "diff_write_pattern_scan",
+      "command": "git diff -- app.html | rg -n \"executeGAS|appendRow|getSheetByName|setValue|setValues|pendingSync|syncPendingChanges\"",
+      "status": "passed",
+      "output": "No matches in app.html diff"
+    }
+  ],
+  "notes": [
+    "No Spreadsheet schema changes were introduced.",
+    "No new individual executeGAS(payload...) write path was introduced."
+  ]
+}
