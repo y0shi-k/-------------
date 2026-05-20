@@ -3620,9 +3620,9 @@
             <button onclick="changeScheduleWeek(-1)" class="min-w-0 overflow-hidden h-12 bg-sky-50 text-sky-700 border border-sky-100 px-2 rounded-xl font-medium text-[11px] flex items-center justify-center gap-1 active:scale-95 transition-all">
               <span class="shrink-0">←</span><span class="min-w-0 truncate">前の週</span>
             </button>
-            <div class="min-w-0 overflow-hidden h-12 bg-sky-600 text-white px-3 rounded-xl font-medium text-[12px] flex items-center justify-center shadow-sm">
+            <button onclick="resetScheduleWeek()" class="min-w-0 overflow-hidden h-12 bg-sky-600 text-white px-3 rounded-xl font-medium text-[12px] flex items-center justify-center shadow-sm active:scale-95 transition-all">
               <span id="scheduleWeekLabel" class="min-w-0 truncate">${weekLabel}</span>
-            </div>
+            </button>
             <button onclick="changeScheduleWeek(1)" class="min-w-0 overflow-hidden h-12 bg-sky-50 text-sky-700 border border-sky-100 px-2 rounded-xl font-medium text-[11px] flex items-center justify-center gap-1 active:scale-95 transition-all">
               <span class="min-w-0 truncate">次の週</span><span class="shrink-0">→</span>
             </button>
@@ -3722,42 +3722,74 @@
     }
 
     /* --- Schedule Rendering --- */
+    function formatLocalDate(date) {
+      const y = date.getFullYear();
+      const m = String(date.getMonth() + 1).padStart(2, '0');
+      const d = String(date.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    }
+
+    function parseLocalDate(dateStr) {
+      const parts = String(dateStr || '').split('-').map(Number);
+      if (parts.length !== 3 || parts.some(n => !Number.isFinite(n))) return null;
+      const date = new Date(parts[0], parts[1] - 1, parts[2]);
+      date.setHours(0,0,0,0);
+      return date;
+    }
+
     function getWeekDates(offset) {
       const today = new Date();
       today.setHours(0,0,0,0);
-      const dayOfWeek = today.getDay();
-      const startOfWeek = new Date(today);
-      startOfWeek.setDate(today.getDate() - dayOfWeek + (offset * 7));
+      const startDate = new Date(today);
+      startDate.setDate(today.getDate() + ((offset || 0) * 7) - 3);
       const dates = [];
       for (let i = 0; i < 7; i++) {
-        const d = new Date(startOfWeek);
-        d.setDate(startOfWeek.getDate() + i);
-        dates.push(d.toISOString().split('T')[0]);
+        const d = new Date(startDate);
+        d.setDate(startDate.getDate() + i);
+        dates.push(formatLocalDate(d));
       }
       return dates;
     }
 
     function getScheduleWeekOffsetForDate(dateStr) {
-      const parts = String(dateStr || '').split('-').map(Number);
-      if (parts.length !== 3 || parts.some(n => !Number.isFinite(n))) return state.scheduleWeekOffset || 0;
-      const target = new Date(parts[0], parts[1] - 1, parts[2]);
-      target.setHours(0,0,0,0);
+      const target = parseLocalDate(dateStr);
+      if (!target) return state.scheduleWeekOffset || 0;
       const today = new Date();
       today.setHours(0,0,0,0);
-      const currentWeekStart = new Date(today);
-      currentWeekStart.setDate(today.getDate() - today.getDay());
-      const diffDays = Math.floor((target - currentWeekStart) / 86400000);
-      return Math.floor(diffDays / 7);
+      const diffDays = Math.round((target - today) / 86400000);
+      return Math.floor((diffDays + 3) / 7);
     }
 
     function formatScheduleDate(dateStr) {
-      const d = new Date(dateStr);
+      const d = parseLocalDate(dateStr);
+      if (!d) return dateStr || '';
       const days = ['日','月','火','水','木','金','土'];
       return `${d.getMonth()+1}/${d.getDate()} (${days[d.getDay()]})`;
     }
 
     function getScheduleWeekLabel() {
       return state.scheduleWeekOffset === 0 ? '今週' : `${state.scheduleWeekOffset > 0 ? '+' : ''}${state.scheduleWeekOffset}週`;
+    }
+
+    function getScheduleDateTone(dateStr) {
+      const d = parseLocalDate(dateStr);
+      const today = new Date();
+      today.setHours(0,0,0,0);
+      if (!d) return { outer: 'border-sky-100 bg-white/80', badge: 'bg-sky-100 text-sky-800 border-sky-100', caption: '' };
+      if (d.getTime() === today.getTime()) {
+        return {
+          outer: 'border-amber-300 bg-amber-50/90 ring-2 ring-amber-200',
+          badge: 'bg-amber-500 text-white border-amber-400 shadow-sm',
+          caption: '<span class="mt-1 text-[10px] font-bold text-amber-700 leading-none">今日</span>'
+        };
+      }
+      if (d.getDay() === 0) {
+        return { outer: 'border-rose-100 bg-rose-50/60', badge: 'bg-rose-100 text-rose-700 border-rose-200', caption: '' };
+      }
+      if (d.getDay() === 6) {
+        return { outer: 'border-sky-100 bg-sky-50/60', badge: 'bg-sky-100 text-sky-700 border-sky-200', caption: '' };
+      }
+      return { outer: 'border-sky-100 bg-white/80', badge: 'bg-slate-100 text-slate-700 border-slate-100', caption: '' };
     }
 
     function normalizeScheduleMeal(meal) {
@@ -3799,6 +3831,7 @@
       if (labelEl) labelEl.textContent = weekLabel;
 
       dates.forEach(date => {
+        const dateTone = getScheduleDateTone(date);
         const meals = ['朝','昼','晩'];
         let slotsHtml = '';
         meals.forEach(meal => {
@@ -3831,9 +3864,10 @@
           `;
         });
         container.insertAdjacentHTML('beforeend', `
-          <div class="w-full max-w-full min-w-0 overflow-hidden bg-white/80 rounded-xl p-3 shadow-sm border border-sky-100 flex items-stretch gap-3">
-            <div class="w-16 shrink-0 rounded-xl bg-sky-100 text-sky-800 flex flex-col items-center justify-center px-2 text-center">
+          <div class="w-full max-w-full min-w-0 overflow-hidden ${dateTone.outer} rounded-xl p-3 shadow-sm border flex items-stretch gap-3">
+            <div class="w-16 shrink-0 rounded-xl ${dateTone.badge} border flex flex-col items-center justify-center px-2 text-center">
               <p class="text-xs font-medium leading-tight">${formatScheduleDate(date)}</p>
+              ${dateTone.caption}
             </div>
             <div class="min-w-0 flex-1 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)] gap-2">${slotsHtml}</div>
           </div>
@@ -3844,6 +3878,12 @@
 
     function changeScheduleWeek(delta) {
       state.scheduleWeekOffset += delta;
+      renderRecipeMode();
+      resetHorizontalScroll();
+    }
+
+    function resetScheduleWeek() {
+      state.scheduleWeekOffset = 0;
       renderRecipeMode();
       resetHorizontalScroll();
     }

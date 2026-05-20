@@ -1,0 +1,22 @@
+{
+  "ticket": "TKT-0069-schedule-centered-week",
+  "status": "passed",
+  "commands": [
+    {
+      "command": "python3 -c \"import html.parser; html.parser.HTMLParser().feed(open('app.html').read())\" && grep -q 'executeGAS' app.html && grep -q 'GAS_URL' app.html && echo 'VERIFY_PASSED'",
+      "result": "VERIFY_PASSED"
+    },
+    {
+      "command": "rg -n \"alert\\(|confirm\\(|prompt\\(|function showToast|GEMINI_API_KEY|executeGAS\\(payload\" app.html",
+      "result": "showToast exists; no alert/confirm/prompt matches; executeGAS(payload...) call sites unchanged from existing sync/load paths."
+    },
+    {
+      "command": "node -e \"const fmt=d=>[d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-'); const today=new Date(); today.setHours(0,0,0,0); for (const off of [-1,0,1]) { const start=new Date(today); start.setDate(today.getDate()+off*7-3); const dates=[]; for(let i=0;i<7;i++){const d=new Date(start); d.setDate(start.getDate()+i); dates.push(fmt(d));} console.log(off, dates.join(','), 'center', dates[3]); }\"",
+      "result": "offset 0 produced 2026-05-17..2026-05-23 with center 2026-05-20 in the current environment."
+    },
+    {
+      "command": "git diff --check",
+      "result": "passed"
+    }
+  ]
+}

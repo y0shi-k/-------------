@@ -1,7 +1,7 @@
 ---
 id: TKT-0069-schedule-centered-week
 title: スケジュール今日中心7日表示
-status: implementation_ready
+status: ready_for_user_browser_test
 goal: スケジュール画面を今日中心の7日表示にし、今週ボタンで今日中心へ戻せるようにしつつ、今日と土日の視認性を上げる
 acceptance:
   - scheduleWeekOffset が 0 のとき、今日を中央にした 今日-3日 から 今日+3日 の7日が表示される
