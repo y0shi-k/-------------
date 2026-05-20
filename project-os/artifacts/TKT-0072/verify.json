@@ -1,0 +1,26 @@
+{
+  "ticket": "TKT-0072-schedule-controls-spacing",
+  "status": "passed",
+  "checks": [
+    {
+      "name": "standard_verify",
+      "command": "python3 -c \"import html.parser; html.parser.HTMLParser().feed(open('app.html').read())\" && grep -q 'executeGAS' app.html && grep -q 'GAS_URL' app.html && echo 'VERIFY_PASSED'",
+      "result": "VERIFY_PASSED"
+    },
+    {
+      "name": "canvas_dialog_check",
+      "command": "rg -n \"alert\\(|confirm\\(|prompt\\(\" app.html",
+      "result": "no matches"
+    },
+    {
+      "name": "execute_gas_payload_check",
+      "command": "rg -n \"executeGAS\\(payload\" app.html",
+      "result": "existing calls only: syncPendingChanges, executeGAS definition, handleInit, loadSchedule"
+    },
+    {
+      "name": "schedule_count_label_check",
+      "command": "rg -n \"7日分|日分\" app.html",
+      "result": "no matches in app.html"
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "ticket": "TKT-0071-schedule-dnd-sync-button-lock",
+  "status": "passed",
+  "checked_at": "2026-05-20",
+  "commands": [
+    {
+      "name": "standard_verify",
+      "command": "python3 -c \"import html.parser; html.parser.HTMLParser().feed(open('app.html').read())\" && grep -q 'executeGAS' app.html && grep -q 'GAS_URL' app.html && echo 'VERIFY_PASSED'",
+      "result": "VERIFY_PASSED"
+    },
+    {
+      "name": "forbidden_dialogs_and_gas_call_scan",
+      "command": "rg -n \"alert\\(|confirm\\(|prompt\\(|function showToast|executeGAS\\(payload\" app.html",
+      "result": "showToast exists. No alert/confirm/prompt matches. executeGAS(payload...) call sites remain existing sync/init/load flows."
+    },
+    {
+      "name": "spreadsheet_write_scope_scan",
+      "command": "rg -n \"appendRow|deleteRow|setValue|setValues|SpreadsheetApp\" app.html",
+      "result": "Spreadsheet writes remain inside handleInit() and syncPendingChanges(); scheduleUpdates now writes the existing 8-column schedule row data through syncPendingChanges()."
+    }
+  ],
+  "notes": [
+    "No new per-operation GAS write path was added.",
+    "Canvas/browser Spreadsheet smoke remains manual per project workflow."
+  ]
+}

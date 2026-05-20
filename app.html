@@ -69,7 +69,10 @@
         <p id="syncDetail" class="text-[10px] text-slate-300 font-bold truncate">変更はまだスプレッドシートへ反映されていません</p>
       </div>
       <button onclick="discardPendingChanges()" class="px-3 py-2 rounded-xl bg-slate-700 text-slate-100 text-xs font-medium hover:bg-slate-600 active:scale-95 transition-all">破棄</button>
-      <button onclick="syncPendingChanges()" class="px-4 py-2 rounded-xl bg-emerald-500 text-white text-xs font-medium hover:bg-emerald-600 active:scale-95 transition-all">同期する</button>
+      <button id="syncButton" onclick="syncPendingChanges()" aria-busy="false" class="px-4 py-2 rounded-xl bg-emerald-500 text-white text-xs font-medium hover:bg-emerald-600 active:scale-95 transition-all disabled:opacity-70 disabled:cursor-not-allowed disabled:active:scale-100 inline-flex items-center gap-2">
+        <span id="syncButtonSpinner" class="hidden w-3 h-3 rounded-full border-2 border-white/40 border-t-white animate-spin"></span>
+        <span id="syncButtonLabel">同期する</span>
+      </button>
     </div>
   </div>
 
@@ -1308,9 +1311,22 @@
         + p.cookingHistory.length;
     }
 
+    function updateSyncButtonState() {
+      const button = document.getElementById('syncButton');
+      if (!button) return;
+      const spinner = document.getElementById('syncButtonSpinner');
+      const label = document.getElementById('syncButtonLabel');
+      const isSyncing = !!state.isSyncing;
+      button.disabled = isSyncing;
+      button.setAttribute('aria-busy', isSyncing ? 'true' : 'false');
+      if (spinner) spinner.classList.toggle('hidden', !isSyncing);
+      if (label) label.textContent = isSyncing ? '同期中' : '同期する';
+    }
+
     function updateSyncBar() {
       const bar = document.getElementById('syncBar');
       if (!bar) return;
+      updateSyncButtonState();
       const count = getPendingSyncCount();
       if (count === 0) {
         bar.classList.add('sync-bar-hidden');
@@ -2691,6 +2707,7 @@
         return;
       }
       state.isSyncing = true;
+      updateSyncBar();
       const pending = JSON.parse(JSON.stringify(state.pendingSync));
       const payload = `(function(){
         var pending = ${JSON.stringify(pending)};
@@ -2987,9 +3004,15 @@
               var suMeal = f(schData[si][2]);
               var suRecipeId = f(schData[si][3]);
               if((u.id && u.id === suId) || (!u.id && u.date === suDate && u.meal === suMeal && u.recipeId === suRecipeId)) {
-                if(u.status !== undefined) sSchedule.getRange(si+1, 6).setValue(u.status);
-                if(u.sortOrder !== undefined) sSchedule.getRange(si+1, 7).setValue(Number(u.sortOrder) || 0);
-                sSchedule.getRange(si+1, 8).setValue(now);
+                sSchedule.getRange(si+1, 2, 1, 7).setValues([[
+                  u.date || suDate,
+                  u.meal || suMeal,
+                  u.recipeId || suRecipeId,
+                  u.recipeName || f(schData[si][4]),
+                  u.status !== undefined ? u.status : (f(schData[si][5]) || '未完了'),
+                  u.sortOrder !== undefined ? Number(u.sortOrder) || 0 : Number(schData[si][6]) || 0,
+                  now
+                ]]);
                 break;
               }
             }
@@ -3063,6 +3086,7 @@
         }
       } finally {
         state.isSyncing = false;
+        updateSyncBar();
       }
     }
 
@@ -3615,6 +3639,8 @@
       if (state.currentBTab === 'schedule') {
         const weekLabel = getScheduleWeekLabel();
         const selectCount = state.scheduleSelectedIds.length;
+        secondary.className = 'overflow-hidden';
+        select.className = 'hidden';
         primary.innerHTML = `
           <div class="grid grid-cols-[1fr_auto_1fr] gap-2 w-full min-w-0">
             <button onclick="changeScheduleWeek(-1)" class="min-w-0 overflow-hidden h-12 bg-sky-50 text-sky-700 border border-sky-100 px-2 rounded-xl font-medium text-[11px] flex items-center justify-center gap-1 active:scale-95 transition-all">
@@ -3629,20 +3655,25 @@
           </div>
         `;
         secondary.innerHTML = `
-          <div class="h-20 flex items-start justify-between gap-2 px-1 pt-2">
+          <div class="flex items-center justify-between gap-2 px-1 pt-2">
             <div class="min-w-0 flex items-center gap-2 overflow-x-auto no-scrollbar">
               <button onclick="toggleScheduleSelectMode()" class="h-8 px-3 rounded-lg ${state.scheduleSelectMode ? 'bg-sky-600 text-white' : 'bg-white text-sky-600 border border-sky-200'} text-[11px] font-medium flex items-center gap-1 active:scale-95 transition-all whitespace-nowrap">
                 ${state.scheduleSelectMode ? '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m5 12 4 4L19 6"/></svg>' : '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="2" stroke-width="2"/></svg>'} 選択モード
               </button>
               ${state.scheduleSelectMode && selectCount > 0 ? `<span class="h-8 px-2 rounded-lg bg-sky-100 text-sky-700 text-[11px] font-medium flex items-center whitespace-nowrap">${selectCount} 件選択中</span>` : ''}
             </div>
-            ${state.scheduleSelectMode && selectCount > 0 ? `<button onclick="batchDeleteSchedule()" class="shrink-0 inline-flex h-8 items-center justify-center rounded-full bg-rose-600 px-3 text-[11px] font-bold text-white shadow-sm active:scale-95 transition-all whitespace-nowrap">選択削除</button>` : ''}
+            <div class="shrink-0 min-w-0 flex items-center justify-end gap-2">
+              <span class="block max-w-[7.5rem] sm:max-w-[13rem] truncate text-[10px] font-bold text-slate-400">同期は上部の同期ボタンで一括反映</span>
+              ${state.scheduleSelectMode && selectCount > 0 ? `<button onclick="batchDeleteSchedule()" class="shrink-0 inline-flex h-8 items-center justify-center rounded-full bg-rose-600 px-3 text-[11px] font-bold text-white shadow-sm active:scale-95 transition-all whitespace-nowrap">選択削除</button>` : ''}
+            </div>
           </div>
         `;
-        select.innerHTML = renderRecipeCountLine(getWeekDates(state.scheduleWeekOffset).length, '日分');
+        select.innerHTML = '';
         return;
       }
 
+      secondary.className = 'h-20 overflow-hidden';
+      select.className = 'h-8 overflow-hidden';
       primary.innerHTML = `
         <div class="grid grid-cols-3 gap-2">
           <button onclick="openRecipeEditor()" class="h-12 min-w-0 bg-indigo-600 text-white px-2 rounded-xl font-medium text-[10px] sm:text-[11px] flex items-center justify-center gap-1.5 active:scale-95 transition-all shadow-sm">
@@ -7774,13 +7805,7 @@ ${text}`;
       // 献立ステータスをフロント側stateで「完了」に更新 + pendingSyncに積む
       if (scheduleItem) {
         scheduleItem.status = '完了';
-        state.pendingSync.scheduleUpdates.push({
-          id: scheduleItem.id || '',
-          date: scheduleItem.date,
-          meal: scheduleItem.meal,
-          recipeId: scheduleItem.recipeId,
-          status: '完了'
-        });
+        queueScheduleUpdate(scheduleItem);
       }
 
       // レシピの調理回数・履歴をフロント側stateで更新 + pendingSyncに積む
