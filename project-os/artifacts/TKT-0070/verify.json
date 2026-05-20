@@ -1,0 +1,21 @@
+{
+  "ticket": "TKT-0070-schedule-slot-header-add-button",
+  "verified_at": "2026-05-20",
+  "commands": [
+    {
+      "command": "python3 -c \"import html.parser; html.parser.HTMLParser().feed(open('app.html').read())\" && grep -q 'executeGAS' app.html && grep -q 'GAS_URL' app.html && echo 'VERIFY_PASSED'",
+      "status": "passed",
+      "output": "VERIFY_PASSED"
+    },
+    {
+      "command": "rg -n \"alert\\(|confirm\\(|prompt\\(\" app.html",
+      "status": "passed",
+      "output": "no matches"
+    },
+    {
+      "command": "rg -n \"executeGAS\\(\" app.html",
+      "status": "passed",
+      "output": "existing calls only: syncPendingChanges, executeGAS definition, handleInit, loadScheduleFromServer, prefetchCookingHistoryImages"
+    }
+  ]
+}

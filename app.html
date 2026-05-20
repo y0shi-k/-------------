@@ -3857,9 +3857,11 @@
             <div class="w-full max-w-full min-w-0 min-h-[4.5rem] flex flex-col gap-1 bg-white border ${isEmpty ? 'border-slate-200' : 'border-sky-100'} rounded-xl p-2 transition-all"
               data-schedule-date="${date}" data-schedule-meal="${meal}"
               ondragover="handleScheduleDragOver(event)" ondragleave="handleScheduleDragLeave(event)" ondrop="handleScheduleDrop(event, '${date}', '${meal}')">
-              <p class="text-[10px] font-bold ${isEmpty ? 'text-slate-400' : 'text-sky-500'} text-center leading-none mb-1">${meal}</p>
+              <div class="h-6 flex items-center justify-between gap-1 mb-1">
+                <span class="min-w-0 flex-1 text-[10px] font-bold ${isEmpty ? 'text-slate-400' : 'text-sky-500'} text-center leading-none">${meal}</span>
+                <button onclick="event.stopPropagation(); openScheduleRecipePicker('${date}', '${meal}')" class="w-6 h-6 shrink-0 rounded-lg bg-sky-50 text-sky-500 border border-sky-100 hover:bg-sky-100 flex items-center justify-center text-sm font-bold leading-none transition-all active:scale-95" title="${meal}に追加">＋</button>
+              </div>
               ${cardsHtml}
-              <button onclick="openScheduleRecipePicker('${date}', '${meal}')" class="w-full h-8 rounded-lg ${isEmpty ? 'bg-white text-slate-300 hover:bg-slate-50' : 'bg-sky-50 text-sky-400 hover:bg-sky-100'} text-lg font-medium flex items-center justify-center transition-all active:scale-95 border border-dashed ${isEmpty ? 'border-slate-200' : 'border-sky-200'}">＋</button>
             </div>
           `;
         });
