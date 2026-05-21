@@ -1,0 +1,31 @@
+{
+  "ticket_id": "TKT-0076-ai-processing-cancel",
+  "spec_id": "SPEC-0076-ai-processing-cancel",
+  "verified_at": "2026-05-21",
+  "results": [
+    {
+      "name": "standard_verify",
+      "command": "python3 -c \"import html.parser; html.parser.HTMLParser().feed(open('app.html').read())\" && grep -q 'executeGAS' app.html && grep -q 'GAS_URL' app.html && echo 'VERIFY_PASSED'",
+      "status": "passed",
+      "output": "VERIFY_PASSED"
+    },
+    {
+      "name": "js_parse",
+      "command": "node -e \"const fs=require('fs'); const html=fs.readFileSync('app.html','utf8'); const scripts=[...html.matchAll(/<script[^>]*>([\\\\s\\\\S]*?)<\\\\/script>/gi)].map(m=>m[1]); scripts.forEach((s,i)=>new Function(s)); console.log('JS_PARSE_PASSED', scripts.length);\"",
+      "status": "passed",
+      "output": "JS_PARSE_PASSED 2"
+    },
+    {
+      "name": "native_dialog_check",
+      "command": "rg -n 'alert\\\\(|confirm\\\\(|prompt\\\\(' app.html",
+      "status": "passed",
+      "output": "no matches"
+    },
+    {
+      "name": "execute_gas_payload_check",
+      "command": "rg -n 'executeGAS\\\\(payload' app.html",
+      "status": "reviewed",
+      "output": "existing calls only: syncPendingChanges, executeGAS definition, handleInit, loadSchedule"
+    }
+  ]
+}

@@ -59,6 +59,7 @@
     <div class="bg-white/90 p-8 rounded-xl shadow flex flex-col items-center gap-4 max-w-[80%] border border-white">
       <div class="w-12 h-12 border-4 border-indigo-100 border-t-indigo-600 rounded-full animate-spin"></div>
       <p id="overlayStatusLabel" class="text-sm font-medium text-slate-700 tracking-tight text-center">処理を実行中...</p>
+      <button id="aiCancelButton" onclick="cancelActiveAiRequest()" class="hidden px-5 py-2.5 rounded-xl bg-slate-900 text-white text-xs font-medium hover:bg-slate-700 active:scale-95 transition-all">キャンセル</button>
     </div>
   </div>
 
@@ -1073,6 +1074,9 @@
       cookingStepTab: 'all',
       cookingReturnContext: null,
       activityStatusToken: null,
+      activeAiAbortController: null,
+      activeAiRequestId: null,
+      activeAiOperationLabel: '',
       isSyncing: false,
       editMode: null,
       editId: null,
@@ -1151,24 +1155,68 @@
       return '';
     }
 
-    function setStatus(show, label = 'Processing...') {
+    function setStatus(show, label = 'Processing...', options = {}) {
       const bar = document.getElementById('statusBar');
       const overlay = document.getElementById('processingOverlay');
       const overlayLabel = document.getElementById('overlayStatusLabel');
+      const cancelButton = document.getElementById('aiCancelButton');
       state.isProcessing = show;
       if (show) {
         bar.classList.remove('hidden');
         overlayLabel.innerHTML = label;
+        if (cancelButton) {
+          cancelButton.classList.toggle('hidden', options.cancelable !== true);
+          cancelButton.disabled = false;
+        }
         overlay.classList.remove('invisible');
         overlay.classList.add('opacity-100');
       } else {
         overlay.classList.remove('opacity-100');
         overlay.classList.add('invisible');
+        if (cancelButton) cancelButton.classList.add('hidden');
         setTimeout(() => bar.classList.add('hidden'), 500);
       }
       document.querySelectorAll('button, input, select').forEach(el => {
-        if (!el.id.includes('geminiCopyBtn')) el.disabled = show;
+        if (el.id !== 'aiCancelButton' && !el.id.includes('geminiCopyBtn')) el.disabled = show;
       });
+      if (cancelButton) cancelButton.disabled = false;
+    }
+
+    function beginAiRequest(label, operationLabel) {
+      const controller = new AbortController();
+      const requestId = 'ai_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+      state.activeAiAbortController = controller;
+      state.activeAiRequestId = requestId;
+      state.activeAiOperationLabel = operationLabel || stripHtml(label);
+      setStatus(true, label, { cancelable: true, operation: state.activeAiOperationLabel });
+      return { controller, requestId };
+    }
+
+    function isActiveAiRequest(requestId) {
+      return !!requestId && state.activeAiRequestId === requestId;
+    }
+
+    function endAiRequest(requestId) {
+      if (!isActiveAiRequest(requestId)) return;
+      state.activeAiAbortController = null;
+      state.activeAiRequestId = null;
+      state.activeAiOperationLabel = '';
+      setStatus(false);
+    }
+
+    function isAiCancelError(err, requestId) {
+      return (err && err.name === 'AbortError') || !isActiveAiRequest(requestId);
+    }
+
+    function cancelActiveAiRequest() {
+      const controller = state.activeAiAbortController;
+      if (!controller) return;
+      try { controller.abort(); } catch (e) {}
+      state.activeAiAbortController = null;
+      state.activeAiRequestId = null;
+      state.activeAiOperationLabel = '';
+      setStatus(false);
+      showToast('AI処理をキャンセルしました。', 'info');
     }
 
     function stripHtml(text) {
@@ -4611,19 +4659,22 @@ ${request ? '\nユーザーの追加要望: ' + request : ''}
 
 上記の指示と要望に基づいて、どんなレシピを提案するか、200文字以内で自然な日本語で説明してください。具体的な料理名や使い方を含めてください。JSONは不要です。`;
 
-      setStatus(true, 'AIに相談中...<br><span class="text-[10px] font-bold opacity-50 uppercase tracking-widest">Consulting</span>');
+      const aiRequest = beginAiRequest('AIに相談中...<br><span class="text-[10px] font-bold opacity-50 uppercase tracking-widest">Consulting</span>', 'AIレシピ相談');
       try {
         const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ contents: [{ parts: [{ text: consultPrompt }] }] })
+          body: JSON.stringify({ contents: [{ parts: [{ text: consultPrompt }] }] }),
+          signal: aiRequest.controller.signal
         });
+        if (!isActiveAiRequest(aiRequest.requestId)) return false;
         if (!res.ok) {
           let errMsg = `APIエラー: ${res.status}`;
           try { const errData = await res.json(); if(errData.error&&errData.error.message) errMsg += '\n'+errData.error.message; } catch(e){}
           throw new Error(errMsg);
         }
         const data = await res.json();
+        if (!isActiveAiRequest(aiRequest.requestId)) return false;
         const plan = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
         state._aiPendingPlan = plan;
         state._aiPendingPrompt = promptText;
@@ -4631,10 +4682,11 @@ ${request ? '\nユーザーの追加要望: ' + request : ''}
         document.getElementById('aiRequestPlanText').textContent = plan;
         document.getElementById('aiRequestInputView').classList.add('hidden');
         document.getElementById('aiRequestConfirmView').classList.remove('hidden');
-        setStatus(false);
+        endAiRequest(aiRequest.requestId);
       } catch (err) {
+        if (isAiCancelError(err, aiRequest.requestId)) return false;
         console.error('[AI Consult] error:', err);
-        setStatus(false);
+        endAiRequest(aiRequest.requestId);
         if (err.message && err.message.includes('401')) {
           showToast('APIの利用制限に達した可能性があります。しばらくしてから実行してください。', 'error');
         } else {
@@ -4695,7 +4747,7 @@ ${plan ? '\n提案方針: ' + plan : ''}
 - JSON以外の説明文は一切出力しないでください`;
 
       closeAiRequestModal();
-      setStatus(true, 'AIがレシピを考案中...<br><span class="text-[10px] font-bold opacity-50 uppercase tracking-widest">Recipe Generation</span>');
+      const aiRequest = beginAiRequest('AIがレシピを考案中...<br><span class="text-[10px] font-bold opacity-50 uppercase tracking-widest">Recipe Generation</span>', 'AIレシピ生成');
       try {
         const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`, {
           method: 'POST',
@@ -4703,24 +4755,29 @@ ${plan ? '\n提案方針: ' + plan : ''}
           body: JSON.stringify({
             contents: [{ parts: [{ text: finalPrompt }] }],
             generationConfig: { responseMimeType: 'application/json' }
-          })
+          }),
+          signal: aiRequest.controller.signal
         });
+        if (!isActiveAiRequest(aiRequest.requestId)) return false;
         if (!res.ok) {
           let errMsg = `APIエラー: ${res.status}`;
           try { const errData = await res.json(); if(errData.error&&errData.error.message) errMsg += '\n'+errData.error.message; } catch(e){}
           throw new Error(errMsg);
         }
         const data = await res.json();
+        if (!isActiveAiRequest(aiRequest.requestId)) return false;
         const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
         const parsed = parseAIJsonResponse(raw, 'AI Recipe');
+        if (!isActiveAiRequest(aiRequest.requestId)) return false;
         state._aiGeneratedRecipe = parsed;
         state._aiGeneratedMode = mode;
         state._aiGeneratedItems = items;
-        setStatus(false);
+        endAiRequest(aiRequest.requestId);
         openAiRecipePreview(parsed);
       } catch (err) {
+        if (isAiCancelError(err, aiRequest.requestId)) return false;
         console.error('[AI Recipe] error:', err);
-        setStatus(false);
+        endAiRequest(aiRequest.requestId);
         if (err.message && err.message.includes('401')) {
           showToast('APIの利用制限に達した可能性があります。しばらくしてから実行してください。', 'error');
         } else {
@@ -5446,7 +5503,7 @@ ${plan ? '\n提案方針: ' + plan : ''}
         return { idx, name: state.staging[idx].name, openDate: state.staging[idx].open || new Date().toISOString().split('T')[0] };
       });
       
-      setStatus(true, `AIが ${itemsToAnalyze.length} 件の食材を解析中です...<br><span class="text-[10px] font-bold opacity-50 uppercase tracking-widest">Calculating Shelf Life</span>`);
+      const aiRequest = beginAiRequest(`AIが ${itemsToAnalyze.length} 件の食材を解析中です...<br><span class="text-[10px] font-bold opacity-50 uppercase tracking-widest">Calculating Shelf Life</span>`, '食材期限AI解析');
       
       try {
         const apiKey = GEMINI_API_KEY;
@@ -5455,17 +5512,21 @@ ${plan ? '\n提案方針: ' + plan : ''}
         const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseMimeType: "application/json" } })
+          body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseMimeType: "application/json" } }),
+          signal: aiRequest.controller.signal
         });
+        if (!isActiveAiRequest(aiRequest.requestId)) return false;
         if (!res.ok) {
           let errMsg = `APIエラー: ${res.status}`;
           try { const errData = await res.json(); if(errData.error&&errData.error.message) errMsg += '\n'+errData.error.message; } catch(e){}
           throw new Error(errMsg);
         }
         const data = await res.json();
+        if (!isActiveAiRequest(aiRequest.requestId)) return false;
         const parsedResults = parseAIJsonResponse(data.candidates?.[0]?.content?.parts?.[0]?.text || '', 'Shelf Life AI');
         const results = Array.isArray(parsedResults) ? parsedResults : ((parsedResults && (parsedResults.items || parsedResults.results)) || []);
         if (!Array.isArray(results)) throw new Error('AI解析結果が配列ではありません。');
+        if (!isActiveAiRequest(aiRequest.requestId)) return false;
         
         let log = "【AI解析結果】\n";
         results.forEach(resItem => {
@@ -5478,6 +5539,7 @@ ${plan ? '\n提案方針: ' + plan : ''}
         });
         if (!quiet) showToast(`${results.length} 件の期限をAI解析しました`, 'success');
       } catch(e) {
+        if (isAiCancelError(e, aiRequest.requestId)) return false;
         console.error(e);
         if (!quiet) {
           if (e.message && e.message.includes('401')) {
@@ -5487,7 +5549,7 @@ ${plan ? '\n提案方針: ' + plan : ''}
           }
         }
       }
-      setStatus(false);
+      endAiRequest(aiRequest.requestId);
       renderList();
       return true;
     }
@@ -5512,6 +5574,7 @@ ${plan ? '\n提案方針: ' + plan : ''}
       if (state.staging.length === 0) return;
       document.querySelectorAll('.staging-cb').forEach(cb => cb.checked = true);
       const aiDone = await batchPredictAI(true);
+      if (!aiDone) return;
       setTimeout(async () => { await batchRegisterDB(); }, 800);
     }
 
@@ -5941,7 +6004,7 @@ ${plan ? '\n提案方針: ' + plan : ''}
     async function parseRecipeTextWithAI() {
       const text = document.getElementById('r-text-input').value.trim();
       if (!text) { showToast('テキストを入力してください。', 'error'); return; }
-      setStatus(true, 'AIがレシピを解析中...<br><span class="text-[10px] font-bold opacity-50 uppercase tracking-widest">Recipe Structuring</span>');
+      const aiRequest = beginAiRequest('AIがレシピを解析中...<br><span class="text-[10px] font-bold opacity-50 uppercase tracking-widest">Recipe Structuring</span>', 'レシピテキストAI解析');
       const prompt = `あなたはレシピ構造化アシスタントです。以下のレシピテキストから、レシピ名・材料・調味料・下ごしらえ・調理工程を抽出し、以下の厳密なJSON形式で出力してください。
 
 出力形式:
@@ -5988,16 +6051,20 @@ ${text}`;
           body: JSON.stringify({
             contents: [{ parts: [{ text: prompt }] }],
             generationConfig: { responseMimeType: 'application/json' }
-          })
+          }),
+          signal: aiRequest.controller.signal
         });
+        if (!isActiveAiRequest(aiRequest.requestId)) return false;
         if (!res.ok) {
           let errMsg = `APIエラー: ${res.status}`;
           try { const errData = await res.json(); if(errData.error&&errData.error.message) errMsg += '\n'+errData.error.message; } catch(e){}
           throw new Error(errMsg);
         }
         const data = await res.json();
+        if (!isActiveAiRequest(aiRequest.requestId)) return false;
         const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
         const parsed = parseAIJsonResponse(raw, 'RecipeAI');
+        if (!isActiveAiRequest(aiRequest.requestId)) return false;
         // source: AIが返したものを優先。なければ入力テキストからURL抽出
         let source = (parsed.source || '').trim();
         if (!source) {
@@ -6012,11 +6079,12 @@ ${text}`;
         renderSeasoningInputs(JSON.stringify(parsed.seasonings || []));
         renderPrepStepInputs(JSON.stringify(parsed.prepSteps || []));
         renderCookStepInputs(JSON.stringify(parsed.steps || []));
-        setStatus(false);
+        endAiRequest(aiRequest.requestId);
         showToast('レシピを構造化しました。内容を確認・修正してください。', 'success');
       } catch (err) {
+        if (isAiCancelError(err, aiRequest.requestId)) return false;
         console.error('[RecipeAI] error:', err);
-        setStatus(false);
+        endAiRequest(aiRequest.requestId);
         if (err.message && err.message.includes('401')) {
           showToast('APIの利用制限に達した可能性があります。しばらくしてから実行してください。', 'error');
         } else {
@@ -6273,7 +6341,7 @@ ${text}`;
 
     async function scanImageWithAI(base64Data, mimeType) {
       console.log('[ImageScan] starting Gemini API call...');
-      setStatus(true, 'AIが画像を解析中...<br><span class="text-[10px] font-bold opacity-50 uppercase tracking-widest">Image Recognition</span>');
+      const aiRequest = beginAiRequest('AIが画像を解析中...<br><span class="text-[10px] font-bold opacity-50 uppercase tracking-widest">Image Recognition</span>', '画像AI解析');
       const prompt = `あなたは食材管理アシスタントです。与えられた画像（レシートまたは食材パッケージ）から、食材情報のみを抽出してください。
 
 以下のJSON配列形式で出力してください:
@@ -6305,8 +6373,10 @@ ${text}`;
               ]
             }],
             generationConfig: { responseMimeType: "application/json" }
-          })
+          }),
+          signal: aiRequest.controller.signal
         });
+        if (!isActiveAiRequest(aiRequest.requestId)) return false;
         console.log('[ImageScan] API response status:', res.status);
         if (!res.ok) {
           let errMsg = `APIエラー: ${res.status}`;
@@ -6320,13 +6390,15 @@ ${text}`;
           throw new Error(errMsg);
         }
         const data = await res.json();
+        if (!isActiveAiRequest(aiRequest.requestId)) return false;
         console.log('[ImageScan] API response data:', data);
         const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
         console.log('[ImageScan] raw text:', text);
         const items = parseAIImageResponse(text);
+        if (!isActiveAiRequest(aiRequest.requestId)) return false;
         console.log('[ImageScan] parsed items:', items);
         if (items.length === 0) {
-          setStatus(false);
+          endAiRequest(aiRequest.requestId);
           showToast('画像から食材が検出されませんでした。', 'error');
           return;
         }
@@ -6346,12 +6418,13 @@ ${text}`;
             _newAi: true
           });
         });
-        setStatus(false);
+        endAiRequest(aiRequest.requestId);
         filterByLocation('登録待ち');
         showToast(`${items.length} 件の食材を登録待ちリストに追加しました。内容を確認・修正してください。`, 'success');
       } catch (err) {
+        if (isAiCancelError(err, aiRequest.requestId)) return false;
         console.error('[ImageScan] scan error:', err);
-        setStatus(false);
+        endAiRequest(aiRequest.requestId);
         if (err.message && err.message.includes('401')) {
           showToast('APIの利用制限に達した可能性があります。しばらくしてから実行してください。', 'error');
         } else {
