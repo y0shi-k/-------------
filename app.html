@@ -871,6 +871,22 @@
     </div>
   </div>
 
+  <!-- モーダル: 汎用削除確認 -->
+  <div id="deleteConfirmModal" onclick="handleModalBackdropClick(event, closeDeleteConfirmModal)" class="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
+    <div onclick="event.stopPropagation()" class="bg-white w-full max-w-sm rounded-xl p-6 shadow transform scale-95 transition-transform duration-300 border border-slate-100">
+      <div class="flex justify-between items-center mb-5">
+        <h3 id="deleteConfirmTitle" class="text-xl font-medium text-slate-800 tracking-tight">削除確認</h3>
+        <button onclick="closeDeleteConfirmModal()" class="text-slate-300 hover:text-slate-600 bg-slate-100 p-2 rounded-full"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+      </div>
+      <p id="deleteConfirmMessage" class="text-sm font-bold text-slate-600 mb-2">削除してもよろしいですか？</p>
+      <p id="deleteConfirmTarget" class="text-sm font-bold text-rose-700 bg-rose-50 border border-rose-100 rounded-xl px-3 py-3 mb-6 truncate"></p>
+      <div class="flex gap-3">
+        <button onclick="closeDeleteConfirmModal()" class="flex-1 bg-slate-100 text-slate-600 font-medium py-4 rounded-xl hover:bg-slate-200 transition-all">キャンセル</button>
+        <button id="deleteConfirmButton" onclick="confirmDeleteAction()" class="flex-1 bg-rose-500 text-white font-medium py-4 rounded-xl hover:bg-rose-600 transition-all shadow-sm">削除する</button>
+      </div>
+    </div>
+  </div>
+
   <!-- モーダル: スケジュールに追加（ミニカレンダー＋食事選択） -->
   <div id="scheduleAddModal" onclick="handleModalBackdropClick(event, closeScheduleAddModal)" class="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
     <div onclick="event.stopPropagation()" class="bg-white w-full max-w-lg rounded-xl p-6 shadow transform scale-95 transition-transform duration-300 border border-slate-100 max-h-[85vh] overflow-y-auto">
@@ -1277,6 +1293,7 @@
       'scheduleSlotMenu',
       'scheduleSlotDeleteModal',
       'scheduleBatchDeleteModal',
+      'deleteConfirmModal',
       'substitutionModal'
     ]);
 
@@ -1290,6 +1307,42 @@
       if (!event || event.target !== event.currentTarget) return;
       if (!canCloseModalFromBackdrop(event.currentTarget)) return;
       if (typeof closeFn === 'function') closeFn();
+    }
+
+    let _deleteConfirmAction = null;
+
+    function openDeleteConfirmModal(options = {}) {
+      const title = document.getElementById('deleteConfirmTitle');
+      const message = document.getElementById('deleteConfirmMessage');
+      const target = document.getElementById('deleteConfirmTarget');
+      const button = document.getElementById('deleteConfirmButton');
+      const m = document.getElementById('deleteConfirmModal');
+      if (!m) return;
+      _deleteConfirmAction = typeof options.onConfirm === 'function' ? options.onConfirm : null;
+      if (title) title.textContent = options.title || '削除確認';
+      if (message) message.textContent = options.message || '削除してもよろしいですか？';
+      if (target) {
+        target.textContent = options.targetText || '';
+        target.classList.toggle('hidden', !options.targetText);
+      }
+      if (button) button.textContent = options.confirmLabel || '削除する';
+      m.classList.remove('hidden');
+      setTimeout(() => m.classList.remove('opacity-0'), 10);
+    }
+
+    function closeDeleteConfirmModal() {
+      const m = document.getElementById('deleteConfirmModal');
+      if (!m) return;
+      m.classList.add('opacity-0');
+      setTimeout(() => m.classList.add('hidden'), 300);
+      _deleteConfirmAction = null;
+      updateSyncBar();
+    }
+
+    function confirmDeleteAction() {
+      const action = _deleteConfirmAction;
+      closeDeleteConfirmModal();
+      if (typeof action === 'function') action();
     }
 
     function showToast(message, type = 'info') {
@@ -5236,12 +5289,12 @@ ${plan ? '\n提案方針: ' + plan : ''}
     function batchDeleteSchedule() {
       if (state.scheduleSelectedIds.length === 0) return;
       const targets = state.schedule.filter(s => state.scheduleSelectedIds.includes(s.id || ''));
-      const hasDone = targets.some(t => t.status === '完了');
-      if (hasDone) {
-        openScheduleBatchDeleteModal();
-      } else {
-        batchDeleteScheduleConfirmed();
-      }
+      openDeleteConfirmModal({
+        title: '献立の一括削除確認',
+        message: '選択した献立を削除してもよろしいですか？',
+        targetText: `${targets.length} 件の献立`,
+        onConfirm: batchDeleteScheduleConfirmed
+      });
     }
 
     function batchDeleteScheduleConfirmed() {
@@ -6257,18 +6310,36 @@ ${text}`;
       await executeBulkPurchase(items, 'merge');
     }
 
-    function deleteShoppingItem(id) {
+    function performDeleteShoppingItem(id) {
       queueShoppingDelete(id);
       renderList();
       showToast('買い物リストから削除を保留しました。同期するまでスプシ未反映です。', 'info');
     }
 
+    function deleteShoppingItem(id) {
+      const item = state.shopping.find(i => i.id === id);
+      if (!item) return;
+      openDeleteConfirmModal({
+        title: '買い物リストの削除確認',
+        message: 'この買い物リスト項目を削除してもよろしいですか？',
+        targetText: item.name || '（名称未設定）',
+        onConfirm: () => performDeleteShoppingItem(id)
+      });
+    }
+
     function bulkDeleteShopping() {
       const checked = getSelectedShoppingIds();
       if (checked.length === 0) { showToast('削除する買い物を選択してください。', 'error'); return; }
-      checked.forEach(id => queueShoppingDelete(id));
-      renderList();
-      showToast(`${checked.length} 件の削除を保留しました。同期するまでスプシ未反映です。`, 'success');
+      openDeleteConfirmModal({
+        title: '買い物リストの一括削除確認',
+        message: '選択した買い物リスト項目を削除してもよろしいですか？',
+        targetText: `${checked.length} 件の買い物`,
+        onConfirm: () => {
+          checked.forEach(id => queueShoppingDelete(id));
+          renderList();
+          showToast(`${checked.length} 件の削除を保留しました。同期するまでスプシ未反映です。`, 'success');
+        }
+      });
     }
 
     async function adjustInventoryQty(id, delta) {
@@ -6277,8 +6348,10 @@ ${text}`;
       const newQty = Math.max(0, item.qty + delta);
 
       if (newQty === 0) {
-        await deleteInventoryItem(id);
-        showToast(`${item.name} の数量が0になったため削除しました`, 'info');
+        await deleteInventoryItem(id, {
+          message: '数量が0になるため、この在庫を削除してもよろしいですか？',
+          toastMessage: `${item.name} の数量が0になったため削除しました`
+        });
         return;
       }
       item.qty = newQty;
@@ -6295,18 +6368,36 @@ ${text}`;
       showToast('在庫の変更を保留しました。同期するまでスプシ未反映です。', 'info');
     }
 
-    async function deleteInventoryItem(id) {
+    function performDeleteInventoryItem(id, toastMessage = '在庫削除を保留しました。同期するまでスプシ未反映です。') {
       queueInventoryDelete(id);
       renderList();
-      showToast('在庫削除を保留しました。同期するまでスプシ未反映です。', 'info');
+      showToast(toastMessage, 'info');
+    }
+
+    async function deleteInventoryItem(id, options = {}) {
+      const item = state.inventory.find(i => i.id === id);
+      if (!item) return;
+      openDeleteConfirmModal({
+        title: '在庫の削除確認',
+        message: options.message || 'この在庫を削除してもよろしいですか？',
+        targetText: item.name || '（名称未設定）',
+        onConfirm: () => performDeleteInventoryItem(id, options.toastMessage)
+      });
     }
 
     async function batchDeleteInventory() {
       const checked = Array.from(document.querySelectorAll('.inv-cb:checked')).map(el => el.dataset.id);
       if (checked.length === 0) { showToast('削除する項目を選択してください。', 'error'); return; }
-      checked.forEach(id => queueInventoryDelete(id));
-      renderList();
-      showToast(`${checked.length} 件の削除を保留しました。同期するまでスプシ未反映です。`, 'success');
+      openDeleteConfirmModal({
+        title: '在庫の一括削除確認',
+        message: '選択した在庫を削除してもよろしいですか？',
+        targetText: `${checked.length} 件の在庫`,
+        onConfirm: () => {
+          checked.forEach(id => queueInventoryDelete(id));
+          renderList();
+          showToast(`${checked.length} 件の削除を保留しました。同期するまでスプシ未反映です。`, 'success');
+        }
+      });
     }
 
     async function handleImageScan(e) {
@@ -6474,10 +6565,21 @@ ${text}`;
       showToast('レシピ更新を保留しました。同期するまでスプシ未反映です。', 'info');
     }
 
-    async function deleteRecipe(id) {
+    function performDeleteRecipe(id) {
       queueRecipeDelete(id);
       renderRecipeMode();
       showToast('レシピ削除を保留しました。同期するまでスプシ未反映です。', 'info');
+    }
+
+    async function deleteRecipe(id) {
+      const recipe = state.recipes.find(r => r.id === id);
+      if (!recipe) return;
+      openDeleteConfirmModal({
+        title: 'レシピの削除確認',
+        message: 'このレシピを削除してもよろしいですか？',
+        targetText: recipe.name || '（名称未設定）',
+        onConfirm: () => performDeleteRecipe(id)
+      });
     }
 
     /* --- Cooking Mode Home --- */
@@ -6782,6 +6884,12 @@ ${text}`;
         `);
       }
       const selectedItems = byDate[state.cookingCalendarSelectedDate] || [];
+      const selectedSchedules = getCookingScheduledItemsForDate(state.cookingCalendarSelectedDate);
+      const selectedSummary = `記録${selectedItems.length}件 / 予定${selectedSchedules.length}件`;
+      const selectedBody = selectedItems.length || selectedSchedules.length
+        ? `${selectedSchedules.length ? `<div class="space-y-2">${selectedSchedules.map(item => renderCookingScheduleCard(item)).join('')}</div>` : ''}
+           ${selectedItems.length ? `<div class="space-y-2">${selectedItems.map(item => renderCookingHistoryCard(item)).join('')}</div>` : ''}`
+        : emptyStateHtml('この日の料理記録・予定はありません。');
       container.innerHTML = `
         <div class="grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-slate-400 px-1">
           ${['日','月','火','水','木','金','土'].map(d => `<div>${d}</div>`).join('')}
@@ -6796,12 +6904,23 @@ ${text}`;
         <section class="space-y-2">
           <div class="flex items-center justify-between px-1">
             <h3 class="text-xs font-bold text-amber-700">${formatCookingDateLabel(state.cookingCalendarSelectedDate)}</h3>
-            <span class="text-[10px] font-bold text-slate-400">${selectedItems.length}件</span>
+            <span class="text-[10px] font-bold text-slate-400">${selectedSummary}</span>
           </div>
-          ${selectedItems.length ? selectedItems.map(item => renderCookingHistoryCard(item)).join('') : emptyStateHtml('この日の料理記録はありません。')}
+          ${selectedBody}
         </section>
       `;
       setTimeout(() => loadCookingHistoryImages(history.filter(h => h.dateKey.slice(0, 7) === `${year}-${String(month).padStart(2, '0')}`)), 0);
+    }
+
+    function getCookingScheduledItemsForDate(dateKey) {
+      const mealOrder = { '朝': 0, '昼': 1, '晩': 2 };
+      return state.schedule
+        .filter(item => item.date === dateKey && item.status !== '完了')
+        .sort((a, b) => {
+          const mealDiff = (mealOrder[normalizeScheduleMeal(a.meal)] ?? 99) - (mealOrder[normalizeScheduleMeal(b.meal)] ?? 99);
+          if (mealDiff !== 0) return mealDiff;
+          return (Number(a.sortOrder) || 0) - (Number(b.sortOrder) || 0);
+        });
     }
 
     function getCookingScheduledDateMap() {
@@ -6810,6 +6929,31 @@ ${text}`;
         acc[item.date] = (acc[item.date] || 0) + 1;
         return acc;
       }, {});
+    }
+
+    function renderCookingScheduleCard(item) {
+      const recipeId = item.recipeId || '';
+      const scheduleItemId = item.id || '';
+      const canOpenRecipe = !!state.recipes.find(r => r.id === recipeId);
+      const meal = normalizeScheduleMeal(item.meal) || 'その他';
+      return `
+        <article class="bg-sky-50/80 rounded-xl p-4 shadow-sm border border-sky-100 flex items-center gap-3">
+          <div class="w-12 h-12 rounded-xl bg-white text-sky-500 border border-sky-100 flex items-center justify-center shrink-0">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3M5 11h14M6 5h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z"/></svg>
+          </div>
+          <div class="min-w-0 flex-1">
+            <div class="flex flex-wrap items-center gap-1 mb-1">
+              <span class="inline-flex items-center rounded-full bg-white text-sky-600 border border-sky-100 px-2 py-0.5 text-[10px] font-bold">${escapeHtml(meal)}</span>
+              <span class="inline-flex items-center rounded-full bg-white/70 text-slate-500 border border-sky-100 px-2 py-0.5 text-[10px] font-bold">未完了</span>
+            </div>
+            <h3 class="text-base font-medium text-slate-800 truncate">${escapeHtml(item.recipeName || '（レシピ名なし）')}</h3>
+          </div>
+          <div class="shrink-0 flex flex-wrap justify-end gap-2">
+            <button onclick="openRecipeViewer(${jsStringForHtmlAttribute(recipeId)})" class="px-3 py-2 rounded-xl bg-white text-slate-600 border border-sky-100 text-[10px] font-medium active:scale-95 transition-all ${canOpenRecipe ? '' : 'opacity-40 cursor-not-allowed'}" ${canOpenRecipe ? '' : 'disabled'}>レシピを見る</button>
+            <button onclick="openCookingViewer(${jsStringForHtmlAttribute(recipeId)}, { returnTo: 'cookingHistory', scheduleItemId: ${jsStringForHtmlAttribute(scheduleItemId)} })" class="px-3 py-2 rounded-xl bg-emerald-600 text-white text-[10px] font-medium active:scale-95 transition-all ${canOpenRecipe ? '' : 'opacity-40 cursor-not-allowed'}" ${canOpenRecipe ? '' : 'disabled'}>調理を開始</button>
+          </div>
+        </article>
+      `;
     }
 
     function renderCookingInsightsView(container) {

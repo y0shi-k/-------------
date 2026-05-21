@@ -1,0 +1,10 @@
+VERIFY_PASSED
+
+Command:
+python3 -c "import html.parser; html.parser.HTMLParser().feed(open('app.html').read())" && grep -q 'executeGAS' app.html && grep -q 'GAS_URL' app.html && echo 'VERIFY_PASSED'
+
+Result:
+passed
+
+Note:
+tools/verify_repo.py is not present in this repository, so the AGENTS.md standard verify command was used.

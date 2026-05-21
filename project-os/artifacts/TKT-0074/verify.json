@@ -25,10 +25,17 @@
       "command": "git diff -- app.html | rg -n \"executeGAS|appendRow|getSheetByName|setValue|setValues|pendingSync|syncPendingChanges\"",
       "status": "passed",
       "output": "No matches in app.html diff"
+    },
+    {
+      "name": "calendar_schedule_detail_scan",
+      "command": "rg -n \"getCookingScheduledItemsForDate|renderCookingScheduleCard|記録\\\\$\\\\{selectedItems.length\\\\}件 / 予定\\\\$\\\\{selectedSchedules.length\\\\}件\" app.html",
+      "status": "passed",
+      "output": "Calendar selected-date schedule helper, card renderer, and record/schedule summary are present."
     }
   ],
   "notes": [
     "No Spreadsheet schema changes were introduced.",
-    "No new individual executeGAS(payload...) write path was introduced."
+    "No new individual executeGAS(payload...) write path was introduced.",
+    "Selected calendar dates now render incomplete schedule details from existing state.schedule data."
   ]
 }
