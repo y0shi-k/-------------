@@ -315,7 +315,7 @@
   </nav>
 
   <!-- モーダル: 食材の追加/編集 -->
-  <div id="itemModal" onclick="if(event.target===this) closeModal()" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
+  <div id="itemModal" onclick="handleModalBackdropClick(event, closeModal)" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
     <div onclick="event.stopPropagation()" class="bg-white w-full max-w-md rounded-xl p-8 shadow transform scale-95 transition-transform duration-300 border border-slate-100" id="modalContent">
       <div class="flex justify-between items-center mb-6">
         <h3 id="modalTitle" class="text-2xl font-medium text-slate-800 tracking-tight">リストに追加</h3>
@@ -408,7 +408,7 @@
   </div>
 
   <!-- モーダル: 保存場所管理 -->
-  <div id="locationManageModal" onclick="if(event.target===this) closeLocationManager()" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
+  <div id="locationManageModal" onclick="handleModalBackdropClick(event, closeLocationManager)" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
     <div onclick="event.stopPropagation()" class="bg-white w-full max-w-md rounded-xl p-6 shadow transform scale-95 transition-transform duration-300 border border-slate-100">
       <div class="flex justify-between items-center mb-5">
         <div>
@@ -428,7 +428,7 @@
   </div>
 
   <!-- モーダル: 買い物リスト手動追加 -->
-  <div id="shoppingManualModal" onclick="if(event.target===this) closeShoppingManualModal()" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
+  <div id="shoppingManualModal" onclick="handleModalBackdropClick(event, closeShoppingManualModal)" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
     <div onclick="event.stopPropagation()" class="bg-white w-full max-w-sm rounded-xl p-6 shadow transform scale-95 transition-transform duration-300 border border-slate-100">
       <div class="flex justify-between items-center mb-5">
         <h3 class="text-xl font-medium text-slate-800 tracking-tight">買い物を追加</h3>
@@ -455,7 +455,7 @@
   </div>
 
   <!-- モーダル: レシピの追加/編集 -->
-  <div id="recipeModal" onclick="if(event.target===this) closeRecipeModal()" class="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
+  <div id="recipeModal" onclick="handleModalBackdropClick(event, closeRecipeModal)" class="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
     <div onclick="event.stopPropagation()" class="bg-white w-full max-w-2xl rounded-xl shadow transform scale-95 transition-transform duration-300 border border-slate-100 max-h-[90vh] overflow-hidden flex flex-col">
       <div class="shrink-0 flex justify-between items-center p-6 pb-5">
         <h3 id="recipeModalTitle" class="text-2xl font-medium text-slate-800 tracking-tight">レシピを追加</h3>
@@ -548,7 +548,7 @@
   </div>
 
   <!-- モーダル: テキストからレシピ構造化 -->
-  <div id="recipeTextModal" onclick="if(event.target===this) closeRecipeTextModal()" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
+  <div id="recipeTextModal" onclick="handleModalBackdropClick(event, closeRecipeTextModal)" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
     <div onclick="event.stopPropagation()" class="bg-white w-full max-w-lg rounded-xl p-6 shadow transform scale-95 transition-transform duration-300 border border-slate-100 max-h-[90vh] overflow-y-auto">
       <div class="flex justify-between items-center mb-5">
         <h3 class="text-2xl font-medium text-slate-800 tracking-tight">テキストからレシピを追加</h3>
@@ -567,7 +567,7 @@
   </div>
 
   <!-- モーダル: AI考案メニュー -->
-  <div id="aiAddMenuModal" onclick="if(event.target===this) closeAiAddMenuModal()" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
+  <div id="aiAddMenuModal" onclick="handleModalBackdropClick(event, closeAiAddMenuModal)" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
     <div onclick="event.stopPropagation()" class="bg-white w-full max-w-lg rounded-xl p-6 shadow transform scale-95 transition-transform duration-300 border border-slate-100 max-h-[90vh] overflow-y-auto">
       <div class="flex justify-between items-center mb-5">
         <div>
@@ -601,7 +601,7 @@
   </div>
 
   <!-- モーダル: AIレシピ相談 -->
-  <div id="aiRequestModal" onclick="if(event.target===this) closeAiRequestModal()" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
+  <div id="aiRequestModal" onclick="handleModalBackdropClick(event, closeAiRequestModal)" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
     <div onclick="event.stopPropagation()" class="bg-white w-full max-w-lg rounded-xl p-6 shadow transform scale-95 transition-transform duration-300 border border-slate-100 max-h-[90vh] overflow-y-auto">
       <div class="flex justify-between items-center mb-5">
         <h3 id="aiRequestTitle" class="text-2xl font-medium text-slate-800 tracking-tight">レシピのリクエスト</h3>
@@ -702,7 +702,7 @@
   </div>
 
   <!-- モーダル: AIレシピプレビュー -->
-  <div id="aiRecipePreviewModal" onclick="if(event.target===this) closeAiPreviewModal()" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
+  <div id="aiRecipePreviewModal" onclick="handleModalBackdropClick(event, closeAiPreviewModal)" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
     <div onclick="event.stopPropagation()" class="bg-white w-full max-w-lg rounded-xl p-6 shadow transform scale-95 transition-transform duration-300 border border-slate-100 max-h-[90vh] overflow-y-auto">
       <div class="flex justify-between items-center gap-3 mb-5">
         <h3 id="aiPreviewTitle" class="text-2xl font-medium text-slate-800 tracking-tight">生成されたレシピ</h3>
@@ -768,7 +768,7 @@
   </div>
 
   <!-- モーダル: 献立レシピ選択 -->
-  <div id="scheduleRecipeModal" onclick="if(event.target===this) closeScheduleRecipeModal()" class="fixed inset-0 z-50 flex items-start justify-center pt-12 p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
+  <div id="scheduleRecipeModal" onclick="handleModalBackdropClick(event, closeScheduleRecipeModal)" class="fixed inset-0 z-50 flex items-start justify-center pt-12 p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
     <div onclick="event.stopPropagation()" class="bg-white w-full max-w-lg rounded-xl p-6 shadow transform scale-95 origin-top transition-transform duration-300 border border-slate-100 h-[calc(100vh-6rem)] flex flex-col">
       <div class="flex justify-between items-center mb-5">
         <h3 class="text-2xl font-medium text-slate-800 tracking-tight">レシピを選択</h3>
@@ -795,7 +795,7 @@
   </div>
 
   <!-- モーダル: 買い物候補選択 -->
-  <div id="shoppingShortageSelectModal" onclick="if(event.target===this) closeShoppingShortageSelectModal()" class="fixed inset-0 z-[70] flex items-start justify-center pt-12 p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
+  <div id="shoppingShortageSelectModal" onclick="handleModalBackdropClick(event, closeShoppingShortageSelectModal)" class="fixed inset-0 z-[70] flex items-start justify-center pt-12 p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
     <div onclick="event.stopPropagation()" class="bg-white w-full max-w-lg rounded-xl p-6 shadow transform scale-95 origin-top transition-transform duration-300 border border-slate-100 h-[calc(100vh-6rem)] flex flex-col">
       <div class="flex justify-between items-start gap-3 mb-4">
         <div>
@@ -825,7 +825,7 @@
   </div>
 
   <!-- モーダル: 献立スロット操作メニュー -->
-  <div id="scheduleSlotMenu" onclick="if(event.target===this) closeScheduleSlotMenu()" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
+  <div id="scheduleSlotMenu" onclick="handleModalBackdropClick(event, closeScheduleSlotMenu)" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
     <div onclick="event.stopPropagation()" class="bg-white w-full max-w-sm rounded-xl p-6 shadow transform scale-95 transition-transform duration-300 border border-slate-100">
       <div class="flex justify-between items-center mb-5">
         <h3 id="scheduleSlotMenuTitle" class="text-xl font-medium text-slate-800 tracking-tight">献立の操作</h3>
@@ -840,7 +840,7 @@
   </div>
 
   <!-- モーダル: 献立単体削除確認 -->
-  <div id="scheduleSlotDeleteModal" onclick="if(event.target===this) closeScheduleSlotDeleteModal()" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
+  <div id="scheduleSlotDeleteModal" onclick="handleModalBackdropClick(event, closeScheduleSlotDeleteModal)" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
     <div onclick="event.stopPropagation()" class="bg-white w-full max-w-sm rounded-xl p-6 shadow transform scale-95 transition-transform duration-300 border border-slate-100">
       <div class="flex justify-between items-center mb-5">
         <h3 class="text-xl font-medium text-slate-800 tracking-tight">献立の削除確認</h3>
@@ -856,7 +856,7 @@
   </div>
 
   <!-- モーダル: 献立一括削除確認 -->
-  <div id="scheduleBatchDeleteModal" onclick="if(event.target===this) closeScheduleBatchDeleteModal()" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
+  <div id="scheduleBatchDeleteModal" onclick="handleModalBackdropClick(event, closeScheduleBatchDeleteModal)" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
     <div onclick="event.stopPropagation()" class="bg-white w-full max-w-sm rounded-xl p-6 shadow transform scale-95 transition-transform duration-300 border border-slate-100">
       <div class="flex justify-between items-center mb-5">
         <h3 class="text-xl font-medium text-slate-800 tracking-tight">献立の削除確認</h3>
@@ -871,7 +871,7 @@
   </div>
 
   <!-- モーダル: スケジュールに追加（ミニカレンダー＋食事選択） -->
-  <div id="scheduleAddModal" onclick="if(event.target===this) closeScheduleAddModal()" class="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
+  <div id="scheduleAddModal" onclick="handleModalBackdropClick(event, closeScheduleAddModal)" class="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
     <div onclick="event.stopPropagation()" class="bg-white w-full max-w-lg rounded-xl p-6 shadow transform scale-95 transition-transform duration-300 border border-slate-100 max-h-[85vh] overflow-y-auto">
       <div class="flex justify-between items-center mb-5">
         <div class="min-w-0">
@@ -896,7 +896,7 @@
   </div>
 
   <!-- モーダル: 消費量調整 -->
-  <div id="consumptionModal" onclick="if(event.target===this) closeConsumptionModal()" class="fixed inset-0 z-50 flex items-start justify-center pt-12 p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
+  <div id="consumptionModal" onclick="handleModalBackdropClick(event, closeConsumptionModal)" class="fixed inset-0 z-50 flex items-start justify-center pt-12 p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
     <div onclick="event.stopPropagation()" class="bg-white w-full max-w-lg rounded-xl p-6 shadow transform scale-95 origin-top transition-transform duration-300 border border-slate-100 h-[calc(100vh-6rem)] flex flex-col">
       <div class="flex justify-between items-center mb-5">
         <h3 class="text-2xl font-medium text-slate-800 tracking-tight">実際の消費量を調整</h3>
@@ -925,7 +925,7 @@
   </div>
 
   <!-- モーダル: 代替品選択 -->
-  <div id="substitutionModal" onclick="if(event.target===this) closeSubstitutionModal()" class="fixed inset-0 z-[55] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
+  <div id="substitutionModal" onclick="handleModalBackdropClick(event, closeSubstitutionModal)" class="fixed inset-0 z-[55] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
     <div onclick="event.stopPropagation()" class="bg-white w-full max-w-lg rounded-xl p-6 shadow transform scale-95 transition-transform duration-300 border border-slate-100 max-h-[90vh] overflow-y-auto">
       <div class="flex justify-between items-center mb-4">
         <div>
@@ -965,7 +965,7 @@
   </div>
 
   <!-- モーダル: 料理の記録 -->
-  <div id="cookingRecordModal" onclick="if(event.target===this) closeCookingRecordModal()" class="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
+  <div id="cookingRecordModal" onclick="handleModalBackdropClick(event, closeCookingRecordModal)" class="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
     <div onclick="event.stopPropagation()" class="bg-white w-full max-w-lg rounded-xl p-6 shadow transform scale-95 transition-transform duration-300 border border-slate-100 max-h-[90vh] overflow-y-auto">
       <div class="flex justify-between items-center mb-5">
         <h3 class="text-2xl font-medium text-slate-800 tracking-tight">料理の記録</h3>
@@ -1222,6 +1222,26 @@
         spinner.className = 'w-3 h-3 border border-indigo-100 border-t-indigo-600 rounded-full animate-spin shrink-0 transition-opacity duration-200';
         state.activityStatusToken = null;
       }
+    }
+
+    const BACKDROP_CLOSABLE_MODAL_IDS = new Set([
+      'aiAddMenuModal',
+      'scheduleSlotMenu',
+      'scheduleSlotDeleteModal',
+      'scheduleBatchDeleteModal',
+      'substitutionModal'
+    ]);
+
+    function canCloseModalFromBackdrop(modal) {
+      if (!modal) return false;
+      if (modal.id === 'aiRecipePreviewModal') return state._aiPreviewMode === 'viewing';
+      return BACKDROP_CLOSABLE_MODAL_IDS.has(modal.id);
+    }
+
+    function handleModalBackdropClick(event, closeFn) {
+      if (!event || event.target !== event.currentTarget) return;
+      if (!canCloseModalFromBackdrop(event.currentTarget)) return;
+      if (typeof closeFn === 'function') closeFn();
     }
 
     function showToast(message, type = 'info') {
