@@ -7026,7 +7026,7 @@ ${text}`;
       const container = document.getElementById('cookingContentContainer');
       if (!controls || !container) return;
       ensureCookingRecordDefaults();
-      controls.innerHTML = renderTodayExpirySummary() + renderCookingRecordSummary() + renderCookingRecordTabs() + renderCookingRecordControls();
+      controls.innerHTML = renderTodayDashboard() + renderCookingRecordSummary() + renderCookingRecordTabs() + renderCookingRecordControls();
       container.innerHTML = '';
       if (state.cookingHistoryView === 'calendar') {
         renderCookingCalendarView(container);
@@ -7067,6 +7067,249 @@ ${text}`;
           </div>
           <div class="space-y-2">${body}</div>
         </section>
+      `;
+    }
+
+    function getTodayScheduleItems(today) {
+      const mealOrder = { '朝': 0, '昼': 1, '晩': 2 };
+      return (state.schedule || [])
+        .filter(item => item.date === today && item.status !== '完了')
+        .sort((a, b) => {
+          const mealDiff = (mealOrder[normalizeScheduleMeal(a.meal)] ?? 99) - (mealOrder[normalizeScheduleMeal(b.meal)] ?? 99);
+          if (mealDiff !== 0) return mealDiff;
+          return (Number(a.sortOrder) || 0) - (Number(b.sortOrder) || 0);
+        });
+    }
+
+    function getTodayShoppingSummary() {
+      const items = state.shopping || [];
+      const grouped = new Set(items.map(item => `${item.name || ''}||${item.unit || ''}`));
+      const sorted = [...items].sort((a, b) => {
+        const ad = a.scheduleDate || '9999-99-99';
+        const bd = b.scheduleDate || '9999-99-99';
+        if (ad !== bd) return ad.localeCompare(bd);
+        return String(a.name || '').localeCompare(String(b.name || ''), 'ja');
+      });
+      const recent = sorted[0] || null;
+      const recentParts = recent ? [
+        recent.sourceType || '',
+        recent.scheduleDate || '',
+        normalizeScheduleMeal(recent.meal) || ''
+      ].filter(Boolean) : [];
+      return {
+        count: items.length,
+        groupedCount: grouped.size,
+        recentLabel: recentParts.join(' / ')
+      };
+    }
+
+    function getTodayRecipeCandidates(limit = 3) {
+      const candidates = (state.recipes || []).map(recipe => {
+        const meta = getRecipeDecisionMeta(recipe);
+        const expiringScore = (meta.expiringMatches || []).reduce((sum, item) => sum + (item.daysLeft <= 0 ? 40 : item.daysLeft <= 3 ? 30 : 12), 0);
+        const frequentScore = Math.min(Number(meta.count) || 0, 8);
+        const staleScore = meta.staleDays === null ? 6 : Math.min(Math.floor(meta.staleDays / 10), 12);
+        const highRatingScore = meta.hasHighRating ? 4 : 0;
+        const score = expiringScore + frequentScore + staleScore + highRatingScore;
+        const reasons = [
+          meta.expiringMatches && meta.expiringMatches.length ? `期限食材 ${meta.expiringMatches.map(item => item.name).filter(Boolean).slice(0, 2).join('、')}` : '',
+          meta.count >= 5 ? `よく作る ${meta.count}回` : '',
+          meta.staleDays !== null && meta.staleDays >= 45 ? `前回から${meta.staleDays}日` : '',
+          meta.hasHighRating ? '高評価' : ''
+        ].filter(Boolean);
+        return { recipe, meta, score, reasons };
+      })
+        .filter(item => item.score > 0)
+        .sort((a, b) => b.score - a.score || String(a.recipe.name || '').localeCompare(String(b.recipe.name || ''), 'ja'));
+      return candidates.slice(0, limit);
+    }
+
+    function getTodayDashboardData() {
+      const today = getLocalDateString(new Date());
+      const expiryRows = getExpiryInventoryRows().filter(row => ['expired', 'within3', 'within7'].includes(row.meta.group));
+      return {
+        today,
+        scheduleItems: getTodayScheduleItems(today),
+        expiryRows,
+        expirySummary: getExpiryInventorySummary(),
+        shopping: getTodayShoppingSummary(),
+        pendingSyncCount: getPendingSyncCount(),
+        candidates: getTodayRecipeCandidates(3)
+      };
+    }
+
+    function openTodayScheduleView() {
+      state.currentBTab = 'schedule';
+      setScheduleDayOffset(getScheduleDayOffsetForDate(getLocalDateString(new Date())));
+      switchMode('B');
+    }
+
+    function renderTodayDashboard() {
+      const data = getTodayDashboardData();
+      const dateLabel = formatCookingDateLabel(data.today);
+      return `
+        <section class="space-y-3">
+          <div class="flex items-end justify-between gap-3 px-1">
+            <div class="min-w-0">
+              <p class="text-[10px] font-bold text-amber-500 uppercase tracking-widest">TODAY DASHBOARD</p>
+              <h2 class="text-xl font-bold text-slate-800 truncate">今日やること</h2>
+            </div>
+            <p class="shrink-0 text-xs font-bold text-slate-400">${escapeHtml(dateLabel)}</p>
+          </div>
+          <div class="grid gap-3 lg:grid-cols-2">
+            ${renderTodaySchedulePanel(data)}
+            ${renderTodayExpiryPanel(data)}
+            ${renderTodayShoppingPanel(data)}
+            ${renderTodaySyncPanel(data)}
+          </div>
+          ${data.scheduleItems.length ? '' : renderTodayCandidatePanel(data)}
+        </section>
+      `;
+    }
+
+    function renderTodaySchedulePanel(data) {
+      const body = data.scheduleItems.length
+        ? data.scheduleItems.map(item => renderTodayScheduleItem(item)).join('')
+        : `<div class="bg-white border border-sky-100 rounded-xl px-3 py-4 text-xs font-bold text-slate-300 text-center">今日の未完了献立はありません</div>`;
+      return `
+        <section class="bg-sky-50 border border-sky-100 rounded-xl p-3 shadow-sm min-w-0">
+          <div class="flex items-center justify-between gap-3 mb-2">
+            <div class="min-w-0">
+              <p class="text-[10px] font-bold text-sky-500 uppercase tracking-widest">TODAY MEALS</p>
+              <h3 class="text-sm font-bold text-slate-800">今日の献立 ${data.scheduleItems.length}件</h3>
+            </div>
+            <button type="button" onclick="openTodayScheduleView()" class="shrink-0 px-3 py-2 rounded-xl bg-sky-600 text-white text-[10px] font-bold active:scale-95 transition-all">スケジュールへ</button>
+          </div>
+          <div class="space-y-2">${body}</div>
+        </section>
+      `;
+    }
+
+    function renderTodayScheduleItem(item) {
+      const recipeId = item.recipeId || '';
+      const scheduleItemId = item.id || '';
+      const canOpenRecipe = !!state.recipes.find(r => r.id === recipeId);
+      const meal = normalizeScheduleMeal(item.meal) || 'その他';
+      return `
+        <div class="bg-white border border-sky-100 rounded-xl px-3 py-3 flex items-center gap-3 min-w-0">
+          <span class="shrink-0 inline-flex items-center rounded-full bg-sky-100 text-sky-700 border border-sky-200 px-2 py-0.5 text-[10px] font-bold">${escapeHtml(meal)}</span>
+          <div class="min-w-0 flex-1">
+            <p class="text-sm font-bold text-slate-800 truncate">${escapeHtml(item.recipeName || '（レシピ名なし）')}</p>
+            <p class="text-[10px] font-bold text-slate-400">未完了</p>
+          </div>
+          <div class="shrink-0 flex gap-1.5">
+            <button type="button" onclick="openRecipeViewer(${jsStringForHtmlAttribute(recipeId)})" class="px-2.5 py-2 rounded-lg bg-slate-50 text-slate-600 border border-slate-100 text-[10px] font-bold active:scale-95 transition-all ${canOpenRecipe ? '' : 'opacity-40 cursor-not-allowed'}" ${canOpenRecipe ? '' : 'disabled'}>見る</button>
+            <button type="button" onclick="openCookingViewer(${jsStringForHtmlAttribute(recipeId)}, { returnTo: 'cookingHistory', scheduleItemId: ${jsStringForHtmlAttribute(scheduleItemId)} })" class="px-2.5 py-2 rounded-lg bg-emerald-600 text-white text-[10px] font-bold active:scale-95 transition-all ${canOpenRecipe ? '' : 'opacity-40 cursor-not-allowed'}" ${canOpenRecipe ? '' : 'disabled'}>作る</button>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderTodayExpiryPanel(data) {
+      const rows = data.expiryRows.slice(0, 3);
+      const body = rows.length
+        ? rows.map(row => {
+            const item = row.item;
+            const meta = row.meta;
+            return `
+              <button type="button" onclick="searchRecipesByInventoryItem(${jsStringForHtmlAttribute(item.id)})" class="w-full bg-white border border-rose-100 rounded-xl px-3 py-2 text-left flex items-center gap-3 active:scale-[0.99] transition-all">
+                <span class="inline-flex items-center justify-center rounded-full border ${getExpiryBadgeClass(meta)} px-2 py-0.5 text-[10px] font-bold shrink-0">${escapeHtml(formatExpiryDays(meta))}</span>
+                <span class="min-w-0 flex-1">
+                  <span class="block text-sm font-bold text-slate-800 truncate">${escapeHtml(item.name || '（品名なし）')}</span>
+                  <span class="block text-[10px] font-bold text-slate-400 truncate">${escapeHtml(item.loc || '冷蔵庫')} · ${formatQty(Number(item.qty) || 0)}${escapeHtml(item.unit || '')} · ${escapeHtml(meta.limit || '期限未設定')}</span>
+                </span>
+              </button>
+            `;
+          }).join('')
+        : `<div class="bg-white border border-rose-100 rounded-xl px-3 py-4 text-xs font-bold text-slate-300 text-center">期限が近い食材はありません</div>`;
+      return `
+        <section class="bg-rose-50 border border-rose-100 rounded-xl p-3 shadow-sm min-w-0">
+          <div class="flex items-center justify-between gap-3 mb-2">
+            <div class="min-w-0">
+              <p class="text-[10px] font-bold text-rose-500 uppercase tracking-widest">USE-UP</p>
+              <h3 class="text-sm font-bold text-slate-800">期限食材 ${data.expirySummary.urgentCount}件</h3>
+            </div>
+            <button type="button" onclick="openExpiryUseUpHub()" class="shrink-0 px-3 py-2 rounded-xl bg-rose-600 text-white text-[10px] font-bold active:scale-95 transition-all">使い切り</button>
+          </div>
+          <div class="space-y-2">${body}</div>
+        </section>
+      `;
+    }
+
+    function renderTodayShoppingPanel(data) {
+      const summary = data.shopping;
+      const detail = summary.count
+        ? `材料まとめ ${summary.groupedCount}件${summary.recentLabel ? ` / ${summary.recentLabel}` : ''}`
+        : '買い物リストは空です';
+      return `
+        <section class="bg-emerald-50 border border-emerald-100 rounded-xl p-3 shadow-sm min-w-0">
+          <div class="flex items-center justify-between gap-3 mb-2">
+            <div class="min-w-0">
+              <p class="text-[10px] font-bold text-emerald-600 uppercase tracking-widest">SHOPPING</p>
+              <h3 class="text-sm font-bold text-slate-800">買い物 ${summary.count}件</h3>
+            </div>
+            <button type="button" onclick="switchMode('A'); filterByLocation('買い物リスト')" class="shrink-0 px-3 py-2 rounded-xl bg-emerald-600 text-white text-[10px] font-bold active:scale-95 transition-all">買い物へ</button>
+          </div>
+          <div class="bg-white border border-emerald-100 rounded-xl px-3 py-4">
+            <p class="text-2xl font-bold text-emerald-700">${summary.count}<span class="text-xs ml-1">件</span></p>
+            <p class="text-xs font-bold text-slate-400 truncate">${escapeHtml(detail)}</p>
+          </div>
+        </section>
+      `;
+    }
+
+    function renderTodaySyncPanel(data) {
+      const hasPending = data.pendingSyncCount > 0;
+      return `
+        <section class="bg-slate-50 border border-slate-200 rounded-xl p-3 shadow-sm min-w-0">
+          <div class="flex items-center justify-between gap-3 mb-2">
+            <div class="min-w-0">
+              <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">SYNC</p>
+              <h3 class="text-sm font-bold text-slate-800">未同期 ${data.pendingSyncCount}件</h3>
+            </div>
+            <span class="shrink-0 px-3 py-2 rounded-xl ${hasPending ? 'bg-slate-900 text-white' : 'bg-white text-slate-400 border border-slate-200'} text-[10px] font-bold">${hasPending ? '同期バーを確認' : '反映済み'}</span>
+          </div>
+          <div class="bg-white border border-slate-100 rounded-xl px-3 py-4">
+            <p class="text-xs font-bold ${hasPending ? 'text-slate-700' : 'text-slate-400'}">${hasPending ? '上部の同期バーからまとめてスプシへ反映できます。' : '同期待ちの変更はありません。'}</p>
+          </div>
+        </section>
+      `;
+    }
+
+    function renderTodayCandidatePanel(data) {
+      const body = data.candidates.length
+        ? data.candidates.map(item => renderTodayCandidateItem(item)).join('')
+        : `<div class="bg-white border border-amber-100 rounded-xl px-3 py-4 text-xs font-bold text-slate-300 text-center">候補レシピはまだありません</div>`;
+      return `
+        <section class="bg-amber-50 border border-amber-100 rounded-xl p-3 shadow-sm min-w-0">
+          <div class="flex items-center justify-between gap-3 mb-2">
+            <div class="min-w-0">
+              <p class="text-[10px] font-bold text-amber-600 uppercase tracking-widest">CANDIDATES</p>
+              <h3 class="text-sm font-bold text-slate-800">作る候補</h3>
+            </div>
+            <button type="button" onclick="state.currentBTab='recipes'; switchMode('B')" class="shrink-0 px-3 py-2 rounded-xl bg-amber-500 text-white text-[10px] font-bold active:scale-95 transition-all">レシピへ</button>
+          </div>
+          <div class="space-y-2">${body}</div>
+        </section>
+      `;
+    }
+
+    function renderTodayCandidateItem(item) {
+      const recipe = item.recipe;
+      const recipeId = recipe.id || '';
+      const reason = item.reasons.length ? item.reasons.slice(0, 2).join(' / ') : renderRecipeDecisionMetaLine(item.meta);
+      return `
+        <div class="bg-white border border-amber-100 rounded-xl px-3 py-3 flex items-center gap-3 min-w-0">
+          ${renderRecipeDecisionThumbnail(recipe, item.meta).replace('w-16 h-16', 'w-12 h-12')}
+          <div class="min-w-0 flex-1">
+            <p class="text-sm font-bold text-slate-800 truncate">${escapeHtml(recipe.name || '（名称未設定）')}</p>
+            <p class="text-[10px] font-bold text-slate-400 truncate">${escapeHtml(reason || '今日の候補')}</p>
+          </div>
+          <div class="shrink-0 flex gap-1.5">
+            <button type="button" onclick="openRecipeViewer(${jsStringForHtmlAttribute(recipeId)})" class="px-2.5 py-2 rounded-lg bg-slate-50 text-slate-600 border border-slate-100 text-[10px] font-bold active:scale-95 transition-all">見る</button>
+            <button type="button" onclick="openCookingViewer(${jsStringForHtmlAttribute(recipeId)}, { returnTo: 'cookingHistory' })" class="px-2.5 py-2 rounded-lg bg-emerald-600 text-white text-[10px] font-bold active:scale-95 transition-all">作る</button>
+          </div>
+        </div>
       `;
     }
 
