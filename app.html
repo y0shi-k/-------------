@@ -1040,7 +1040,7 @@
     const convId = "CONV-RECIPE-P1-FINAL-BATCH-FIX";
     const DEFAULT_STORAGE_LOCATIONS = ['冷蔵庫', '冷凍庫', 'パントリー', 'ベランダ', 'その他'];
     const DEFAULT_RECIPE_GENRES = ['和食', '洋食', '中華', '韓国', 'イタリアン', 'エスニック', 'その他'];
-    const SYSTEM_LOCATIONS = ['すべて', '登録待ち', '買い物リスト'];
+    const SYSTEM_LOCATIONS = ['すべて', '登録待ち', '買い物リスト', '使い切り'];
     let state = {
       inventory: [],
       shopping: [],
@@ -1953,6 +1953,7 @@
 
     function renderInventoryPrimaryRow() {
       const allCount = state.inventory.length;
+      const useUpCount = getExpiryInventorySummary().urgentCount;
       const countBadgeClass = 'absolute -top-1 -right-1 min-w-[1.25rem] h-5 px-1 rounded-full bg-rose-600 text-white ring-2 ring-white flex items-center justify-center text-[10px] font-medium';
 
       const storageTabs = getStorageLocations().map(loc => {
@@ -1970,6 +1971,10 @@
           <button onclick="filterByLocation(this.dataset.loc)" class="${getLocationTabClass('すべて')}" data-loc="すべて">
             すべて
             <span class="${countBadgeClass}">${allCount}</span>
+          </button>
+          <button onclick="filterByLocation(this.dataset.loc)" class="${getLocationTabClass('使い切り')}" data-loc="使い切り">
+            使い切り
+            <span class="${countBadgeClass}">${useUpCount}</span>
           </button>
           ${storageTabs}
           <button onclick="openLocationManager()" class="bg-slate-800 text-white px-4 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-all active:scale-95 shrink-0">＋ 管理</button>
@@ -2069,6 +2074,8 @@
         container.className = `${base} bg-emerald-50 p-3 rounded-xl border border-emerald-100`;
       } else if (state.currentLoc === '登録待ち') {
         container.className = `${base} bg-amber-50 p-3 rounded-xl border border-amber-100`;
+      } else if (state.currentLoc === '使い切り') {
+        container.className = `${base} bg-rose-50 p-3 rounded-xl border border-rose-100`;
       } else {
         container.className = `${base} bg-slate-100 p-3 rounded-xl border border-slate-200`;
       }
@@ -2366,6 +2373,9 @@
       }
       if (loc === '買い物リスト') {
         tone = active ? 'active bg-emerald-50 text-emerald-600 shadow-sm border border-emerald-100' : 'bg-emerald-50 text-emerald-600 border border-emerald-100';
+      }
+      if (loc === '使い切り') {
+        tone = active ? 'active bg-rose-50 text-rose-600 shadow-sm border border-rose-100' : 'bg-rose-50 text-rose-600 border border-rose-100';
       }
       return `location-tab ${tone} pl-5 pr-7 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-all relative shrink-0`;
     }
@@ -3513,6 +3523,93 @@
     }
 
     /* --- List Rendering --- */
+    function renderExpiryUseUpCard(row) {
+      const item = row.item;
+      const meta = row.meta;
+      const qty = `${formatQty(Number(item.qty) || 0)}${escapeHtml(item.unit || '')}`;
+      const limitText = meta.limit ? `${escapeHtml(meta.limitType)} ${escapeHtml(meta.limit)}` : '期限未設定';
+      const opened = meta.isOpened ? `<span class="inline-flex items-center rounded-full bg-white text-rose-600 border border-rose-100 px-2 py-0.5 text-[10px] font-bold">開封済み ${escapeHtml(item.open || '')}</span>` : '';
+      return `
+        <article class="bg-white/90 border border-rose-100 rounded-xl p-4 shadow-sm min-w-0">
+          <div class="flex flex-wrap items-start gap-3">
+            <div class="flex-1 min-w-[12rem]">
+              <div class="flex flex-wrap items-center gap-2 mb-1">
+                <h3 class="text-base font-bold text-slate-800 truncate">${escapeHtml(item.name || '（品名なし）')}</h3>
+                <span class="inline-flex items-center rounded-full border ${getExpiryBadgeClass(meta)} px-2 py-0.5 text-[10px] font-bold">${escapeHtml(formatExpiryDays(meta))}</span>
+                ${opened}
+              </div>
+              <div class="flex flex-wrap gap-x-3 gap-y-1 text-[10px] font-bold text-slate-400">
+                <span>${qty}</span>
+                <span>${escapeHtml(item.type || '食材')}</span>
+                <span>${escapeHtml(item.loc || '冷蔵庫')}</span>
+                <span>${limitText}</span>
+              </div>
+            </div>
+            <div class="shrink-0 flex flex-wrap justify-end gap-2">
+              <button type="button" onclick="searchRecipesByInventoryItem(${jsStringForHtmlAttribute(item.id)})" class="px-3 py-2 rounded-xl bg-white text-indigo-600 border border-indigo-100 text-[10px] font-bold active:scale-95 transition-all">この食材で探す</button>
+              <button type="button" onclick="startUseUpAiFromInventoryItem(${jsStringForHtmlAttribute(item.id)})" class="px-3 py-2 rounded-xl bg-violet-600 text-white text-[10px] font-bold active:scale-95 transition-all shadow-sm">AIで使い切り</button>
+            </div>
+          </div>
+        </article>
+      `;
+    }
+
+    function renderExpiryUseUpSection(title, caption, rows, tone) {
+      const count = rows.length;
+      const titleClass = tone === 'rose' ? 'text-rose-700' : tone === 'amber' ? 'text-amber-700' : tone === 'sky' ? 'text-sky-700' : 'text-slate-600';
+      const body = count
+        ? `<div class="space-y-2">${rows.map(renderExpiryUseUpCard).join('')}</div>`
+        : `<div class="bg-white/70 border border-rose-100 rounded-xl px-4 py-5 text-center text-xs font-bold text-slate-300">該当する食材はありません</div>`;
+      return `
+        <section class="space-y-2">
+          <div class="flex items-center justify-between px-1">
+            <div class="min-w-0">
+              <h2 class="text-sm font-bold ${titleClass}">${escapeHtml(title)}</h2>
+              <p class="text-[10px] font-bold text-slate-400">${escapeHtml(caption)}</p>
+            </div>
+            <span class="text-[10px] font-bold text-slate-400">${count}件</span>
+          </div>
+          ${body}
+        </section>
+      `;
+    }
+
+    function renderExpiryUseUpHub(container) {
+      const summary = getExpiryInventorySummary();
+      const groups = summary.groups;
+      if ((state.inventory || []).length === 0) {
+        container.innerHTML = emptyStateHtml('在庫はありません。\n登録待ちから食材を追加してください。', { py: 'py-16', extraClass: 'bg-white/70 rounded-xl border border-rose-100' });
+        return;
+      }
+      const hasAnyTarget = summary.totalCount > 0;
+      container.innerHTML = `
+        <section class="bg-white border border-rose-100 rounded-xl p-4 shadow-sm">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p class="text-[10px] font-bold text-rose-400 uppercase tracking-widest">USE-UP HUB</p>
+              <h2 class="text-lg font-bold text-slate-800 mt-0.5">期限食材と使い切り</h2>
+              <p class="text-xs font-bold text-slate-400 mt-1">期限が近い食材を、レシピ検索とAI考案につなげます。</p>
+            </div>
+            <div class="flex gap-2">
+              <button type="button" onclick="openAiAddMenuModal()" class="px-3 py-2 rounded-xl bg-violet-50 text-violet-700 border border-violet-100 text-[10px] font-bold active:scale-95 transition-all">優先消費AI</button>
+              <button type="button" onclick="filterByLocation('すべて')" class="px-3 py-2 rounded-xl bg-slate-100 text-slate-600 text-[10px] font-bold active:scale-95 transition-all">在庫一覧へ</button>
+            </div>
+          </div>
+          <div class="grid grid-cols-3 gap-2 mt-4">
+            <div class="rounded-xl bg-rose-50 border border-rose-100 px-3 py-2"><p class="text-[10px] font-bold text-rose-400">期限切れ</p><p class="text-xl font-bold text-rose-700">${groups.expired.length}</p></div>
+            <div class="rounded-xl bg-amber-50 border border-amber-100 px-3 py-2"><p class="text-[10px] font-bold text-amber-500">3日以内</p><p class="text-xl font-bold text-amber-700">${groups.within3.length}</p></div>
+            <div class="rounded-xl bg-sky-50 border border-sky-100 px-3 py-2"><p class="text-[10px] font-bold text-sky-500">7日以内</p><p class="text-xl font-bold text-sky-700">${groups.within7.length}</p></div>
+          </div>
+        </section>
+        ${hasAnyTarget ? '' : emptyStateHtml('期限対象の食材はありません。', { py: 'py-10', extraClass: 'bg-white/70 rounded-xl border border-rose-100' })}
+        ${renderExpiryUseUpSection('期限切れ', 'すぐに状態確認して、使えるものから消費します', groups.expired, 'rose')}
+        ${renderExpiryUseUpSection('3日以内', '優先的に献立へ入れたい食材です', groups.within3, 'amber')}
+        ${renderExpiryUseUpSection('7日以内', '今週中に使う候補です', groups.within7, 'sky')}
+        ${renderExpiryUseUpSection('期限未設定', '警告ではなく、期限を補完したい食材です', groups.unset, 'slate')}
+      `;
+      updateBulkActionSlot();
+    }
+
     function renderList() {
       renderModeControls();
       const container = document.getElementById('listContainer');
@@ -3587,6 +3684,14 @@
           ? renderShoppingGrouped(list)
           : list.map(item => renderShoppingRow(item)).join('');
         updateBulkActionSlot();
+        return;
+      }
+
+      if (state.currentLoc === '使い切り') {
+        stagingActions.classList.add('hidden');
+        inventoryActions.classList.add('hidden');
+        shoppingActions.classList.add('hidden');
+        renderExpiryUseUpHub(container);
         return;
       }
 
@@ -4431,20 +4536,120 @@
 
     /* --- AI Recipe Suggestion --- */
     function getExpiringItems() {
-      const today = new Date();
-      today.setHours(0,0,0,0);
-      return state.inventory.filter(item => {
-        const limit = item.limit2 || item.limit1;
-        if (!limit) return false;
-        const limitDate = new Date(limit);
-        limitDate.setHours(0,0,0,0);
-        const diff = (limitDate - today) / (1000 * 60 * 60 * 24);
-        return diff <= 3;
-      });
+      return getExpiryInventoryRows()
+        .filter(row => row.meta.daysLeft !== null && row.meta.daysLeft <= 3)
+        .map(row => row.item);
     }
 
     function getItemLimitValue(item) {
       return item.limit2 || item.limit1 || '';
+    }
+
+    function getItemExpiryMeta(item, today = new Date()) {
+      const limit = getItemLimitValue(item);
+      const hasLimit = !!limit;
+      const base = new Date(today);
+      base.setHours(0,0,0,0);
+      let daysLeft = null;
+      if (hasLimit) {
+        const limitDate = new Date(limit);
+        limitDate.setHours(0,0,0,0);
+        if (!Number.isNaN(limitDate.getTime())) {
+          daysLeft = Math.ceil((limitDate - base) / 86400000);
+        }
+      }
+      let group = hasLimit ? 'later' : 'unset';
+      if (daysLeft !== null) {
+        if (daysLeft <= 0) group = 'expired';
+        else if (daysLeft <= 3) group = 'within3';
+        else if (daysLeft <= 7) group = 'within7';
+      }
+      return {
+        limit,
+        daysLeft,
+        group,
+        limitType: item.limit2 ? '実質期限' : (item.limit1 ? '表示期限' : '期限未設定'),
+        isOpened: !!item.open
+      };
+    }
+
+    function getExpiryInventoryRows() {
+      const today = new Date();
+      today.setHours(0,0,0,0);
+      return (state.inventory || [])
+        .map(item => ({ item, meta: getItemExpiryMeta(item, today) }))
+        .sort((a, b) => {
+          const order = { expired: 0, within3: 1, within7: 2, unset: 3, later: 4 };
+          const groupDiff = (order[a.meta.group] ?? 9) - (order[b.meta.group] ?? 9);
+          if (groupDiff !== 0) return groupDiff;
+          const al = a.meta.limit || '9999-99-99';
+          const bl = b.meta.limit || '9999-99-99';
+          if (al !== bl) return al.localeCompare(bl);
+          const locDiff = String(a.item.loc || '').localeCompare(String(b.item.loc || ''), 'ja');
+          if (locDiff !== 0) return locDiff;
+          return String(a.item.name || '').localeCompare(String(b.item.name || ''), 'ja');
+        });
+    }
+
+    function getExpiryInventoryGroups() {
+      const groups = {
+        expired: [],
+        within3: [],
+        within7: [],
+        unset: []
+      };
+      getExpiryInventoryRows().forEach(row => {
+        if (groups[row.meta.group]) groups[row.meta.group].push(row);
+      });
+      return groups;
+    }
+
+    function getExpiryInventorySummary() {
+      const groups = getExpiryInventoryGroups();
+      const urgentCount = groups.expired.length + groups.within3.length + groups.within7.length;
+      return { groups, urgentCount, totalCount: urgentCount + groups.unset.length };
+    }
+
+    function formatExpiryDays(meta) {
+      if (!meta || meta.daysLeft === null) return '期限未設定';
+      if (meta.daysLeft < 0) return `${Math.abs(meta.daysLeft)}日超過`;
+      if (meta.daysLeft === 0) return '今日まで';
+      return `あと${meta.daysLeft}日`;
+    }
+
+    function getExpiryBadgeClass(meta) {
+      if (!meta || meta.group === 'unset') return 'bg-slate-100 text-slate-500 border-slate-200';
+      if (meta.group === 'expired') return 'bg-rose-600 text-white border-rose-600';
+      if (meta.group === 'within3') return 'bg-amber-500 text-white border-amber-500';
+      return 'bg-sky-100 text-sky-700 border-sky-200';
+    }
+
+    function searchRecipesByInventoryItem(id) {
+      const item = (state.inventory || []).find(i => i.id === id);
+      if (!item) {
+        showToast('食材が見つかりません。', 'error');
+        return;
+      }
+      state.currentBTab = 'recipes';
+      state.recipeSearchMode = 'ingredient';
+      state.recipeSearchLogic = 'or';
+      state.recipeSearchQuery = item.name || '';
+      switchMode('B');
+      showToast(`${item.name} を使うレシピを検索しました。`, 'info');
+    }
+
+    function startUseUpAiFromInventoryItem(id) {
+      const item = (state.inventory || []).find(i => i.id === id);
+      if (!item) {
+        showToast('食材が見つかりません。', 'error');
+        return;
+      }
+      openAiRequestModal([item], 'priority');
+    }
+
+    function openExpiryUseUpHub() {
+      switchMode('A');
+      filterByLocation('使い切り');
     }
 
     function getSortedExpiringItems() {
@@ -6821,7 +7026,7 @@ ${text}`;
       const container = document.getElementById('cookingContentContainer');
       if (!controls || !container) return;
       ensureCookingRecordDefaults();
-      controls.innerHTML = renderCookingRecordSummary() + renderCookingRecordTabs() + renderCookingRecordControls();
+      controls.innerHTML = renderTodayExpirySummary() + renderCookingRecordSummary() + renderCookingRecordTabs() + renderCookingRecordControls();
       container.innerHTML = '';
       if (state.cookingHistoryView === 'calendar') {
         renderCookingCalendarView(container);
@@ -6830,6 +7035,39 @@ ${text}`;
       } else {
         renderCookingTimelineView(container);
       }
+    }
+
+    function renderTodayExpirySummary() {
+      const rows = getExpiryInventoryRows().filter(row => ['expired', 'within3', 'within7'].includes(row.meta.group)).slice(0, 3);
+      const summary = getExpiryInventorySummary();
+      const body = rows.length
+        ? rows.map(row => {
+            const item = row.item;
+            const meta = row.meta;
+            const badgeClass = getExpiryBadgeClass(meta);
+            return `
+              <button type="button" onclick="searchRecipesByInventoryItem(${jsStringForHtmlAttribute(item.id)})" class="w-full bg-white border border-rose-100 rounded-xl px-3 py-2 text-left flex items-center gap-3 active:scale-[0.99] transition-all">
+                <span class="inline-flex items-center justify-center rounded-full border ${badgeClass} px-2 py-0.5 text-[10px] font-bold shrink-0">${escapeHtml(formatExpiryDays(meta))}</span>
+                <span class="min-w-0 flex-1">
+                  <span class="block text-sm font-bold text-slate-800 truncate">${escapeHtml(item.name || '（品名なし）')}</span>
+                  <span class="block text-[10px] font-bold text-slate-400 truncate">${escapeHtml(item.loc || '冷蔵庫')} · ${formatQty(Number(item.qty) || 0)}${escapeHtml(item.unit || '')} · ${escapeHtml(meta.limit || '期限未設定')}</span>
+                </span>
+              </button>
+            `;
+          }).join('')
+        : `<div class="bg-white border border-rose-100 rounded-xl px-3 py-4 text-xs font-bold text-slate-300 text-center">期限が近い食材はありません</div>`;
+      return `
+        <section class="bg-rose-50 border border-rose-100 rounded-xl p-3 shadow-sm">
+          <div class="flex items-center justify-between gap-3 mb-2">
+            <div class="min-w-0">
+              <p class="text-[10px] font-bold text-rose-400 uppercase tracking-widest">TODAY USE-UP</p>
+              <h2 class="text-sm font-bold text-slate-800">期限食材 ${summary.urgentCount}件</h2>
+            </div>
+            <button type="button" onclick="openExpiryUseUpHub()" class="shrink-0 px-3 py-2 rounded-xl bg-rose-600 text-white text-[10px] font-bold active:scale-95 transition-all">使い切りを見る</button>
+          </div>
+          <div class="space-y-2">${body}</div>
+        </section>
+      `;
     }
 
     function renderCookingRecordSummary() {

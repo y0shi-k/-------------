@@ -1,0 +1,21 @@
+{
+  "ticket": "TKT-0081-expiry-use-up-hub",
+  "status": "passed",
+  "checks": [
+    {
+      "name": "html_parser_executeGAS_GAS_URL",
+      "command": "python3 -c \"import html.parser; html.parser.HTMLParser().feed(open('app.html').read())\" && grep -q 'executeGAS' app.html && grep -q 'GAS_URL' app.html && echo 'VERIFY_PASSED'",
+      "result": "VERIFY_PASSED"
+    },
+    {
+      "name": "js_syntax",
+      "command": "node -e \"const fs=require('fs'); const html=fs.readFileSync('app.html','utf8'); const m=html.match(/<script>([\\s\\S]*)<\\/script>/); new Function(m[1]); console.log('JS_SYNTAX_PASSED')\"",
+      "result": "JS_SYNTAX_PASSED"
+    },
+    {
+      "name": "browser_dialogs",
+      "command": "rg -n \"alert\\(|confirm\\(|prompt\\(\" app.html",
+      "result": "no matches"
+    }
+  ]
+}
