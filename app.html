@@ -1491,6 +1491,7 @@
     }
 
     function parseJsonArray(value) {
+      if (Array.isArray(value)) return value;
       try {
         const parsed = JSON.parse(value || '[]');
         return Array.isArray(parsed) ? parsed : [];
@@ -3757,6 +3758,166 @@
         + getRecipeItems(recipe, 'seasonings', '調味料').length;
     }
 
+    function normalizeDecisionMatchText(value) {
+      return String(value || '').replace(/\s+/g, '').toLowerCase();
+    }
+
+    function getDaysBetweenLocalDates(fromDate, toDate) {
+      const from = new Date(fromDate);
+      const to = new Date(toDate);
+      if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) return null;
+      from.setHours(0, 0, 0, 0);
+      to.setHours(0, 0, 0, 0);
+      return Math.floor((to - from) / 86400000);
+    }
+
+    function getRecipeHistoryDates(recipe) {
+      return parseJsonArray(recipe && recipe.history)
+        .map(value => String(value || '').slice(0, 10))
+        .filter(value => /^\d{4}-\d{2}-\d{2}$/.test(value));
+    }
+
+    function getRecipeHistoryEntries(recipe) {
+      if (!recipe) return [];
+      const recipeId = String(recipe.id || '');
+      const recipeName = String(recipe.name || '');
+      return [...(state.cookingHistory || [])]
+        .filter(item => {
+          if (!item) return false;
+          if (recipeId && String(item.recipeId || '') === recipeId) return true;
+          return !recipeId && recipeName && String(item.recipeName || '') === recipeName;
+        })
+        .sort((a, b) => String(b.cookingDate || '').localeCompare(String(a.cookingDate || '')));
+    }
+
+    function getRecipeExpiringMatches(recipe) {
+      const recipeItems = [
+        ...getRecipeItems(recipe, 'ingredients', '食材'),
+        ...getRecipeItems(recipe, 'seasonings', '調味料')
+      ];
+      const recipeNames = recipeItems.map(item => normalizeDecisionMatchText(item.name)).filter(Boolean);
+      if (!recipeNames.length) return [];
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      return (state.inventory || [])
+        .map(item => {
+          const limit = getItemLimitValue(item);
+          if (!limit) return null;
+          const limitDate = new Date(limit);
+          limitDate.setHours(0, 0, 0, 0);
+          const daysLeft = Math.ceil((limitDate - today) / 86400000);
+          if (Number.isNaN(daysLeft) || daysLeft > 3) return null;
+          const itemName = normalizeDecisionMatchText(item.name);
+          const matched = recipeNames.some(name => name === itemName || (name.length >= 2 && itemName.includes(name)) || (itemName.length >= 2 && name.includes(itemName)));
+          return matched ? { ...item, limit, daysLeft } : null;
+        })
+        .filter(Boolean)
+        .sort((a, b) => a.daysLeft - b.daysLeft || String(a.limit || '').localeCompare(String(b.limit || '')) || String(a.name || '').localeCompare(String(b.name || ''), 'ja'))
+        .slice(0, 2);
+    }
+
+    function getRecipeDecisionMeta(recipe) {
+      const historyEntries = getRecipeHistoryEntries(recipe);
+      const historyDates = getRecipeHistoryDates(recipe);
+      const entryDates = historyEntries.map(item => getHistoryDateKey(item)).filter(Boolean);
+      const allDates = [...historyDates, ...entryDates].filter(value => /^\d{4}-\d{2}-\d{2}$/.test(value)).sort();
+      const lastCookedDate = allDates.length ? allDates[allDates.length - 1] : '';
+      const ratings = historyEntries.map(item => Number(item.rating) || 0).filter(value => value > 0);
+      const latestRated = historyEntries.find(item => Number(item.rating) > 0);
+      const latestRating = latestRated ? Number(latestRated.rating) || 0 : 0;
+      const averageRating = ratings.length ? ratings.reduce((sum, value) => sum + value, 0) / ratings.length : 0;
+      const photoEntry = historyEntries.find(item => item.photoUrl);
+      const photoUrl = photoEntry ? photoEntry.photoUrl || '' : '';
+      const photoSrc = photoUrl ? getCookingHistoryPhotoSrc(photoUrl) : '';
+      const count = Math.max(Number(recipe && recipe.count) || 0, allDates.length, historyEntries.length);
+      const staleDays = lastCookedDate ? getDaysBetweenLocalDates(lastCookedDate, new Date()) : null;
+      return {
+        count,
+        lastCookedDate,
+        staleDays,
+        latestRating,
+        averageRating,
+        ratingCount: ratings.length,
+        hasHighRating: latestRating >= 4 || averageRating >= 4,
+        hasPhoto: !!photoUrl,
+        photoUrl,
+        photoSrc,
+        expiringMatches: getRecipeExpiringMatches(recipe)
+      };
+    }
+
+    function formatRecipeDecisionRating(meta) {
+      if (!meta || !meta.ratingCount) return '';
+      const value = meta.averageRating ? Math.round(meta.averageRating * 10) / 10 : meta.latestRating;
+      return `評価 ${value}`;
+    }
+
+    function renderRecipeDecisionThumbnail(recipe, meta) {
+      if (meta.photoSrc) {
+        return `
+          <div class="w-16 h-16 rounded-xl overflow-hidden bg-slate-100 border border-indigo-100 flex-shrink-0">
+            <img src="${escapeHtml(meta.photoSrc)}" alt="${escapeHtml(recipe.name || '完成写真')}" class="w-full h-full object-cover">
+          </div>
+        `;
+      }
+      if (meta.hasPhoto) {
+        return `
+          <div class="w-16 h-16 rounded-xl bg-amber-50 border border-amber-100 text-amber-600 flex flex-col items-center justify-center flex-shrink-0 gap-1">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h3l2-3h6l2 3h3v11H4V8Zm8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/></svg>
+            <span class="text-[9px] font-bold">写真あり</span>
+          </div>
+        `;
+      }
+      return `
+        <div class="w-16 h-16 bg-indigo-100 rounded-xl flex items-center justify-center flex-shrink-0">
+          <svg class="w-7 h-7 text-indigo-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 3v18M10 3v18M6 8h4M17 3v8a3 3 0 0 1-3 3h0v7"/></svg>
+        </div>
+      `;
+    }
+
+    function renderRecipeDecisionBadges(meta) {
+      const badges = [];
+      if (meta.expiringMatches.length) {
+        const first = meta.expiringMatches[0];
+        const suffix = meta.expiringMatches.length > 1 ? ` +${meta.expiringMatches.length - 1}` : '';
+        const cls = first.daysLeft <= 0 ? 'bg-rose-100 text-rose-700 border-rose-200' : 'bg-amber-100 text-amber-700 border-amber-200';
+        badges.push(`<span class="inline-flex items-center max-w-full rounded-full border ${cls} px-2 py-0.5 text-[10px] font-bold"><span class="truncate">期限 ${escapeHtml(first.name || '')}${suffix}</span></span>`);
+      }
+      if (meta.hasPhoto) badges.push('<span class="inline-flex items-center rounded-full border border-indigo-100 bg-indigo-50 text-indigo-700 px-2 py-0.5 text-[10px] font-bold">写真あり</span>');
+      if (meta.hasHighRating) badges.push('<span class="inline-flex items-center rounded-full border border-emerald-100 bg-emerald-50 text-emerald-700 px-2 py-0.5 text-[10px] font-bold">高評価</span>');
+      if (meta.count >= 5) badges.push('<span class="inline-flex items-center rounded-full border border-sky-100 bg-sky-50 text-sky-700 px-2 py-0.5 text-[10px] font-bold">よく作る</span>');
+      if (meta.staleDays !== null && meta.staleDays >= 45) badges.push('<span class="inline-flex items-center rounded-full border border-slate-200 bg-slate-100 text-slate-600 px-2 py-0.5 text-[10px] font-bold">久しぶり</span>');
+      return badges.slice(0, 3).join('');
+    }
+
+    function renderRecipeDecisionMetaLine(meta) {
+      const parts = [
+        meta.lastCookedDate ? `前回 ${meta.lastCookedDate}` : '前回 —',
+        `調理 ${meta.count || 0}回`,
+        formatRecipeDecisionRating(meta)
+      ].filter(Boolean);
+      return escapeHtml(parts.join(' | '));
+    }
+
+    function renderRecipeDecisionDetailMeta(recipe) {
+      const meta = getRecipeDecisionMeta(recipe);
+      const rating = formatRecipeDecisionRating(meta);
+      const expiring = meta.expiringMatches.map(item => item.name).filter(Boolean).slice(0, 2).join('、');
+      const chips = [
+        meta.lastCookedDate ? `前回 ${meta.lastCookedDate}` : '',
+        `調理 ${meta.count || 0}回`,
+        rating,
+        expiring ? `期限食材 ${expiring}` : '',
+        meta.hasPhoto ? '写真あり' : ''
+      ].filter(Boolean);
+      if (!chips.length) return '';
+      return `
+        <div class="flex flex-wrap justify-center gap-1.5">
+          ${chips.map(text => `<span class="inline-flex items-center rounded-full bg-slate-50 text-slate-500 border border-slate-100 px-2.5 py-1 text-[10px] font-bold">${escapeHtml(text)}</span>`).join('')}
+        </div>
+      `;
+    }
+
     function renderRecipeModeControls() {
       const primary = document.getElementById('recipePrimaryRow');
       const secondary = document.getElementById('recipeSecondaryRow');
@@ -4915,6 +5076,7 @@ ${plan ? '\n提案方針: ' + plan : ''}
       if (genreTags.length) {
         sourceContainer.insertAdjacentHTML('beforeend', `<div class="flex flex-wrap justify-center gap-1.5">${genreTags.map(genre => renderGenreTag(genre)).join('')}</div>`);
       }
+      sourceContainer.insertAdjacentHTML('beforeend', renderRecipeDecisionDetailMeta(recipe));
       const sourceUrls = (recipe.source || '').split(/\n+/).map(s => s.trim()).filter(Boolean);
       if (sourceUrls.length > 0) {
         sourceUrls.forEach(url => {
@@ -5390,18 +5552,18 @@ ${plan ? '\n提案方針: ' + plan : ''}
         const ingCount = getRecipeIngredientCount(recipe);
         const syncBadge = getRecipeSyncBadge(recipe);
         const genreSummary = renderRecipeListGenreSummary(recipe);
+        const decisionMeta = getRecipeDecisionMeta(recipe);
+        const decisionBadges = renderRecipeDecisionBadges(decisionMeta);
         container.insertAdjacentHTML('beforeend', `
-          <div class="bg-white/80 p-5 rounded-xl shadow-sm border border-indigo-100 flex items-start gap-4 group cursor-pointer hover:bg-indigo-50 transition-colors" onclick="openRecipeViewer('${recipe.id}')">
-            <div class="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center flex-shrink-0 mt-1">
-              <svg class="w-6 h-6 text-indigo-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 3v18M10 3v18M6 8h4M17 3v8a3 3 0 0 1-3 3h0v7"/></svg>
-            </div>
+          <div class="bg-white/80 p-4 rounded-xl shadow-sm border border-indigo-100 flex items-start gap-3 group cursor-pointer hover:bg-indigo-50 transition-colors min-w-0" onclick="openRecipeViewer('${recipe.id}')">
+            ${renderRecipeDecisionThumbnail(recipe, decisionMeta)}
             <div class="flex-1 min-w-0">
-              <div class="flex items-center gap-3 min-h-[2.5rem]">
-                <div class="flex-1 min-w-0 flex items-center gap-2">
+              <div class="flex flex-wrap items-start gap-3 min-h-[2.5rem]">
+                <div class="flex-1 min-w-[10rem] flex items-center gap-2">
                   <h4 class="font-medium text-slate-800 text-lg truncate">${escapeHtml(recipe.name)}</h4>
                   ${syncBadge}
                 </div>
-                <div class="flex items-center gap-1 shrink-0">
+                <div class="flex items-center gap-1 shrink-0 ml-auto">
                   <button onclick="event.stopPropagation(); openCookingViewer('${recipe.id}', { returnTo: 'recipes' })" class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 hover:bg-emerald-100 flex items-center justify-center transition-all" title="料理する">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 3v18M10 3v18M6 8h4M17 3v8a3 3 0 0 1-3 3h0v7"/></svg>
                   </button>
@@ -5414,13 +5576,15 @@ ${plan ? '\n提案方針: ' + plan : ''}
                 </div>
               </div>
               <div class="mt-1 flex items-center gap-2 min-w-0 h-6 overflow-hidden">
-                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest truncate shrink-0 max-w-[52%]">材料 ${ingCount} 品目 | 調理回数 ${recipe.count || 0} | 登録 ${escapeHtml(getRecipeDateValue(recipe, 'createdAt') || '—')}</p>
+                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest truncate shrink-0 max-w-[58%]">材料 ${ingCount} 品目 | ${renderRecipeDecisionMetaLine(decisionMeta)}</p>
                 ${genreSummary}
               </div>
+              ${decisionBadges ? `<div class="mt-2 flex flex-wrap gap-1.5 overflow-hidden max-h-7">${decisionBadges}</div>` : ''}
             </div>
           </div>
         `);
       });
+      scheduleRecipeListGenreFit();
     }
 
     function setRecipeSearchMode(mode) {

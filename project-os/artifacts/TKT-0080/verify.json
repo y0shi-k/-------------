@@ -1,0 +1,32 @@
+{
+  "ticket": "TKT-0080-recipe-card-decision-signals",
+  "status": "passed",
+  "verified_at": "2026-05-22",
+  "commands": [
+    {
+      "command": "python3 -c \"import html.parser; html.parser.HTMLParser().feed(open('app.html').read())\" && grep -q 'executeGAS' app.html && grep -q 'GAS_URL' app.html && echo 'VERIFY_PASSED'",
+      "status": "passed",
+      "output": "VERIFY_PASSED"
+    },
+    {
+      "command": "git diff --check -- app.html",
+      "status": "passed",
+      "output": ""
+    },
+    {
+      "command": "rg -n \"alert\\(|confirm\\(|prompt\\(\" app.html",
+      "status": "passed",
+      "output": "no matches"
+    }
+  ],
+  "static_checks": {
+    "new_spreadsheet_write_execute_gas": "none added",
+    "storage_schema_changed": false,
+    "gas_schema_changed": false,
+    "recipe_or_history_format_changed": false
+  },
+  "browser_check": {
+    "status": "blocked",
+    "reason": "In-app browser blocked file:// navigation by URL policy; no workaround was attempted."
+  }
+}
