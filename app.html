@@ -8574,7 +8574,9 @@ ${text}`;
       if (!scheduleItem) {
         scheduleItem = state.schedule.find(s => s.date === todayStr && s.recipeId === recipeId && s.status !== '完了');
       }
-      const cookingDate = `${todayStr} ${String(today.getHours()).padStart(2, '0')}:${String(today.getMinutes()).padStart(2, '0')}:${String(today.getSeconds()).padStart(2, '0')}`;
+      const cookingDateKey = scheduleItem && scheduleItem.date ? scheduleItem.date : todayStr;
+      const cookingTime = `${String(today.getHours()).padStart(2, '0')}:${String(today.getMinutes()).padStart(2, '0')}:${String(today.getSeconds()).padStart(2, '0')}`;
+      const cookingDate = `${cookingDateKey} ${cookingTime}`;
 
       // レシピ名を取得
       const recipe = state.recipes.find(r => r.id === recipeId);
@@ -8595,7 +8597,7 @@ ${text}`;
       if (recipe) {
         recipe.count = (Number(recipe.count) || 0) + 1;
         const history = parseJsonArray(recipe.history);
-        history.push(todayStr);
+        history.push(cookingDateKey);
         recipe.history = JSON.stringify(history);
         recipe.updatedAt = cookingDate;
         state.pendingSync.recipeHistory.push({
