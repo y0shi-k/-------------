@@ -26,6 +26,29 @@
       "id": "canvas_gas_url_marker",
       "command": "grep -q GAS_URL app.html",
       "status": "passed"
+    },
+    {
+      "id": "web_migration_specs_created",
+      "command": "rg --files project-os/specs | rg 'SPEC-01(0[1-9]|1[0-2])-'",
+      "status": "passed",
+      "detail": "SPEC-0101 through SPEC-0112 exist"
+    },
+    {
+      "id": "web_migration_tickets_created",
+      "command": "rg --files project-os/tickets | rg 'TKT-01(0[1-9]|1[0-2])-'",
+      "status": "passed",
+      "detail": "TKT-0101 through TKT-0112 exist"
+    },
+    {
+      "id": "canvas_html_parse_after_ticket_creation",
+      "command": "python3 -c \"import html.parser; html.parser.HTMLParser().feed(open('app.html').read())\"",
+      "status": "passed"
+    },
+    {
+      "id": "no_secret_literal_in_web_migration_docs",
+      "command": "rg -n \"AKIA|AIza|SUPABASE_SERVICE_ROLE_KEY=.*[A-Za-z0-9_-]{20}|SUPABASE_DB_PASSWORD=.*[^ ]|GEMINI_API_KEY=.*[A-Za-z0-9_-]{20}\" project-os/specs/SPEC-01*.md project-os/tickets/TKT-01*.md project-os/knowledge/web-migration-map.md",
+      "status": "passed",
+      "detail": "No matches"
     }
   ],
   "skipped": [

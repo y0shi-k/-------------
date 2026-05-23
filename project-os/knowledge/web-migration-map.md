@@ -35,16 +35,23 @@ Canvas版 Stock Master を壊さず、同じリポジトリ内でWeb版を新設
 
 ## チケット分解
 
-- `TKT-0100`: AGENTS/ハーネス/テンプレートをWeb移植対応にする
-- `TKT-0101`: `web/` にNext.js土台を作る
-- `TKT-0102`: Supabase接続と環境変数管理を整える
-- `TKT-0103`: Supabase schema v1を作る
-- `TKT-0104`: 自分だけログインを作る
-- `TKT-0105`: 在庫と登録待ちをWeb版へ移植する
-- `TKT-0106`: スマホ/タブレット写真取り込みと圧縮アップロードを作る
-- `TKT-0107`: サーバー側API経由のAI食材解析を作る
-- `TKT-0108`: 料理履歴と完成写真をWeb版へ移植する
-- `TKT-0109`: レシピ、献立、調理導線をWeb版へ移植する
-- `TKT-0110`: Spreadsheet CSVをSupabaseへ移す
-- `TKT-0111`: PWA化とスマホUI調整を行う
-- `TKT-0112`: Vercel公開前チェックを行う
+| 順番 | SPEC | TICKET | 目的 |
+| --- | --- | --- | --- |
+| 0 | `project-os/specs/SPEC-0100-web-migration-governance.md` | `project-os/tickets/TKT-0100-web-migration-governance.md` | AGENTS/ハーネス/テンプレートをWeb移植対応にする |
+| 1 | `project-os/specs/SPEC-0101-web-project-bootstrap.md` | `project-os/tickets/TKT-0101-web-project-bootstrap.md` | `web/` にNext.js土台を作る |
+| 2 | `project-os/specs/SPEC-0102-supabase-project-and-env.md` | `project-os/tickets/TKT-0102-supabase-project-and-env.md` | Supabase接続と環境変数管理を整える |
+| 3 | `project-os/specs/SPEC-0103-supabase-schema-v1.md` | `project-os/tickets/TKT-0103-supabase-schema-v1.md` | Supabase schema v1を作る |
+| 4 | `project-os/specs/SPEC-0104-auth-self-user.md` | `project-os/tickets/TKT-0104-auth-self-user.md` | 自分だけログインを作る |
+| 5 | `project-os/specs/SPEC-0105-inventory-and-staging-web.md` | `project-os/tickets/TKT-0105-inventory-and-staging-web.md` | 在庫と登録待ちをWeb版へ移植する |
+| 6 | `project-os/specs/SPEC-0106-mobile-photo-capture-upload.md` | `project-os/tickets/TKT-0106-mobile-photo-capture-upload.md` | スマホ/タブレット写真取り込みと圧縮アップロードを作る |
+| 7 | `project-os/specs/SPEC-0107-ai-ingredient-scan-api.md` | `project-os/tickets/TKT-0107-ai-ingredient-scan-api.md` | サーバー側API経由のAI食材解析を作る |
+| 8 | `project-os/specs/SPEC-0108-cooking-history-photo-web.md` | `project-os/tickets/TKT-0108-cooking-history-photo-web.md` | 料理履歴と完成写真をWeb版へ移植する |
+| 9 | `project-os/specs/SPEC-0109-recipes-and-meal-schedule-web.md` | `project-os/tickets/TKT-0109-recipes-and-meal-schedule-web.md` | レシピ、献立、調理導線をWeb版へ移植する |
+| 10 | `project-os/specs/SPEC-0110-csv-migration-tool.md` | `project-os/tickets/TKT-0110-csv-migration-tool.md` | Spreadsheet CSVをSupabaseへ移す |
+| 11 | `project-os/specs/SPEC-0111-pwa-mobile-polish.md` | `project-os/tickets/TKT-0111-pwa-mobile-polish.md` | PWA化とスマホUI調整を行う |
+| 12 | `project-os/specs/SPEC-0112-production-release-checklist.md` | `project-os/tickets/TKT-0112-production-release-checklist.md` | Vercel公開前チェックを行う |
+
+## 再開方法
+
+次に実装へ入る場合は `project-os/tickets/TKT-0101-web-project-bootstrap.md` を読む。
+以後は各ticketの末尾にある「次」をたどる。
