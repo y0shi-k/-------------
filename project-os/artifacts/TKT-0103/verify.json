@@ -1,0 +1,75 @@
+{
+  "ticket": "TKT-0103-supabase-schema-v1",
+  "status": "passed",
+  "verified_at": "2026-05-23",
+  "commands": [
+    {
+      "command": "supabase db push --dry-run",
+      "cwd": ".",
+      "status": "passed",
+      "summary": "Dry-run showed 20260523094705_schema_v1.sql before the first push."
+    },
+    {
+      "command": "supabase db push",
+      "cwd": ".",
+      "status": "passed",
+      "summary": "Applied 20260523094705_schema_v1.sql to the linked Supabase project."
+    },
+    {
+      "command": "supabase db push --dry-run",
+      "cwd": ".",
+      "status": "passed",
+      "summary": "Dry-run showed 20260523095800_fix_composite_fk_delete_actions.sql before the follow-up push."
+    },
+    {
+      "command": "supabase db push",
+      "cwd": ".",
+      "status": "passed",
+      "summary": "Applied 20260523095800_fix_composite_fk_delete_actions.sql to the linked Supabase project."
+    },
+    {
+      "command": "supabase migration list",
+      "cwd": ".",
+      "status": "passed",
+      "summary": "Local and Remote both show 20260523094705 and 20260523095800."
+    },
+    {
+      "command": "npm run lint",
+      "cwd": "web",
+      "status": "passed"
+    },
+    {
+      "command": "npm run typecheck",
+      "cwd": "web",
+      "status": "passed"
+    },
+    {
+      "command": "npm run test",
+      "cwd": "web",
+      "status": "passed",
+      "summary": "2 test files passed, 4 tests passed."
+    },
+    {
+      "command": "npm run build",
+      "cwd": "web",
+      "status": "passed"
+    },
+    {
+      "command": "rg schema/RLS/storage checks",
+      "cwd": ".",
+      "status": "passed",
+      "summary": "Migration contains all eight required tables, RLS enable statements, auth.uid() policies, and a private photos bucket."
+    },
+    {
+      "command": "rg secret literal scan",
+      "cwd": ".",
+      "status": "passed",
+      "summary": "No API key, JWT-like secret, database URL, service role key literal, DB password literal, or Gemini key literal found in supabase/ or web/."
+    }
+  ],
+  "notes": [
+    "The first schema migration was pushed by Codex after dry-run approval.",
+    "The follow-up migration was pushed by the user because Codex escalation approval timed out for the remote command.",
+    "No secret values were recorded in artifacts."
+  ]
+}
