@@ -1,0 +1,62 @@
+{
+  "ticket": "TKT-0102-supabase-project-and-env",
+  "status": "passed",
+  "verified_at": "2026-05-23",
+  "commands": [
+    {
+      "command": "npm run lint",
+      "cwd": "web",
+      "status": "passed"
+    },
+    {
+      "command": "npm run typecheck",
+      "cwd": "web",
+      "status": "passed"
+    },
+    {
+      "command": "npm run test",
+      "cwd": "web",
+      "status": "passed",
+      "summary": "2 test files passed, 4 tests passed"
+    },
+    {
+      "command": "npm run build",
+      "cwd": "web",
+      "status": "passed"
+    },
+    {
+      "command": "rg -n 'GAS_URL|executeGAS|SpreadsheetApp|DriveApp' web docs/runbook project-os/tickets/TKT-0102-supabase-project-and-env.md",
+      "cwd": ".",
+      "status": "passed_with_known_existing_docs_matches",
+      "summary": "No Web app code matches. Existing Canvas runbook mentions GAS verify and sensitive data."
+    },
+    {
+      "command": "rg -n 'AIza[0-9A-Za-z_-]{20,}|supabase\\.co.*(service|secret|password)|eyJ[A-Za-z0-9_-]{20,}\\.[A-Za-z0-9_-]{20,}\\.[A-Za-z0-9_-]{20,}' web docs/runbook project-os/tickets/TKT-0102-supabase-project-and-env.md",
+      "cwd": ".",
+      "status": "passed",
+      "summary": "No API key, Supabase service key, or JWT-like secret literal found."
+    },
+    {
+      "command": "rg -n 'SUPABASE_SERVICE_ROLE_KEY|SUPABASE_DB_PASSWORD|GEMINI_API_KEY' web/src/lib/supabase web/src/__tests__ web/.env.example docs/runbook/Supabase登録の詳細手順.md",
+      "cwd": ".",
+      "status": "passed",
+      "summary": "Only variable names, placeholders, and fake test values are present."
+    },
+    {
+      "command": "Browser smoke: http://localhost:3001 desktop viewport",
+      "cwd": "web",
+      "status": "passed",
+      "summary": "Page title, heading, TKT-0102 scope, and Supabase client text were visible."
+    },
+    {
+      "command": "Browser smoke: http://localhost:3001 mobile viewport 390x844",
+      "cwd": "web",
+      "status": "passed",
+      "summary": "Heading, TKT-0102 scope, and Supabase client text were visible on mobile viewport."
+    }
+  ],
+  "notes": [
+    "The first npm install attempts failed inside the restricted sandbox due to DNS/network restrictions. Approved escalated npm install succeeded for @supabase/supabase-js and server-only.",
+    "No real Supabase project, Vercel settings, production DB, or Storage resources were created."
+  ]
+}

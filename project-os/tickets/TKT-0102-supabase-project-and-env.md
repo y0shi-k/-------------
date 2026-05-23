@@ -7,6 +7,7 @@ acceptance:
   - `.env.example` にSupabase/Gemini/Vercelで必要な変数名がある
   - `NEXT_PUBLIC_` を付ける変数と付けない秘密変数が分かれている
   - service role keyをブラウザ側で参照しない
+  - 非エンジニア向けのSupabase登録手順が `docs/runbook/` にある
   - `rg` でAPIキー実値やDBパスワードの直書きがない
   - Web版verifyが通る
 required_evals:
@@ -15,6 +16,7 @@ required_evals:
 eval_selection_mode: manual
 changed_paths:
   - web/
+  - docs/runbook/
   - project-os/artifacts/TKT-0102/
 required_gates:
   - spec_ready

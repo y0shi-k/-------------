@@ -2,6 +2,7 @@
 
 ## 目的別の参照先
 - 通常運用を見るとき: `runbook/導入手順.md`
+- Supabase登録手順を見るとき: `runbook/Supabase登録の詳細手順.md`
 - 調査資料を置くとき: `research/`
 - 長期計画を見るとき: `plans/`
 - 完了報告やテスト結果を見るとき: `reports/`

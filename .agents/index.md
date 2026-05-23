@@ -6,6 +6,7 @@
 - 正本/生成物の境界: `rules/source-of-truth.md`
 - verify と phase gate: `rules/verify-and-gates.md`
 - データ安全ルール: `rules/data-safety.md`
+- 依存関係安全ルール: `rules/dependency-security.md`
 - 技術スタック・絶対制約: `rules/tech-stack.md`
 - コーディング規約: `rules/coding-standards.md`
 - データベーススキーマ: `rules/schema.md`

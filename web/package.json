@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "preinstall": "node scripts/guard-dependency-install.mjs",
     "dev": "next dev",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
@@ -10,9 +11,11 @@
     "build": "next build"
   },
   "dependencies": {
+    "@supabase/supabase-js": "2.106.1",
     "next": "15.5.18",
     "react": "19.0.0",
-    "react-dom": "19.0.0"
+    "react-dom": "19.0.0",
+    "server-only": "0.0.1"
   },
   "devDependencies": {
     "@testing-library/react": "16.3.0",

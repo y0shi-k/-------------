@@ -14,12 +14,12 @@ export const setupSteps: SetupStep[] = [
   },
   {
     title: "Supabase接続",
-    description: "環境変数と接続確認は TKT-0102 で実施",
-    status: "next"
+    description: "環境変数と安全な接続clientを TKT-0102 で準備",
+    status: "ready"
   },
   {
     title: "在庫・レシピ機能",
-    description: "認証とDBの安全設定後に順番に追加",
+    description: "DB設計と認証の安全設定後に順番に追加",
     status: "later"
   }
 ];

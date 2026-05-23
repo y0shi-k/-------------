@@ -79,3 +79,12 @@
 - `rg -n 'GAS_URL|executeGAS|SpreadsheetApp|DriveApp' web supabase scripts` で、Web版にGAS/Spreadsheet/Drive依存が入っていないことを確認する。
 - `rg -n 'GEMINI_API_KEY|SUPABASE_SERVICE_ROLE_KEY|SUPABASE_DB_PASSWORD' web supabase scripts` で、実値を直書きしていないことを確認する。変数名だけの参照は許容する。
 - Supabase migrationでは、個人データを持つテーブルにRLSと本人制限policyがあることを確認する。
+
+## 依存関係 security check
+- npm / Python / 外部CLI などの依存関係を追加・更新・削除する変更では、`required_evals` に `dependency_security_check` を含める。
+- 実行前にユーザー許可を得たことを artifact に残す。
+- npm変更では `web/.npmrc` の `save-exact=true` と `package-lock.json` の存在を確認する。
+- npm変更では `npm audit --audit-level=high` を実行し、結果を artifact に残す。
+- Python変更では直接依存のバージョン固定、lockfile、または hash 固定方針を確認する。
+- Python変更では `python3 -m pip check` を実行し、結果を artifact に残す。
+- 依存関係ファイル（`package.json`, `package-lock.json`, `.npmrc`, `requirements.txt`, `pyproject.toml`, `uv.lock`, `Pipfile.lock`, `poetry.lock` など）の差分を確認し、意図しない更新がないことを review に書く。
