@@ -10,6 +10,6 @@ describe("SetupStatus", () => {
     expect(screen.getByRole("heading", { name: "Web版の準備状況" })).toBeTruthy();
     expect(screen.getByText("Web版の器")).toBeTruthy();
     expect(screen.getByText("Supabase接続")).toBeTruthy();
-    expect(screen.getByText("在庫・レシピ機能")).toBeTruthy();
+    expect(screen.getByText("自分だけログイン")).toBeTruthy();
   });
 });

@@ -1,0 +1,39 @@
+{
+  "ticket": "TKT-0104-auth-self-user",
+  "status": "passed",
+  "checked_at": "2026-05-23",
+  "commands": [
+    {
+      "command": "npm run lint",
+      "cwd": "web",
+      "status": "passed"
+    },
+    {
+      "command": "npm run typecheck",
+      "cwd": "web",
+      "status": "passed"
+    },
+    {
+      "command": "npm run test",
+      "cwd": "web",
+      "status": "passed",
+      "summary": "4 test files passed, 10 tests passed"
+    },
+    {
+      "command": "npm run build",
+      "cwd": "web",
+      "status": "passed",
+      "summary": "Routes / and /login are dynamic; middleware built successfully"
+    },
+    {
+      "command": "npm audit --audit-level=high",
+      "cwd": "web",
+      "status": "passed",
+      "summary": "found 0 vulnerabilities"
+    }
+  ],
+  "notes": [
+    "The first sandboxed npm audit attempt failed because network access was blocked, then passed with approved network access.",
+    "No Supabase migration was added for this ticket because TKT-0103 already defines user_id and RLS policies."
+  ]
+}

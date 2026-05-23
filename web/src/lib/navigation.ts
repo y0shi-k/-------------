@@ -18,8 +18,8 @@ export const setupSteps: SetupStep[] = [
     status: "ready"
   },
   {
-    title: "在庫・レシピ機能",
-    description: "DB設計と認証の安全設定後に順番に追加",
-    status: "later"
+    title: "自分だけログイン",
+    description: "Supabase Authで本人だけがWeb版へ入れる導線を追加",
+    status: "ready"
   }
 ];
