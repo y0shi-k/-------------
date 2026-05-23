@@ -5,14 +5,22 @@
     "要件定義書.md",
     "AGENTS.md",
     ".agents/",
-    "harness/*.json"
+    "harness/*.json",
+    "project-os/",
+    "docs/",
+    "web/",
+    "supabase/",
+    "scripts/"
   ],
   "generated_files": [
     "GASデプロイ後のWebアプリ",
     "Google Spreadsheet 内のデータ",
-    "Google Drive へ保存された画像ファイル"
+    "Google Drive へ保存された画像ファイル",
+    "Vercelデプロイ",
+    "Supabase本番DB",
+    "Supabase Storage画像"
   ],
-  "verify_command": "python3 -c \"import html.parser; html.parser.HTMLParser().feed(open('app.html').read())\" && grep -q 'executeGAS' app.html && grep -q 'GAS_URL' app.html && echo 'VERIFY_PASSED'",
+  "verify_command": "Canvas版: python3 -c \"import html.parser; html.parser.HTMLParser().feed(open('app.html').read())\" && grep -q 'executeGAS' app.html && grep -q 'GAS_URL' app.html && echo 'VERIFY_PASSED' / Web版: cd web && npm run lint && npm run typecheck && npm run test && npm run build",
   "optional_audit_command": "未定（Phase2以降で必要に応じて設定）",
   "build_markers": [
     "HTML構文パース成功",
@@ -59,6 +67,36 @@
       "id": "code_bloat_check",
       "label": "コード肥大化抑制",
       "summary": "新規機能の追加行数が最小限であり、既存パターンの再利用が徹底されていること"
+    },
+    {
+      "id": "web_build",
+      "label": "Web版ビルド",
+      "summary": "web/ で npm run build が成功し、Vercel公開前に壊れていないこと"
+    },
+    {
+      "id": "web_lint",
+      "label": "Web版lint",
+      "summary": "web/ で npm run lint が成功し、基本的なコード品質を満たすこと"
+    },
+    {
+      "id": "web_typecheck",
+      "label": "Web版型チェック",
+      "summary": "web/ で npm run typecheck が成功し、TypeScriptの型エラーがないこと"
+    },
+    {
+      "id": "web_auth_guard",
+      "label": "Web版ログイン保護",
+      "summary": "未ログイン状態で個人データ画面へアクセスできないこと"
+    },
+    {
+      "id": "web_storage_security",
+      "label": "Web版写真Storage保護",
+      "summary": "Supabase Storageの写真が公開バケットや推測可能URLで公開されていないこと"
+    },
+    {
+      "id": "web_mobile_photo_capture",
+      "label": "スマホ写真取り込み",
+      "summary": "iPhone/Android/タブレットで写真撮影、プレビュー、撮り直し、アップロードができること"
     }
   ]
 }

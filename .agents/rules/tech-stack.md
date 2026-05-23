@@ -1,5 +1,29 @@
 # 技術スタックと絶対制約
 
+このリポジトリにはCanvas版とWeb版を同居させる。どちらを触るかで制約が違うため、変更前に対象ticketの範囲を確認する。
+
+## Web版の技術スタック
+
+| 層 | 技術 | 制約・注意 |
+|---|---|---|
+| **フロントエンド** | Next.js + TypeScript | `web/` 配下に作る。Canvas版の `app.html` へ混ぜない。 |
+| **認証** | Supabase Auth | 初期は自分だけログイン。未ログインで個人データを見せない。 |
+| **データベース** | Supabase Postgres | migrationを正本にする。RLSを必須にする。RLSは本人のデータだけ読めるようにするDB側の安全設定。 |
+| **画像保存** | Supabase Storage | 写真は個人情報を含む可能性があるため、公開バケットや推測可能URLを使わない。 |
+| **AI連携** | Gemini API | フロントから直接呼ばない。Next.js API Route側で環境変数からキーを読む。 |
+| **公開** | Vercel | 環境変数はVercel側に設定し、コードに直書きしない。 |
+| **スマホ体験** | PWA | ホーム画面追加、スマホ/タブレット表示、写真取り込みを重視する。 |
+
+## Web版の絶対制約
+
+- Web版ではGAS、Google Spreadsheet、Google Driveを使わない。
+- `GEMINI_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_DB_PASSWORD` などの実値をコード、Markdown、JSONへ書かない。
+- Supabase Storageの写真は公開URL前提にしない。
+- Supabase RLS未設定のテーブルを本番利用しない。
+- `web/` 変更後は `npm run lint`, `npm run typecheck`, `npm run test`, `npm run build` を確認する。
+
+## Canvas版の技術スタック
+
 | 層 | 技術 | 制約・注意 |
 |---|---|---|
 | **フロントエンド** | 単一HTMLファイル (`app.html`) | **1ファイルに全部書く**。外部JS/CSSファイルを分離しない。React等のフレームワークは使用しない（純粋なVanilla JS + DOM操作）。 |
@@ -9,7 +33,7 @@
 | **永続化** | `PropertiesService` (GAS) | スプレッドシートID (`SS_ID_RECIPE_APP`) を保存。GAS実行ごとにシートが増殖しないよう、初期化ロジックで存在確認を徹底する。 |
 | **AI連携** | Gemini API | フロントエンドから直接呼ぶ場合はAPIキー管理に注意。可能であればGAS側でプロキシし、キーを隠蔽する設計を推奨。 |
 
-## Canvasアプリ特有の絶対制約
+## Canvas版特有の絶対制約
 
 - **単一ファイル構成**: HTML・CSS・JSを全て `app.html`（HTMLとして解釈される）に内包する。
 - **ローカルストレージ不使用**: ブラウザの `localStorage` 等には頼らず、ソース・オブジェクト・画像は全てGAS/Spreadsheet/DriveAppで管理する。

@@ -1,24 +1,37 @@
 # Verify and Gates
 
 ## verify の入口
-- 全体確認: `python3 -c "import html.parser; html.parser.HTMLParser().feed(open('app.html').read())" && grep -q 'executeGAS' app.html && grep -q 'GAS_URL' app.html && echo 'VERIFY_PASSED'`
+- Canvas版確認: `python3 -c "import html.parser; html.parser.HTMLParser().feed(open('app.html').read())" && grep -q 'executeGAS' app.html && grep -q 'GAS_URL' app.html && echo 'VERIFY_PASSED'`
+- Web版確認: `cd web && npm run lint && npm run typecheck && npm run test && npm run build`
 - 監査が必要な時だけ: 現時点では未定
 
 ## verify が確認するもの
 - 正本と生成物の整合
-- HTML構文チェック、`executeGAS` と `GAS_URL` の存在確認
+- Canvas版ではHTML構文チェック、`executeGAS` と `GAS_URL` の存在確認
+- Web版ではlint、型チェック、テスト、build、認証/Storage/RLSの安全確認
 - `change_evals.json` に基づく manual smoke と artifact 要件
 - ticket / spec / artifact 内容に基づく phase gate 判定
 
 ## 停止条件
+### 共通
 - `spec_ready` と `implementation_ready` が揃う前の実装開始
 - 生成物 drift の未解消
+- 必須 policy check 失敗
+- 監査が必要な変更で監査未実施または失敗
+
+### Canvas版
 - HTML構文エラー
 - `executeGAS` または `GAS_URL` の消失
 - 初期読込/承認/`syncPendingChanges()` 以外で、スプシ書き込み・更新・削除を個別 `executeGAS(payload...)` している
 - スプシ書き込み系の新規UIに未同期状態表示または手動同期導線がない
-- 必須 policy check 失敗
-- 監査が必要な変更で監査未実施または失敗
+
+### Web版
+- APIキー、Supabase秘密鍵、DBパスワードの直書き
+- Supabase RLS未設定のまま個人データを扱う
+- ログインなしで個人データを閲覧できる
+- Supabase Storageで写真を公開バケットに保存する
+- `npm run build` 失敗
+- Gemini APIをブラウザから直接呼び、APIキーが露出する
 
 ## phase gate の意味
 - `spec_ready`: 関連 spec と acceptance がある
@@ -60,3 +73,9 @@
 - `rg -n 'executeGAS\\(payload' app.html` で、書き込み系の個別通信が増えていないことを確認する
 - `rg -n 'appendRow|deleteRow|setValue|setValues|SpreadsheetApp' app.html` で、書き込みGASが `handleInit()` または `syncPendingChanges()` に収まっていることを確認する
 - manual smoke では `manual_bulk_sync` を実施し、操作直後はスプシ未反映、同期ボタン後に反映されることを確認する
+
+## Web版 policy check
+- Web版の新規コードでは `required_evals` に対象に応じて `web_project_bootstrap`, `supabase_schema_change`, `auth_and_rls_policy`, `photo_upload_storage`, `ai_server_route`, `csv_import_migration`, `pwa_mobile_ui` を含める。
+- `rg -n 'GAS_URL|executeGAS|SpreadsheetApp|DriveApp' web supabase scripts` で、Web版にGAS/Spreadsheet/Drive依存が入っていないことを確認する。
+- `rg -n 'GEMINI_API_KEY|SUPABASE_SERVICE_ROLE_KEY|SUPABASE_DB_PASSWORD' web supabase scripts` で、実値を直書きしていないことを確認する。変数名だけの参照は許容する。
+- Supabase migrationでは、個人データを持つテーブルにRLSと本人制限policyがあることを確認する。

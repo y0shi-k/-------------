@@ -1,0 +1,37 @@
+{
+  "ticket_id": "TKT-0100-web-migration-governance",
+  "status": "passed",
+  "checks": [
+    {
+      "id": "registry_json_valid",
+      "command": "python3 -m json.tool harness/registry.json",
+      "status": "passed"
+    },
+    {
+      "id": "change_evals_json_valid",
+      "command": "python3 -m json.tool harness/change_evals.json",
+      "status": "passed"
+    },
+    {
+      "id": "canvas_html_parse",
+      "command": "python3 -c \"import html.parser; html.parser.HTMLParser().feed(open('app.html').read())\"",
+      "status": "passed"
+    },
+    {
+      "id": "canvas_execute_gas_marker",
+      "command": "grep -q executeGAS app.html",
+      "status": "passed"
+    },
+    {
+      "id": "canvas_gas_url_marker",
+      "command": "grep -q GAS_URL app.html",
+      "status": "passed"
+    }
+  ],
+  "skipped": [
+    {
+      "id": "web_verify",
+      "reason": "web/ は次チケット TKT-0101 で作成予定のため未実行"
+    }
+  ]
+}

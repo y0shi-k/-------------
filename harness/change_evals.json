@@ -332,6 +332,353 @@
         "JSON出力指示（responseMimeType: application/json）が維持されているか"
       ],
       "notes": "AIプロンプトは 'jsonで出力' 指示と実際の出力の間で微妙な齟齬が起きやすい。プロンプト変更後は必ず実際のAI通信で構造化結果を検証すること。"
+    },
+    {
+      "id": "web_project_bootstrap",
+      "change_scope": "Web版Next.jsプロジェクト土台の作成・変更",
+      "match_paths": [
+        "web/",
+        "package.json",
+        "AGENTS.md"
+      ],
+      "match_rules": {
+        "paths_any": [
+          "web/",
+          "package.json"
+        ],
+        "diff_regex_any": [
+          "next",
+          "typescript",
+          "eslint",
+          "npm run build",
+          "PWA|manifest"
+        ]
+      },
+      "required_verify": [
+        "web_lint",
+        "web_typecheck",
+        "web_build"
+      ],
+      "required_manual_smokes": [
+        "ui_consistency"
+      ],
+      "phase_gate_tags": [
+        "spec_ready",
+        "implementation_ready",
+        "verify_passed",
+        "manual_smokes_done",
+        "review_ready",
+        "report_ready"
+      ],
+      "artifact_requirements": [
+        "verify_summary",
+        "manual_smoke_report",
+        "review_record",
+        "user_report_draft"
+      ],
+      "review_focus": [
+        "Canvas版のapp.htmlにWeb版実装を混ぜていないか",
+        "web/配下でlint/typecheck/buildが通るか",
+        "秘密情報を.env.example以外に書いていないか"
+      ],
+      "notes": "Web版はCanvas版と別アプリとしてweb/に作る。"
+    },
+    {
+      "id": "supabase_schema_change",
+      "change_scope": "Supabase DB/Storage/Auth schema または migration の変更",
+      "match_paths": [
+        "supabase/",
+        "web/"
+      ],
+      "match_rules": {
+        "paths_any": [
+          "supabase/",
+          "web/"
+        ],
+        "diff_regex_any": [
+          "create table",
+          "alter table",
+          "create policy",
+          "enable row level security",
+          "storage\\.buckets",
+          "inventory_items|staging_items|recipes|meal_schedules|cooking_history|photos"
+        ]
+      },
+      "required_verify": [
+        "web_typecheck",
+        "web_build"
+      ],
+      "required_manual_smokes": [
+        "web_auth_guard",
+        "web_storage_security"
+      ],
+      "phase_gate_tags": [
+        "spec_ready",
+        "implementation_ready",
+        "verify_passed",
+        "manual_smokes_done",
+        "review_ready",
+        "report_ready"
+      ],
+      "artifact_requirements": [
+        "verify_summary",
+        "manual_smoke_report",
+        "review_record",
+        "user_report_draft"
+      ],
+      "review_focus": [
+        "個人データを持つテーブルでRLSが有効か",
+        "本人以外のデータを読めないpolicyになっているか",
+        "写真Storageが公開バケットになっていないか"
+      ],
+      "notes": "Supabase変更はデータ保護の中心。RLS未設定なら停止する。"
+    },
+    {
+      "id": "auth_and_rls_policy",
+      "change_scope": "Web版ログイン、セッション、Supabase RLS policy の変更",
+      "match_paths": [
+        "web/",
+        "supabase/"
+      ],
+      "match_rules": {
+        "paths_any": [
+          "web/",
+          "supabase/"
+        ],
+        "diff_regex_any": [
+          "auth",
+          "session",
+          "getUser",
+          "signIn",
+          "signOut",
+          "create policy",
+          "auth\\.uid\\(\\)"
+        ]
+      },
+      "required_verify": [
+        "web_lint",
+        "web_typecheck",
+        "web_build"
+      ],
+      "required_manual_smokes": [
+        "web_auth_guard"
+      ],
+      "phase_gate_tags": [
+        "spec_ready",
+        "implementation_ready",
+        "verify_passed",
+        "manual_smokes_done",
+        "review_ready",
+        "report_ready"
+      ],
+      "artifact_requirements": [
+        "verify_summary",
+        "manual_smoke_report",
+        "review_record",
+        "user_report_draft"
+      ],
+      "review_focus": [
+        "未ログインで個人データ画面へ入れないか",
+        "RLS policyが本人データに限定されているか",
+        "service role keyをブラウザ側で使っていないか"
+      ],
+      "notes": "初期Web版は自分だけログイン前提。ログインなし運用にしない。"
+    },
+    {
+      "id": "photo_upload_storage",
+      "change_scope": "スマホ写真取り込み、画像圧縮、Supabase Storage保存の変更",
+      "match_paths": [
+        "web/",
+        "supabase/"
+      ],
+      "match_rules": {
+        "paths_any": [
+          "web/",
+          "supabase/"
+        ],
+        "diff_regex_any": [
+          "accept=\"image/\\*\"",
+          "capture=\"environment\"",
+          "canvas\\.toDataURL",
+          "Storage",
+          "upload\\(",
+          "photo|image|写真|画像"
+        ]
+      },
+      "required_verify": [
+        "web_lint",
+        "web_typecheck",
+        "web_build"
+      ],
+      "required_manual_smokes": [
+        "web_mobile_photo_capture",
+        "web_storage_security"
+      ],
+      "phase_gate_tags": [
+        "spec_ready",
+        "implementation_ready",
+        "verify_passed",
+        "manual_smokes_done",
+        "review_ready",
+        "report_ready"
+      ],
+      "artifact_requirements": [
+        "verify_summary",
+        "manual_smoke_report",
+        "review_record",
+        "user_report_draft"
+      ],
+      "review_focus": [
+        "スマホ/タブレットで撮影・プレビュー・撮り直しができるか",
+        "元画像を不要に保存していないか",
+        "写真URLやStorageパスが公開されていないか"
+      ],
+      "notes": "写真は個人情報を含む可能性があるため、圧縮と非公開保存を標準にする。"
+    },
+    {
+      "id": "ai_server_route",
+      "change_scope": "Web版AI解析API Route と Gemini連携の変更",
+      "match_paths": [
+        "web/"
+      ],
+      "match_rules": {
+        "paths_any": [
+          "web/"
+        ],
+        "diff_regex_any": [
+          "generateContent",
+          "GEMINI_API_KEY",
+          "scan-ingredients",
+          "inlineData",
+          "responseMimeType"
+        ]
+      },
+      "required_verify": [
+        "web_lint",
+        "web_typecheck",
+        "web_build"
+      ],
+      "required_manual_smokes": [
+        "web_auth_guard"
+      ],
+      "phase_gate_tags": [
+        "spec_ready",
+        "implementation_ready",
+        "verify_passed",
+        "manual_smokes_done",
+        "review_ready",
+        "report_ready"
+      ],
+      "artifact_requirements": [
+        "verify_summary",
+        "manual_smoke_report",
+        "review_record",
+        "user_report_draft"
+      ],
+      "review_focus": [
+        "Gemini APIキーがブラウザに出ていないか",
+        "AI結果を直接確定せず登録候補にしているか",
+        "写真内の不要な個人情報を保存・表示していないか"
+      ],
+      "notes": "Web版AIは必ずサーバー側API経由にする。"
+    },
+    {
+      "id": "csv_import_migration",
+      "change_scope": "Spreadsheet CSV から Supabase への移行スクリプト変更",
+      "match_paths": [
+        "scripts/",
+        "supabase/",
+        "project-os/"
+      ],
+      "match_rules": {
+        "paths_any": [
+          "scripts/",
+          "supabase/"
+        ],
+        "diff_regex_any": [
+          "csv",
+          "import",
+          "migration",
+          "Spreadsheet",
+          "upsert",
+          "row count|件数"
+        ]
+      },
+      "required_verify": [
+        "web_typecheck"
+      ],
+      "required_manual_smokes": [
+        "schema_integrity"
+      ],
+      "phase_gate_tags": [
+        "spec_ready",
+        "implementation_ready",
+        "verify_passed",
+        "manual_smokes_done",
+        "review_ready",
+        "report_ready"
+      ],
+      "artifact_requirements": [
+        "verify_summary",
+        "manual_smoke_report",
+        "review_record",
+        "user_report_draft"
+      ],
+      "review_focus": [
+        "移行前後の件数確認があるか",
+        "失敗時に原因が分かるログを出すか",
+        "本番DBへ誤投入しない安全装置があるか"
+      ],
+      "notes": "CSV移行は一回限りでもデータ破損リスクが高い。dry-runと件数確認を優先する。"
+    },
+    {
+      "id": "pwa_mobile_ui",
+      "change_scope": "PWA、スマホ、タブレット向けUI変更",
+      "match_paths": [
+        "web/"
+      ],
+      "match_rules": {
+        "paths_any": [
+          "web/"
+        ],
+        "diff_regex_any": [
+          "manifest",
+          "service worker",
+          "viewport",
+          "safe-area",
+          "responsive",
+          "mobile|tablet|PWA"
+        ]
+      },
+      "required_verify": [
+        "web_lint",
+        "web_typecheck",
+        "web_build"
+      ],
+      "required_manual_smokes": [
+        "web_mobile_photo_capture",
+        "ui_consistency"
+      ],
+      "phase_gate_tags": [
+        "spec_ready",
+        "implementation_ready",
+        "verify_passed",
+        "manual_smokes_done",
+        "review_ready",
+        "report_ready"
+      ],
+      "artifact_requirements": [
+        "verify_summary",
+        "manual_smoke_report",
+        "review_record",
+        "user_report_draft"
+      ],
+      "review_focus": [
+        "スマホ幅で文字やボタンが重ならないか",
+        "タブレット幅で主要操作が見つけやすいか",
+        "ホーム画面追加後の表示が破綻しないか"
+      ],
+      "notes": "Web版の最重要体験はスマホ/タブレットからの写真取り込み。"
     }
   ]
 }
