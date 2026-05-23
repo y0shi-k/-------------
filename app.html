@@ -205,6 +205,7 @@
 
         <div id="recipeModeTopTabs" class="flex gap-2 overflow-x-auto no-scrollbar pb-3 mb-2 snap-x">
           <button onclick="switchBTab('recipes')" class="b-tab active bg-indigo-600 text-white shadow-sm border border-indigo-100 px-5 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap snap-start transition-all" data-tab="recipes">レシピ集</button>
+          <button onclick="switchBTab('candidates')" class="b-tab bg-white text-amber-600 border border-amber-100 px-5 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap snap-start transition-all" data-tab="candidates">候補</button>
           <button onclick="switchBTab('schedule')" class="b-tab bg-white text-sky-600 border border-sky-100 px-5 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap snap-start transition-all" data-tab="schedule">スケジュール</button>
         </div>
 
@@ -903,6 +904,10 @@
       </div>
       <div id="scheduleAddMealSelect" class="hidden">
         <p class="text-[11px] font-medium text-slate-400 uppercase tracking-widest mb-2">食事を選択</p>
+        <label id="scheduleAddCandidateOption" class="hidden mb-3 rounded-xl bg-amber-50 border border-amber-100 px-3 py-2 text-xs font-bold text-amber-700 items-center gap-2">
+          <input id="scheduleAddRemoveCandidate" type="checkbox" class="w-4 h-4 rounded border-amber-300 text-amber-500 focus:ring-amber-400" checked>
+          <span>割り当て後に候補から外す</span>
+        </label>
         <div class="grid grid-cols-3 gap-2">
           <button onclick="assignScheduleFromViewer('朝')" class="meal-btn bg-sky-50 text-sky-700 border border-sky-100 font-medium py-3 rounded-xl hover:bg-sky-100 active:scale-95 transition-all">朝</button>
           <button onclick="assignScheduleFromViewer('昼')" class="meal-btn bg-sky-50 text-sky-700 border border-sky-100 font-medium py-3 rounded-xl hover:bg-sky-100 active:scale-95 transition-all">昼</button>
@@ -1041,6 +1046,8 @@
     const DEFAULT_STORAGE_LOCATIONS = ['冷蔵庫', '冷凍庫', 'パントリー', 'ベランダ', 'その他'];
     const DEFAULT_RECIPE_GENRES = ['和食', '洋食', '中華', '韓国', 'イタリアン', 'エスニック', 'その他'];
     const SYSTEM_LOCATIONS = ['すべて', '登録待ち', '買い物リスト', '使い切り'];
+    const COOK_CANDIDATE_DATE = '9999-12-31';
+    const COOK_CANDIDATE_MEAL = '候補';
     let state = {
       inventory: [],
       shopping: [],
@@ -1683,7 +1690,19 @@
     function queueScheduleDelete(item) {
       const itemMeal = normalizeScheduleMeal(item.meal);
       const key = item.id ? ('id:' + item.id) : (item.date + '|' + itemMeal + '|' + item.recipeId);
-      if (!state.pendingSync.scheduleDeletes.some(d => {
+      const wasCreated = state.pendingSync.scheduleCreates.some(i => {
+        const ik = i.id ? ('id:' + i.id) : (i.date + '|' + normalizeScheduleMeal(i.meal) + '|' + i.recipeId);
+        return ik === key;
+      });
+      state.pendingSync.scheduleCreates = state.pendingSync.scheduleCreates.filter(i => {
+        const ik = i.id ? ('id:' + i.id) : (i.date + '|' + normalizeScheduleMeal(i.meal) + '|' + i.recipeId);
+        return ik !== key;
+      });
+      state.pendingSync.scheduleUpdates = state.pendingSync.scheduleUpdates.filter(u => {
+        const uk = u.id ? ('id:' + u.id) : (u.date + '|' + normalizeScheduleMeal(u.meal) + '|' + u.recipeId);
+        return uk !== key;
+      });
+      if (!wasCreated && !state.pendingSync.scheduleDeletes.some(d => {
         const dk = d.id ? ('id:' + d.id) : (d.date + '|' + normalizeScheduleMeal(d.meal) + '|' + d.recipeId);
         return dk === key;
       })) {
@@ -3455,7 +3474,7 @@
         setSyncedSnapshot();
         document.getElementById('initView').classList.add('hidden');
         document.getElementById('bottomNav').classList.remove('hidden');
-        switchMode('A');
+        switchMode('C');
         scheduleCookingHistoryImagePrefetch();
         initRecipeDragDrop('ingredientList', '.ingredient-row');
         initRecipeDragDrop('seasoningList', '.seasoning-row');
@@ -3515,7 +3534,8 @@
             item.sortOrder = existingPending[pendingIdx].sortOrder;
           }
         });
-        state.schedule = loaded;
+        const existingCandidates = (state.schedule || []).filter(isCookCandidateScheduleItem);
+        state.schedule = [...existingCandidates, ...loaded];
         if (state.currentMode === 'B') renderRecipeMode();
       } else {
         showToast('献立データの読み込みに失敗しました。', 'error');
@@ -3821,11 +3841,18 @@
     }
 
     function switchBTab(tab) {
-      state.currentBTab = ['recipes', 'schedule'].includes(tab) ? tab : 'recipes';
+      state.currentBTab = ['recipes', 'candidates', 'schedule'].includes(tab) ? tab : 'recipes';
       renderRecipeMode();
     }
 
     function getRecipeTabTone(tab = state.currentBTab) {
+      if (tab === 'candidates') return {
+        key: 'amber',
+        label: 'COOK CANDIDATES',
+        active: 'bg-amber-500 text-white shadow-sm border border-amber-200',
+        inactive: 'bg-white text-amber-600 border border-amber-100 hover:bg-amber-50',
+        list: 'space-y-3 mt-3 transition-colors bg-amber-50 p-3 rounded-xl border border-amber-100 overflow-hidden'
+      };
       if (tab === 'schedule') return {
         key: 'sky',
         label: 'MEAL SCHEDULE',
@@ -4066,6 +4093,33 @@
         return;
       }
 
+      if (state.currentBTab === 'candidates') {
+        const count = getCookCandidateItems().length;
+        secondary.className = 'h-10 overflow-hidden';
+        select.className = 'h-8 overflow-hidden';
+        primary.innerHTML = `
+          <div class="grid grid-cols-3 gap-2">
+            <button onclick="switchBTab('recipes')" class="h-12 min-w-0 bg-indigo-50 text-indigo-700 border border-indigo-100 px-2 rounded-xl font-medium text-[10px] sm:text-[11px] flex items-center justify-center gap-1.5 active:scale-95 transition-all">
+              <span>レシピ集</span>
+            </button>
+            <button onclick="openExpiryUseUpHub()" class="h-12 min-w-0 bg-rose-50 text-rose-700 border border-rose-100 px-2 rounded-xl font-medium text-[10px] sm:text-[11px] flex items-center justify-center gap-1.5 active:scale-95 transition-all">
+              <span>期限食材</span>
+            </button>
+            <button onclick="openAiAddMenuModal()" class="h-12 min-w-0 bg-violet-50 text-violet-700 border border-violet-100 px-2 rounded-xl font-medium text-[10px] sm:text-[11px] flex items-center justify-center gap-1.5 active:scale-95 transition-all">
+              <span>AI考案</span>
+            </button>
+          </div>
+        `;
+        secondary.innerHTML = `
+          <div class="h-10 flex items-center justify-between gap-2 px-1">
+            <span class="text-xs font-medium text-amber-700 uppercase tracking-widest">${count} 候補</span>
+            <span class="text-[10px] font-bold text-slate-400">同期は上部の同期ボタンで一括反映</span>
+          </div>
+        `;
+        select.innerHTML = '';
+        return;
+      }
+
       secondary.className = 'h-20 overflow-hidden';
       select.className = 'h-8 overflow-hidden';
       primary.innerHTML = `
@@ -4130,6 +4184,11 @@
       container.innerHTML = '';
       if (state.currentBTab === 'schedule') {
         renderSchedule();
+        return;
+      }
+      if (state.currentBTab === 'candidates') {
+        renderCookCandidateList();
+        resetHorizontalScroll();
         return;
       }
       renderRecipeList();
@@ -4240,6 +4299,73 @@
     function normalizeScheduleMeal(meal) {
       const value = String(meal || '').trim();
       return value === '夜' ? '晩' : value;
+    }
+
+    function isCookCandidateScheduleItem(item) {
+      if (!item) return false;
+      return item.date === COOK_CANDIDATE_DATE
+        && normalizeScheduleMeal(item.meal) === COOK_CANDIDATE_MEAL
+        && (item.status || COOK_CANDIDATE_MEAL) === COOK_CANDIDATE_MEAL;
+    }
+
+    function findCookCandidateByRecipeId(recipeId) {
+      return (state.schedule || []).find(item => isCookCandidateScheduleItem(item) && item.recipeId === recipeId) || null;
+    }
+
+    function getCookCandidateReasons(recipe, meta) {
+      const reasons = ['手動'];
+      const expiring = (meta.expiringMatches || []).map(item => item.name).filter(Boolean).slice(0, 2).join('、');
+      if (expiring) reasons.push(`期限食材 ${expiring}`);
+      if ((recipe.source || '') === 'AI生成') reasons.push('AI提案');
+      if (meta.staleDays !== null && meta.staleDays >= 45) reasons.push(`前回から${meta.staleDays}日`);
+      if (meta.hasHighRating) reasons.push('高評価');
+      if (meta.count >= 5) reasons.push(`よく作る ${meta.count}回`);
+      return [...new Set(reasons)];
+    }
+
+    function getCookCandidateItems() {
+      return (state.schedule || [])
+        .filter(isCookCandidateScheduleItem)
+        .map(item => {
+          const recipe = state.recipes.find(r => r.id === item.recipeId) || null;
+          const meta = recipe ? getRecipeDecisionMeta(recipe) : { expiringMatches: [], staleDays: null, hasHighRating: false, count: 0 };
+          return { item, recipe, meta, reasons: recipe ? getCookCandidateReasons(recipe, meta) : ['手動'] };
+        })
+        .sort((a, b) => (Number(a.item.sortOrder) || 0) - (Number(b.item.sortOrder) || 0));
+    }
+
+    function toggleCookCandidate(recipeId, reason) {
+      const recipe = state.recipes.find(r => r.id === recipeId);
+      if (!recipe) return;
+      const existing = findCookCandidateByRecipeId(recipeId);
+      if (existing) {
+        queueScheduleDelete(existing);
+        showToast('候補から外しました。同期するまでスプシ未反映です。', 'success');
+      } else {
+        const candidates = (state.schedule || []).filter(isCookCandidateScheduleItem);
+        const maxSort = candidates.length ? Math.max(...candidates.map(s => Number(s.sortOrder) || 0)) : -1;
+        const item = {
+          id: createClientId('sched'),
+          date: COOK_CANDIDATE_DATE,
+          meal: COOK_CANDIDATE_MEAL,
+          recipeId,
+          recipeName: recipe.name || '',
+          status: COOK_CANDIDATE_MEAL,
+          sortOrder: maxSort + 1
+        };
+        state.schedule.push(item);
+        queueScheduleCreate(item);
+        showToast(`${reason || '作りたい'}候補に追加しました。同期するまでスプシ未反映です。`, 'success');
+      }
+      renderRecipeMode();
+    }
+
+    function removeCookCandidate(scheduleId, recipeId) {
+      const candidate = (state.schedule || []).find(item => isCookCandidateScheduleItem(item) && ((scheduleId && item.id === scheduleId) || (recipeId && item.recipeId === recipeId)));
+      if (!candidate) return;
+      queueScheduleDelete(candidate);
+      showToast('候補から外しました。同期するまでスプシ未反映です。', 'success');
+      renderRecipeMode();
     }
 
     function getScheduleDaySummary(date) {
@@ -5734,6 +5860,63 @@ ${plan ? '\n提案方針: ' + plan : ''}
       return state.recipeSortOrder === 'desc' ? sorted.reverse() : sorted;
     }
 
+    function renderCookCandidateReasonChips(reasons) {
+      return (reasons || []).slice(0, 4).map(reason => {
+        let cls = 'bg-amber-100 text-amber-700 border-amber-200';
+        if (String(reason).startsWith('期限食材')) cls = 'bg-rose-100 text-rose-700 border-rose-200';
+        if (String(reason) === 'AI提案') cls = 'bg-violet-100 text-violet-700 border-violet-200';
+        if (String(reason) === '高評価') cls = 'bg-emerald-100 text-emerald-700 border-emerald-200';
+        if (String(reason).startsWith('前回から')) cls = 'bg-slate-100 text-slate-600 border-slate-200';
+        return `<span class="inline-flex items-center max-w-full rounded-full border ${cls} px-2 py-0.5 text-[10px] font-bold"><span class="truncate">${escapeHtml(reason)}</span></span>`;
+      }).join('');
+    }
+
+    function renderCookCandidateList() {
+      const container = document.getElementById('recipeListContainer');
+      if (!container) return;
+      const candidates = getCookCandidateItems();
+      if (candidates.length === 0) {
+        container.innerHTML = `
+          <div class="bg-white border border-amber-100 rounded-xl p-5 text-center">
+            <p class="text-sm font-bold text-slate-500">作りたい候補はまだありません</p>
+            <div class="mt-4 grid grid-cols-3 gap-2">
+              <button type="button" onclick="switchBTab('recipes')" class="min-w-0 h-11 rounded-xl bg-indigo-50 text-indigo-700 border border-indigo-100 text-[10px] font-bold active:scale-95 transition-all">レシピ集</button>
+              <button type="button" onclick="openExpiryUseUpHub()" class="min-w-0 h-11 rounded-xl bg-rose-50 text-rose-700 border border-rose-100 text-[10px] font-bold active:scale-95 transition-all">期限食材</button>
+              <button type="button" onclick="openAiAddMenuModal()" class="min-w-0 h-11 rounded-xl bg-violet-50 text-violet-700 border border-violet-100 text-[10px] font-bold active:scale-95 transition-all">AI考案</button>
+            </div>
+          </div>
+        `;
+        return;
+      }
+      container.innerHTML = candidates.map(({ item, recipe, meta, reasons }) => {
+        const recipeId = item.recipeId || '';
+        const canOpenRecipe = !!recipe;
+        const title = recipe ? recipe.name : (item.recipeName || '（レシピ名なし）');
+        const thumbnail = recipe
+          ? renderRecipeDecisionThumbnail(recipe, meta)
+          : `<div class="w-16 h-16 bg-amber-100 rounded-xl flex items-center justify-center flex-shrink-0 text-amber-700"><svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 3v18M10 3v18M6 8h4M17 3v8a3 3 0 0 1-3 3h0v7"/></svg></div>`;
+        return `
+          <div class="bg-white/90 p-4 rounded-xl shadow-sm border border-amber-100 flex items-start gap-3 min-w-0">
+            ${thumbnail}
+            <div class="flex-1 min-w-0">
+              <div class="flex flex-wrap items-start gap-3">
+                <div class="flex-1 min-w-[10rem]">
+                  <h4 class="font-medium text-slate-800 text-lg truncate">${escapeHtml(title)}</h4>
+                  <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest truncate">${recipe ? renderRecipeDecisionMetaLine(meta) : 'レシピ集に見つかりません'}</p>
+                </div>
+                <div class="shrink-0 flex items-center gap-1">
+                  <button type="button" onclick="openScheduleAddModal(${jsStringForHtmlAttribute(recipeId)}, { fromCandidate: true })" class="px-3 py-2 rounded-xl bg-sky-600 text-white text-[10px] font-bold active:scale-95 transition-all ${canOpenRecipe ? '' : 'opacity-40 cursor-not-allowed'}" ${canOpenRecipe ? '' : 'disabled'}>献立に入れる</button>
+                  <button type="button" onclick="openCookingViewer(${jsStringForHtmlAttribute(recipeId)}, { returnTo: 'candidates' })" class="px-3 py-2 rounded-xl bg-emerald-600 text-white text-[10px] font-bold active:scale-95 transition-all ${canOpenRecipe ? '' : 'opacity-40 cursor-not-allowed'}" ${canOpenRecipe ? '' : 'disabled'}>料理する</button>
+                  <button type="button" onclick="removeCookCandidate(${jsStringForHtmlAttribute(item.id || '')}, ${jsStringForHtmlAttribute(recipeId)})" class="px-3 py-2 rounded-xl bg-slate-50 text-slate-600 border border-slate-100 text-[10px] font-bold active:scale-95 transition-all">外す</button>
+                </div>
+              </div>
+              <div class="mt-2 flex flex-wrap gap-1.5 overflow-hidden max-h-14">${renderCookCandidateReasonChips(reasons)}</div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
     function renderRecipeList() {
       const container = document.getElementById('recipeListContainer');
       if (!container) return;
@@ -5759,6 +5942,7 @@ ${plan ? '\n提案方針: ' + plan : ''}
         const genreSummary = renderRecipeListGenreSummary(recipe);
         const decisionMeta = getRecipeDecisionMeta(recipe);
         const decisionBadges = renderRecipeDecisionBadges(decisionMeta);
+        const isCandidate = !!findCookCandidateByRecipeId(recipe.id);
         container.insertAdjacentHTML('beforeend', `
           <div class="bg-white/80 p-4 rounded-xl shadow-sm border border-indigo-100 flex items-start gap-3 group cursor-pointer hover:bg-indigo-50 transition-colors min-w-0" onclick="openRecipeViewer('${recipe.id}')">
             ${renderRecipeDecisionThumbnail(recipe, decisionMeta)}
@@ -5769,6 +5953,9 @@ ${plan ? '\n提案方針: ' + plan : ''}
                   ${syncBadge}
                 </div>
                 <div class="flex items-center gap-1 shrink-0 ml-auto">
+                  <button onclick="event.stopPropagation(); toggleCookCandidate('${recipe.id}')" class="w-10 h-10 rounded-xl ${isCandidate ? 'bg-amber-500 text-white hover:bg-amber-600' : 'bg-amber-50 text-amber-600 hover:bg-amber-100'} flex items-center justify-center transition-all" title="${isCandidate ? '作りたい候補から外す' : '作りたい候補に追加'}" aria-pressed="${isCandidate ? 'true' : 'false'}">
+                    <svg class="w-5 h-5" fill="${isCandidate ? 'currentColor' : 'none'}" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m12 4 2.5 5.2 5.7.8-4.1 4 1 5.6-5.1-2.7-5.1 2.7 1-5.6-4.1-4 5.7-.8L12 4Z"/></svg>
+                  </button>
                   <button onclick="event.stopPropagation(); openCookingViewer('${recipe.id}', { returnTo: 'recipes' })" class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 hover:bg-emerald-100 flex items-center justify-center transition-all" title="料理する">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 3v18M10 3v18M6 8h4M17 3v8a3 3 0 0 1-3 3h0v7"/></svg>
                   </button>
@@ -7127,6 +7314,7 @@ ${text}`;
     function getTodayDashboardData() {
       const today = getLocalDateString(new Date());
       const expiryRows = getExpiryInventoryRows().filter(row => ['expired', 'within3', 'within7'].includes(row.meta.group));
+      const queuedCandidates = getCookCandidateItems().filter(item => item.recipe).slice(0, 3);
       return {
         today,
         scheduleItems: getTodayScheduleItems(today),
@@ -7134,7 +7322,7 @@ ${text}`;
         expirySummary: getExpiryInventorySummary(),
         shopping: getTodayShoppingSummary(),
         pendingSyncCount: getPendingSyncCount(),
-        candidates: getTodayRecipeCandidates(3)
+        candidates: queuedCandidates.length ? queuedCandidates : getTodayRecipeCandidates(3)
       };
     }
 
@@ -7287,7 +7475,7 @@ ${text}`;
               <p class="text-[10px] font-bold text-amber-600 uppercase tracking-widest">CANDIDATES</p>
               <h3 class="text-sm font-bold text-slate-800">作る候補</h3>
             </div>
-            <button type="button" onclick="state.currentBTab='recipes'; switchMode('B')" class="shrink-0 px-3 py-2 rounded-xl bg-amber-500 text-white text-[10px] font-bold active:scale-95 transition-all">レシピへ</button>
+            <button type="button" onclick="state.currentBTab='candidates'; switchMode('B')" class="shrink-0 px-3 py-2 rounded-xl bg-amber-500 text-white text-[10px] font-bold active:scale-95 transition-all">候補へ</button>
           </div>
           <div class="space-y-2">${body}</div>
         </section>
@@ -7836,6 +8024,7 @@ ${text}`;
     function getCookingReturnContext(options = {}) {
       if (options.returnTo === 'schedule') return { mode: 'B', bTab: 'schedule' };
       if (options.returnTo === 'recipes') return { mode: 'B', bTab: 'recipes' };
+      if (options.returnTo === 'candidates') return { mode: 'B', bTab: 'candidates' };
       if (options.returnTo === 'cookingHistory') return { mode: 'C', cTab: 'history' };
       return {
         mode: state.currentMode || 'C',
@@ -7847,7 +8036,7 @@ ${text}`;
     function restoreCookingReturnContext(context) {
       const target = context || { mode: 'C', cTab: 'history' };
       if (target.mode === 'B') {
-        state.currentBTab = ['recipes', 'schedule'].includes(target.bTab) ? target.bTab : 'recipes';
+        state.currentBTab = ['recipes', 'candidates', 'schedule'].includes(target.bTab) ? target.bTab : 'recipes';
         switchMode('B');
         return;
       }
@@ -7909,14 +8098,22 @@ ${text}`;
       openScheduleAddModal(recipeId);
     }
 
-    function openScheduleAddModal(recipeId) {
+    function openScheduleAddModal(recipeId, options = {}) {
       const recipe = state.recipes.find(r => r.id === recipeId);
       if (!recipe) return;
       state._scheduleAddRecipeId = recipeId;
       state._scheduleAddRecipeName = recipe.name || '';
       state._scheduleAddSelectedDate = null;
+      state._scheduleAddSourceCandidateId = options.fromCandidate ? recipeId : null;
       document.getElementById('scheduleAddRecipeName').textContent = recipe.name || '';
       document.getElementById('scheduleAddMealSelect').classList.add('hidden');
+      const candidateOption = document.getElementById('scheduleAddCandidateOption');
+      const removeCandidate = document.getElementById('scheduleAddRemoveCandidate');
+      if (candidateOption) {
+        candidateOption.classList.toggle('hidden', !options.fromCandidate);
+        candidateOption.classList.toggle('flex', !!options.fromCandidate);
+      }
+      if (removeCandidate) removeCandidate.checked = true;
       renderScheduleAddCalendar();
       const m = document.getElementById('scheduleAddModal');
       m.classList.remove('hidden');
@@ -7930,6 +8127,7 @@ ${text}`;
       state._scheduleAddRecipeId = null;
       state._scheduleAddRecipeName = '';
       state._scheduleAddSelectedDate = null;
+      state._scheduleAddSourceCandidateId = null;
     }
 
     function renderScheduleAddCalendar() {
@@ -7999,6 +8197,12 @@ ${text}`;
         state.schedule.push(targetItem);
       }
       if (targetItem) queueScheduleCreate(targetItem);
+      const sourceCandidateId = state._scheduleAddSourceCandidateId;
+      const shouldRemoveCandidate = !!sourceCandidateId && document.getElementById('scheduleAddRemoveCandidate')?.checked;
+      if (shouldRemoveCandidate) {
+        const candidate = findCookCandidateByRecipeId(sourceCandidateId);
+        if (candidate) queueScheduleDelete(candidate);
+      }
       closeScheduleAddModal();
       closeAiPreviewModal();
       setScheduleDayOffset(getScheduleDayOffsetForDate(date));
