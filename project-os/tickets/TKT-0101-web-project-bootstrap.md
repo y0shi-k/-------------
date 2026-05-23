@@ -14,6 +14,7 @@ required_evals:
   - pwa_mobile_ui
 eval_selection_mode: manual
 changed_paths:
+  - .gitignore
   - web/
   - project-os/artifacts/TKT-0101/
 required_gates:

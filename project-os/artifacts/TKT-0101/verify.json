@@ -1,0 +1,32 @@
+{
+  "ticket_id": "TKT-0101-web-project-bootstrap",
+  "status": "passed",
+  "checked_at": "2026-05-23T12:25:00+09:00",
+  "commands": [
+    {
+      "command": "cd web && npm run lint && npm run typecheck && npm run test && npm run build",
+      "status": "passed",
+      "detail": "lint, TypeScript typecheck, Vitest, and Next.js production build passed"
+    },
+    {
+      "command": "cd web && npm audit --audit-level=moderate",
+      "status": "passed",
+      "detail": "found 0 vulnerabilities after updating Next.js to 15.5.18 and overriding postcss to 8.5.15"
+    },
+    {
+      "command": "rg -n 'GAS_URL|executeGAS|SpreadsheetApp|DriveApp' web",
+      "status": "passed",
+      "detail": "no Web app dependency on GAS, Google Spreadsheet, or Google Drive APIs found"
+    },
+    {
+      "command": "rg -n 'SUPABASE_SERVICE_ROLE_KEY|SUPABASE_DB_PASSWORD' web",
+      "status": "passed",
+      "detail": "no Supabase secret variable references found in Web app code"
+    }
+  ],
+  "notes": [
+    "NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, and GEMINI_API_KEY are listed in web/.env.example without values.",
+    "app.html was not changed.",
+    "The first npm install failed in sandbox because registry access was blocked; dependency installation was rerun with approved network access."
+  ]
+}
