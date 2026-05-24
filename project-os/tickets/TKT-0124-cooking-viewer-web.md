@@ -1,7 +1,7 @@
 ---
 id: TKT-0124-cooking-viewer-web
 title: 調理ビューアWeb移植
-status: ready_for_implementation
+status: completed
 goal: 調理中に材料、在庫、手順を確認できるCanvas版ビューアをWeb版へ移す
 acceptance:
   - レシピから調理ビューアを開ける

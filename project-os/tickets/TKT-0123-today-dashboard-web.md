@@ -1,7 +1,7 @@
 ---
 id: TKT-0123-today-dashboard-web
 title: 今日ダッシュボードWeb移植
-status: ready_for_implementation
+status: completed
 goal: 今日の献立、期限、買い物、候補をWeb版でまとめて見られるようにする
 acceptance:
   - 今日の献立が見える

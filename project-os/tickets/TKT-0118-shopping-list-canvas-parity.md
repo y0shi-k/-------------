@@ -1,7 +1,7 @@
 ---
 id: TKT-0118-shopping-list-canvas-parity
 title: 買い物リストCanvas同等化
-status: ready_for_implementation
+status: completed
 goal: 買い物リストの手動追加、購入済み、一括操作、出自別表示をWeb版へ移す
 acceptance:
   - 買い物を手動追加できる

@@ -1,7 +1,7 @@
 ---
 id: TKT-0126-cooking-history-analysis-web
 title: 料理履歴分析Web移植
-status: ready_for_implementation
+status: completed
 goal: 料理履歴のタイムライン、カレンダー、分析、検索、フィルタをWeb版へ移す
 acceptance:
   - 履歴をタイムラインで見られる

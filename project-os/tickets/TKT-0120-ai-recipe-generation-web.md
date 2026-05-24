@@ -1,7 +1,7 @@
 ---
 id: TKT-0120-ai-recipe-generation-web
 title: AIレシピ考案と本文構造化Web移植
-status: ready_for_implementation
+status: completed
 goal: Canvas版のAIレシピ考案と本文構造化をWeb版へ安全に移す
 acceptance:
   - AIレシピ考案がサーバー側API経由で動く

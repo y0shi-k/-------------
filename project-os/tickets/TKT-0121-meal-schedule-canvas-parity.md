@@ -1,7 +1,7 @@
 ---
 id: TKT-0121-meal-schedule-canvas-parity
 title: 献立Canvas同等化
-status: ready_for_implementation
+status: completed
 goal: Canvas版の7日献立、日送り、予定操作をWeb版へ移す
 acceptance:
   - 7日分の献立を見られる

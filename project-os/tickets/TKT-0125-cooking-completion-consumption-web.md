@@ -1,7 +1,7 @@
 ---
 id: TKT-0125-cooking-completion-consumption-web
 title: 調理完了と在庫消費Web移植
-status: ready_for_implementation
+status: completed
 goal: 調理完了時に消費量調整、代替品選択、在庫減算、履歴作成を安全に行う
 acceptance:
   - 調理完了前に消費量を確認/調整できる

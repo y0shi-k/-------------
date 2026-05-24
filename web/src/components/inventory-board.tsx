@@ -1,6 +1,7 @@
 "use client";
 
 import { ChangeEvent, FormEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { DeleteConfirmPanel } from "@/components/delete-confirm-panel";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import {
   emptyStockItemFormValues,
@@ -22,6 +23,12 @@ type InventoryBoardProps = {
 type Feedback = {
   tone: "success" | "error" | "info";
   message: string;
+};
+
+type PendingDelete = {
+  confirm: () => void;
+  message: string;
+  target: string;
 };
 
 type ScanIngredientsResponse = {
@@ -162,6 +169,7 @@ export function InventoryBoard({
   const [newLocationName, setNewLocationName] = useState("");
   const [editing, setEditing] = useState<EditingTarget>(null);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
   const [photoFeedback, setPhotoFeedback] = useState<Feedback | null>(null);
   const [selectedPhoto, setSelectedPhoto] = useState<File | null>(null);
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
@@ -177,6 +185,11 @@ export function InventoryBoard({
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const photoInputRef = useRef<HTMLInputElement | null>(null);
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
+
+  function requestDelete(target: string, message: string, confirm: () => void) {
+    setPendingDelete({ target, message, confirm });
+    setFeedback(null);
+  }
   const storageLocationOptions = useMemo(
     () =>
       Array.from(
@@ -601,6 +614,20 @@ export function InventoryBoard({
         </p>
       ) : null}
 
+      {pendingDelete ? (
+        <DeleteConfirmPanel
+          disabled={isSaving}
+          message={pendingDelete.message}
+          onCancel={() => setPendingDelete(null)}
+          onConfirm={() => {
+            const action = pendingDelete.confirm;
+            setPendingDelete(null);
+            action();
+          }}
+          target={pendingDelete.target}
+        />
+      ) : null}
+
       <div className="inventory-grid">
         <section className="stock-panel" aria-labelledby="staging-heading">
           <div className="panel-title">
@@ -641,7 +668,7 @@ export function InventoryBoard({
                       <button
                         className="danger-button compact-button"
                         disabled={isSaving || usageCount > 0}
-                        onClick={() => deleteStorageLocation(location)}
+                        onClick={() => requestDelete(location.name, "この保存場所を削除します。使用中の場所は削除できません。", () => deleteStorageLocation(location))}
                         type="button"
                       >
                         削除
@@ -812,7 +839,7 @@ export function InventoryBoard({
             items={stagingItems}
             list="staging"
             onConfirm={confirmStaging}
-            onDelete={deleteItem}
+            onDelete={(list, item) => requestDelete(item.name, "この登録待ちを削除します。元には戻せません。", () => deleteItem(list, item))}
             onEdit={startEdit}
             onSelect={toggleSelected}
             selectedIds={selectedStagingIds}
@@ -821,7 +848,7 @@ export function InventoryBoard({
                 disabled={isSaving}
                 itemIds={stagingItems.map((item) => item.id)}
                 onClear={() => clearSelected("staging")}
-                onDeleteSelected={deleteSelectedStaging}
+                onDeleteSelected={() => requestDelete(`${selectedStagingIds.length}件の登録待ち`, "選択した登録待ちをまとめて削除します。元には戻せません。", deleteSelectedStaging)}
                 onSelectAll={(ids) => selectAllVisible("staging", ids)}
                 selectedCount={selectedStagingIds.length}
                 showDelete
@@ -894,7 +921,7 @@ export function InventoryBoard({
             emptyText="在庫はありません。登録待ちから確定するとここに表示されます。"
             items={filteredInventoryItems}
             list="inventory"
-            onDelete={deleteItem}
+            onDelete={(list, item) => requestDelete(item.name, "この在庫を削除します。元には戻せません。", () => deleteItem(list, item))}
             onEdit={startEdit}
             onSelect={toggleSelected}
             onUseUp={useUpItem}

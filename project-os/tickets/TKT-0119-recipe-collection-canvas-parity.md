@@ -1,7 +1,7 @@
 ---
 id: TKT-0119-recipe-collection-canvas-parity
 title: レシピ集Canvas同等化
-status: ready_for_implementation
+status: completed
 goal: レシピ集の検索、ソート、削除、ジャンル選択、編集UIをCanvas版に近づける
 acceptance:
   - レシピ検索とソートができる

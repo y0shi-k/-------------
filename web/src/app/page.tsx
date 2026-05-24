@@ -3,10 +3,11 @@ import { CookingHistoryBoard } from "@/components/cooking-history-board";
 import { InventoryBoard } from "@/components/inventory-board";
 import { RecipeMealWorkspace } from "@/components/recipe-meal-workspace";
 import { SetupStatus } from "@/components/setup-status";
+import { TodayDashboard } from "@/components/today-dashboard";
 import { WebModeShell } from "@/components/web-mode-shell";
 import type { CookingHistoryItem, CookingHistoryPhoto } from "@/lib/cooking-history/types";
 import type { StockItem, StorageLocation } from "@/lib/inventory/types";
-import type { MealSchedule, Recipe, RecipeIngredient, ShoppingItem } from "@/lib/recipes/types";
+import type { CookCandidate, MealSchedule, Recipe, RecipeIngredient, ShoppingItem } from "@/lib/recipes/types";
 import { setupSteps } from "@/lib/navigation";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
@@ -28,6 +29,7 @@ export default async function Home() {
     { data: recipeIngredients },
     { data: mealSchedules },
     { data: shoppingItems },
+    { data: cookCandidates },
     { data: storageLocations }
   ] = await Promise.all([
     supabase
@@ -65,6 +67,12 @@ export default async function Home() {
       .from("shopping_items")
       .select("*")
       .eq("user_id", user.id)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("cook_candidates")
+      .select("*")
+      .eq("user_id", user.id)
+      .eq("status", "候補")
       .order("created_at", { ascending: false }),
     supabase
       .from("storage_locations")
@@ -108,6 +116,12 @@ export default async function Home() {
 
   return (
     <main className="app-shell">
+      <TodayDashboard
+        cookCandidates={(cookCandidates ?? []) as CookCandidate[]}
+        inventoryItems={(inventoryItems ?? []) as StockItem[]}
+        mealSchedules={(mealSchedules ?? []) as MealSchedule[]}
+        shoppingItems={(shoppingItems ?? []) as ShoppingItem[]}
+      />
       <WebModeShell
         childrenByMode={{
           ingredients: (
@@ -122,6 +136,7 @@ export default async function Home() {
           recipes: (
             <RecipeMealWorkspace
               initialInventoryItems={(inventoryItems ?? []) as StockItem[]}
+              initialCookCandidates={(cookCandidates ?? []) as CookCandidate[]}
               initialMealSchedules={(mealSchedules ?? []) as MealSchedule[]}
               initialRecipes={recipesWithIngredients as Recipe[]}
               initialShoppingItems={(shoppingItems ?? []) as ShoppingItem[]}

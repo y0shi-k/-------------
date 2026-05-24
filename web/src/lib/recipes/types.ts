@@ -57,6 +57,17 @@ export type ShoppingItem = {
   updated_at: string;
 };
 
+export type CookCandidate = {
+  id: string;
+  user_id: string;
+  recipe_id: string | null;
+  recipe_name: string;
+  reasons: string[];
+  status: "候補" | "解除";
+  created_at: string;
+  updated_at: string;
+};
+
 export type RecipeIngredientFormValues = {
   item_type: RecipeIngredientType;
   name: string;

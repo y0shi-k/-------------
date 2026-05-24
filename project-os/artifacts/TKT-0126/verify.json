@@ -1,0 +1,11 @@
+{
+  "ticket": "TKT-0126-cooking-history-analysis-web",
+  "status": "passed",
+  "checks": [
+    { "name": "npm run test -- cooking-history-board", "status": "passed", "summary": "5 tests passed" },
+    { "name": "npm run typecheck", "status": "passed", "summary": "tsc --noEmit passed" },
+    { "name": "npm run lint", "status": "passed", "summary": "eslint . passed" },
+    { "name": "npm run test", "status": "passed", "summary": "57 tests passed" },
+    { "name": "npm run build", "status": "passed", "summary": "Next.js production build passed" }
+  ]
+}

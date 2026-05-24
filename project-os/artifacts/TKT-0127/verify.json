@@ -1,0 +1,12 @@
+{
+  "ticket": "TKT-0127-delete-confirmation-web",
+  "status": "passed",
+  "checks": [
+    { "name": "npm run test -- inventory-board", "status": "passed", "summary": "13 tests passed" },
+    { "name": "npm run test -- recipe-meal-workspace", "status": "passed", "summary": "16 tests passed" },
+    { "name": "npm run typecheck", "status": "passed", "summary": "tsc --noEmit passed" },
+    { "name": "npm run lint", "status": "passed", "summary": "eslint . passed" },
+    { "name": "npm run test", "status": "passed", "summary": "57 tests passed" },
+    { "name": "npm run build", "status": "passed", "summary": "Next.js production build passed" }
+  ]
+}

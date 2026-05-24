@@ -20,6 +20,9 @@ type Feedback = {
   message: string;
 };
 
+type HistoryView = "timeline" | "calendar" | "analysis";
+type RatingFilter = "all" | "rated" | "unrated";
+
 function formatCookedAt(value: string) {
   return new Intl.DateTimeFormat("ja-JP", {
     dateStyle: "medium",
@@ -37,6 +40,9 @@ function ratingLabel(rating: number | null) {
 
 export function CookingHistoryBoard({ initialHistory, userId }: CookingHistoryBoardProps) {
   const [history, setHistory] = useState(initialHistory);
+  const [historyView, setHistoryView] = useState<HistoryView>("timeline");
+  const [historySearch, setHistorySearch] = useState("");
+  const [ratingFilter, setRatingFilter] = useState<RatingFilter>("all");
   const [values, setValues] = useState(emptyCookingHistoryFormValues);
   const [selectedPhoto, setSelectedPhoto] = useState<File | null>(null);
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
@@ -44,6 +50,30 @@ export function CookingHistoryBoard({ initialHistory, userId }: CookingHistoryBo
   const [isSaving, setIsSaving] = useState(false);
   const photoInputRef = useRef<HTMLInputElement | null>(null);
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
+  const visibleHistory = history.filter((item) => {
+    const query = historySearch.trim().toLowerCase();
+    const matchesQuery = query
+      ? [item.recipe_name, item.note, ratingLabel(item.rating)].join(" ").toLowerCase().includes(query)
+      : true;
+    const matchesRating =
+      ratingFilter === "all" ? true : ratingFilter === "rated" ? item.rating !== null : item.rating === null;
+    return matchesQuery && matchesRating;
+  });
+  const calendarGroups = visibleHistory.reduce<Record<string, CookingHistoryItem[]>>((groups, item) => {
+    const key = item.cooked_at.slice(0, 10);
+    groups[key] = [...(groups[key] ?? []), item];
+    return groups;
+  }, {});
+  const ratedItems = visibleHistory.filter((item) => item.rating !== null);
+  const averageRating = ratedItems.length > 0 ? ratedItems.reduce((total, item) => total + Number(item.rating), 0) / ratedItems.length : null;
+  const recipeCounts = visibleHistory.reduce<Record<string, number>>((counts, item) => {
+    const name = displayRecipeName(item.recipe_name);
+    counts[name] = (counts[name] ?? 0) + 1;
+    return counts;
+  }, {});
+  const topRecipes = Object.entries(recipeCounts)
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "ja"))
+    .slice(0, 5);
 
   useEffect(() => {
     return () => {
@@ -330,11 +360,64 @@ export function CookingHistoryBoard({ initialHistory, userId }: CookingHistoryBo
             </div>
           </div>
 
+          <div className="history-controls">
+            <div className="segmented-control three-segments">
+              <button className="secondary-button compact-button" data-active={historyView === "timeline"} type="button" onClick={() => setHistoryView("timeline")}>
+                タイムライン
+              </button>
+              <button className="secondary-button compact-button" data-active={historyView === "calendar"} type="button" onClick={() => setHistoryView("calendar")}>
+                カレンダー
+              </button>
+              <button className="secondary-button compact-button" data-active={historyView === "analysis"} type="button" onClick={() => setHistoryView("analysis")}>
+                分析
+              </button>
+            </div>
+            <input aria-label="料理履歴検索" value={historySearch} onChange={(event) => setHistorySearch(event.target.value)} placeholder="料理名・メモで検索" />
+            <select aria-label="料理履歴評価フィルタ" value={ratingFilter} onChange={(event) => setRatingFilter(event.target.value as RatingFilter)}>
+              <option value="all">すべて</option>
+              <option value="rated">評価あり</option>
+              <option value="unrated">未評価</option>
+            </select>
+          </div>
+
           {history.length === 0 ? (
             <p className="empty-list">料理履歴はありません。作った料理を1件保存してください。</p>
+          ) : visibleHistory.length === 0 ? (
+            <p className="empty-list">条件に合う料理履歴はありません。</p>
+          ) : historyView === "calendar" ? (
+            <div className="history-calendar" aria-label="料理履歴カレンダー">
+              {Object.entries(calendarGroups).map(([date, items]) => (
+                <section className="history-calendar-day" key={date}>
+                  <strong>{new Intl.DateTimeFormat("ja-JP", { dateStyle: "medium" }).format(new Date(`${date}T00:00:00`))}</strong>
+                  {items.map((item) => (
+                    <span key={item.id}>{displayRecipeName(item.recipe_name)}</span>
+                  ))}
+                </section>
+              ))}
+            </div>
+          ) : historyView === "analysis" ? (
+            <div className="history-analysis" aria-label="料理履歴分析">
+              <div className="analysis-card">
+                <span>記録数</span>
+                <strong>{visibleHistory.length}件</strong>
+              </div>
+              <div className="analysis-card">
+                <span>平均評価</span>
+                <strong>{averageRating === null ? "未評価" : averageRating.toFixed(1)}</strong>
+              </div>
+              <section className="analysis-list">
+                <h4>よく作る料理</h4>
+                {topRecipes.map(([name, count]) => (
+                  <p key={name}>
+                    <span>{name}</span>
+                    <strong>{count}回</strong>
+                  </p>
+                ))}
+              </section>
+            </div>
           ) : (
             <div className="history-list">
-              {history.map((item) => (
+              {visibleHistory.map((item) => (
                 <article className="history-item" key={item.id}>
                   <HistoryPhoto photos={item.photos} recipeName={displayRecipeName(item.recipe_name)} />
                   <div className="history-item-body">

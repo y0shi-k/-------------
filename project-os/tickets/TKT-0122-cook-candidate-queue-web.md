@@ -1,7 +1,7 @@
 ---
 id: TKT-0122-cook-candidate-queue-web
 title: 作りたい候補Web移植
-status: ready_for_implementation
+status: completed
 goal: 作りたい候補キューと理由チップをWeb版へ移す
 acceptance:
   - 候補を登録、解除できる

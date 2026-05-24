@@ -97,6 +97,34 @@ describe("CookingHistoryBoard", () => {
     expect(screen.getByText("写真なし")).toBeTruthy();
   });
 
+  it("filters history and switches calendar and analysis views", () => {
+    renderBoard({
+      initialHistory: [
+        baseHistory,
+        { ...baseHistory, id: "history-2", recipe_name: "味噌汁", note: "朝食", rating: null, cooked_at: "2026-05-25T08:00:00.000Z", photos: [] }
+      ]
+    });
+
+    fireEvent.change(screen.getByLabelText("料理履歴検索"), { target: { value: "味噌" } });
+    expect(screen.getByText("味噌汁")).toBeTruthy();
+    expect(screen.queryByText("辛さ控えめ")).toBeNull();
+
+    fireEvent.change(screen.getByLabelText("料理履歴検索"), { target: { value: "" } });
+    fireEvent.change(screen.getByLabelText("料理履歴評価フィルタ"), { target: { value: "rated" } });
+    expect(screen.getByText("カレー")).toBeTruthy();
+    expect(screen.queryByText("味噌汁")).toBeNull();
+
+    fireEvent.change(screen.getByLabelText("料理履歴評価フィルタ"), { target: { value: "all" } });
+    fireEvent.click(screen.getByRole("button", { name: "カレンダー" }));
+    expect(screen.getByLabelText("料理履歴カレンダー")).toBeTruthy();
+    expect(screen.getByText("2026/05/25")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "分析" }));
+    expect(screen.getByLabelText("料理履歴分析")).toBeTruthy();
+    expect(screen.getByText("記録数")).toBeTruthy();
+    expect(screen.getByText("よく作る料理")).toBeTruthy();
+  });
+
   it("adds cooking history without a photo for the authenticated user", async () => {
     const cookingInsert = insertQuery({ ...baseHistory, id: "history-new", recipe_name: "親子丼", rating: null, photos: undefined });
     from.mockReturnValue({ insert: cookingInsert.insert });

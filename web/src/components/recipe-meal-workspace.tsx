@@ -2,8 +2,10 @@
 
 import { FormEvent, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { DeleteConfirmPanel } from "@/components/delete-confirm-panel";
 import type { StockItem } from "@/lib/inventory/types";
 import {
+  CookCandidate,
   emptyRecipeFormValues,
   emptyRecipeIngredientFormValues,
   MealSchedule,
@@ -20,6 +22,7 @@ import {
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 
 type RecipeMealWorkspaceProps = {
+  initialCookCandidates: CookCandidate[];
   initialInventoryItems: StockItem[];
   initialMealSchedules: MealSchedule[];
   initialRecipes: Recipe[];
@@ -32,13 +35,34 @@ type Feedback = {
   message: string;
 };
 
+type PendingDelete = {
+  confirm: () => void;
+  message: string;
+  target: string;
+};
+
 type ShoppingFormValues = {
   name: string;
   required_quantity: string;
   unit: string;
 };
 
+type ConsumptionDraft = {
+  amount: string;
+  ingredientName: string;
+  requestedAmount: number;
+  requestedUnit: string;
+  stockItemId: string;
+};
+
+type AiRecipeMode = "generate" | "structure";
+
+type RecipeSort = "created_desc" | "name_asc" | "ingredients_desc";
+type CookingIngredientTab = "食材" | "調味料";
+type CookingStepTab = "prep" | "steps";
+
 const mealTypes: MealType[] = ["朝", "昼", "晩", "その他"];
+const mealTypeOrder: Record<MealType, number> = { 朝: 0, 昼: 1, 晩: 2, その他: 3 };
 
 type NormalizedRecipeForm =
   | {
@@ -60,7 +84,17 @@ type NormalizedRecipeForm =
   | { error: string };
 
 function todayValue() {
-  return new Date().toISOString().slice(0, 10);
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, "0");
+  const day = String(today.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function addDays(value: string, days: number) {
+  const [year, month, day] = value.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day + days));
+  return date.toISOString().slice(0, 10);
 }
 
 function normalizeRecipeForm(values: RecipeFormValues): NormalizedRecipeForm {
@@ -104,6 +138,14 @@ function formatScheduleDate(value: string) {
   }).format(new Date(`${value}T00:00:00`));
 }
 
+function formatScheduleDayLabel(value: string) {
+  return new Intl.DateTimeFormat("ja-JP", {
+    day: "numeric",
+    month: "numeric",
+    weekday: "short"
+  }).format(new Date(`${value}T00:00:00`));
+}
+
 function inventoryAmountByNameAndUnit(items: StockItem[], name: string, unit: string) {
   return items
     .filter((item) => item.name === name && item.unit === unit)
@@ -117,6 +159,29 @@ function toShortageKey(name: string, unit: string, recipeName: string) {
 function shoppingSourceLabel(item: ShoppingItem) {
   if (item.source_type === "meal_schedule") return item.linked_recipe_name ? `献立: ${item.linked_recipe_name}` : "献立由来";
   return "手動追加";
+}
+
+function filterAndSortRecipes(recipes: Recipe[], query: string, sort: RecipeSort) {
+  const normalizedQuery = query.trim().toLowerCase();
+  const filtered = normalizedQuery
+    ? recipes.filter((recipe) => {
+        const haystack = [
+          recipe.name,
+          recipe.source,
+          ...recipe.genre,
+          ...recipe.ingredients.map((ingredient) => ingredient.name)
+        ]
+          .join(" ")
+          .toLowerCase();
+        return haystack.includes(normalizedQuery);
+      })
+    : recipes;
+
+  return [...filtered].sort((a, b) => {
+    if (sort === "name_asc") return a.name.localeCompare(b.name, "ja");
+    if (sort === "ingredients_desc") return b.ingredients.length - a.ingredients.length || a.name.localeCompare(b.name, "ja");
+    return b.created_at.localeCompare(a.created_at);
+  });
 }
 
 function buildShortageCandidates(schedule: MealSchedule | null, recipes: Recipe[], inventoryItems: StockItem[]) {
@@ -142,6 +207,7 @@ function buildShortageCandidates(schedule: MealSchedule | null, recipes: Recipe[
 }
 
 export function RecipeMealWorkspace({
+  initialCookCandidates,
   initialInventoryItems,
   initialMealSchedules,
   initialRecipes,
@@ -149,11 +215,15 @@ export function RecipeMealWorkspace({
   userId
 }: RecipeMealWorkspaceProps) {
   const [recipes, setRecipes] = useState(initialRecipes);
+  const [cookCandidates, setCookCandidates] = useState(initialCookCandidates);
+  const [inventoryItemsForMeals, setInventoryItemsForMeals] = useState(initialInventoryItems);
   const [mealSchedules, setMealSchedules] = useState(initialMealSchedules);
   const [shoppingItems, setShoppingItems] = useState(initialShoppingItems);
   const [recipeValues, setRecipeValues] = useState<RecipeFormValues>(emptyRecipeFormValues);
   const [editingRecipeId, setEditingRecipeId] = useState<string | null>(null);
   const [selectedRecipeId, setSelectedRecipeId] = useState(initialRecipes[0]?.id ?? "");
+  const [activeCookingRecipeId, setActiveCookingRecipeId] = useState("");
+  const [scheduleWindowStart, setScheduleWindowStart] = useState(todayValue);
   const [scheduleDate, setScheduleDate] = useState(todayValue);
   const [scheduleMealType, setScheduleMealType] = useState<MealType>("晩");
   const [scheduleRecipeId, setScheduleRecipeId] = useState(initialRecipes[0]?.id ?? "");
@@ -161,17 +231,40 @@ export function RecipeMealWorkspace({
   const [selectedShortageKeys, setSelectedShortageKeys] = useState<string[]>([]);
   const [selectedShoppingIds, setSelectedShoppingIds] = useState<string[]>([]);
   const [shoppingValues, setShoppingValues] = useState<ShoppingFormValues>({ name: "", required_quantity: "1", unit: "個" });
+  const [candidateReasons, setCandidateReasons] = useState("");
+  const [recipeSearch, setRecipeSearch] = useState("");
+  const [recipeSort, setRecipeSort] = useState<RecipeSort>("created_desc");
+  const [pendingDeleteRecipeId, setPendingDeleteRecipeId] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
+  const [pendingConsumptionScheduleId, setPendingConsumptionScheduleId] = useState<string | null>(null);
+  const [consumptionDrafts, setConsumptionDrafts] = useState<ConsumptionDraft[]>([]);
+  const [cookingIngredientTab, setCookingIngredientTab] = useState<CookingIngredientTab>("食材");
+  const [cookingStepTab, setCookingStepTab] = useState<CookingStepTab>("steps");
+  const [highlightedIngredientName, setHighlightedIngredientName] = useState("");
+  const [aiMode, setAiMode] = useState<AiRecipeMode>("generate");
+  const [aiRequired, setAiRequired] = useState("");
+  const [aiOptional, setAiOptional] = useState("");
+  const [aiSourceText, setAiSourceText] = useState("");
+  const [aiPreview, setAiPreview] = useState<RecipeFormValues | null>(null);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isAiRunning, setIsAiRunning] = useState(false);
   const router = useRouter();
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
 
   const selectedRecipe = recipes.find((recipe) => recipe.id === selectedRecipeId) ?? recipes[0] ?? null;
+  const activeCookingRecipe = recipes.find((recipe) => recipe.id === activeCookingRecipeId) ?? null;
+  const visibleRecipes = filterAndSortRecipes(recipes, recipeSearch, recipeSort);
   const selectedSchedule = mealSchedules.find((schedule) => schedule.id === selectedScheduleId) ?? mealSchedules[0] ?? null;
-  const shortageCandidates = buildShortageCandidates(selectedSchedule, recipes, initialInventoryItems);
+  const scheduleDays = Array.from({ length: 7 }, (_, index) => addDays(scheduleWindowStart, index));
+  const visibleMealSchedules = mealSchedules
+    .filter((schedule) => scheduleDays.includes(schedule.scheduled_on))
+    .sort((a, b) => a.scheduled_on.localeCompare(b.scheduled_on) || mealTypeOrder[a.meal_type] - mealTypeOrder[b.meal_type]);
+  const shortageCandidates = buildShortageCandidates(selectedSchedule, recipes, inventoryItemsForMeals);
   const activeShortageKeys = selectedShortageKeys.filter((key) => shortageCandidates.some((item) => item.key === key));
   const openShoppingItems = shoppingItems.filter((item) => item.status === "未購入");
   const purchasedShoppingItems = shoppingItems.filter((item) => item.status === "購入済");
+  const activeCookCandidates = cookCandidates.filter((item) => item.status === "候補");
 
   function updateShoppingValue<K extends keyof ShoppingFormValues>(key: K, value: ShoppingFormValues[K]) {
     setShoppingValues((current) => ({ ...current, [key]: value }));
@@ -212,11 +305,127 @@ export function RecipeMealWorkspace({
     }));
   }
 
+  async function runAiRecipe() {
+    if (!aiRequired.trim() && !aiOptional.trim() && !aiSourceText.trim()) {
+      setFeedback({
+        tone: "error",
+        message: "原因: AIに渡す食材や本文が空です。影響: レシピ案を作れません。修正方法: 必須食材、任意食材、またはレシピ本文を入力してください。"
+      });
+      return;
+    }
+
+    setIsAiRunning(true);
+    setFeedback(null);
+
+    try {
+      const response = await fetch("/api/ai/recipes", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          mode: aiMode,
+          required: aiRequired,
+          optional: aiOptional,
+          sourceText: aiSourceText
+        })
+      });
+      const result = (await response.json().catch(() => ({}))) as { recipe?: RecipeFormValues; error?: string };
+
+      if (!response.ok || !result.recipe) {
+        setFeedback({
+          tone: "error",
+          message: result.error || "原因: AIレシピの取得に失敗しました。影響: プレビューを表示できません。修正方法: 時間を置いて再度お試しください。"
+        });
+        return;
+      }
+
+      setAiPreview(result.recipe);
+      setFeedback({ tone: "success", message: "AIレシピ案を作成しました。内容を確認してからフォームへ反映してください。" });
+    } catch {
+      setFeedback({
+        tone: "error",
+        message: "原因: AIレシピ通信に失敗しました。影響: プレビューを表示できません。修正方法: 通信状態を確認してください。"
+      });
+    } finally {
+      setIsAiRunning(false);
+    }
+  }
+
+  function applyAiPreview() {
+    if (!aiPreview) return;
+    setRecipeValues(aiPreview);
+    setEditingRecipeId(null);
+    setFeedback({ tone: "info", message: "AIレシピ案を入力フォームへ反映しました。内容を確認して保存してください。" });
+  }
+
   function startEditRecipe(recipe: Recipe) {
     setRecipeValues(toRecipeFormValues(recipe));
     setEditingRecipeId(recipe.id);
     setSelectedRecipeId(recipe.id);
+    setPendingDeleteRecipeId(null);
     setFeedback({ tone: "info", message: `${recipe.name} を編集中です。` });
+  }
+
+  function openCookingViewer(recipe: Recipe) {
+    setActiveCookingRecipeId(recipe.id);
+    setSelectedRecipeId(recipe.id);
+    setHighlightedIngredientName("");
+    setFeedback({ tone: "info", message: `${recipe.name} の調理ビューアを開きました。` });
+  }
+
+  function requestDelete(target: string, message: string, confirm: () => void) {
+    setPendingDelete({ target, message, confirm });
+    setFeedback(null);
+  }
+
+  function stockOptionsForIngredient(ingredient: RecipeIngredient) {
+    return inventoryItemsForMeals.filter((item) => item.category === ingredient.item_type && item.unit === ingredient.unit && item.quantity > 0);
+  }
+
+  function buildConsumptionDrafts(schedule: MealSchedule) {
+    const recipe = recipes.find((item) => item.id === schedule.recipe_id);
+    if (!recipe) return [];
+
+    return recipe.ingredients.map((ingredient) => {
+      const exactStock = stockOptionsForIngredient(ingredient).find((item) => item.name === ingredient.name);
+      return {
+        ingredientName: ingredient.name,
+        requestedAmount: ingredient.amount,
+        requestedUnit: ingredient.unit,
+        amount: exactStock ? String(Math.min(ingredient.amount, exactStock.quantity)) : "0",
+        stockItemId: exactStock?.id ?? ""
+      };
+    });
+  }
+
+  function updateConsumptionDraft(index: number, values: Partial<ConsumptionDraft>) {
+    setConsumptionDrafts((items) => items.map((item, currentIndex) => (currentIndex === index ? { ...item, ...values } : item)));
+  }
+
+  async function deleteRecipe(recipe: Recipe) {
+    setIsSaving(true);
+    setFeedback(null);
+
+    const { error } = await supabase.from("recipes").delete().eq("id", recipe.id).eq("user_id", userId);
+
+    setIsSaving(false);
+
+    if (error) {
+      setFeedback({ tone: "error", message: "原因: レシピを削除できませんでした。影響: レシピ一覧に残ります。修正方法: ログイン状態を確認してください。" });
+      return;
+    }
+
+    setRecipes((items) => items.filter((item) => item.id !== recipe.id));
+    setMealSchedules((items) => items.map((item) => (item.recipe_id === recipe.id ? { ...item, recipe_id: null } : item)));
+    setPendingDeleteRecipeId(null);
+    if (selectedRecipeId === recipe.id) {
+      const nextRecipe = recipes.find((item) => item.id !== recipe.id);
+      setSelectedRecipeId(nextRecipe?.id ?? "");
+      setScheduleRecipeId(nextRecipe?.id ?? "");
+    }
+    if (editingRecipeId === recipe.id) resetRecipeForm();
+    setFeedback({ tone: "info", message: `${recipe.name} を削除しました。` });
   }
 
   async function saveRecipe(event: FormEvent<HTMLFormElement>) {
@@ -355,8 +564,157 @@ export function RecipeMealWorkspace({
 
     setMealSchedules((items) => [data as MealSchedule, ...items]);
     setSelectedScheduleId(String(data.id));
+    if (!scheduleDays.includes(String(data.scheduled_on))) {
+      setScheduleWindowStart(String(data.scheduled_on));
+    }
     setSelectedShortageKeys([]);
     setFeedback({ tone: "success", message: "献立に追加しました。" });
+  }
+
+  async function addCookCandidate(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const recipe = selectedRecipe;
+    if (!recipe) {
+      setFeedback({
+        tone: "error",
+        message: "原因: レシピが未選択です。影響: 作りたい候補に追加できません。修正方法: レシピを選んでください。"
+      });
+      return;
+    }
+
+    setIsSaving(true);
+    setFeedback(null);
+
+    const { data, error } = await supabase
+      .from("cook_candidates")
+      .insert({
+        user_id: userId,
+        recipe_id: recipe.id,
+        recipe_name: recipe.name,
+        reasons: splitCsv(candidateReasons),
+        status: "候補"
+      })
+      .select()
+      .single();
+
+    setIsSaving(false);
+
+    if (error || !data) {
+      setFeedback({ tone: "error", message: "原因: 作りたい候補をDBへ保存できませんでした。影響: 候補一覧に残りません。修正方法: ログイン状態を確認してください。" });
+      return;
+    }
+
+    setCookCandidates((items) => [data as CookCandidate, ...items]);
+    setCandidateReasons("");
+    setFeedback({ tone: "success", message: `${recipe.name} を作りたい候補に追加しました。` });
+  }
+
+  async function deleteCookCandidate(candidate: CookCandidate) {
+    setIsSaving(true);
+    setFeedback(null);
+
+    const { error } = await supabase.from("cook_candidates").delete().eq("id", candidate.id).eq("user_id", userId);
+
+    setIsSaving(false);
+
+    if (error) {
+      setFeedback({ tone: "error", message: "原因: 作りたい候補を解除できませんでした。影響: 候補一覧に残ります。修正方法: ログイン状態を確認してください。" });
+      return;
+    }
+
+    setCookCandidates((items) => items.filter((item) => item.id !== candidate.id));
+    setFeedback({ tone: "info", message: `${candidate.recipe_name || "候補"} を作りたい候補から解除しました。` });
+  }
+
+  async function assignCandidateToSchedule(candidate: CookCandidate) {
+    if (!scheduleDate) {
+      setFeedback({
+        tone: "error",
+        message: "原因: 献立日付が未選択です。影響: 候補を献立へ追加できません。修正方法: 日付を選んでください。"
+      });
+      return;
+    }
+
+    setIsSaving(true);
+    setFeedback(null);
+
+    const { data, error } = await supabase
+      .from("meal_schedules")
+      .insert({
+        user_id: userId,
+        scheduled_on: scheduleDate,
+        meal_type: scheduleMealType,
+        recipe_id: candidate.recipe_id,
+        recipe_name: candidate.recipe_name,
+        status: "未完了"
+      })
+      .select()
+      .single();
+
+    setIsSaving(false);
+
+    if (error || !data) {
+      setFeedback({ tone: "error", message: "原因: 候補を献立へ保存できませんでした。影響: 献立に表示されません。修正方法: ログイン状態を確認してください。" });
+      return;
+    }
+
+    setMealSchedules((items) => [data as MealSchedule, ...items]);
+    setSelectedScheduleId(String(data.id));
+    if (!scheduleDays.includes(String(data.scheduled_on))) {
+      setScheduleWindowStart(String(data.scheduled_on));
+    }
+    setSelectedShortageKeys([]);
+    setFeedback({ tone: "success", message: `${candidate.recipe_name || "候補"} を献立に追加しました。` });
+  }
+
+  async function moveSchedule(schedule: MealSchedule, days: number) {
+    const nextDate = addDays(schedule.scheduled_on, days);
+    setIsSaving(true);
+    setFeedback(null);
+
+    const { data, error } = await supabase
+      .from("meal_schedules")
+      .update({ scheduled_on: nextDate })
+      .eq("id", schedule.id)
+      .eq("user_id", userId)
+      .select()
+      .single();
+
+    setIsSaving(false);
+
+    if (error || !data) {
+      setFeedback({ tone: "error", message: "原因: 献立の日付を移動できませんでした。影響: 予定日が変わりません。修正方法: ログイン状態を確認してください。" });
+      return;
+    }
+
+    setMealSchedules((items) => items.map((item) => (item.id === schedule.id ? (data as MealSchedule) : item)));
+    setSelectedScheduleId(schedule.id);
+    if (!scheduleDays.includes(nextDate)) {
+      setScheduleWindowStart(nextDate);
+    }
+    setFeedback({ tone: "success", message: `${schedule.recipe_name || "献立"} を ${formatScheduleDate(nextDate)} へ移動しました。` });
+  }
+
+  async function deleteSchedule(schedule: MealSchedule) {
+    setIsSaving(true);
+    setFeedback(null);
+
+    const { error } = await supabase.from("meal_schedules").delete().eq("id", schedule.id).eq("user_id", userId);
+
+    setIsSaving(false);
+
+    if (error) {
+      setFeedback({ tone: "error", message: "原因: 献立を削除できませんでした。影響: 予定が残ります。修正方法: ログイン状態を確認してください。" });
+      return;
+    }
+
+    setMealSchedules((items) => items.filter((item) => item.id !== schedule.id));
+    if (selectedScheduleId === schedule.id) {
+      const nextSchedule = mealSchedules.find((item) => item.id !== schedule.id);
+      setSelectedScheduleId(nextSchedule?.id ?? "");
+      setSelectedShortageKeys([]);
+    }
+    setFeedback({ tone: "info", message: `${schedule.recipe_name || "献立"} を献立から削除しました。` });
   }
 
   function toggleShortage(key: string, checked: boolean) {
@@ -516,8 +874,56 @@ export function RecipeMealWorkspace({
       return;
     }
 
+    if (pendingConsumptionScheduleId !== schedule.id) {
+      setPendingConsumptionScheduleId(schedule.id);
+      setConsumptionDrafts(buildConsumptionDrafts(schedule));
+      setSelectedScheduleId(schedule.id);
+      setFeedback({ tone: "info", message: "消費量を確認してから、もう一度「消費して完了」を押してください。" });
+      return;
+    }
+
+    const normalizedDrafts = consumptionDrafts.map((draft) => ({
+      ...draft,
+      consumedAmount: Number(draft.amount)
+    }));
+    const invalidDraft = normalizedDrafts.find((draft) => !Number.isFinite(draft.consumedAmount) || draft.consumedAmount < 0);
+    if (invalidDraft) {
+      setFeedback({ tone: "error", message: "原因: 消費量に不備があります。影響: 在庫を減算できません。修正方法: 0以上の数値に直してください。" });
+      return;
+    }
+
     setIsSaving(true);
     setFeedback(null);
+
+    const consumedRows: Array<{
+      draft: ConsumptionDraft & { consumedAmount: number };
+      nextQuantity: number;
+      stockItem: StockItem;
+    }> = [];
+    for (const draft of normalizedDrafts) {
+      if (!draft.stockItemId || draft.consumedAmount === 0) continue;
+      const stockItem = inventoryItemsForMeals.find((item) => item.id === draft.stockItemId);
+      if (!stockItem) continue;
+      consumedRows.push({
+        draft,
+        stockItem,
+        nextQuantity: Math.max(0, Number(stockItem.quantity || 0) - draft.consumedAmount)
+      });
+    }
+
+    for (const row of consumedRows) {
+      const { error: inventoryError } = await supabase
+        .from("inventory_items")
+        .update({ quantity: row.nextQuantity })
+        .eq("id", row.stockItem.id)
+        .eq("user_id", userId);
+
+      if (inventoryError) {
+        setIsSaving(false);
+        setFeedback({ tone: "error", message: "原因: 在庫を減算できませんでした。影響: 調理完了と料理履歴の作成を中止しました。修正方法: ログイン状態と在庫データを確認してください。" });
+        return;
+      }
+    }
 
     const completedAt = new Date().toISOString();
     const { data: updatedSchedule, error: scheduleError } = await supabase
@@ -540,19 +946,23 @@ export function RecipeMealWorkspace({
       return;
     }
 
-    const { error: historyError } = await supabase.from("cooking_history").insert({
-      user_id: userId,
-      cooked_at: completedAt,
-      recipe_id: schedule.recipe_id,
-      recipe_name: schedule.recipe_name,
-      meal_schedule_id: schedule.id,
-      note: "献立から調理完了",
-      rating: null
-    });
+    const { data: historyData, error: historyError } = await supabase
+      .from("cooking_history")
+      .insert({
+        user_id: userId,
+        cooked_at: completedAt,
+        recipe_id: schedule.recipe_id,
+        recipe_name: schedule.recipe_name,
+        meal_schedule_id: schedule.id,
+        note: "献立から調理完了",
+        rating: null
+      })
+      .select()
+      .single();
 
     setIsSaving(false);
 
-    if (historyError) {
+    if (historyError || !historyData) {
       setMealSchedules((items) => items.map((item) => (item.id === schedule.id ? (updatedSchedule as MealSchedule) : item)));
       setFeedback({
         tone: "error",
@@ -561,7 +971,44 @@ export function RecipeMealWorkspace({
       return;
     }
 
+    if (normalizedDrafts.length > 0) {
+      const { error: consumptionError } = await supabase.from("cooking_consumption_events").insert(
+        normalizedDrafts.map((draft) => {
+          const stockItem = draft.stockItemId ? inventoryItemsForMeals.find((item) => item.id === draft.stockItemId) : null;
+          return {
+            user_id: userId,
+            cooking_history_id: String(historyData.id),
+            meal_schedule_id: schedule.id,
+            recipe_id: schedule.recipe_id,
+            ingredient_name: draft.ingredientName,
+            requested_amount: draft.requestedAmount,
+            requested_unit: draft.requestedUnit,
+            consumed_amount: draft.consumedAmount,
+            consumed_unit: draft.requestedUnit,
+            stock_item_id: stockItem?.id ?? null,
+            stock_item_name: stockItem?.name ?? "",
+            substitute_for: stockItem && stockItem.name !== draft.ingredientName ? draft.ingredientName : ""
+          };
+        })
+      );
+
+      if (consumptionError) {
+        setFeedback({
+          tone: "error",
+          message: "原因: 消費履歴を保存できませんでした。影響: 在庫と料理履歴は更新済みですが、消費内訳が残りません。修正方法: 必要なら料理履歴メモへ追記してください。"
+        });
+      }
+    }
+
     setMealSchedules((items) => items.map((item) => (item.id === schedule.id ? (updatedSchedule as MealSchedule) : item)));
+    setInventoryItemsForMeals((items) =>
+      items.map((item) => {
+        const consumed = consumedRows.find((row) => row.stockItem.id === item.id);
+        return consumed ? { ...item, quantity: consumed.nextQuantity } : item;
+      })
+    );
+    setPendingConsumptionScheduleId(null);
+    setConsumptionDrafts([]);
     router.refresh();
     setFeedback({ tone: "success", message: `${schedule.recipe_name} を調理完了にしました。料理履歴にも記録済みです。` });
   }
@@ -577,6 +1024,20 @@ export function RecipeMealWorkspace({
         <p className="operation-message" data-tone={feedback.tone} role={feedback.tone === "error" ? "alert" : "status"}>
           {feedback.message}
         </p>
+      ) : null}
+
+      {pendingDelete ? (
+        <DeleteConfirmPanel
+          disabled={isSaving}
+          message={pendingDelete.message}
+          onCancel={() => setPendingDelete(null)}
+          onConfirm={() => {
+            const action = pendingDelete.confirm;
+            setPendingDelete(null);
+            action();
+          }}
+          target={pendingDelete.target}
+        />
       ) : null}
 
       <div className="recipe-meal-grid">
@@ -681,12 +1142,60 @@ export function RecipeMealWorkspace({
             </div>
           </form>
 
+          <section className="ai-recipe-panel" aria-label="AIレシピ">
+            <div className="panel-title compact-title">
+              <div>
+                <span>AI</span>
+                <h4>レシピ案を作る</h4>
+              </div>
+            </div>
+            <div className="ai-mode-row">
+              <button className="secondary-button compact-button" data-active={aiMode === "generate"} type="button" onClick={() => setAiMode("generate")}>
+                食材から考案
+              </button>
+              <button className="secondary-button compact-button" data-active={aiMode === "structure"} type="button" onClick={() => setAiMode("structure")}>
+                本文を構造化
+              </button>
+            </div>
+            <label>
+              必須食材
+              <textarea rows={2} value={aiRequired} onChange={(event) => setAiRequired(event.target.value)} placeholder="例: 豚肉, キャベツ" />
+            </label>
+            <label>
+              任意食材
+              <textarea rows={2} value={aiOptional} onChange={(event) => setAiOptional(event.target.value)} placeholder="例: にんじん, しょうが" />
+            </label>
+            <label>
+              レシピ本文・補足
+              <textarea rows={4} value={aiSourceText} onChange={(event) => setAiSourceText(event.target.value)} placeholder="貼り付けたレシピ本文や希望を書く" />
+            </label>
+            <button className="primary-button" type="button" disabled={isAiRunning} onClick={runAiRecipe}>
+              {isAiRunning ? "AI実行中" : "AIレシピをプレビュー"}
+            </button>
+            {aiPreview ? (
+              <div className="ai-preview">
+                <span>{aiPreview.genre || "ジャンル未設定"}</span>
+                <strong>{aiPreview.name}</strong>
+                <p>{aiPreview.ingredients.map((item) => `${item.name}${item.amount}${item.unit}`).join(" / ")}</p>
+                <button className="secondary-button compact-button" type="button" onClick={applyAiPreview}>
+                  フォームへ反映
+                </button>
+              </div>
+            ) : null}
+          </section>
+
           <RecipeList
             disabled={isSaving}
             onEdit={startEditRecipe}
+            onDelete={(recipe) => requestDelete(recipe.name, "このレシピを削除します。献立に紐づくレシピ参照も外れます。", () => deleteRecipe(recipe))}
             onSelect={setSelectedRecipeId}
-            recipes={recipes}
+            pendingDeleteRecipeId={pendingDeleteRecipeId}
+            recipes={visibleRecipes}
+            search={recipeSearch}
             selectedRecipeId={selectedRecipe?.id ?? ""}
+            sort={recipeSort}
+            onSearchChange={setRecipeSearch}
+            onSortChange={setRecipeSort}
           />
         </section>
 
@@ -698,6 +1207,22 @@ export function RecipeMealWorkspace({
             </div>
           </div>
           <RecipeDetail recipe={selectedRecipe} />
+          <button className="primary-button" type="button" disabled={!selectedRecipe} onClick={() => selectedRecipe && openCookingViewer(selectedRecipe)}>
+            調理ビューを開く
+          </button>
+
+          {activeCookingRecipe ? (
+            <CookingViewer
+              highlightedIngredientName={highlightedIngredientName}
+              ingredientTab={cookingIngredientTab}
+              inventoryItems={inventoryItemsForMeals}
+              onHighlightIngredient={setHighlightedIngredientName}
+              onIngredientTabChange={setCookingIngredientTab}
+              onStepTabChange={setCookingStepTab}
+              recipe={activeCookingRecipe}
+              stepTab={cookingStepTab}
+            />
+          ) : null}
 
           <form className="stock-form schedule-form" onSubmit={saveSchedule}>
             <h4>献立へ追加</h4>
@@ -731,34 +1256,147 @@ export function RecipeMealWorkspace({
               献立に追加
             </button>
           </form>
+
+          <section className="candidate-panel" aria-label="作りたい候補">
+            <div className="panel-title compact-title">
+              <div>
+                <span>候補</span>
+                <h4>作りたい候補</h4>
+              </div>
+              <strong>{activeCookCandidates.length}件</strong>
+            </div>
+            <form className="candidate-form" onSubmit={addCookCandidate}>
+              <label>
+                候補理由
+                <input value={candidateReasons} onChange={(event) => setCandidateReasons(event.target.value)} placeholder="期限が近い, 家族リクエスト" />
+              </label>
+              <button className="primary-button compact-button" type="submit" disabled={isSaving || !selectedRecipe}>
+                選択レシピを候補へ
+              </button>
+            </form>
+            {activeCookCandidates.length === 0 ? (
+              <p className="empty-list">作りたい候補はありません。</p>
+            ) : (
+              <div className="candidate-list">
+                {activeCookCandidates.map((candidate) => (
+                  <article className="candidate-item" key={candidate.id}>
+                    <div className="item-main">
+                      <span>作りたい</span>
+                      <h4>{candidate.recipe_name || "レシピ名なし"}</h4>
+                      <div className="reason-chip-row">
+                        {candidate.reasons.length === 0 ? (
+                          <small>理由未設定</small>
+                        ) : (
+                          candidate.reasons.map((reason, index) => <small key={`${candidate.id}-${reason}-${index}`}>{reason}</small>)
+                        )}
+                      </div>
+                    </div>
+                    <div className="candidate-actions">
+                      <button className="secondary-button compact-button" type="button" disabled={isSaving} onClick={() => assignCandidateToSchedule(candidate)}>
+                        献立へ追加
+                      </button>
+                      <button
+                        className="danger-button compact-button"
+                        type="button"
+                        disabled={isSaving}
+                        onClick={() => requestDelete(candidate.recipe_name || "候補", "この作りたい候補を解除します。レシピ本体は削除されません。", () => deleteCookCandidate(candidate))}
+                      >
+                        解除
+                      </button>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
+          </section>
         </section>
 
         <section className="stock-panel" aria-labelledby="meal-list-heading">
           <div className="panel-title">
             <div>
               <span>献立</span>
-              <h3 id="meal-list-heading">予定と買い物候補</h3>
+              <h3 id="meal-list-heading">7日予定と買い物候補</h3>
             </div>
+          </div>
+
+          <div className="schedule-toolbar">
+            <button className="secondary-button compact-button" type="button" onClick={() => setScheduleWindowStart(addDays(scheduleWindowStart, -7))}>
+              前の7日
+            </button>
+            <button
+              className="secondary-button compact-button"
+              type="button"
+              onClick={() => {
+                setScheduleWindowStart(todayValue());
+                setScheduleDate(todayValue());
+              }}
+            >
+              今日
+            </button>
+            <button className="secondary-button compact-button" type="button" onClick={() => setScheduleWindowStart(addDays(scheduleWindowStart, 7))}>
+              次の7日
+            </button>
           </div>
 
           {mealSchedules.length === 0 ? (
             <p className="empty-list">献立はありません。レシピを選んで予定に追加してください。</p>
           ) : (
-            <div className="meal-list">
-              {mealSchedules.map((schedule) => (
-                <article className="meal-item" data-active={selectedSchedule?.id === schedule.id} key={schedule.id}>
-                  <button className="meal-select-button" type="button" onClick={() => setSelectedScheduleId(schedule.id)}>
-                    <span>{formatScheduleDate(schedule.scheduled_on)} / {schedule.meal_type}</span>
-                    <strong>{schedule.recipe_name || "レシピ名なし"}</strong>
-                    <em>{schedule.status}</em>
+            <div className="meal-week" aria-label="7日献立">
+              {scheduleDays.map((day) => (
+                <section className="meal-day" key={day}>
+                  <button className="meal-day-heading" type="button" onClick={() => setScheduleDate(day)}>
+                    <span>{formatScheduleDayLabel(day)}</span>
+                    <strong>{visibleMealSchedules.filter((schedule) => schedule.scheduled_on === day).length}件</strong>
                   </button>
-                  <button className="secondary-button" type="button" disabled={isSaving || schedule.status === "完了"} onClick={() => completeSchedule(schedule)}>
-                    調理完了
-                  </button>
-                </article>
+                  {visibleMealSchedules.filter((schedule) => schedule.scheduled_on === day).length === 0 ? (
+                    <p className="empty-list compact-empty">予定なし</p>
+                  ) : (
+                    <div className="meal-list">
+                      {visibleMealSchedules
+                        .filter((schedule) => schedule.scheduled_on === day)
+                        .map((schedule) => (
+                          <article className="meal-item" data-active={selectedSchedule?.id === schedule.id} key={schedule.id}>
+                            <button className="meal-select-button" type="button" onClick={() => setSelectedScheduleId(schedule.id)}>
+                              <span>{schedule.meal_type}</span>
+                              <strong>{schedule.recipe_name || "レシピ名なし"}</strong>
+                              <em>{schedule.status}</em>
+                            </button>
+                            <div className="meal-actions">
+                              <button className="secondary-button compact-button" type="button" disabled={isSaving} onClick={() => moveSchedule(schedule, -1)}>
+                                前日
+                              </button>
+                              <button className="secondary-button compact-button" type="button" disabled={isSaving} onClick={() => moveSchedule(schedule, 1)}>
+                                翌日
+                              </button>
+                              <button className="secondary-button compact-button" type="button" disabled={isSaving || schedule.status === "完了"} onClick={() => completeSchedule(schedule)}>
+                                {pendingConsumptionScheduleId === schedule.id ? "消費して完了" : "調理完了"}
+                              </button>
+                              <button
+                                className="danger-button compact-button"
+                                type="button"
+                                disabled={isSaving}
+                                onClick={() => requestDelete(schedule.recipe_name || "献立", "この献立予定を削除します。料理履歴は削除されません。", () => deleteSchedule(schedule))}
+                              >
+                                削除
+                              </button>
+                            </div>
+                          </article>
+                        ))}
+                    </div>
+                  )}
+                </section>
               ))}
             </div>
           )}
+
+          {pendingConsumptionScheduleId && selectedSchedule?.id === pendingConsumptionScheduleId ? (
+            <ConsumptionEditor
+              drafts={consumptionDrafts}
+              inventoryItems={inventoryItemsForMeals}
+              onChange={updateConsumptionDraft}
+              recipe={recipes.find((item) => item.id === selectedSchedule.recipe_id) ?? null}
+            />
+          ) : null}
 
           <div className="shortage-panel">
             <div className="panel-title compact-title">
@@ -798,7 +1436,7 @@ export function RecipeMealWorkspace({
                 className="danger-button compact-button"
                 type="button"
                 disabled={isSaving || selectedShoppingIds.length === 0}
-                onClick={deleteSelectedShoppingItems}
+                onClick={() => requestDelete(`${selectedShoppingIds.length}件の買い物`, "選択した買い物を削除します。元には戻せません。", deleteSelectedShoppingItems)}
               >
                 選択削除
               </button>
@@ -853,6 +1491,175 @@ export function RecipeMealWorkspace({
   );
 }
 
+function ConsumptionEditor({
+  drafts,
+  inventoryItems,
+  onChange,
+  recipe
+}: {
+  drafts: ConsumptionDraft[];
+  inventoryItems: StockItem[];
+  onChange: (index: number, values: Partial<ConsumptionDraft>) => void;
+  recipe: Recipe | null;
+}) {
+  if (!recipe) {
+    return <p className="empty-list">レシピが見つからないため、消費量を作成できません。</p>;
+  }
+
+  return (
+    <section className="consumption-editor" aria-label="消費量確認">
+      <div className="panel-title compact-title">
+        <div>
+          <span>消費確認</span>
+          <h4>在庫から減らす量</h4>
+        </div>
+      </div>
+      {drafts.length === 0 ? (
+        <p className="empty-list">減算対象の材料はありません。このまま完了できます。</p>
+      ) : (
+        <div className="consumption-list">
+          {drafts.map((draft, index) => {
+            const ingredient = recipe.ingredients.find((item) => item.name === draft.ingredientName && item.unit === draft.requestedUnit);
+            const options = ingredient
+              ? inventoryItems.filter((item) => item.category === ingredient.item_type && item.unit === ingredient.unit && item.quantity > 0)
+              : [];
+            return (
+              <article className="consumption-item" key={`${draft.ingredientName}-${draft.requestedUnit}-${index}`}>
+                <div className="item-main">
+                  <span>必要 {draft.requestedAmount}{draft.requestedUnit}</span>
+                  <h4>{draft.ingredientName}</h4>
+                </div>
+                <label>
+                  減らす在庫
+                  <select value={draft.stockItemId} onChange={(event) => onChange(index, { stockItemId: event.target.value })}>
+                    <option value="">減算しない</option>
+                    {options.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.name} / {item.quantity}{item.unit} / {item.storage_location}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  消費量
+                  <input min="0" step="0.1" type="number" value={draft.amount} onChange={(event) => onChange(index, { amount: event.target.value })} />
+                </label>
+              </article>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function CookingViewer({
+  highlightedIngredientName,
+  ingredientTab,
+  inventoryItems,
+  onHighlightIngredient,
+  onIngredientTabChange,
+  onStepTabChange,
+  recipe,
+  stepTab
+}: {
+  highlightedIngredientName: string;
+  ingredientTab: CookingIngredientTab;
+  inventoryItems: StockItem[];
+  onHighlightIngredient: (name: string) => void;
+  onIngredientTabChange: (tab: CookingIngredientTab) => void;
+  onStepTabChange: (tab: CookingStepTab) => void;
+  recipe: Recipe | null;
+  stepTab: CookingStepTab;
+}) {
+  if (!recipe) {
+    return <p className="empty-list">レシピを選ぶと調理ビューを確認できます。</p>;
+  }
+
+  const visibleIngredients = recipe.ingredients.filter((ingredient) => ingredient.item_type === ingredientTab);
+  const allIngredientNames = recipe.ingredients.map((ingredient) => ingredient.name).filter(Boolean);
+  const visibleSteps = stepTab === "prep" ? recipe.prep_steps : recipe.steps;
+
+  return (
+    <section className="cooking-viewer" aria-label="調理ビューア">
+      <div className="panel-title compact-title">
+        <div>
+          <span>調理中</span>
+          <h4>{recipe.name}</h4>
+        </div>
+      </div>
+
+      <div className="cooking-viewer-grid">
+        <section className="cooking-viewer-pane" aria-label="材料と在庫">
+          <div className="segmented-control">
+            {mealIngredientTabs.map((tab) => (
+              <button className="secondary-button compact-button" data-active={ingredientTab === tab} key={tab} type="button" onClick={() => onIngredientTabChange(tab)}>
+                {tab}
+              </button>
+            ))}
+          </div>
+          {visibleIngredients.length === 0 ? (
+            <p className="empty-list">{ingredientTab}はありません。</p>
+          ) : (
+            <div className="cooking-ingredient-list">
+              {visibleIngredients.map((ingredient) => {
+                const stockAmount = inventoryAmountByNameAndUnit(inventoryItems, ingredient.name, ingredient.unit);
+                const status = stockAmount >= ingredient.amount ? "在庫あり" : stockAmount > 0 ? "不足" : "在庫なし";
+                return (
+                  <article className="cooking-ingredient-item" data-highlighted={highlightedIngredientName === ingredient.name} key={ingredient.id || ingredient.name}>
+                    <div>
+                      <strong>{ingredient.name}</strong>
+                      <span>必要 {ingredient.amount}{ingredient.unit}</span>
+                    </div>
+                    <small data-status={status}>在庫 {stockAmount}{ingredient.unit} / {status}</small>
+                  </article>
+                );
+              })}
+            </div>
+          )}
+        </section>
+
+        <section className="cooking-viewer-pane" aria-label="手順">
+          <div className="segmented-control">
+            <button className="secondary-button compact-button" data-active={stepTab === "prep"} type="button" onClick={() => onStepTabChange("prep")}>
+              下準備
+            </button>
+            <button className="secondary-button compact-button" data-active={stepTab === "steps"} type="button" onClick={() => onStepTabChange("steps")}>
+              調理手順
+            </button>
+          </div>
+          {visibleSteps.length === 0 ? (
+            <p className="empty-list">{stepTab === "prep" ? "下準備" : "調理手順"}はありません。</p>
+          ) : (
+            <ol className="cooking-step-list">
+              {visibleSteps.map((step, index) => {
+                const matchedNames = allIngredientNames.filter((name) => step.includes(name));
+                return (
+                  <li className="cooking-step-item" key={`${step}-${index}`}>
+                    <span>Step {index + 1}</span>
+                    <p>{step}</p>
+                    {matchedNames.length > 0 ? (
+                      <div className="step-chip-row">
+                        {matchedNames.map((name) => (
+                          <button className="secondary-button compact-button" type="button" key={`${index}-${name}`} onClick={() => onHighlightIngredient(name)}>
+                            {name}
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+                  </li>
+                );
+              })}
+            </ol>
+          )}
+        </section>
+      </div>
+    </section>
+  );
+}
+
+const mealIngredientTabs: CookingIngredientTab[] = ["食材", "調味料"];
+
 function ShoppingListSection({
   emptyText,
   items,
@@ -904,36 +1711,64 @@ function ShoppingListSection({
 
 function RecipeList({
   disabled,
+  onDelete,
   onEdit,
   onSelect,
+  onSearchChange,
+  onSortChange,
+  pendingDeleteRecipeId,
   recipes,
-  selectedRecipeId
+  search,
+  selectedRecipeId,
+  sort
 }: {
   disabled: boolean;
+  onDelete: (recipe: Recipe) => void;
   onEdit: (recipe: Recipe) => void;
   onSelect: (id: string) => void;
+  onSearchChange: (value: string) => void;
+  onSortChange: (value: RecipeSort) => void;
+  pendingDeleteRecipeId: string | null;
   recipes: Recipe[];
+  search: string;
   selectedRecipeId: string;
+  sort: RecipeSort;
 }) {
-  if (recipes.length === 0) {
-    return <p className="empty-list">レシピはありません。まずは1件追加してください。</p>;
-  }
-
   return (
-    <div className="recipe-list">
-      {recipes.map((recipe) => (
-        <article className="recipe-card" data-active={selectedRecipeId === recipe.id} key={recipe.id}>
-          <button className="recipe-select-button" type="button" onClick={() => onSelect(recipe.id)}>
-            <span>{recipe.genre.join(", ") || "ジャンル未設定"}</span>
-            <strong>{recipe.name}</strong>
-            <small>{recipe.ingredients.length}材料</small>
-          </button>
-          <button className="secondary-button compact-button" type="button" disabled={disabled} onClick={() => onEdit(recipe)}>
-            編集
-          </button>
-        </article>
-      ))}
-    </div>
+    <section className="recipe-browser" aria-label="レシピ一覧">
+      <div className="recipe-list-controls">
+        <input aria-label="レシピ検索" value={search} onChange={(event) => onSearchChange(event.target.value)} placeholder="レシピ名・ジャンル・材料で検索" />
+        <select aria-label="レシピの並び順" value={sort} onChange={(event) => onSortChange(event.target.value as RecipeSort)}>
+          <option value="created_desc">登録が新しい順</option>
+          <option value="name_asc">名前順</option>
+          <option value="ingredients_desc">材料が多い順</option>
+        </select>
+      </div>
+
+      {recipes.length === 0 ? (
+        <p className="empty-list">条件に合うレシピはありません。</p>
+      ) : (
+        <div className="recipe-list">
+          {recipes.map((recipe) => (
+            <article className="recipe-card" data-active={selectedRecipeId === recipe.id} key={recipe.id}>
+              <button className="recipe-select-button" type="button" onClick={() => onSelect(recipe.id)}>
+                <span>{recipe.genre.join(", ") || "ジャンル未設定"}</span>
+                <strong>{recipe.name}</strong>
+                <small>{recipe.ingredients.length}材料</small>
+              </button>
+              <div className="recipe-card-actions">
+                <button className="secondary-button compact-button" type="button" disabled={disabled} onClick={() => onEdit(recipe)}>
+                  編集
+                </button>
+                <button className="danger-button compact-button" type="button" disabled={disabled} onClick={() => onDelete(recipe)}>
+                  {pendingDeleteRecipeId === recipe.id ? "削除する" : "削除"}
+                </button>
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
 

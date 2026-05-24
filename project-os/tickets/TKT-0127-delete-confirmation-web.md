@@ -1,7 +1,7 @@
 ---
 id: TKT-0127-delete-confirmation-web
 title: Web版削除確認統一
-status: ready_for_implementation
+status: completed
 goal: Web版の削除操作をCanvas版同様に安全な確認UIへ統一する
 acceptance:
   - 削除前に統一された確認UIが出る

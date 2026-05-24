@@ -247,6 +247,8 @@ describe("InventoryBoard", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "すべて選択" }));
     fireEvent.click(screen.getByRole("button", { name: "選択削除" }));
+    expect(await screen.findByLabelText("削除確認")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "削除する" }));
 
     await waitFor(() => {
       expect(from).toHaveBeenCalledWith("staging_items");
