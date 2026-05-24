@@ -55,6 +55,7 @@ describe("InventoryBoard", () => {
     compressImageFile.mockReset();
     buildPhotoStoragePath.mockReset();
     buildPhotoStoragePath.mockReturnValue("user-1/ingredient-scan/photo-1.jpg");
+    global.fetch = vi.fn();
     URL.createObjectURL = vi.fn(() => "blob:preview");
     URL.revokeObjectURL = vi.fn();
   });
@@ -141,19 +142,22 @@ describe("InventoryBoard", () => {
     });
 
     expect(screen.getByAltText("選択した食材写真のプレビュー")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "圧縮して保存" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "AI解析する" })).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "別の写真にする" }));
 
     expect(screen.queryByAltText("選択した食材写真のプレビュー")).toBeNull();
-    expect(screen.getByText("写真は圧縮してから非公開で保存します。AI解析は次の段階で追加します。")).toBeTruthy();
+    expect(screen.getByText("写真は非公開で保存し、サーバー側でAI解析します。APIキーはブラウザへ出しません。")).toBeTruthy();
   });
 
-  it("compresses and uploads a selected photo with private storage metadata", async () => {
+  it("compresses, uploads, and scans a selected photo into staging items", async () => {
     const upload = vi.fn().mockResolvedValue({ error: null });
     const remove = vi.fn().mockResolvedValue({ error: null });
-    const insert = vi.fn().mockResolvedValue({ error: null });
+    const photoSingle = vi.fn().mockResolvedValue({ data: { id: "photo-1" }, error: null });
+    const photoSelect = vi.fn(() => ({ single: photoSingle }));
+    const insert = vi.fn(() => ({ select: photoSelect }));
     const compressedBlob = new Blob(["compressed"], { type: "image/jpeg" });
+    const aiItem = { ...baseItem, id: "ai-1", name: "ヨーグルト", source: "ai_photo" };
 
     storageFrom.mockReturnValue({ upload, remove });
     from.mockImplementation((table: string) => {
@@ -167,6 +171,10 @@ describe("InventoryBoard", () => {
       width: 1024,
       height: 768
     });
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      json: async () => ({ items: [aiItem] })
+    } as Response);
 
     renderBoard();
 
@@ -175,7 +183,7 @@ describe("InventoryBoard", () => {
         files: [new File(["photo"], "ingredient.jpg", { type: "image/jpeg" })]
       }
     });
-    fireEvent.click(screen.getByRole("button", { name: "圧縮して保存" }));
+    fireEvent.click(screen.getByRole("button", { name: "AI解析する" }));
 
     await waitFor(() => {
       expect(storageFrom).toHaveBeenCalledWith("photos");
@@ -196,8 +204,16 @@ describe("InventoryBoard", () => {
           height: 768
         })
       );
+      expect(fetch).toHaveBeenCalledWith("/api/ai/scan-ingredients", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ photoId: "photo-1" })
+      });
     });
-    expect(await screen.findByText("圧縮した写真を非公開Storageに保存しました。")).toBeTruthy();
+    expect(await screen.findByText("1件の候補を登録待ちへ追加しました。確認してから在庫へ確定してください。")).toBeTruthy();
+    expect(screen.getByText("ヨーグルト")).toBeTruthy();
   });
 
   it("shows a clear error when photo upload fails", async () => {
@@ -218,9 +234,48 @@ describe("InventoryBoard", () => {
         files: [new File(["photo"], "ingredient.jpg", { type: "image/jpeg" })]
       }
     });
-    fireEvent.click(screen.getByRole("button", { name: "圧縮して保存" }));
+    fireEvent.click(screen.getByRole("button", { name: "AI解析する" }));
 
     expect(await screen.findByText(/原因: 写真をStorageへ保存できませんでした。/)).toBeTruthy();
     expect(from).not.toHaveBeenCalledWith("photos");
+  });
+
+  it("shows a clear error when ingredient scan fails", async () => {
+    const upload = vi.fn().mockResolvedValue({ error: null });
+    const remove = vi.fn().mockResolvedValue({ error: null });
+    const photoSingle = vi.fn().mockResolvedValue({ data: { id: "photo-1" }, error: null });
+    const photoSelect = vi.fn(() => ({ single: photoSingle }));
+    const insert = vi.fn(() => ({ select: photoSelect }));
+
+    storageFrom.mockReturnValue({ upload, remove });
+    from.mockImplementation((table: string) => {
+      if (table === "photos") return { insert };
+      return {};
+    });
+    compressImageFile.mockResolvedValue({
+      blob: new Blob(["compressed"], { type: "image/jpeg" }),
+      byteSize: 10,
+      contentType: "image/jpeg",
+      width: 1024,
+      height: 768
+    });
+    vi.mocked(fetch).mockResolvedValue({
+      ok: false,
+      json: async () => ({
+        error: "原因: Gemini APIの解析に失敗しました。影響: 登録待ちへ追加できません。修正方法: 時間を置いて再度解析してください。"
+      })
+    } as Response);
+
+    renderBoard();
+
+    fireEvent.change(screen.getByLabelText("写真を撮る"), {
+      target: {
+        files: [new File(["photo"], "ingredient.jpg", { type: "image/jpeg" })]
+      }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "AI解析する" }));
+
+    expect(await screen.findByText(/原因: Gemini APIの解析に失敗しました。/)).toBeTruthy();
+    expect(screen.queryByText("ヨーグルト")).toBeNull();
   });
 });

@@ -1,0 +1,27 @@
+{
+  "ticket": "TKT-0107-ai-ingredient-scan-api",
+  "status": "passed",
+  "checked_at": "2026-05-24",
+  "commands": [
+    {
+      "command": "cd web && npm run lint && npm run typecheck && npm run test && npm run build",
+      "result": "passed",
+      "notes": "lint, typecheck, 27 Vitest tests, and Next.js production build all passed. Build includes /api/ai/scan-ingredients."
+    },
+    {
+      "command": "rg -n 'GAS_URL|executeGAS|SpreadsheetApp|DriveApp' web supabase",
+      "result": "passed",
+      "notes": "No matches. Web version still has no GAS, Spreadsheet, or Drive dependency."
+    },
+    {
+      "command": "rg -n 'GEMINI_API_KEY|SUPABASE_SERVICE_ROLE_KEY|SUPABASE_DB_PASSWORD' web supabase",
+      "result": "passed",
+      "notes": "Only environment variable names and test dummy values are referenced. No real secret values are stored."
+    }
+  ],
+  "coverage": [
+    "ai_server_route",
+    "photo_upload_storage",
+    "auth_and_rls_policy"
+  ]
+}

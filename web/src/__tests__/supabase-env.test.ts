@@ -9,7 +9,8 @@ describe("Supabase environment separation", () => {
     const env = getPublicSupabaseEnv({
       NEXT_PUBLIC_SUPABASE_URL: "https://example.supabase.co",
       NEXT_PUBLIC_SUPABASE_ANON_KEY: "anon-key",
-      SUPABASE_SERVICE_ROLE_KEY: "server-secret"
+      SUPABASE_SERVICE_ROLE_KEY: "server-secret",
+      GEMINI_API_KEY: "gemini-secret"
     });
 
     expect(env).toEqual({

@@ -21,6 +21,11 @@ type Feedback = {
   message: string;
 };
 
+type ScanIngredientsResponse = {
+  items?: StockItem[];
+  error?: string;
+};
+
 type EditingTarget =
   | { list: "staging"; item: StockItem }
   | { list: "inventory"; item: StockItem }
@@ -147,11 +152,11 @@ export function InventoryBoard({
     setPhotoFeedback({ tone: "info", message: "写真を選びました。内容を確認してから保存してください。" });
   }
 
-  async function uploadPhoto() {
+  async function scanPhoto() {
     if (!selectedPhoto) {
       setPhotoFeedback({
         tone: "error",
-        message: "原因: 写真が未選択です。影響: 保存できません。修正方法: 先に写真を撮るか選んでください。"
+        message: "原因: 写真が未選択です。影響: AI解析できません。修正方法: 先に写真を撮るか選んでください。"
       });
       return;
     }
@@ -175,18 +180,22 @@ export function InventoryBoard({
         return;
       }
 
-      const { error: insertError } = await supabase.from("photos").insert({
-        user_id: userId,
-        bucket_id: "photos",
-        storage_path: storagePath,
-        usage_type: "ingredient_scan",
-        content_type: compressed.contentType,
-        byte_size: compressed.byteSize,
-        width: compressed.width,
-        height: compressed.height
-      });
+      const { data: photo, error: insertError } = await supabase
+        .from("photos")
+        .insert({
+          user_id: userId,
+          bucket_id: "photos",
+          storage_path: storagePath,
+          usage_type: "ingredient_scan",
+          content_type: compressed.contentType,
+          byte_size: compressed.byteSize,
+          width: compressed.width,
+          height: compressed.height
+        })
+        .select("id")
+        .single();
 
-      if (insertError) {
+      if (insertError || !photo) {
         await supabase.storage.from("photos").remove([storagePath]);
         setPhotoFeedback({
           tone: "error",
@@ -195,12 +204,34 @@ export function InventoryBoard({
         return;
       }
 
+      setPhotoFeedback({ tone: "info", message: "写真を保存しました。AIで食材候補を解析しています。" });
+
+      const scanResponse = await fetch("/api/ai/scan-ingredients", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ photoId: photo.id })
+      });
+      const scanResult = (await scanResponse.json().catch(() => ({}))) as ScanIngredientsResponse;
+
+      if (!scanResponse.ok || scanResult.error || !scanResult.items) {
+        setPhotoFeedback({
+          tone: "error",
+          message:
+            scanResult.error ||
+            "原因: AI解析結果を取得できませんでした。影響: 登録待ちへ追加できません。修正方法: 時間を置いて再度解析してください。"
+        });
+        return;
+      }
+
+      setStagingItems((items) => [...(scanResult.items ?? []), ...items]);
       resetPhoto();
-      setPhotoFeedback({ tone: "success", message: "圧縮した写真を非公開Storageに保存しました。" });
+      setPhotoFeedback({ tone: "success", message: `${scanResult.items.length}件の候補を登録待ちへ追加しました。確認してから在庫へ確定してください。` });
     } catch {
       setPhotoFeedback({
         tone: "error",
-        message: "原因: 画像の圧縮に失敗しました。影響: 元画像は保存されません。修正方法: 別の写真で撮り直してください。"
+        message: "原因: 写真の保存またはAI解析に失敗しました。影響: 登録待ちへ追加できません。修正方法: 別の写真で撮り直してください。"
       });
     } finally {
       setIsUploadingPhoto(false);
@@ -413,7 +444,7 @@ export function InventoryBoard({
             <div className="photo-capture-heading">
               <div>
                 <span>写真登録</span>
-                <h4 id="photo-capture-heading">食材写真を保存</h4>
+                <h4 id="photo-capture-heading">写真を解析して登録待ちへ</h4>
               </div>
               <label className="photo-file-button">
                 写真を撮る
@@ -435,7 +466,7 @@ export function InventoryBoard({
                 <img src={photoPreviewUrl} alt="選択した食材写真のプレビュー" />
               </div>
             ) : (
-              <p className="photo-empty">写真は圧縮してから非公開で保存します。AI解析は次の段階で追加します。</p>
+              <p className="photo-empty">写真は非公開で保存し、サーバー側でAI解析します。APIキーはブラウザへ出しません。</p>
             )}
 
             {photoFeedback ? (
@@ -445,8 +476,8 @@ export function InventoryBoard({
             ) : null}
 
             <div className="photo-actions">
-              <button className="primary-button" type="button" disabled={!selectedPhoto || isUploadingPhoto || isSaving} onClick={uploadPhoto}>
-                {isUploadingPhoto ? "保存中" : "圧縮して保存"}
+              <button className="primary-button" type="button" disabled={!selectedPhoto || isUploadingPhoto || isSaving} onClick={scanPhoto}>
+                {isUploadingPhoto ? "解析中" : "AI解析する"}
               </button>
               <button className="secondary-button" type="button" disabled={!selectedPhoto || isUploadingPhoto} onClick={resetPhoto}>
                 別の写真にする
