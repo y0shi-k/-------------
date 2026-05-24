@@ -1,7 +1,7 @@
 ---
 id: TKT-0113-canvas-parity-audit
 title: Canvas版完全一致監査
-status: ready_for_implementation
+status: completed
 goal: Web版を「スプシ連携以外はCanvas版と同じ」にするため、未移植差分を正本化してCSV移行前に止める
 acceptance:
   - `project-os/knowledge/canvas-parity-matrix.md` がCanvas版全体を基準に更新されている
@@ -59,4 +59,4 @@ owner_notes:
 
 ## 次
 
-監査結果に応じて、`TKT-0114` 以降に未移植機能を分解する。CSV移行はその後に再判断する。
+監査結果に応じて、`TKT-0114` から `TKT-0127` に未移植機能を分解済み。CSV移行は完全一致チケット群の完了後に再判断する。

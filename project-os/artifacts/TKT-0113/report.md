@@ -15,7 +15,7 @@ TKT-0113の監査結果として、Web版はまだCanvas版完全一致ではな
 
 - `project-os/knowledge/canvas-parity-matrix.md` を更新した。
 - Canvas版の主要領域を、Web版の実装済み/未実装/仕様差分に分類した。
-- `missing`, `changed`, `partial` に後続チケット候補を付けた。
+- `missing`, `changed`, `partial` に後続チケットを付けた。
 - CSV移行を止める判断を明記した。
 
 ## 主な未移植差分
@@ -45,9 +45,9 @@ TKT-0113の監査結果として、Web版はまだCanvas版完全一致ではな
 
 ## 次の推奨順
 
-1. TKT-0114: 全体ナビ、ステータス、スマホ導線
-2. TKT-0116: 保存場所管理
-3. TKT-0117: 単位換算
-4. TKT-0122: 作りたい候補
-5. TKT-0125: 調理完了、在庫減算、代替品
-6. その後にTKT-0110 CSV移行を再判断する
+1. `TKT-0114-web-canvas-mode-navigation`
+2. `TKT-0115-inventory-staging-canvas-parity`
+3. `TKT-0116-storage-location-management-web`
+4. `TKT-0117-unit-conversion-web`
+5. `TKT-0118` から `TKT-0127` の完全一致チケット群
+6. その後に `TKT-0110-csv-migration-tool` を再判断する

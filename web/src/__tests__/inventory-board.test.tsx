@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { InventoryBoard } from "@/components/inventory-board";
-import type { StockItem } from "@/lib/inventory/types";
+import type { StockItem, StorageLocation } from "@/lib/inventory/types";
 
 const from = vi.fn();
 const storageFrom = vi.fn();
@@ -38,10 +38,20 @@ const baseItem: StockItem = {
   updated_at: "2026-05-24T00:00:00Z"
 };
 
+const baseLocation: StorageLocation = {
+  id: "location-1",
+  user_id: "user-1",
+  name: "冷蔵庫",
+  sort_order: 0,
+  created_at: "2026-05-24T00:00:00Z",
+  updated_at: "2026-05-24T00:00:00Z"
+};
+
 function renderBoard(props?: Partial<React.ComponentProps<typeof InventoryBoard>>) {
   return render(
     <InventoryBoard
       initialInventoryItems={props?.initialInventoryItems ?? []}
+      initialStorageLocations={props?.initialStorageLocations ?? []}
       initialStagingItems={props?.initialStagingItems ?? []}
       userId={props?.userId ?? "user-1"}
     />
@@ -71,6 +81,36 @@ describe("InventoryBoard", () => {
     expect(screen.getByText("卵")).toBeTruthy();
     expect(screen.getByRole("button", { name: "在庫へ確定" })).toBeTruthy();
     expect(screen.getByLabelText("写真を撮る")).toBeTruthy();
+    expect(screen.getByLabelText("在庫の保存場所")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "保存場所を管理" })).toBeTruthy();
+  });
+
+  it("adds a storage location candidate", async () => {
+    const inserted = { ...baseLocation, id: "location-new", name: "野菜室" };
+    const single = vi.fn().mockResolvedValue({ data: inserted, error: null });
+    const select = vi.fn(() => ({ single }));
+    const insert = vi.fn(() => ({ select }));
+    from.mockReturnValue({ insert });
+
+    renderBoard();
+
+    fireEvent.change(screen.getByLabelText("追加する保存場所"), { target: { value: "野菜室" } });
+    fireEvent.click(screen.getByRole("button", { name: "追加" }));
+
+    await waitFor(() => {
+      expect(from).toHaveBeenCalledWith("storage_locations");
+      expect(insert).toHaveBeenCalledWith({ user_id: "user-1", name: "野菜室", sort_order: 0 });
+    });
+    expect(await screen.findByText("野菜室 を保存場所に追加しました。")).toBeTruthy();
+    expect(screen.getByRole("option", { name: "野菜室" })).toBeTruthy();
+  });
+
+  it("prevents deleting a storage location while it is used", () => {
+    renderBoard({ initialInventoryItems: [baseItem], initialStorageLocations: [baseLocation] });
+
+    const deleteButtons = screen.getAllByRole("button", { name: "削除" }) as HTMLButtonElement[];
+    expect(deleteButtons.some((button) => button.disabled)).toBe(true);
+    expect(screen.getAllByText("1件").length).toBeGreaterThan(0);
   });
 
   it("adds a manual staging item with the authenticated user id", async () => {
@@ -130,6 +170,71 @@ describe("InventoryBoard", () => {
       expect(deleteItem).toHaveBeenCalled();
     });
     expect(await screen.findByText("牛乳 を在庫へ確定しました。")).toBeTruthy();
+  });
+
+  it("filters inventory by location and category", () => {
+    renderBoard({
+      initialInventoryItems: [
+        { ...baseItem, id: "inventory-1", name: "卵", unit: "個", quantity: 6, storage_location: "冷蔵庫", category: "食材" },
+        { ...baseItem, id: "inventory-2", name: "醤油", unit: "本", quantity: 1, storage_location: "常温棚", category: "調味料" }
+      ]
+    });
+
+    fireEvent.change(screen.getByLabelText("在庫の保存場所"), { target: { value: "常温棚" } });
+
+    expect(screen.getByText("醤油")).toBeTruthy();
+    expect(screen.queryByText("卵")).toBeNull();
+
+    fireEvent.change(screen.getByLabelText("在庫の種別"), { target: { value: "食材" } });
+
+    expect(screen.queryByText("醤油")).toBeNull();
+    expect(screen.getByText("在庫はありません。登録待ちから確定するとここに表示されます。")).toBeTruthy();
+  });
+
+  it("marks an inventory item as used up", async () => {
+    const usedUpItem = { ...baseItem, quantity: 0, status_note: "朝食用 / 使い切り" };
+    const single = vi.fn().mockResolvedValue({ data: usedUpItem, error: null });
+    const select = vi.fn(() => ({ single }));
+    const eqUser = vi.fn(() => ({ select }));
+    const eqId = vi.fn(() => ({ eq: eqUser }));
+    const update = vi.fn(() => ({ eq: eqId }));
+    from.mockReturnValue({ update });
+
+    renderBoard({ initialInventoryItems: [baseItem] });
+
+    fireEvent.click(screen.getByRole("button", { name: "使い切り" }));
+
+    await waitFor(() => {
+      expect(from).toHaveBeenCalledWith("inventory_items");
+      expect(update).toHaveBeenCalledWith({ quantity: 0, status_note: "朝食用 / 使い切り" });
+    });
+    expect(await screen.findByText("牛乳 を使い切りにしました。")).toBeTruthy();
+    expect(screen.getByText("0本 / 冷蔵庫")).toBeTruthy();
+  });
+
+  it("bulk deletes selected staging items", async () => {
+    const inIds = vi.fn().mockResolvedValue({ error: null });
+    const eqUser = vi.fn(() => ({ in: inIds }));
+    const deleteRows = vi.fn(() => ({ eq: eqUser }));
+    from.mockReturnValue({ delete: deleteRows });
+
+    renderBoard({
+      initialStagingItems: [
+        baseItem,
+        { ...baseItem, id: "item-2", name: "チーズ" }
+      ]
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "すべて選択" }));
+    fireEvent.click(screen.getByRole("button", { name: "選択削除" }));
+
+    await waitFor(() => {
+      expect(from).toHaveBeenCalledWith("staging_items");
+      expect(inIds).toHaveBeenCalledWith("id", ["item-1", "item-2"]);
+    });
+    expect(await screen.findByText("登録待ちを2件削除しました。")).toBeTruthy();
+    expect(screen.queryByText("牛乳")).toBeNull();
+    expect(screen.queryByText("チーズ")).toBeNull();
   });
 
   it("previews a selected photo and allows replacing it", () => {

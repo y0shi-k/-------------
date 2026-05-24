@@ -16,6 +16,15 @@ export type StockItem = {
   updated_at: string;
 };
 
+export type StorageLocation = {
+  id: string;
+  user_id: string;
+  name: string;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+};
+
 export type StockItemFormValues = {
   category: ItemCategory;
   name: string;

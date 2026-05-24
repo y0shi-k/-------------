@@ -3,9 +3,9 @@ import { CookingHistoryBoard } from "@/components/cooking-history-board";
 import { InventoryBoard } from "@/components/inventory-board";
 import { RecipeMealWorkspace } from "@/components/recipe-meal-workspace";
 import { SetupStatus } from "@/components/setup-status";
-import { LogoutButton } from "@/components/logout-button";
+import { WebModeShell } from "@/components/web-mode-shell";
 import type { CookingHistoryItem, CookingHistoryPhoto } from "@/lib/cooking-history/types";
-import type { StockItem } from "@/lib/inventory/types";
+import type { StockItem, StorageLocation } from "@/lib/inventory/types";
 import type { MealSchedule, Recipe, RecipeIngredient, ShoppingItem } from "@/lib/recipes/types";
 import { setupSteps } from "@/lib/navigation";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
@@ -27,7 +27,8 @@ export default async function Home() {
     { data: recipes },
     { data: recipeIngredients },
     { data: mealSchedules },
-    { data: shoppingItems }
+    { data: shoppingItems },
+    { data: storageLocations }
   ] = await Promise.all([
     supabase
       .from("staging_items")
@@ -64,7 +65,13 @@ export default async function Home() {
       .from("shopping_items")
       .select("*")
       .eq("user_id", user.id)
-      .order("created_at", { ascending: false })
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("storage_locations")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("sort_order", { ascending: true })
+      .order("name", { ascending: true })
   ]);
   const recipeRows = (recipes ?? []) as Omit<Recipe, "ingredients">[];
   const ingredientRows = (recipeIngredients ?? []) as RecipeIngredient[];
@@ -101,38 +108,41 @@ export default async function Home() {
 
   return (
     <main className="app-shell">
-      <section className="hero" aria-labelledby="page-title">
-        <div>
-          <p className="eyebrow">Stock Master</p>
-          <h1 id="page-title">在庫管理のWeb版ホーム</h1>
-          <p className="lead">
-            {user.email ?? "ログイン中のユーザー"} の在庫、レシピ、献立、料理履歴だけを扱います。
-          </p>
-        </div>
-        <div className="summary-box" aria-label="今回の範囲">
-          <span>Scope</span>
-          <strong>TKT-0109</strong>
-          <p>レシピ、献立、買い物、調理完了をSupabaseへ保存します。</p>
-          <LogoutButton />
-        </div>
-      </section>
-
-      <RecipeMealWorkspace
-        initialInventoryItems={(inventoryItems ?? []) as StockItem[]}
-        initialMealSchedules={(mealSchedules ?? []) as MealSchedule[]}
-        initialRecipes={recipesWithIngredients as Recipe[]}
-        initialShoppingItems={(shoppingItems ?? []) as ShoppingItem[]}
-        userId={user.id}
-      />
-      <CookingHistoryBoard
-        initialHistory={cookingHistoryWithPhotos as CookingHistoryItem[]}
-        key={cookingHistoryWithPhotos.map((item) => item.id).join(":")}
-        userId={user.id}
-      />
-      <InventoryBoard
-        initialInventoryItems={(inventoryItems ?? []) as StockItem[]}
-        initialStagingItems={(stagingItems ?? []) as StockItem[]}
-        userId={user.id}
+      <WebModeShell
+        childrenByMode={{
+          ingredients: (
+            <InventoryBoard
+              initialInventoryItems={(inventoryItems ?? []) as StockItem[]}
+              initialStorageLocations={(storageLocations ?? []) as StorageLocation[]}
+              initialStagingItems={(stagingItems ?? []) as StockItem[]}
+              key="ingredients"
+              userId={user.id}
+            />
+          ),
+          recipes: (
+            <RecipeMealWorkspace
+              initialInventoryItems={(inventoryItems ?? []) as StockItem[]}
+              initialMealSchedules={(mealSchedules ?? []) as MealSchedule[]}
+              initialRecipes={recipesWithIngredients as Recipe[]}
+              initialShoppingItems={(shoppingItems ?? []) as ShoppingItem[]}
+              key="recipes"
+              userId={user.id}
+            />
+          ),
+          cooking: (
+            <CookingHistoryBoard
+              initialHistory={cookingHistoryWithPhotos as CookingHistoryItem[]}
+              key="cooking"
+              userId={user.id}
+            />
+          )
+        }}
+        historyCount={cookingHistoryWithPhotos.length}
+        inventoryCount={(inventoryItems ?? []).length}
+        mealCount={(mealSchedules ?? []).length}
+        recipeCount={recipesWithIngredients.length}
+        stagingCount={(stagingItems ?? []).length}
+        userEmail={user.email ?? "ログイン中のユーザー"}
       />
       <SetupStatus steps={setupSteps} />
     </main>
