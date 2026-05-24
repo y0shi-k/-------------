@@ -29,6 +29,7 @@ const baseItem: StockItem = {
   name: "牛乳",
   quantity: 1,
   unit: "本",
+  unit_conversion: null,
   display_expires_on: "2026-05-30",
   effective_expires_on: null,
   storage_location: "冷蔵庫",
@@ -114,7 +115,8 @@ describe("InventoryBoard", () => {
   });
 
   it("adds a manual staging item with the authenticated user id", async () => {
-    const inserted = { ...baseItem, id: "inserted-1", name: "豆腐", quantity: 2, unit: "丁" };
+    const unitConversion = { fromQty: 1, fromUnit: "丁", toQty: 300, toUnit: "g" };
+    const inserted = { ...baseItem, id: "inserted-1", name: "豆腐", quantity: 2, unit: "丁", unit_conversion: unitConversion };
     const single = vi.fn().mockResolvedValue({ data: inserted, error: null });
     const select = vi.fn(() => ({ single }));
     const insert = vi.fn(() => ({ select }));
@@ -125,6 +127,10 @@ describe("InventoryBoard", () => {
     fireEvent.change(screen.getByLabelText("品名"), { target: { value: "豆腐" } });
     fireEvent.change(screen.getByLabelText("数量"), { target: { value: "2" } });
     fireEvent.change(screen.getByLabelText("単位"), { target: { value: "丁" } });
+    fireEvent.change(screen.getByLabelText("換算元数量"), { target: { value: "1" } });
+    fireEvent.change(screen.getByLabelText("換算元単位"), { target: { value: "丁" } });
+    fireEvent.change(screen.getByLabelText("換算先数量"), { target: { value: "300" } });
+    fireEvent.change(screen.getByLabelText("換算先単位"), { target: { value: "g" } });
     fireEvent.click(screen.getByRole("button", { name: "登録待ちに追加" }));
 
     await waitFor(() => {
@@ -134,12 +140,26 @@ describe("InventoryBoard", () => {
           user_id: "user-1",
           name: "豆腐",
           quantity: 2,
-          unit: "丁"
+          unit: "丁",
+          unit_conversion: unitConversion
         })
       );
     });
     expect(await screen.findByText("登録待ちに追加しました。")).toBeTruthy();
     expect(screen.getByText("豆腐")).toBeTruthy();
+    expect(screen.getByText("換算: 1丁 = 300g")).toBeTruthy();
+  });
+
+  it("rejects incomplete unit conversion settings", async () => {
+    renderBoard();
+
+    fireEvent.change(screen.getByLabelText("品名"), { target: { value: "ひき肉" } });
+    fireEvent.change(screen.getByLabelText("換算元数量"), { target: { value: "1" } });
+    fireEvent.change(screen.getByLabelText("換算元単位"), { target: { value: "パック" } });
+    fireEvent.click(screen.getByRole("button", { name: "登録待ちに追加" }));
+
+    expect(await screen.findByText("単位換算は「1 パック = 150 g」のように数量と単位をすべて入力してください。")).toBeTruthy();
+    expect(from).not.toHaveBeenCalledWith("staging_items");
   });
 
   it("moves a staging item into inventory and removes it from staging", async () => {

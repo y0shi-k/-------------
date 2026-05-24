@@ -1,7 +1,7 @@
 ---
 id: TKT-0117-unit-conversion-web
 title: 単位換算Web移植
-status: ready_for_implementation
+status: completed
 goal: 単位違いの在庫消費をWeb版でも安全に扱えるようにする
 acceptance:
   - 単位換算に必要なschemaまたは保存形式がある

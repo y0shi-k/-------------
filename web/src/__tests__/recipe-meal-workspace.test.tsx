@@ -54,6 +54,7 @@ const baseInventory: StockItem = {
   name: "玉ねぎ",
   quantity: 1,
   unit: "個",
+  unit_conversion: null,
   display_expires_on: null,
   effective_expires_on: null,
   storage_location: "冷蔵庫",
@@ -72,6 +73,20 @@ const baseSchedule: MealSchedule = {
   recipe_name: "カレー",
   status: "未完了",
   completed_at: null,
+  created_at: "2026-05-24T00:00:00.000Z",
+  updated_at: "2026-05-24T00:00:00.000Z"
+};
+
+const baseShoppingItem: ShoppingItem = {
+  id: "shopping-1",
+  user_id: "user-1",
+  name: "玉ねぎ",
+  required_quantity: 1,
+  unit: "個",
+  status: "未購入",
+  linked_recipe_name: "カレー",
+  source_type: "meal_schedule",
+  purchased_at: null,
   created_at: "2026-05-24T00:00:00.000Z",
   updated_at: "2026-05-24T00:00:00.000Z"
 };
@@ -109,6 +124,13 @@ function deleteQuery(error: unknown = null) {
   const eqRecipe = vi.fn(() => ({ eq: eqUser }));
   const deleteRows = vi.fn(() => ({ eq: eqRecipe }));
   return { deleteRows, eqRecipe, eqUser };
+}
+
+function deleteInQuery(error: unknown = null) {
+  const inIds = vi.fn().mockResolvedValue({ error });
+  const eqUser = vi.fn(() => ({ in: inIds }));
+  const deleteRows = vi.fn(() => ({ eq: eqUser }));
+  return { deleteRows, eqUser, inIds };
 }
 
 function insertListQuery(data: unknown[], error: unknown = null) {
@@ -234,20 +256,7 @@ describe("RecipeMealWorkspace", () => {
   });
 
   it("adds selected shortages to shopping items", async () => {
-    const shoppingRow: ShoppingItem = {
-      id: "shopping-1",
-      user_id: "user-1",
-      name: "玉ねぎ",
-      required_quantity: 1,
-      unit: "個",
-      status: "未購入",
-      linked_recipe_name: "カレー",
-      source_type: "meal_schedule",
-      purchased_at: null,
-      created_at: "2026-05-24T00:00:00.000Z",
-      updated_at: "2026-05-24T00:00:00.000Z"
-    };
-    const shoppingInsert = insertListQuery([shoppingRow]);
+    const shoppingInsert = insertListQuery([baseShoppingItem]);
     from.mockReturnValue({ insert: shoppingInsert.insert });
 
     renderWorkspace({ initialMealSchedules: [baseSchedule] });
@@ -269,6 +278,82 @@ describe("RecipeMealWorkspace", () => {
       ]);
     });
     expect(await screen.findByText("1件を買い物リストへ追加しました。")).toBeTruthy();
+  });
+
+  it("adds a manual shopping item", async () => {
+    const manualShopping = { ...baseShoppingItem, id: "shopping-manual", name: "牛乳", required_quantity: 2, unit: "本", linked_recipe_name: "", source_type: "manual" };
+    const shoppingInsert = insertSingleQuery(manualShopping);
+    from.mockReturnValue({ insert: shoppingInsert.insert });
+
+    renderWorkspace();
+
+    fireEvent.change(screen.getByLabelText("買い物の品名"), { target: { value: "牛乳" } });
+    fireEvent.change(screen.getByLabelText("買い物の数量"), { target: { value: "2" } });
+    fireEvent.change(screen.getByLabelText("買い物の単位"), { target: { value: "本" } });
+    fireEvent.click(screen.getByRole("button", { name: "手動追加" }));
+
+    await waitFor(() => {
+      expect(from).toHaveBeenCalledWith("shopping_items");
+      expect(shoppingInsert.insert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          user_id: "user-1",
+          name: "牛乳",
+          required_quantity: 2,
+          unit: "本",
+          status: "未購入",
+          linked_recipe_name: "",
+          source_type: "manual"
+        })
+      );
+    });
+    expect(await screen.findByText("牛乳 を買い物リストへ追加しました。")).toBeTruthy();
+    expect(screen.getAllByText("手動追加").length).toBeGreaterThan(0);
+  });
+
+  it("marks a shopping item as purchased", async () => {
+    const purchased = { ...baseShoppingItem, status: "購入済", purchased_at: "2026-05-24T10:00:00.000Z" };
+    const shoppingUpdate = updateSingleQuery(purchased);
+    from.mockReturnValue({ update: shoppingUpdate.update });
+
+    renderWorkspace({ initialShoppingItems: [baseShoppingItem] });
+
+    fireEvent.click(screen.getByRole("button", { name: "購入済み" }));
+
+    await waitFor(() => {
+      expect(from).toHaveBeenCalledWith("shopping_items");
+      expect(shoppingUpdate.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: "購入済",
+          purchased_at: expect.any(String)
+        })
+      );
+    });
+    expect(await screen.findByText("玉ねぎ を購入済みにしました。")).toBeTruthy();
+    expect(screen.getAllByText("購入済").length).toBeGreaterThan(0);
+  });
+
+  it("bulk deletes selected shopping items", async () => {
+    const deleteRows = deleteInQuery();
+    from.mockReturnValue({ delete: deleteRows.deleteRows });
+
+    renderWorkspace({
+      initialShoppingItems: [
+        baseShoppingItem,
+        { ...baseShoppingItem, id: "shopping-2", name: "じゃがいも" }
+      ]
+    });
+
+    fireEvent.click(screen.getAllByLabelText("選択")[0]);
+    fireEvent.click(screen.getAllByLabelText("選択")[1]);
+    fireEvent.click(screen.getByRole("button", { name: "選択削除" }));
+
+    await waitFor(() => {
+      expect(from).toHaveBeenCalledWith("shopping_items");
+      expect(deleteRows.inIds).toHaveBeenCalledWith("id", ["shopping-1", "shopping-2"]);
+    });
+    expect(await screen.findByText("買い物を2件削除しました。")).toBeTruthy();
+    expect(screen.queryByText("玉ねぎ")).toBeNull();
+    expect(screen.queryByText("じゃがいも")).toBeNull();
   });
 
   it("completes a meal schedule and creates cooking history", async () => {

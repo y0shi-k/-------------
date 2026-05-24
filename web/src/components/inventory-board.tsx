@@ -7,6 +7,7 @@ import {
   StorageLocation,
   StockItem,
   StockItemFormValues,
+  UnitConversion,
   toFormValues
 } from "@/lib/inventory/types";
 import { buildPhotoStoragePath, compressImageFile } from "@/lib/photos/compress";
@@ -44,6 +45,26 @@ type NormalizedForm =
   | { data: Omit<StockItem, "id" | "created_at" | "updated_at"> }
   | { error: string };
 
+function normalizeUnitConversion(values: StockItemFormValues): UnitConversion | null | { error: string } {
+  const hasAnyConversionValue =
+    values.conversion_from_qty || values.conversion_from_unit || values.conversion_to_qty || values.conversion_to_unit;
+
+  if (!hasAnyConversionValue) {
+    return null;
+  }
+
+  const fromQty = Number(values.conversion_from_qty);
+  const toQty = Number(values.conversion_to_qty);
+  const fromUnit = values.conversion_from_unit.trim();
+  const toUnit = values.conversion_to_unit.trim();
+
+  if (!Number.isFinite(fromQty) || fromQty <= 0 || !Number.isFinite(toQty) || toQty <= 0 || !fromUnit || !toUnit) {
+    return { error: "単位換算は「1 パック = 150 g」のように数量と単位をすべて入力してください。" };
+  }
+
+  return { fromQty, fromUnit, toQty, toUnit };
+}
+
 function normalizeForm(values: StockItemFormValues, userId: string): NormalizedForm {
   const quantity = Number(values.quantity);
 
@@ -59,6 +80,11 @@ function normalizeForm(values: StockItemFormValues, userId: string): NormalizedF
     return { error: "単位を入力してください。" };
   }
 
+  const unitConversion = normalizeUnitConversion(values);
+  if (unitConversion && "error" in unitConversion) {
+    return { error: unitConversion.error };
+  }
+
   return {
     data: {
       user_id: userId,
@@ -66,6 +92,7 @@ function normalizeForm(values: StockItemFormValues, userId: string): NormalizedF
       name: values.name.trim(),
       quantity,
       unit: values.unit.trim(),
+      unit_conversion: unitConversion,
       display_expires_on: values.display_expires_on || null,
       effective_expires_on: values.effective_expires_on || null,
       storage_location: values.storage_location.trim() || "その他",
@@ -84,6 +111,12 @@ function itemSubtitle(item: StockItem) {
   return `${item.quantity}${item.unit} / ${item.storage_location}`;
 }
 
+function unitConversionLabel(item: StockItem) {
+  const conversion = item.unit_conversion;
+  if (!conversion) return "";
+  return `${conversion.fromQty}${conversion.fromUnit} = ${conversion.toQty}${conversion.toUnit}`;
+}
+
 function toInventoryInsert(item: StockItem, userId: string): Omit<StockItem, "id" | "created_at" | "updated_at"> {
   return {
     user_id: userId,
@@ -91,6 +124,7 @@ function toInventoryInsert(item: StockItem, userId: string): Omit<StockItem, "id
     name: item.name,
     quantity: item.quantity,
     unit: item.unit,
+    unit_conversion: item.unit_conversion,
     display_expires_on: item.display_expires_on,
     effective_expires_on: item.effective_expires_on,
     storage_location: item.storage_location,
@@ -663,6 +697,45 @@ export function InventoryBoard({
                 </datalist>
               </label>
             </div>
+            <fieldset className="unit-conversion-fields">
+              <legend>単位換算</legend>
+              <div className="conversion-row">
+                <input
+                  aria-label="換算元数量"
+                  inputMode="decimal"
+                  min="0"
+                  step="0.1"
+                  type="number"
+                  value={values.conversion_from_qty}
+                  onChange={(event) => updateValue("conversion_from_qty", event.target.value)}
+                  placeholder="1"
+                />
+                <input
+                  aria-label="換算元単位"
+                  value={values.conversion_from_unit}
+                  onChange={(event) => updateValue("conversion_from_unit", event.target.value)}
+                  placeholder="パック"
+                />
+                <span>=</span>
+                <input
+                  aria-label="換算先数量"
+                  inputMode="decimal"
+                  min="0"
+                  step="0.1"
+                  type="number"
+                  value={values.conversion_to_qty}
+                  onChange={(event) => updateValue("conversion_to_qty", event.target.value)}
+                  placeholder="150"
+                />
+                <input
+                  aria-label="換算先単位"
+                  value={values.conversion_to_unit}
+                  onChange={(event) => updateValue("conversion_to_unit", event.target.value)}
+                  placeholder="g"
+                />
+              </div>
+              <p>例: 1パック = 150g。調理完了時の在庫消費で使います。</p>
+            </fieldset>
             <div className="form-row two-columns">
               <label>
                 表示期限
@@ -880,6 +953,7 @@ function ItemList({ disabled, emptyText, items, list, onConfirm, onDelete, onEdi
             <span>{item.category}</span>
             <h4>{item.name}</h4>
             <p>{itemSubtitle(item)}</p>
+            {item.unit_conversion ? <p className="conversion-note">換算: {unitConversionLabel(item)}</p> : null}
           </div>
           <dl className="item-meta">
             <div>

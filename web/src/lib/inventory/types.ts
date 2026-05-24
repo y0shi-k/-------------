@@ -1,5 +1,12 @@
 export type ItemCategory = "食材" | "調味料";
 
+export type UnitConversion = {
+  fromQty: number;
+  fromUnit: string;
+  toQty: number;
+  toUnit: string;
+};
+
 export type StockItem = {
   id: string;
   user_id: string;
@@ -7,6 +14,7 @@ export type StockItem = {
   name: string;
   quantity: number;
   unit: string;
+  unit_conversion: UnitConversion | null;
   display_expires_on: string | null;
   effective_expires_on: string | null;
   storage_location: string;
@@ -30,6 +38,10 @@ export type StockItemFormValues = {
   name: string;
   quantity: string;
   unit: string;
+  conversion_from_qty: string;
+  conversion_from_unit: string;
+  conversion_to_qty: string;
+  conversion_to_unit: string;
   display_expires_on: string;
   effective_expires_on: string;
   storage_location: string;
@@ -41,6 +53,10 @@ export const emptyStockItemFormValues: StockItemFormValues = {
   name: "",
   quantity: "1",
   unit: "個",
+  conversion_from_qty: "",
+  conversion_from_unit: "",
+  conversion_to_qty: "",
+  conversion_to_unit: "",
   display_expires_on: "",
   effective_expires_on: "",
   storage_location: "冷蔵庫",
@@ -53,6 +69,10 @@ export function toFormValues(item: StockItem): StockItemFormValues {
     name: item.name,
     quantity: String(item.quantity),
     unit: item.unit,
+    conversion_from_qty: item.unit_conversion ? String(item.unit_conversion.fromQty) : "",
+    conversion_from_unit: item.unit_conversion?.fromUnit ?? "",
+    conversion_to_qty: item.unit_conversion ? String(item.unit_conversion.toQty) : "",
+    conversion_to_unit: item.unit_conversion?.toUnit ?? "",
     display_expires_on: item.display_expires_on ?? "",
     effective_expires_on: item.effective_expires_on ?? "",
     storage_location: item.storage_location,

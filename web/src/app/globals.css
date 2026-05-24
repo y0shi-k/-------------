@@ -453,6 +453,42 @@ h1 {
   gap: 12px;
 }
 
+.unit-conversion-fields {
+  display: grid;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  margin: 0;
+  padding: 12px;
+}
+
+.unit-conversion-fields legend {
+  color: var(--ink);
+  font-size: 0.86rem;
+  font-weight: 800;
+  padding: 0 4px;
+}
+
+.unit-conversion-fields p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.6;
+}
+
+.conversion-row {
+  display: grid;
+  grid-template-columns: minmax(64px, 0.7fr) minmax(80px, 1fr) auto minmax(64px, 0.7fr) minmax(80px, 1fr);
+  gap: 8px;
+  align-items: center;
+}
+
+.conversion-row span {
+  color: var(--muted);
+  font-weight: 800;
+  text-align: center;
+}
+
 .form-actions,
 .item-actions {
   display: grid;
@@ -855,6 +891,50 @@ h1 {
   padding-top: 16px;
 }
 
+.shopping-heading-row,
+.shopping-list-title {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.shopping-add-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+
+.shopping-add-form input {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink);
+  padding: 10px 12px;
+}
+
+.shopping-list-section {
+  display: grid;
+  gap: 10px;
+}
+
+.shopping-list-title span {
+  color: var(--accent);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.shopping-list-title strong {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.shopping-item {
+  grid-template-columns: 1fr;
+}
+
 .compact-title {
   margin-bottom: 0;
 }
@@ -971,6 +1051,12 @@ h1 {
   margin: 0;
   color: var(--muted);
   line-height: 1.6;
+}
+
+.conversion-note {
+  color: var(--accent-strong) !important;
+  font-size: 0.82rem;
+  font-weight: 800;
 }
 
 .item-meta {
@@ -1112,9 +1198,15 @@ h1 {
   .photo-capture-heading,
   .photo-actions,
   .form-row.two-columns,
+  .conversion-row,
+  .shopping-add-form,
   .item-meta,
   .item-actions {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .conversion-row span {
+    display: none;
   }
 
   .photo-capture-heading {

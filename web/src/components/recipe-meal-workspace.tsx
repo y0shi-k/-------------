@@ -32,6 +32,12 @@ type Feedback = {
   message: string;
 };
 
+type ShoppingFormValues = {
+  name: string;
+  required_quantity: string;
+  unit: string;
+};
+
 const mealTypes: MealType[] = ["朝", "昼", "晩", "その他"];
 
 type NormalizedRecipeForm =
@@ -108,6 +114,11 @@ function toShortageKey(name: string, unit: string, recipeName: string) {
   return `${recipeName}:${name}:${unit}`;
 }
 
+function shoppingSourceLabel(item: ShoppingItem) {
+  if (item.source_type === "meal_schedule") return item.linked_recipe_name ? `献立: ${item.linked_recipe_name}` : "献立由来";
+  return "手動追加";
+}
+
 function buildShortageCandidates(schedule: MealSchedule | null, recipes: Recipe[], inventoryItems: StockItem[]) {
   if (!schedule?.recipe_id) return [];
   const recipe = recipes.find((item) => item.id === schedule.recipe_id);
@@ -148,6 +159,8 @@ export function RecipeMealWorkspace({
   const [scheduleRecipeId, setScheduleRecipeId] = useState(initialRecipes[0]?.id ?? "");
   const [selectedScheduleId, setSelectedScheduleId] = useState(initialMealSchedules[0]?.id ?? "");
   const [selectedShortageKeys, setSelectedShortageKeys] = useState<string[]>([]);
+  const [selectedShoppingIds, setSelectedShoppingIds] = useState<string[]>([]);
+  const [shoppingValues, setShoppingValues] = useState<ShoppingFormValues>({ name: "", required_quantity: "1", unit: "個" });
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const router = useRouter();
@@ -158,6 +171,11 @@ export function RecipeMealWorkspace({
   const shortageCandidates = buildShortageCandidates(selectedSchedule, recipes, initialInventoryItems);
   const activeShortageKeys = selectedShortageKeys.filter((key) => shortageCandidates.some((item) => item.key === key));
   const openShoppingItems = shoppingItems.filter((item) => item.status === "未購入");
+  const purchasedShoppingItems = shoppingItems.filter((item) => item.status === "購入済");
+
+  function updateShoppingValue<K extends keyof ShoppingFormValues>(key: K, value: ShoppingFormValues[K]) {
+    setShoppingValues((current) => ({ ...current, [key]: value }));
+  }
 
   function resetRecipeForm() {
     setRecipeValues(emptyRecipeFormValues);
@@ -389,6 +407,107 @@ export function RecipeMealWorkspace({
     setShoppingItems((items) => [...(data as ShoppingItem[]), ...items]);
     setSelectedShortageKeys([]);
     setFeedback({ tone: "success", message: `${data.length}件を買い物リストへ追加しました。` });
+  }
+
+  async function addManualShoppingItem(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const quantity = Number(shoppingValues.required_quantity);
+    const name = shoppingValues.name.trim();
+    const unit = shoppingValues.unit.trim();
+
+    if (!name || !unit || !Number.isFinite(quantity) || quantity <= 0) {
+      setFeedback({
+        tone: "error",
+        message: "原因: 買い物の品名、数量、単位に不備があります。影響: 買い物リストへ追加できません。修正方法: 空欄と0以下の数量を直してください。"
+      });
+      return;
+    }
+
+    setIsSaving(true);
+    setFeedback(null);
+
+    const { data, error } = await supabase
+      .from("shopping_items")
+      .insert({
+        user_id: userId,
+        name,
+        required_quantity: quantity,
+        unit,
+        status: "未購入",
+        linked_recipe_name: "",
+        source_type: "manual"
+      })
+      .select()
+      .single();
+
+    setIsSaving(false);
+
+    if (error || !data) {
+      setFeedback({
+        tone: "error",
+        message: "原因: 買い物をDBへ保存できませんでした。影響: 買い物リストに残りません。修正方法: ログイン状態を確認してください。"
+      });
+      return;
+    }
+
+    setShoppingItems((items) => [data as ShoppingItem, ...items]);
+    setShoppingValues({ name: "", required_quantity: "1", unit: "個" });
+    setFeedback({ tone: "success", message: `${name} を買い物リストへ追加しました。` });
+  }
+
+  async function markShoppingPurchased(item: ShoppingItem) {
+    if (item.status === "購入済") {
+      setFeedback({ tone: "info", message: "この買い物は購入済みです。" });
+      return;
+    }
+
+    setIsSaving(true);
+    setFeedback(null);
+
+    const purchasedAt = new Date().toISOString();
+    const { data, error } = await supabase
+      .from("shopping_items")
+      .update({ status: "購入済", purchased_at: purchasedAt })
+      .eq("id", item.id)
+      .eq("user_id", userId)
+      .select()
+      .single();
+
+    setIsSaving(false);
+
+    if (error || !data) {
+      setFeedback({ tone: "error", message: "原因: 購入済みに更新できませんでした。影響: 買い物が未購入のまま残ります。修正方法: ログイン状態を確認してください。" });
+      return;
+    }
+
+    setShoppingItems((items) => items.map((current) => (current.id === item.id ? (data as ShoppingItem) : current)));
+    setSelectedShoppingIds((ids) => ids.filter((id) => id !== item.id));
+    setFeedback({ tone: "success", message: `${item.name} を購入済みにしました。` });
+  }
+
+  function toggleShoppingSelected(itemId: string) {
+    setSelectedShoppingIds((ids) => (ids.includes(itemId) ? ids.filter((id) => id !== itemId) : [...ids, itemId]));
+  }
+
+  async function deleteSelectedShoppingItems() {
+    if (selectedShoppingIds.length === 0) return;
+
+    setIsSaving(true);
+    setFeedback(null);
+
+    const { error } = await supabase.from("shopping_items").delete().eq("user_id", userId).in("id", selectedShoppingIds);
+
+    setIsSaving(false);
+
+    if (error) {
+      setFeedback({ tone: "error", message: "原因: 買い物を一括削除できませんでした。影響: 選択した買い物が残ります。修正方法: ログイン状態を確認してください。" });
+      return;
+    }
+
+    const deletedCount = selectedShoppingIds.length;
+    setShoppingItems((items) => items.filter((item) => !selectedShoppingIds.includes(item.id)));
+    setSelectedShoppingIds([]);
+    setFeedback({ tone: "info", message: `買い物を${deletedCount}件削除しました。` });
   }
 
   async function completeSchedule(schedule: MealSchedule) {
@@ -673,25 +792,112 @@ export function RecipeMealWorkspace({
           </div>
 
           <div className="shopping-preview">
-            <h4>未購入リスト</h4>
-            {openShoppingItems.length === 0 ? (
-              <p className="empty-list">未購入の買い物はありません。</p>
-            ) : (
-              <div className="stock-list">
-                {openShoppingItems.slice(0, 5).map((item) => (
-                  <article className="stock-item compact-stock-item" key={item.id}>
-                    <div className="item-main">
-                      <span>{item.source_type}</span>
-                      <h4>{item.name}</h4>
-                      <p>{item.required_quantity}{item.unit} / {item.linked_recipe_name || "手動追加"}</p>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            )}
+            <div className="shopping-heading-row">
+              <h4>買い物リスト</h4>
+              <button
+                className="danger-button compact-button"
+                type="button"
+                disabled={isSaving || selectedShoppingIds.length === 0}
+                onClick={deleteSelectedShoppingItems}
+              >
+                選択削除
+              </button>
+            </div>
+
+            <form className="shopping-add-form" onSubmit={addManualShoppingItem}>
+              <input
+                aria-label="買い物の品名"
+                value={shoppingValues.name}
+                onChange={(event) => updateShoppingValue("name", event.target.value)}
+                placeholder="買うもの"
+              />
+              <input
+                aria-label="買い物の数量"
+                min="0"
+                step="0.1"
+                type="number"
+                value={shoppingValues.required_quantity}
+                onChange={(event) => updateShoppingValue("required_quantity", event.target.value)}
+                placeholder="1"
+              />
+              <input
+                aria-label="買い物の単位"
+                value={shoppingValues.unit}
+                onChange={(event) => updateShoppingValue("unit", event.target.value)}
+                placeholder="個"
+              />
+              <button className="primary-button compact-button" type="submit" disabled={isSaving}>
+                手動追加
+              </button>
+            </form>
+
+            <ShoppingListSection
+              emptyText="未購入の買い物はありません。"
+              items={openShoppingItems}
+              onMarkPurchased={markShoppingPurchased}
+              onSelect={toggleShoppingSelected}
+              selectedIds={selectedShoppingIds}
+              title="未購入"
+            />
+            <ShoppingListSection
+              emptyText="購入済みの買い物はありません。"
+              items={purchasedShoppingItems}
+              onSelect={toggleShoppingSelected}
+              selectedIds={selectedShoppingIds}
+              title="購入済み"
+            />
           </div>
         </section>
       </div>
+    </section>
+  );
+}
+
+function ShoppingListSection({
+  emptyText,
+  items,
+  onMarkPurchased,
+  onSelect,
+  selectedIds,
+  title
+}: {
+  emptyText: string;
+  items: ShoppingItem[];
+  onMarkPurchased?: (item: ShoppingItem) => void;
+  onSelect: (id: string) => void;
+  selectedIds: string[];
+  title: string;
+}) {
+  return (
+    <section className="shopping-list-section" aria-label={title}>
+      <div className="shopping-list-title">
+        <span>{title}</span>
+        <strong>{items.length}件</strong>
+      </div>
+      {items.length === 0 ? (
+        <p className="empty-list">{emptyText}</p>
+      ) : (
+        <div className="stock-list">
+          {items.map((item) => (
+            <article className="stock-item compact-stock-item shopping-item" key={item.id}>
+              <label className="select-row">
+                <input checked={selectedIds.includes(item.id)} onChange={() => onSelect(item.id)} type="checkbox" />
+                選択
+              </label>
+              <div className="item-main">
+                <span>{shoppingSourceLabel(item)}</span>
+                <h4>{item.name}</h4>
+                <p>{item.required_quantity}{item.unit} / {item.status}</p>
+              </div>
+              {onMarkPurchased ? (
+                <button className="secondary-button compact-button" type="button" onClick={() => onMarkPurchased(item)}>
+                  購入済み
+                </button>
+              ) : null}
+            </article>
+          ))}
+        </div>
+      )}
     </section>
   );
 }

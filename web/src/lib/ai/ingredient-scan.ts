@@ -155,6 +155,7 @@ export function toStagingInsert(candidate: IngredientScanCandidate, userId: stri
     name: candidate.name,
     quantity: candidate.quantity,
     unit: candidate.unit,
+    unit_conversion: null,
     display_expires_on: candidate.display_expires_on,
     effective_expires_on: candidate.effective_expires_on,
     storage_location: candidate.storage_location,
