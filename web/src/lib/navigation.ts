@@ -21,5 +21,10 @@ export const setupSteps: SetupStep[] = [
     title: "自分だけログイン",
     description: "Supabase Authで本人だけがWeb版へ入れる導線を追加",
     status: "ready"
+  },
+  {
+    title: "在庫と登録待ち",
+    description: "手動追加から在庫確定までをWeb版で使えるようにする",
+    status: "ready"
   }
 ];

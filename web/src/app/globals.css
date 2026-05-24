@@ -197,10 +197,210 @@ h1 {
   color: var(--accent-strong);
 }
 
+.danger-button {
+  min-height: 46px;
+  border: 1px solid #e2b5a5;
+  border-radius: 8px;
+  background: #fff7f4;
+  color: #8b3218;
+  padding: 10px 16px;
+  font-weight: 700;
+}
+
 .account-actions {
   display: grid;
   gap: 10px;
   margin-top: 10px;
+}
+
+.inventory-workspace {
+  padding: 24px 0 0;
+}
+
+.inventory-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+
+.stock-panel {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 16px;
+}
+
+.panel-title {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.panel-title span,
+.item-main span {
+  color: var(--accent);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.panel-title h3 {
+  margin: 4px 0 0;
+  font-size: 1.2rem;
+}
+
+.panel-title strong {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 6px 10px;
+  color: var(--accent-strong);
+  font-size: 0.86rem;
+}
+
+.stock-form {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.stock-form label {
+  display: grid;
+  gap: 7px;
+  color: var(--ink);
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.stock-form input,
+.stock-form select,
+.stock-form textarea {
+  width: 100%;
+  min-height: 46px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink);
+  padding: 11px 12px;
+}
+
+.stock-form textarea {
+  min-height: 86px;
+  resize: vertical;
+}
+
+.stock-form input:focus,
+.stock-form select:focus,
+.stock-form textarea:focus {
+  border-color: var(--accent);
+  outline: 3px solid rgb(38 115 93 / 18%);
+}
+
+.form-row {
+  display: grid;
+  gap: 12px;
+}
+
+.form-actions,
+.item-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.operation-message {
+  margin: 0 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px 14px;
+  line-height: 1.6;
+}
+
+.operation-message[data-tone="success"] {
+  border-color: #9dc8b8;
+  background: #f0faf5;
+  color: #15533f;
+}
+
+.operation-message[data-tone="error"] {
+  border-color: #e1a66f;
+  background: #fff6ed;
+  color: #7b3d0c;
+}
+
+.operation-message[data-tone="info"] {
+  background: #f4f7f5;
+  color: var(--muted);
+}
+
+.photo-placeholder {
+  margin: 0 0 14px;
+  border: 1px dashed #b9c5bf;
+  border-radius: 8px;
+  background: #f8faf8;
+  color: var(--muted);
+  padding: 12px;
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+.stock-list {
+  display: grid;
+  gap: 10px;
+}
+
+.stock-item {
+  display: grid;
+  gap: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfa;
+  padding: 14px;
+}
+
+.item-main h4 {
+  margin: 4px 0 4px;
+  font-size: 1.05rem;
+}
+
+.item-main p,
+.item-note,
+.empty-list {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.item-meta {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  margin: 0;
+}
+
+.item-meta div {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 9px 10px;
+}
+
+.item-meta dt {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.item-meta dd {
+  margin: 3px 0 0;
+  font-weight: 700;
+}
+
+.empty-list {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfa;
+  padding: 16px;
 }
 
 .status-panel {
@@ -272,10 +472,30 @@ h1 {
   }
 
   .step-list {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
   .auth-panel {
     padding: 32px;
+  }
+
+  .inventory-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .form-row.two-columns,
+  .item-meta,
+  .item-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .item-actions {
+    align-items: center;
+  }
+}
+
+@media (min-width: 960px) {
+  .item-actions {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }

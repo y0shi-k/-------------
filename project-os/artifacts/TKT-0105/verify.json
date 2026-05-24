@@ -1,0 +1,50 @@
+{
+  "ticket": "TKT-0105-inventory-and-staging-web",
+  "status": "passed",
+  "checked_at": "2026-05-24",
+  "commands": [
+    {
+      "command": "npm run lint",
+      "cwd": "web",
+      "status": "passed"
+    },
+    {
+      "command": "npm run typecheck",
+      "cwd": "web",
+      "status": "passed"
+    },
+    {
+      "command": "npm run test",
+      "cwd": "web",
+      "status": "passed",
+      "summary": "5 test files passed, 13 tests passed"
+    },
+    {
+      "command": "npm run build",
+      "cwd": "web",
+      "status": "passed",
+      "summary": "Routes / and /login built successfully; / remains dynamic"
+    },
+    {
+      "command": "rg -n 'GAS_URL|executeGAS|SpreadsheetApp|DriveApp' web supabase",
+      "cwd": ".",
+      "status": "passed",
+      "summary": "No Web/Supabase GAS, Spreadsheet, or Drive dependency found."
+    },
+    {
+      "command": "rg -n 'GEMINI_API_KEY|SUPABASE_SERVICE_ROLE_KEY|SUPABASE_DB_PASSWORD' web supabase",
+      "cwd": ".",
+      "status": "passed",
+      "summary": "Only environment variable names/test placeholders were found; no real secret literal was added."
+    }
+  ],
+  "browser_check": {
+    "status": "passed_with_limited_auth_coverage",
+    "summary": "Next.js dev server started at http://localhost:3000. In-app browser opened / and confirmed unauthenticated users are redirected to /login."
+  },
+  "notes": [
+    "No Supabase migration was added because TKT-0103 already defines inventory_items, staging_items, user_id, and owner-only RLS policies.",
+    "No dependency was added or updated.",
+    "Canvas app.html was not changed."
+  ]
+}

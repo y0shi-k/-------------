@@ -11,5 +11,6 @@ describe("SetupStatus", () => {
     expect(screen.getByText("Web版の器")).toBeTruthy();
     expect(screen.getByText("Supabase接続")).toBeTruthy();
     expect(screen.getByText("自分だけログイン")).toBeTruthy();
+    expect(screen.getByText("在庫と登録待ち")).toBeTruthy();
   });
 });

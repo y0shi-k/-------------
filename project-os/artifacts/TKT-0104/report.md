@@ -10,6 +10,7 @@ Status: complete
 - Changed the home page to render only after `supabase.auth.getUser()` succeeds.
 - Added auth routing and login form tests.
 - Updated the setup status text from the previous migration placeholder to the TKT-0104 auth step.
+- Fixed browser-side public environment loading so localhost login can read the Supabase public URL and anon key.
 
 ## Dependency Security
 
@@ -26,6 +27,7 @@ Status: complete
 - `npm run test`: passed
 - `npm run build`: passed
 - `npm audit --audit-level=high`: passed
+- Local real-user login: passed
 
 ## Next
 

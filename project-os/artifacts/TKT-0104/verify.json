@@ -26,6 +26,30 @@
       "summary": "Routes / and /login are dynamic; middleware built successfully"
     },
     {
+      "command": "npm run lint",
+      "cwd": "web",
+      "status": "passed",
+      "summary": "Re-run after fixing browser-side public env loading"
+    },
+    {
+      "command": "npm run typecheck",
+      "cwd": "web",
+      "status": "passed",
+      "summary": "Re-run after fixing browser-side public env loading"
+    },
+    {
+      "command": "npm run test",
+      "cwd": "web",
+      "status": "passed",
+      "summary": "Re-run after fixing browser-side public env loading; 4 test files passed, 10 tests passed"
+    },
+    {
+      "command": "npm run build",
+      "cwd": "web",
+      "status": "passed",
+      "summary": "Re-run after fixing browser-side public env loading"
+    },
+    {
       "command": "npm audit --audit-level=high",
       "cwd": "web",
       "status": "passed",
@@ -34,6 +58,7 @@
   ],
   "notes": [
     "The first sandboxed npm audit attempt failed because network access was blocked, then passed with approved network access.",
-    "No Supabase migration was added for this ticket because TKT-0103 already defines user_id and RLS policies."
+    "No Supabase migration was added for this ticket because TKT-0103 already defines user_id and RLS policies.",
+    "Fixed public env loading so client-side code reads NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY through static process.env property access."
   ]
 }

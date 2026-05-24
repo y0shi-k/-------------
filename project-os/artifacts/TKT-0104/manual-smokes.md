@@ -13,10 +13,10 @@ Status: passed with limited live-login coverage
   - `ログイン` button
 - Checked desktop viewport: no horizontal overflow, input height 48px, button height 46px.
 - Checked mobile viewport at 390px width: no horizontal overflow, panel width 358px, input height 48px, button height 46px.
+- Confirmed a real user can log in locally and reach the authenticated home screen.
 
 ## Not Covered Live
 
-- Real successful login was not performed because a real Supabase Auth user/password was not provided in this session.
 - Invalid-password live submission was not performed to avoid sending test credentials to the connected Supabase project. The safe Japanese error mapping is covered by unit test.
 
 ## Security Notes
