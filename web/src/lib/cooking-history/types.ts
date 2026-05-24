@@ -1,0 +1,48 @@
+export type CookingHistoryPhoto = {
+  id: string;
+  user_id: string;
+  bucket_id: string;
+  storage_path: string;
+  usage_type: string;
+  cooking_history_id: string | null;
+  content_type: string | null;
+  byte_size: number | null;
+  width: number | null;
+  height: number | null;
+  signed_url?: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CookingHistoryItem = {
+  id: string;
+  user_id: string;
+  cooked_at: string;
+  recipe_id: string | null;
+  recipe_name: string;
+  meal_schedule_id: string | null;
+  note: string;
+  rating: number | null;
+  created_at: string;
+  updated_at: string;
+  photos: CookingHistoryPhoto[];
+};
+
+export type CookingHistoryFormValues = {
+  cooked_at: string;
+  recipe_name: string;
+  note: string;
+  rating: string;
+};
+
+export function toDatetimeLocalValue(date = new Date()) {
+  const offsetMs = date.getTimezoneOffset() * 60_000;
+  return new Date(date.getTime() - offsetMs).toISOString().slice(0, 16);
+}
+
+export const emptyCookingHistoryFormValues: CookingHistoryFormValues = {
+  cooked_at: toDatetimeLocalValue(),
+  recipe_name: "",
+  note: "",
+  rating: ""
+};

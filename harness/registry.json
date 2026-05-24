@@ -21,6 +21,7 @@
     "Supabase Storage画像"
   ],
   "verify_command": "Canvas版: python3 -c \"import html.parser; html.parser.HTMLParser().feed(open('app.html').read())\" && grep -q 'executeGAS' app.html && grep -q 'GAS_URL' app.html && echo 'VERIFY_PASSED' / Web版: cd web && npm run lint && npm run typecheck && npm run test && npm run build",
+  "artifact_language": "project-os/artifacts/TKT-xxxx/ 配下の verify.json / manual-smokes.md / review.md / report.md は必ず日本語で記述する。コマンド名、ファイルパス、status値、API名などの識別子だけ英語を許容する。",
   "optional_audit_command": "未定（Phase2以降で必要に応じて設定）",
   "build_markers": [
     "HTML構文パース成功",

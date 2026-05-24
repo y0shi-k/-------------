@@ -8,6 +8,8 @@ review_scope:
 
 # Review Record
 
+> この artifact は日本語で記述する。コマンド名・ファイルパス・status値などの識別子だけ英語を許容する。
+
 ## checked_diff_paths
 
 ## checked_artifacts

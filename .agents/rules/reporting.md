@@ -16,6 +16,9 @@
 
 ## artifact
 - 下書きは `project-os/artifacts/TKT-xxxx/report.md` に残す
+- `project-os/artifacts/TKT-xxxx/` 配下に残す `verify.json` / `manual-smokes.md` / `review.md` / `report.md` は、ユーザーが読む前提で必ず日本語で記述する。
+- コマンド名、ファイルパス、status値、API名などの機械的な識別子は英語のままでよいが、説明文・判断理由・残リスク・次の作業は日本語にする。
+- artifact の本文を英語で作成した場合は、完了前に日本語へ直す。
 
 ## 軽量UI調整の報告
 - 同一 ticket に集約した軽量UI調整は、小修正ごとに個別報告を分けず、一連の変更としてまとめて報告する。

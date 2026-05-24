@@ -1,0 +1,44 @@
+{
+  "ticket": "TKT-0108-cooking-history-photo-web",
+  "status": "passed",
+  "checked_at": "2026-05-24",
+  "language_note": "このartifactの説明文は日本語で記述する。コマンド名やstatus値などの識別子のみ英語を許容する。",
+  "commands": [
+    {
+      "command": "cd web && npm run lint",
+      "result": "passed",
+      "notes": "ESLintが成功した。"
+    },
+    {
+      "command": "cd web && npm run typecheck",
+      "result": "passed",
+      "notes": "TypeScript型チェックが成功した。"
+    },
+    {
+      "command": "cd web && npm run test",
+      "result": "passed",
+      "notes": "Vitest 31件が成功した。料理履歴の写真なし保存、写真付き保存、写真アップロード失敗時の表示、写真あり/なし表示を含む。"
+    },
+    {
+      "command": "cd web && npm run build",
+      "result": "passed",
+      "notes": "Next.js本番ビルドが成功した。"
+    },
+    {
+      "command": "rg -n 'GAS_URL|executeGAS|SpreadsheetApp|DriveApp' web supabase",
+      "result": "passed",
+      "notes": "一致なし。Web版にGAS、Spreadsheet、Drive依存は追加していない。"
+    },
+    {
+      "command": "rg -n 'GEMINI_API_KEY|SUPABASE_SERVICE_ROLE_KEY|SUPABASE_DB_PASSWORD' web supabase",
+      "result": "passed",
+      "notes": "環境変数名とテスト用ダミー値のみ。実際の秘密値は追加していない。"
+    }
+  ],
+  "coverage": [
+    "photo_upload_storage",
+    "auth_and_rls_policy",
+    "pwa_mobile_ui",
+    "cooking_history_create_and_list"
+  ]
+}

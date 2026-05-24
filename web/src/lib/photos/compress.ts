@@ -88,3 +88,8 @@ export function buildPhotoStoragePath(userId: string) {
   const randomPart = globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2);
   return `${userId}/ingredient-scan/${Date.now()}-${randomPart}.jpg`;
 }
+
+export function buildCookingHistoryPhotoStoragePath(userId: string) {
+  const randomPart = globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2);
+  return `${userId}/cooking-history/${Date.now()}-${randomPart}.jpg`;
+}

@@ -1,35 +1,37 @@
-# TKT-0107 Report
+# TKT-0107 実装報告
 
 Status: ready
 
-## Implemented
+> このartifactは日本語で記述する。コマンド名、ファイルパス、status値、API名などの識別子だけ英語を許容する。
 
-- Added `POST /api/ai/scan-ingredients` for server-side Gemini ingredient scanning.
-- Added AI response parsing and normalization for ingredient candidates.
-- Reads `GEMINI_API_KEY` only from the server environment.
-- Downloads private Supabase Storage photos on the server by authenticated user context.
-- Inserts AI candidates into `staging_items` with `source: "ai_photo"`.
-- Updated the photo panel so a selected photo can be saved and AI-scanned into registration candidates.
-- Added tests for parsing, route security/error handling, and UI success/failure behavior.
+## 実装したこと
 
-## Safety
+- サーバー側でGemini食材解析を行う `POST /api/ai/scan-ingredients` を追加した。
+- AIレスポンスを検証し、登録待ち候補へ整形する処理を追加した。
+- `GEMINI_API_KEY` はサーバー環境変数からのみ読むようにした。
+- ログインユーザーの文脈で、非公開Supabase Storageの写真をサーバー側から読み出すようにした。
+- AI候補は `source: "ai_photo"` として `staging_items` に追加する。
+- 写真パネルを、選択した写真を保存してAI解析し、登録待ち候補へ入れる流れに更新した。
+- 解析処理、APIの安全確認、UIの成功/失敗表示に対するテストを追加した。
 
-- No dependency was added.
-- No Supabase migration was added.
-- No Canvas `app.html` change was made.
-- No API key, Supabase secret, or real photo URL was added.
-- No GAS, Spreadsheet, or Drive dependency was added to Web code.
-- AI results remain registration candidates; users must confirm before inventory creation.
+## 安全面
 
-## Verify
+- 依存パッケージは追加していない。
+- Supabase migrationは追加していない。
+- Canvas版の `app.html` は変更していない。
+- APIキー、Supabase秘密鍵、実写真URLは追加していない。
+- WebコードにGAS、Spreadsheet、Drive依存は追加していない。
+- AI結果は登録待ち候補のままで、在庫化にはユーザー確認が必要。
+
+## 確認結果
 
 - `npm run lint`: passed
 - `npm run typecheck`: passed
-- `npm run test`: passed, 27 tests
+- `npm run test`: passed、27件
 - `npm run build`: passed
-- Web policy checks: passed
+- Web版ポリシーチェック: passed
 
-## Next
+## 次
 
-- Set `GEMINI_API_KEY` in server environment before real-device AI testing.
-- Continue to `TKT-0108-cooking-history-photo-web`.
+- 実機AIテスト前に、サーバー環境へ `GEMINI_API_KEY` を設定する。
+- 次は `TKT-0108-cooking-history-photo-web` へ進む。

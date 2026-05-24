@@ -1,8 +1,10 @@
-# TKT-0107 Manual Smokes
+# TKT-0107 手動確認
 
 Status: done
 
-## Checked
+> このartifactは日本語で記述する。コマンド名、API名、status値などの識別子だけ英語を許容する。
+
+## 確認したこと
 
 - [x] 写真選択後、ボタン表示が `AI解析する` になる。
 - [x] 写真保存後、`POST /api/ai/scan-ingredients` へ `photoId` を送る。
@@ -13,7 +15,7 @@ Status: done
 - [x] 本人の `ingredient_scan` 写真メタデータだけを解析対象にする。
 - [x] 写真は非公開Storageから読み出し、公開URLは作らない。
 
-## Notes
+## 補足
 
 - 実Gemini通信は、秘密キーを含むため自動テストではモック確認に留めた。
 - 実機では `web/.env.local` またはVercel環境変数に `GEMINI_API_KEY` を設定してから、スマホでレシートまたは食材パッケージを撮影して確認する。

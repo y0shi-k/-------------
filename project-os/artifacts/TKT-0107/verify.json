@@ -2,21 +2,22 @@
   "ticket": "TKT-0107-ai-ingredient-scan-api",
   "status": "passed",
   "checked_at": "2026-05-24",
+  "language_note": "このartifactの説明文は日本語で記述する。コマンド名やstatus値などの識別子のみ英語を許容する。",
   "commands": [
     {
       "command": "cd web && npm run lint && npm run typecheck && npm run test && npm run build",
       "result": "passed",
-      "notes": "lint, typecheck, 27 Vitest tests, and Next.js production build all passed. Build includes /api/ai/scan-ingredients."
+      "notes": "lint、typecheck、Vitest 27件、Next.js本番ビルドがすべて成功した。ビルド結果に /api/ai/scan-ingredients が含まれている。"
     },
     {
       "command": "rg -n 'GAS_URL|executeGAS|SpreadsheetApp|DriveApp' web supabase",
       "result": "passed",
-      "notes": "No matches. Web version still has no GAS, Spreadsheet, or Drive dependency."
+      "notes": "一致なし。Web版にGAS、Spreadsheet、Drive依存は入っていない。"
     },
     {
       "command": "rg -n 'GEMINI_API_KEY|SUPABASE_SERVICE_ROLE_KEY|SUPABASE_DB_PASSWORD' web supabase",
       "result": "passed",
-      "notes": "Only environment variable names and test dummy values are referenced. No real secret values are stored."
+      "notes": "環境変数名とテスト用ダミー値のみ参照している。実際の秘密値は保存していない。"
     }
   ],
   "coverage": [
