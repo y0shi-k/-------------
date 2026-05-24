@@ -221,7 +221,17 @@ h1 {
   padding: 24px 0 0;
 }
 
+.recipe-meal-workspace {
+  padding: 24px 0 0;
+}
+
 .inventory-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+
+.recipe-meal-grid {
   display: grid;
   grid-template-columns: 1fr;
   gap: 16px;
@@ -441,6 +451,179 @@ h1 {
   padding: 14px;
 }
 
+.ingredient-editor {
+  display: grid;
+  gap: 10px;
+  border: 1px dashed #b9c5bf;
+  border-radius: 8px;
+  background: #f8faf8;
+  padding: 12px;
+}
+
+.ingredient-editor-heading {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.ingredient-editor-heading span {
+  color: var(--accent);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.ingredient-row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 10px;
+}
+
+.compact-button {
+  min-height: 40px;
+  padding: 8px 12px;
+}
+
+.recipe-list,
+.meal-list,
+.shortage-list {
+  display: grid;
+  gap: 10px;
+}
+
+.recipe-card,
+.meal-item {
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfa;
+  padding: 10px;
+}
+
+.recipe-card[data-active="true"],
+.meal-item[data-active="true"] {
+  border-color: #7bb29f;
+  background: #f0faf5;
+}
+
+.recipe-select-button,
+.meal-select-button {
+  display: grid;
+  width: 100%;
+  gap: 5px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  text-align: left;
+}
+
+.recipe-select-button span,
+.meal-select-button span {
+  color: var(--accent);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.recipe-select-button strong,
+.meal-select-button strong {
+  font-size: 1.02rem;
+}
+
+.recipe-select-button small,
+.meal-select-button em {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-style: normal;
+}
+
+.recipe-detail {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.recipe-detail h4,
+.schedule-form h4,
+.shortage-panel h4,
+.shopping-preview h4 {
+  margin: 0;
+  font-size: 1.06rem;
+}
+
+.recipe-detail-section {
+  display: grid;
+  gap: 6px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfa;
+  padding: 12px;
+}
+
+.recipe-detail-section h5 {
+  margin: 0;
+  color: var(--accent);
+  font-size: 0.78rem;
+}
+
+.recipe-detail-section ul,
+.recipe-detail-section ol {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding-left: 18px;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.schedule-form,
+.shortage-panel,
+.shopping-preview {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+  border-top: 1px solid var(--line);
+  padding-top: 16px;
+}
+
+.compact-title {
+  margin-bottom: 0;
+}
+
+.shortage-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 6px 10px;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfa;
+  padding: 10px;
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.shortage-item input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+}
+
+.shortage-item small {
+  grid-column: 2;
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.compact-stock-item {
+  padding: 10px;
+}
+
 .history-list {
   display: grid;
   gap: 12px;
@@ -642,6 +825,15 @@ h1 {
     grid-template-columns: minmax(280px, 0.85fr) minmax(0, 1.15fr);
   }
 
+  .recipe-meal-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .ingredient-row {
+    grid-template-columns: minmax(90px, 0.8fr) minmax(140px, 1.4fr) minmax(90px, 0.7fr) minmax(90px, 0.7fr) auto;
+    align-items: end;
+  }
+
   .history-item {
     grid-template-columns: minmax(150px, 0.42fr) minmax(0, 1fr);
     align-items: stretch;
@@ -672,5 +864,9 @@ h1 {
 @media (min-width: 960px) {
   .item-actions {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .recipe-meal-grid {
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.9fr) minmax(0, 0.9fr);
   }
 }

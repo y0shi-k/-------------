@@ -1,0 +1,70 @@
+{
+  "ticket": "TKT-0113-canvas-parity-audit",
+  "status": "passed",
+  "date": "2026-05-24",
+  "summary": "Canvas版完全一致監査の成果物を作成し、Canvas静的確認、Web版lint/typecheck/test/build、セキュリティ検索を実行した。",
+  "commands": [
+    {
+      "name": "Canvas HTML parse",
+      "command": "python3 -c \"import html.parser; html.parser.HTMLParser().feed(open('app.html').read())\"",
+      "status": "passed",
+      "notes": "HTMLParserで構文エラーなし。"
+    },
+    {
+      "name": "executeGAS marker",
+      "command": "grep -q 'executeGAS' app.html",
+      "status": "passed",
+      "notes": "Canvas版のGAS通信関数マーカーが存在する。"
+    },
+    {
+      "name": "GAS_URL marker",
+      "command": "grep -q 'GAS_URL' app.html",
+      "status": "passed",
+      "notes": "Canvas版のGAS_URLマーカーが存在する。"
+    },
+    {
+      "name": "Web GAS/Drive dependency search",
+      "command": "rg -n 'GAS_URL|executeGAS|SpreadsheetApp|DriveApp' web supabase",
+      "status": "passed",
+      "notes": "一致なし。Web版にGAS/Spreadsheet/Drive依存は見つからなかった。"
+    },
+    {
+      "name": "Secret name search",
+      "command": "rg -n 'GEMINI_API_KEY|SUPABASE_SERVICE_ROLE_KEY|SUPABASE_DB_PASSWORD' web supabase",
+      "status": "passed",
+      "notes": "環境変数名の参照とテスト用ダミー値のみ。実秘密情報の直書きは確認されなかった。"
+    },
+    {
+      "name": "Web lint",
+      "command": "npm run lint",
+      "cwd": "web",
+      "status": "passed",
+      "notes": "eslintが成功。"
+    },
+    {
+      "name": "Web typecheck",
+      "command": "npm run typecheck",
+      "cwd": "web",
+      "status": "passed",
+      "notes": "tsc --noEmitが成功。"
+    },
+    {
+      "name": "Web test",
+      "command": "npm run test",
+      "cwd": "web",
+      "status": "passed",
+      "notes": "9 files / 38 tests passed。"
+    },
+    {
+      "name": "Web build",
+      "command": "npm run build",
+      "cwd": "web",
+      "status": "passed",
+      "notes": "Next.js production buildが成功。"
+    }
+  ],
+  "csv_migration_decision": {
+    "status": "stop",
+    "reason": "単位換算、保存場所管理、作りたい候補、調理完了時の在庫減算/代替品が未確定で、Supabase schemaとCSV移行項目に影響する可能性が高い。"
+  }
+}

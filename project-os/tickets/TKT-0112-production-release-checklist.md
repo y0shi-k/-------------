@@ -37,7 +37,7 @@ related_artifacts:
   - artifacts/TKT-0112/report.md
 owner_role: implementer
 owner_notes:
-  - TKT-0111完了後に実施する
+  - TKT-0114 から TKT-0127、TKT-0110、TKT-0111完了後に実施する
   - このticketは公開前確認であり、デプロイ実行はユーザーの明示依頼がある場合だけ行う
 ---
 
@@ -53,4 +53,4 @@ owner_notes:
 
 ## 次
 
-Web版v1公開判断。追加改善は新しい `TKT-0113` 以降で管理する。
+Web版v1公開判断。完全一致チケット群とCSV移行、PWA仕上げが終わるまで開始しない。

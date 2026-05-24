@@ -37,7 +37,7 @@ owner_role: implementer
 owner_notes:
   - TKT-0108完了後に実施する
   - 大きい場合はサブチケット分割してよいが、このticketに紐付ける
-  - 完了後は TKT-0110 に進む
+  - 完了後は TKT-0113-canvas-parity-audit に進む。TKT-0110 CSV移行へ直行しない
 ---
 
 # Summary
@@ -52,4 +52,4 @@ owner_notes:
 
 ## 次
 
-TKT-0110-csv-migration-tool
+TKT-0113-canvas-parity-audit

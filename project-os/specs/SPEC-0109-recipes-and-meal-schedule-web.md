@@ -11,6 +11,7 @@ constraints:
   - AIレシピ生成の拡張は別途扱う
   - Canvas版 `app.html` は変更しない
   - 既存の主要ワークフローを優先し、過剰な新機能を入れない
+  - 完全移植確認のため、完了後はCSV移行ではなく TKT-0113-canvas-parity-audit へ進む
 acceptance:
   - レシピを作成・編集・閲覧できる
   - 献立へレシピを配置できる
@@ -29,3 +30,7 @@ Canvas版のレシピ、献立、調理導線をWeb版へ移す。Web版v1で現
 - CSV移行
 - PWA仕上げ
 - 本番公開
+
+## 次
+
+TKT-0113-canvas-parity-audit

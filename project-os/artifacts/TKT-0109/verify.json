@@ -1,0 +1,43 @@
+{
+  "ticket_id": "TKT-0109-recipes-and-meal-schedule-web",
+  "status": "passed",
+  "verified_at": "2026-05-24",
+  "commands": [
+    {
+      "command": "cd web && npm run lint",
+      "status": "passed"
+    },
+    {
+      "command": "cd web && npm run typecheck",
+      "status": "passed"
+    },
+    {
+      "command": "cd web && npm run test",
+      "status": "passed",
+      "summary": "9 test files passed, 38 tests passed"
+    },
+    {
+      "command": "cd web && npm run build",
+      "status": "passed"
+    },
+    {
+      "command": "rg -n 'GAS_URL|executeGAS|SpreadsheetApp|DriveApp' web supabase",
+      "status": "passed",
+      "summary": "no matches"
+    },
+    {
+      "command": "rg -n 'GEMINI_API_KEY|SUPABASE_SERVICE_ROLE_KEY|SUPABASE_DB_PASSWORD' web supabase",
+      "status": "passed_with_expected_refs",
+      "summary": "only existing env variable references and tests; no secret values added"
+    }
+  ],
+  "scenarios": [
+    "recipe_create_and_list",
+    "recipe_edit_and_replace_ingredients",
+    "meal_schedule_create",
+    "shopping_shortage_create",
+    "meal_schedule_complete_to_cooking_history",
+    "invalid_recipe_validation",
+    "mobile_responsive_css"
+  ]
+}
