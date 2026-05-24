@@ -4,11 +4,22 @@ import { InventoryBoard } from "@/components/inventory-board";
 import type { StockItem } from "@/lib/inventory/types";
 
 const from = vi.fn();
+const storageFrom = vi.fn();
+const compressImageFile = vi.fn();
+const buildPhotoStoragePath = vi.fn();
 
 vi.mock("@/lib/supabase/browser", () => ({
   createBrowserSupabaseClient: () => ({
-    from
+    from,
+    storage: {
+      from: storageFrom
+    }
   })
+}));
+
+vi.mock("@/lib/photos/compress", () => ({
+  buildPhotoStoragePath: () => buildPhotoStoragePath(),
+  compressImageFile: (file: File) => compressImageFile(file)
 }));
 
 const baseItem: StockItem = {
@@ -40,6 +51,12 @@ function renderBoard(props?: Partial<React.ComponentProps<typeof InventoryBoard>
 describe("InventoryBoard", () => {
   beforeEach(() => {
     from.mockReset();
+    storageFrom.mockReset();
+    compressImageFile.mockReset();
+    buildPhotoStoragePath.mockReset();
+    buildPhotoStoragePath.mockReturnValue("user-1/ingredient-scan/photo-1.jpg");
+    URL.createObjectURL = vi.fn(() => "blob:preview");
+    URL.revokeObjectURL = vi.fn();
   });
 
   it("shows staging and inventory lists", () => {
@@ -52,6 +69,7 @@ describe("InventoryBoard", () => {
     expect(screen.getByText("牛乳")).toBeTruthy();
     expect(screen.getByText("卵")).toBeTruthy();
     expect(screen.getByRole("button", { name: "在庫へ確定" })).toBeTruthy();
+    expect(screen.getByLabelText("写真を撮る")).toBeTruthy();
   });
 
   it("adds a manual staging item with the authenticated user id", async () => {
@@ -111,5 +129,98 @@ describe("InventoryBoard", () => {
       expect(deleteItem).toHaveBeenCalled();
     });
     expect(await screen.findByText("牛乳 を在庫へ確定しました。")).toBeTruthy();
+  });
+
+  it("previews a selected photo and allows replacing it", () => {
+    renderBoard();
+
+    fireEvent.change(screen.getByLabelText("写真を撮る"), {
+      target: {
+        files: [new File(["photo"], "ingredient.jpg", { type: "image/jpeg" })]
+      }
+    });
+
+    expect(screen.getByAltText("選択した食材写真のプレビュー")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "圧縮して保存" })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "別の写真にする" }));
+
+    expect(screen.queryByAltText("選択した食材写真のプレビュー")).toBeNull();
+    expect(screen.getByText("写真は圧縮してから非公開で保存します。AI解析は次の段階で追加します。")).toBeTruthy();
+  });
+
+  it("compresses and uploads a selected photo with private storage metadata", async () => {
+    const upload = vi.fn().mockResolvedValue({ error: null });
+    const remove = vi.fn().mockResolvedValue({ error: null });
+    const insert = vi.fn().mockResolvedValue({ error: null });
+    const compressedBlob = new Blob(["compressed"], { type: "image/jpeg" });
+
+    storageFrom.mockReturnValue({ upload, remove });
+    from.mockImplementation((table: string) => {
+      if (table === "photos") return { insert };
+      return {};
+    });
+    compressImageFile.mockResolvedValue({
+      blob: compressedBlob,
+      byteSize: compressedBlob.size,
+      contentType: "image/jpeg",
+      width: 1024,
+      height: 768
+    });
+
+    renderBoard();
+
+    fireEvent.change(screen.getByLabelText("写真を撮る"), {
+      target: {
+        files: [new File(["photo"], "ingredient.jpg", { type: "image/jpeg" })]
+      }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "圧縮して保存" }));
+
+    await waitFor(() => {
+      expect(storageFrom).toHaveBeenCalledWith("photos");
+      expect(upload).toHaveBeenCalledWith("user-1/ingredient-scan/photo-1.jpg", compressedBlob, {
+        contentType: "image/jpeg",
+        upsert: false
+      });
+      expect(from).toHaveBeenCalledWith("photos");
+      expect(insert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          user_id: "user-1",
+          bucket_id: "photos",
+          storage_path: "user-1/ingredient-scan/photo-1.jpg",
+          usage_type: "ingredient_scan",
+          content_type: "image/jpeg",
+          byte_size: compressedBlob.size,
+          width: 1024,
+          height: 768
+        })
+      );
+    });
+    expect(await screen.findByText("圧縮した写真を非公開Storageに保存しました。")).toBeTruthy();
+  });
+
+  it("shows a clear error when photo upload fails", async () => {
+    const upload = vi.fn().mockResolvedValue({ error: new Error("upload failed") });
+    storageFrom.mockReturnValue({ upload });
+    compressImageFile.mockResolvedValue({
+      blob: new Blob(["compressed"], { type: "image/jpeg" }),
+      byteSize: 10,
+      contentType: "image/jpeg",
+      width: 1024,
+      height: 768
+    });
+
+    renderBoard();
+
+    fireEvent.change(screen.getByLabelText("写真を撮る"), {
+      target: {
+        files: [new File(["photo"], "ingredient.jpg", { type: "image/jpeg" })]
+      }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "圧縮して保存" }));
+
+    expect(await screen.findByText(/原因: 写真をStorageへ保存できませんでした。/)).toBeTruthy();
+    expect(from).not.toHaveBeenCalledWith("photos");
   });
 });

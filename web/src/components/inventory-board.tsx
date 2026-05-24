@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import {
   emptyStockItemFormValues,
@@ -8,6 +8,7 @@ import {
   StockItemFormValues,
   toFormValues
 } from "@/lib/inventory/types";
+import { buildPhotoStoragePath, compressImageFile } from "@/lib/photos/compress";
 
 type InventoryBoardProps = {
   userId: string;
@@ -94,8 +95,19 @@ export function InventoryBoard({
   const [values, setValues] = useState<StockItemFormValues>(emptyStockItemFormValues);
   const [editing, setEditing] = useState<EditingTarget>(null);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
+  const [photoFeedback, setPhotoFeedback] = useState<Feedback | null>(null);
+  const [selectedPhoto, setSelectedPhoto] = useState<File | null>(null);
+  const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const photoInputRef = useRef<HTMLInputElement | null>(null);
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
+
+  useEffect(() => {
+    return () => {
+      if (photoPreviewUrl) URL.revokeObjectURL(photoPreviewUrl);
+    };
+  }, [photoPreviewUrl]);
 
   function updateValue<K extends keyof StockItemFormValues>(key: K, value: StockItemFormValues[K]) {
     setValues((current) => ({ ...current, [key]: value }));
@@ -104,6 +116,95 @@ export function InventoryBoard({
   function resetForm() {
     setValues(emptyStockItemFormValues);
     setEditing(null);
+  }
+
+  function resetPhoto() {
+    if (photoPreviewUrl) URL.revokeObjectURL(photoPreviewUrl);
+    setSelectedPhoto(null);
+    setPhotoPreviewUrl(null);
+    setPhotoFeedback(null);
+    if (photoInputRef.current) {
+      photoInputRef.current.value = "";
+    }
+  }
+
+  function selectPhoto(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0] ?? null;
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      resetPhoto();
+      setPhotoFeedback({
+        tone: "error",
+        message: "原因: 画像ではないファイルです。影響: 写真を保存できません。修正方法: カメラで撮影するか画像を選んでください。"
+      });
+      return;
+    }
+
+    if (photoPreviewUrl) URL.revokeObjectURL(photoPreviewUrl);
+    setSelectedPhoto(file);
+    setPhotoPreviewUrl(URL.createObjectURL(file));
+    setPhotoFeedback({ tone: "info", message: "写真を選びました。内容を確認してから保存してください。" });
+  }
+
+  async function uploadPhoto() {
+    if (!selectedPhoto) {
+      setPhotoFeedback({
+        tone: "error",
+        message: "原因: 写真が未選択です。影響: 保存できません。修正方法: 先に写真を撮るか選んでください。"
+      });
+      return;
+    }
+
+    setIsUploadingPhoto(true);
+    setPhotoFeedback(null);
+
+    try {
+      const compressed = await compressImageFile(selectedPhoto);
+      const storagePath = buildPhotoStoragePath(userId);
+      const { error: uploadError } = await supabase.storage.from("photos").upload(storagePath, compressed.blob, {
+        contentType: compressed.contentType,
+        upsert: false
+      });
+
+      if (uploadError) {
+        setPhotoFeedback({
+          tone: "error",
+          message: "原因: 写真をStorageへ保存できませんでした。影響: AI解析用の写真が残りません。修正方法: 通信状態とログイン状態を確認してください。"
+        });
+        return;
+      }
+
+      const { error: insertError } = await supabase.from("photos").insert({
+        user_id: userId,
+        bucket_id: "photos",
+        storage_path: storagePath,
+        usage_type: "ingredient_scan",
+        content_type: compressed.contentType,
+        byte_size: compressed.byteSize,
+        width: compressed.width,
+        height: compressed.height
+      });
+
+      if (insertError) {
+        await supabase.storage.from("photos").remove([storagePath]);
+        setPhotoFeedback({
+          tone: "error",
+          message: "原因: 写真情報をDBへ保存できませんでした。影響: 保存した写真を後で探せません。修正方法: ログイン状態を確認して再度保存してください。"
+        });
+        return;
+      }
+
+      resetPhoto();
+      setPhotoFeedback({ tone: "success", message: "圧縮した写真を非公開Storageに保存しました。" });
+    } catch {
+      setPhotoFeedback({
+        tone: "error",
+        message: "原因: 画像の圧縮に失敗しました。影響: 元画像は保存されません。修正方法: 別の写真で撮り直してください。"
+      });
+    } finally {
+      setIsUploadingPhoto(false);
+    }
   }
 
   function startEdit(list: "staging" | "inventory", item: StockItem) {
@@ -308,9 +409,50 @@ export function InventoryBoard({
             </div>
           </form>
 
-          <div className="photo-placeholder" aria-label="写真取り込みは次のチケットで対応">
-            写真取り込みは TKT-0106 で追加します。
-          </div>
+          <section className="photo-capture-panel" aria-labelledby="photo-capture-heading">
+            <div className="photo-capture-heading">
+              <div>
+                <span>写真登録</span>
+                <h4 id="photo-capture-heading">食材写真を保存</h4>
+              </div>
+              <label className="photo-file-button">
+                写真を撮る
+                <input
+                  ref={photoInputRef}
+                  accept="image/*"
+                  capture="environment"
+                  type="file"
+                  onChange={selectPhoto}
+                  disabled={isUploadingPhoto}
+                />
+              </label>
+            </div>
+
+            {photoPreviewUrl ? (
+              <div className="photo-preview">
+                {/* Blob URL previews are local-only, so Next Image optimization is not useful here. */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={photoPreviewUrl} alt="選択した食材写真のプレビュー" />
+              </div>
+            ) : (
+              <p className="photo-empty">写真は圧縮してから非公開で保存します。AI解析は次の段階で追加します。</p>
+            )}
+
+            {photoFeedback ? (
+              <p className="operation-message photo-message" data-tone={photoFeedback.tone} role={photoFeedback.tone === "error" ? "alert" : "status"}>
+                {photoFeedback.message}
+              </p>
+            ) : null}
+
+            <div className="photo-actions">
+              <button className="primary-button" type="button" disabled={!selectedPhoto || isUploadingPhoto || isSaving} onClick={uploadPhoto}>
+                {isUploadingPhoto ? "保存中" : "圧縮して保存"}
+              </button>
+              <button className="secondary-button" type="button" disabled={!selectedPhoto || isUploadingPhoto} onClick={resetPhoto}>
+                別の写真にする
+              </button>
+            </div>
+          </section>
 
           <ItemList
             emptyText="登録待ちはありません。まずは手動で1件追加してください。"

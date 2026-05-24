@@ -1,0 +1,44 @@
+{
+  "ticket": "TKT-0106-mobile-photo-capture-upload",
+  "status": "passed",
+  "verified_at": "2026-05-24",
+  "commands": [
+    {
+      "command": "cd web && npm run lint",
+      "status": "passed"
+    },
+    {
+      "command": "cd web && npm run typecheck",
+      "status": "passed"
+    },
+    {
+      "command": "cd web && npm run test",
+      "status": "passed",
+      "summary": "5 test files passed, 16 tests passed"
+    },
+    {
+      "command": "cd web && npm run build",
+      "status": "passed"
+    },
+    {
+      "command": "rg -n \"GAS_URL|executeGAS|SpreadsheetApp|DriveApp\" web supabase",
+      "status": "passed",
+      "summary": "No Web GAS, Spreadsheet, or Drive dependency found."
+    },
+    {
+      "command": "rg -n \"GEMINI_API_KEY|SUPABASE_SERVICE_ROLE_KEY|SUPABASE_DB_PASSWORD\" web supabase",
+      "status": "passed_with_expected_matches",
+      "summary": "Only existing environment variable names and test dummy values were found; no real secret literal was added."
+    },
+    {
+      "command": "rg -n \"public, file_size_limit|public = false|photos_storage_.*own_path|usage_type.*ingredient_scan|getPublicUrl\" web supabase",
+      "status": "passed",
+      "summary": "Existing photos bucket remains private, own-path policies are present, ingredient_scan metadata is used, and no public URL helper is called."
+    }
+  ],
+  "notes": [
+    "No dependency was added.",
+    "No Supabase migration was added because the photos table, private photos bucket, and Storage RLS already exist from TKT-0103.",
+    "The implementation stores only the compressed image in Storage and does not call AI APIs."
+  ]
+}
