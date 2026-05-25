@@ -253,6 +253,7 @@ export function RecipeMealWorkspace({
   const [activeView, setActiveView] = useState<RecipeWorkspaceView>("recipes");
   const [isTextImportOpen, setIsTextImportOpen] = useState(false);
   const [isAiMenuOpen, setIsAiMenuOpen] = useState(false);
+  const [isRecipeEditorOpen, setIsRecipeEditorOpen] = useState(false);
   const router = useRouter();
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
 
@@ -366,6 +367,7 @@ export function RecipeMealWorkspace({
     setEditingRecipeId(null);
     setIsTextImportOpen(false);
     setIsAiMenuOpen(false);
+    setIsRecipeEditorOpen(true);
     setFeedback({ tone: "info", message: "AIレシピ案を入力フォームへ反映しました。内容を確認して保存してください。" });
   }
 
@@ -374,12 +376,19 @@ export function RecipeMealWorkspace({
     setEditingRecipeId(recipe.id);
     setSelectedRecipeId(recipe.id);
     setPendingDeleteRecipeId(null);
+    setIsRecipeEditorOpen(true);
     setFeedback({ tone: "info", message: `${recipe.name} を編集中です。` });
   }
 
   function openNewRecipeEditor() {
     resetRecipeForm();
     setActiveView("recipes");
+    setIsRecipeEditorOpen(true);
+  }
+
+  function closeRecipeEditor() {
+    resetRecipeForm();
+    setIsRecipeEditorOpen(false);
   }
 
   async function structureRecipeText() {
@@ -553,6 +562,7 @@ export function RecipeMealWorkspace({
     setSelectedRecipeId(mergedRecipe.id);
     setScheduleRecipeId((current) => current || mergedRecipe.id);
     resetRecipeForm();
+    setIsRecipeEditorOpen(false);
     setFeedback({ tone: "success", message: editingRecipeId ? "レシピを更新しました。" : "レシピを追加しました。" });
   }
 
@@ -1046,7 +1056,7 @@ export function RecipeMealWorkspace({
 
   return (
     <section className="recipe-meal-workspace" aria-labelledby="recipe-meal-heading">
-      <div className="section-heading">
+      <div className="section-heading sr-only">
         <p className="eyebrow">{activeView === "schedule" ? "MEAL SCHEDULE" : "RECIPE COLLECTION"}</p>
         <h2 id="recipe-meal-heading">献立・レシピ</h2>
         <h2 className="sr-only">レシピ・献立・買い物</h2>
@@ -1153,108 +1163,115 @@ export function RecipeMealWorkspace({
         </div>
       ) : null}
 
+      {isRecipeEditorOpen ? (
+        <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="recipe-editor-heading">
+          <section className="canvas-modal recipe-editor-modal">
+            <button className="modal-close-button" type="button" onClick={closeRecipeEditor} aria-label="閉じる">×</button>
+            <p className="eyebrow">RECIPE EDITOR</p>
+            <h3 id="recipe-editor-heading">{editingRecipeId ? "レシピを編集" : "新規レシピ"}</h3>
+            <form className="stock-form" onSubmit={saveRecipe}>
+              <label>
+                レシピ名
+                <input value={recipeValues.name} onChange={(event) => updateRecipeValue("name", event.target.value)} placeholder="例: カレー" />
+              </label>
+              <div className="form-row two-columns">
+                <label>
+                  ジャンル
+                  <input value={recipeValues.genre} onChange={(event) => updateRecipeValue("genre", event.target.value)} placeholder="和食, 作り置き" />
+                </label>
+                <label>
+                  参考元
+                  <input value={recipeValues.source} onChange={(event) => updateRecipeValue("source", event.target.value)} placeholder="メモやURL" />
+                </label>
+              </div>
+
+              <div className="ingredient-editor" aria-label="材料入力">
+                <div className="ingredient-editor-heading">
+                  <span>材料</span>
+                  <button className="secondary-button compact-button" type="button" onClick={addIngredientRow}>
+                    材料を追加
+                  </button>
+                </div>
+                {recipeValues.ingredients.map((ingredient, index) => (
+                  <div className="ingredient-row" key={`${index}-${ingredient.name}`}>
+                    <label>
+                      種別
+                      <select
+                        value={ingredient.item_type}
+                        onChange={(event) => updateIngredient(index, { item_type: event.target.value as RecipeIngredientFormValues["item_type"] })}
+                      >
+                        <option value="食材">食材</option>
+                        <option value="調味料">調味料</option>
+                      </select>
+                    </label>
+                    <label>
+                      品名
+                      <input value={ingredient.name} onChange={(event) => updateIngredient(index, { name: event.target.value })} placeholder="玉ねぎ" />
+                    </label>
+                    <label>
+                      数量
+                      <input
+                        min="0"
+                        step="0.1"
+                        type="number"
+                        value={ingredient.amount}
+                        onChange={(event) => updateIngredient(index, { amount: event.target.value })}
+                      />
+                    </label>
+                    <label>
+                      単位
+                      <input value={ingredient.unit} onChange={(event) => updateIngredient(index, { unit: event.target.value })} placeholder="個" />
+                    </label>
+                    <button className="danger-button compact-button" type="button" onClick={() => removeIngredientRow(index)}>
+                      削除
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              <div className="form-row two-columns">
+                <label>
+                  下準備
+                  <textarea
+                    rows={4}
+                    value={recipeValues.prep_steps}
+                    onChange={(event) => updateRecipeValue("prep_steps", event.target.value)}
+                    placeholder="1行に1手順"
+                  />
+                </label>
+                <label>
+                  調理手順
+                  <textarea
+                    rows={4}
+                    value={recipeValues.steps}
+                    onChange={(event) => updateRecipeValue("steps", event.target.value)}
+                    placeholder="1行に1手順"
+                  />
+                </label>
+              </div>
+              <div className="form-actions">
+                <button className="primary-button" type="submit" disabled={isSaving}>
+                  {editingRecipeId ? "レシピを更新" : "レシピを保存"}
+                </button>
+                <button className="secondary-button" type="button" onClick={closeRecipeEditor}>
+                  キャンセル
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>
+      ) : null}
+
       <div className="recipe-meal-grid">
         {activeView === "recipes" ? (
         <section className="stock-panel recipe-list-panel" aria-labelledby="recipe-form-heading">
           <div className="panel-title">
             <div>
               <span>レシピ集</span>
-              <h3 id="recipe-form-heading">{editingRecipeId ? "レシピを編集" : "レシピを探す"}</h3>
+              <h3 id="recipe-form-heading">レシピを探す</h3>
             </div>
             <strong>{recipes.length}件</strong>
           </div>
-
-          <form className="stock-form" onSubmit={saveRecipe}>
-            <label>
-              レシピ名
-              <input value={recipeValues.name} onChange={(event) => updateRecipeValue("name", event.target.value)} placeholder="例: カレー" />
-            </label>
-            <div className="form-row two-columns">
-              <label>
-                ジャンル
-                <input value={recipeValues.genre} onChange={(event) => updateRecipeValue("genre", event.target.value)} placeholder="和食, 作り置き" />
-              </label>
-              <label>
-                参考元
-                <input value={recipeValues.source} onChange={(event) => updateRecipeValue("source", event.target.value)} placeholder="メモやURL" />
-              </label>
-            </div>
-
-            <div className="ingredient-editor" aria-label="材料入力">
-              <div className="ingredient-editor-heading">
-                <span>材料</span>
-                <button className="secondary-button compact-button" type="button" onClick={addIngredientRow}>
-                  材料を追加
-                </button>
-              </div>
-              {recipeValues.ingredients.map((ingredient, index) => (
-                <div className="ingredient-row" key={`${index}-${ingredient.name}`}>
-                  <label>
-                    種別
-                    <select
-                      value={ingredient.item_type}
-                      onChange={(event) => updateIngredient(index, { item_type: event.target.value as RecipeIngredientFormValues["item_type"] })}
-                    >
-                      <option value="食材">食材</option>
-                      <option value="調味料">調味料</option>
-                    </select>
-                  </label>
-                  <label>
-                    品名
-                    <input value={ingredient.name} onChange={(event) => updateIngredient(index, { name: event.target.value })} placeholder="玉ねぎ" />
-                  </label>
-                  <label>
-                    数量
-                    <input
-                      min="0"
-                      step="0.1"
-                      type="number"
-                      value={ingredient.amount}
-                      onChange={(event) => updateIngredient(index, { amount: event.target.value })}
-                    />
-                  </label>
-                  <label>
-                    単位
-                    <input value={ingredient.unit} onChange={(event) => updateIngredient(index, { unit: event.target.value })} placeholder="個" />
-                  </label>
-                  <button className="danger-button compact-button" type="button" onClick={() => removeIngredientRow(index)}>
-                    削除
-                  </button>
-                </div>
-              ))}
-            </div>
-
-            <div className="form-row two-columns">
-              <label>
-                下準備
-                <textarea
-                  rows={4}
-                  value={recipeValues.prep_steps}
-                  onChange={(event) => updateRecipeValue("prep_steps", event.target.value)}
-                  placeholder="1行に1手順"
-                />
-              </label>
-              <label>
-                調理手順
-                <textarea
-                  rows={4}
-                  value={recipeValues.steps}
-                  onChange={(event) => updateRecipeValue("steps", event.target.value)}
-                  placeholder="1行に1手順"
-                />
-              </label>
-            </div>
-            <div className="form-actions">
-              <button className="primary-button" type="submit" disabled={isSaving}>
-                {editingRecipeId ? "レシピを更新" : "レシピを保存"}
-              </button>
-              {editingRecipeId ? (
-                <button className="secondary-button" type="button" onClick={resetRecipeForm}>
-                  編集をやめる
-                </button>
-              ) : null}
-            </div>
-          </form>
 
           <section className="ai-recipe-panel inline-ai-panel" aria-label="AIレシピ">
             <div className="panel-title compact-title">
@@ -1314,7 +1331,7 @@ export function RecipeMealWorkspace({
         </section>
         ) : null}
 
-        {activeView === "recipes" ? (
+        {activeView === "recipes" && selectedRecipe ? (
         <section className="stock-panel recipe-detail-panel" aria-labelledby="recipe-detail-heading">
           <div className="panel-title">
             <div>
@@ -1428,6 +1445,7 @@ export function RecipeMealWorkspace({
         </section>
         ) : null}
 
+        {activeView === "schedule" ? (
         <section className="stock-panel schedule-board-panel" aria-labelledby="meal-list-heading">
           <div className="panel-title">
             <div>
@@ -1455,56 +1473,101 @@ export function RecipeMealWorkspace({
             </button>
           </div>
 
-          {mealSchedules.length === 0 ? (
-            <p className="empty-list">献立はありません。レシピを選んで予定に追加してください。</p>
-          ) : (
-            <div className="meal-week" aria-label="7日献立">
-              {scheduleDays.map((day) => (
-                <section className="meal-day" key={day}>
+          <form className="schedule-quick-add" onSubmit={saveSchedule}>
+            <label>
+              日付
+              <input type="date" value={scheduleDate} onChange={(event) => setScheduleDate(event.target.value)} />
+            </label>
+            <label>
+              食事
+              <select value={scheduleMealType} onChange={(event) => setScheduleMealType(event.target.value as MealType)}>
+                {mealTypes.map((mealType) => (
+                  <option key={mealType} value={mealType}>
+                    {mealType}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              レシピ
+              <select value={scheduleRecipeId} onChange={(event) => setScheduleRecipeId(event.target.value)} disabled={recipes.length === 0}>
+                {recipes.map((recipe) => (
+                  <option key={recipe.id} value={recipe.id}>
+                    {recipe.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button className="primary-button compact-button" type="submit" disabled={isSaving || recipes.length === 0}>
+              追加
+            </button>
+          </form>
+
+          <div className="meal-week canvas-schedule-week" aria-label="7日献立">
+            {scheduleDays.map((day) => {
+              const daySchedules = visibleMealSchedules.filter((schedule) => schedule.scheduled_on === day);
+              return (
+                <section className="meal-day canvas-schedule-day" key={day}>
                   <button className="meal-day-heading" type="button" onClick={() => setScheduleDate(day)}>
                     <span>{formatScheduleDayLabel(day)}</span>
-                    <strong>{visibleMealSchedules.filter((schedule) => schedule.scheduled_on === day).length}件</strong>
+                    {day === todayValue() ? <em>今日</em> : null}
                   </button>
-                  {visibleMealSchedules.filter((schedule) => schedule.scheduled_on === day).length === 0 ? (
-                    <p className="empty-list compact-empty">予定なし</p>
-                  ) : (
-                    <div className="meal-list">
-                      {visibleMealSchedules
-                        .filter((schedule) => schedule.scheduled_on === day)
-                        .map((schedule) => (
-                          <article className="meal-item" data-active={selectedSchedule?.id === schedule.id} key={schedule.id}>
-                            <button className="meal-select-button" type="button" onClick={() => setSelectedScheduleId(schedule.id)}>
-                              <span>{schedule.meal_type}</span>
-                              <strong>{schedule.recipe_name || "レシピ名なし"}</strong>
-                              <em>{schedule.status}</em>
+                  <div className="meal-list canvas-meal-slots">
+                    {(["朝", "昼", "晩"] as MealType[]).map((mealType) => {
+                      const schedule = daySchedules.find((item) => item.meal_type === mealType);
+                      return (
+                        <div className="meal-slot" key={`${day}-${mealType}`}>
+                          <div className="meal-slot-heading">
+                            <span>{mealType}</span>
+                            <button
+                              className="secondary-button compact-button meal-add-button"
+                              type="button"
+                              onClick={() => {
+                                setScheduleDate(day);
+                                setScheduleMealType(mealType);
+                              }}
+                              aria-label={`${formatScheduleDayLabel(day)} ${mealType}に追加`}
+                            >
+                              +
                             </button>
-                            <div className="meal-actions">
-                              <button className="secondary-button compact-button" type="button" disabled={isSaving} onClick={() => moveSchedule(schedule, -1)}>
-                                前日
+                          </div>
+                          {schedule ? (
+                            <article className="meal-item" data-active={selectedSchedule?.id === schedule.id}>
+                              <button className="meal-select-button" type="button" onClick={() => setSelectedScheduleId(schedule.id)}>
+                                <strong>{schedule.recipe_name || "レシピ名なし"}</strong>
+                                <em>{schedule.status}</em>
                               </button>
-                              <button className="secondary-button compact-button" type="button" disabled={isSaving} onClick={() => moveSchedule(schedule, 1)}>
-                                翌日
-                              </button>
-                              <button className="secondary-button compact-button" type="button" disabled={isSaving || schedule.status === "完了"} onClick={() => completeSchedule(schedule)}>
-                                {pendingConsumptionScheduleId === schedule.id ? "消費して完了" : "調理完了"}
-                              </button>
-                              <button
-                                className="danger-button compact-button"
-                                type="button"
-                                disabled={isSaving}
-                                onClick={() => requestDelete(schedule.recipe_name || "献立", "この献立予定を削除します。料理履歴は削除されません。", () => deleteSchedule(schedule))}
-                              >
-                                削除
-                              </button>
-                            </div>
-                          </article>
-                        ))}
-                    </div>
-                  )}
+                              <div className="meal-actions">
+                                <button className="secondary-button compact-button" type="button" disabled={isSaving} onClick={() => moveSchedule(schedule, -1)}>
+                                  前日
+                                </button>
+                                <button className="secondary-button compact-button" type="button" disabled={isSaving} onClick={() => moveSchedule(schedule, 1)}>
+                                  翌日
+                                </button>
+                                <button className="secondary-button compact-button" type="button" disabled={isSaving || schedule.status === "完了"} onClick={() => completeSchedule(schedule)}>
+                                  {pendingConsumptionScheduleId === schedule.id ? "消費して完了" : "調理完了"}
+                                </button>
+                                <button
+                                  className="danger-button compact-button"
+                                  type="button"
+                                  disabled={isSaving}
+                                  onClick={() => requestDelete(schedule.recipe_name || "献立", "この献立予定を削除します。料理履歴は削除されません。", () => deleteSchedule(schedule))}
+                                >
+                                  削除
+                                </button>
+                              </div>
+                            </article>
+                          ) : (
+                            <p className="compact-empty">予定なし</p>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </section>
-              ))}
-            </div>
-          )}
+              );
+            })}
+          </div>
 
           {pendingConsumptionScheduleId && selectedSchedule?.id === pendingConsumptionScheduleId ? (
             <ConsumptionEditor
@@ -1603,6 +1666,7 @@ export function RecipeMealWorkspace({
             />
           </div>
         </section>
+        ) : null}
       </div>
     </section>
   );

@@ -626,7 +626,9 @@ h1 {
   position: relative;
   display: grid;
   width: min(560px, 100%);
+  max-height: calc(100vh - 64px);
   gap: 14px;
+  overflow: auto;
   border-radius: 8px;
   background: #fff;
   padding: 28px;
@@ -635,6 +637,10 @@ h1 {
 
 .recipe-editor-modal {
   width: min(680px, 100%);
+}
+
+.inventory-editor-modal {
+  width: min(540px, 100%);
 }
 
 .modal-close-button {
@@ -749,7 +755,7 @@ h1 {
 .stock-form {
   display: grid;
   gap: 12px;
-  margin-bottom: 14px;
+  margin-bottom: 0;
 }
 
 .stock-form label {
@@ -1166,6 +1172,36 @@ h1 {
   margin-bottom: 12px;
 }
 
+.schedule-quick-add {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+  border: 1px solid #d7ecfb;
+  border-radius: 8px;
+  background: #f4fbff;
+  padding: 10px;
+}
+
+.schedule-quick-add label {
+  display: grid;
+  gap: 5px;
+  color: #64748b;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.schedule-quick-add input,
+.schedule-quick-add select {
+  width: 100%;
+  min-height: 40px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink);
+  padding: 8px 10px;
+}
+
 .meal-week {
   display: grid;
   gap: 12px;
@@ -1173,6 +1209,11 @@ h1 {
   border-radius: 8px;
   background: #eef9ff;
   padding: 12px;
+}
+
+.canvas-schedule-week {
+  gap: 10px;
+  background: #eef9ff;
 }
 
 .meal-day {
@@ -1183,6 +1224,10 @@ h1 {
   border-radius: 8px;
   background: #fff;
   padding: 12px;
+}
+
+.canvas-schedule-day {
+  align-items: stretch;
 }
 
 .meal-day-heading {
@@ -1207,8 +1252,51 @@ h1 {
   font-size: 0.78rem;
 }
 
+.meal-day-heading em {
+  color: #f59e0b;
+  font-size: 0.72rem;
+  font-style: normal;
+  font-weight: 900;
+}
+
 .meal-list {
   grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.canvas-meal-slots {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.meal-slot {
+  display: grid;
+  min-height: 96px;
+  gap: 8px;
+  align-content: start;
+  border: 1px solid #cfe3f3;
+  border-radius: 8px;
+  background: #fff;
+  padding: 10px;
+}
+
+.meal-slot-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: #0ea5e9;
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.meal-add-button {
+  width: 30px;
+  min-height: 30px;
+  border-color: #bae6fd;
+  background: #effaff;
+  color: #0284c7;
+  padding: 0;
 }
 
 .recipe-browser {
@@ -1241,6 +1329,14 @@ h1 {
   border-radius: 8px;
   background: #fbfcfa;
   padding: 10px;
+}
+
+.meal-slot .meal-item {
+  padding: 8px;
+}
+
+.meal-slot .meal-actions {
+  margin-top: 4px;
 }
 
 .recipe-card[data-active="true"],
@@ -1293,7 +1389,13 @@ h1 {
 }
 
 .compact-empty {
+  margin: 0;
+  border: 0;
+  background: transparent;
   padding: 8px 10px;
+  color: #94a3b8;
+  font-size: 0.82rem;
+  font-weight: 700;
 }
 
 .recipe-detail {
@@ -2022,6 +2124,10 @@ h1 {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
+  .meal-slot .meal-actions {
+    grid-template-columns: 1fr;
+  }
+
   .candidate-actions {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -2053,7 +2159,9 @@ h1 {
   .recipe-primary-actions,
   .ai-choice-grid,
   .meal-list,
-  .compact-list-controls {
+  .compact-list-controls,
+  .canvas-meal-slots,
+  .schedule-quick-add {
     grid-template-columns: 1fr;
   }
 

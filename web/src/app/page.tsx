@@ -2,13 +2,11 @@ import { redirect } from "next/navigation";
 import { CookingHistoryBoard } from "@/components/cooking-history-board";
 import { InventoryBoard } from "@/components/inventory-board";
 import { RecipeMealWorkspace } from "@/components/recipe-meal-workspace";
-import { SetupStatus } from "@/components/setup-status";
 import { TodayDashboard } from "@/components/today-dashboard";
 import { WebModeShell } from "@/components/web-mode-shell";
 import type { CookingHistoryItem, CookingHistoryPhoto } from "@/lib/cooking-history/types";
 import type { StockItem, StorageLocation } from "@/lib/inventory/types";
 import type { CookCandidate, MealSchedule, Recipe, RecipeIngredient, ShoppingItem } from "@/lib/recipes/types";
-import { setupSteps } from "@/lib/navigation";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export default async function Home() {
@@ -160,7 +158,6 @@ export default async function Home() {
         stagingCount={(stagingItems ?? []).length}
         userEmail={user.email ?? "ログイン中のユーザー"}
       />
-      <SetupStatus steps={setupSteps} />
     </main>
   );
 }

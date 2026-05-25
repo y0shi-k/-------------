@@ -244,6 +244,11 @@ export function InventoryBoard({
     setActiveView("staging");
   }
 
+  function closeStagingModal() {
+    resetForm();
+    setActiveView("inventory");
+  }
+
   function updateInventoryFilter<K extends keyof InventoryFilters>(key: K, value: InventoryFilters[K]) {
     setInventoryFilters((current) => ({ ...current, [key]: value }));
   }
@@ -446,6 +451,7 @@ export function InventoryBoard({
   function startEdit(list: "staging" | "inventory", item: StockItem) {
     setValues(toFormValues(item));
     setEditing({ list, item });
+    setActiveView("staging");
     setFeedback({ tone: "info", message: `${item.name} を編集中です。` });
   }
 
@@ -611,7 +617,7 @@ export function InventoryBoard({
 
   return (
     <section className="inventory-workspace" aria-labelledby="inventory-heading">
-      <div className="section-heading">
+      <div className="section-heading sr-only">
         <p className="eyebrow">{activeView === "shopping" ? "SHOPPING" : activeView === "staging" ? "REGISTRATION" : "ALL STORAGE"}</p>
         <h2 id="inventory-heading">食材管理</h2>
         <h2 className="sr-only">在庫と登録待ち</h2>
@@ -649,8 +655,10 @@ export function InventoryBoard({
         />
       ) : null}
 
-      <div className="inventory-grid">
-        <section className="stock-panel canvas-panel-wide" aria-labelledby="staging-heading">
+      {activeView === "staging" ? (
+        <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="staging-heading">
+        <section className="stock-panel canvas-modal inventory-editor-modal" aria-labelledby="staging-heading">
+          <button className="modal-close-button" type="button" onClick={closeStagingModal} aria-label="閉じる">×</button>
           <div className="panel-title">
             <div>
               <span>登録待ち</span>
@@ -878,6 +886,10 @@ export function InventoryBoard({
             disabled={isSaving}
           />
         </section>
+        </div>
+      ) : null}
+
+      <div className="inventory-grid">
 
         {activeView === "shopping" ? (
         <section className="stock-panel canvas-panel-wide shopping-empty-panel" aria-labelledby="shopping-list-heading">
@@ -901,6 +913,7 @@ export function InventoryBoard({
         </section>
         ) : null}
 
+        {activeView === "inventory" ? (
         <section className="stock-panel canvas-panel-wide" aria-labelledby="inventory-list-heading">
           <div className="panel-title">
             <div>
@@ -1001,6 +1014,7 @@ export function InventoryBoard({
             disabled={isSaving}
           />
         </section>
+        ) : null}
       </div>
     </section>
   );

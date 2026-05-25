@@ -115,6 +115,14 @@ function renderWorkspace(props?: Partial<React.ComponentProps<typeof RecipeMealW
   );
 }
 
+function openRecipeEditor() {
+  fireEvent.click(screen.getByRole("button", { name: "+ 新規レシピ" }));
+}
+
+function openScheduleView() {
+  fireEvent.click(screen.getByRole("button", { name: "スケジュール" }));
+}
+
 function insertSingleQuery(data: unknown, error: unknown = null) {
   const single = vi.fn().mockResolvedValue({ data, error });
   const select = vi.fn(() => ({ single }));
@@ -188,6 +196,7 @@ describe("RecipeMealWorkspace", () => {
     });
 
     renderWorkspace({ initialRecipes: [] });
+    openRecipeEditor();
 
     fireEvent.change(screen.getByLabelText("レシピ名"), { target: { value: "親子丼" } });
     fireEvent.change(screen.getByLabelText("ジャンル"), { target: { value: "和食, 丼" } });
@@ -323,10 +332,11 @@ describe("RecipeMealWorkspace", () => {
     from.mockReturnValue({ insert: scheduleInsert.insert });
 
     renderWorkspace();
+    openScheduleView();
 
     fireEvent.change(screen.getByLabelText("日付"), { target: { value: "2026-05-25" } });
     fireEvent.change(screen.getByLabelText("食事"), { target: { value: "晩" } });
-    fireEvent.click(screen.getByRole("button", { name: "献立に追加" }));
+    fireEvent.click(screen.getByRole("button", { name: "追加" }));
 
     await waitFor(() => {
       expect(from).toHaveBeenCalledWith("meal_schedules");
@@ -350,6 +360,7 @@ describe("RecipeMealWorkspace", () => {
     from.mockReturnValue({ update: scheduleUpdate.update });
 
     renderWorkspace({ initialMealSchedules: [baseSchedule] });
+    openScheduleView();
 
     expect(screen.getByLabelText("7日献立")).toBeTruthy();
     expect(screen.getAllByText("予定なし").length).toBeGreaterThan(0);
@@ -369,6 +380,7 @@ describe("RecipeMealWorkspace", () => {
     from.mockReturnValue({ delete: scheduleDelete.deleteRows });
 
     renderWorkspace({ initialMealSchedules: [baseSchedule] });
+    openScheduleView();
 
     fireEvent.click(within(screen.getByLabelText("7日献立")).getByRole("button", { name: "削除" }));
     expect(await screen.findByLabelText("削除確認")).toBeTruthy();
@@ -477,6 +489,7 @@ describe("RecipeMealWorkspace", () => {
     from.mockReturnValue({ insert: shoppingInsert.insert });
 
     renderWorkspace({ initialMealSchedules: [baseSchedule] });
+    openScheduleView();
 
     fireEvent.click(screen.getByLabelText(/玉ねぎ 1個/));
     fireEvent.click(screen.getByRole("button", { name: "選択食材を買い物へ" }));
@@ -503,6 +516,7 @@ describe("RecipeMealWorkspace", () => {
     from.mockReturnValue({ insert: shoppingInsert.insert });
 
     renderWorkspace();
+    openScheduleView();
 
     fireEvent.change(screen.getByLabelText("買い物の品名"), { target: { value: "牛乳" } });
     fireEvent.change(screen.getByLabelText("買い物の数量"), { target: { value: "2" } });
@@ -533,6 +547,7 @@ describe("RecipeMealWorkspace", () => {
     from.mockReturnValue({ update: shoppingUpdate.update });
 
     renderWorkspace({ initialShoppingItems: [baseShoppingItem] });
+    openScheduleView();
 
     fireEvent.click(screen.getByRole("button", { name: "購入済み" }));
 
@@ -559,6 +574,7 @@ describe("RecipeMealWorkspace", () => {
         { ...baseShoppingItem, id: "shopping-2", name: "じゃがいも" }
       ]
     });
+    openScheduleView();
 
     fireEvent.click(screen.getAllByLabelText("選択")[0]);
     fireEvent.click(screen.getAllByLabelText("選択")[1]);
@@ -591,6 +607,7 @@ describe("RecipeMealWorkspace", () => {
     });
 
     renderWorkspace({ initialMealSchedules: [baseSchedule] });
+    openScheduleView();
 
     fireEvent.click(screen.getByRole("button", { name: "調理完了" }));
     expect(await screen.findByText("消費量を確認してから、もう一度「消費して完了」を押してください。")).toBeTruthy();
@@ -631,6 +648,7 @@ describe("RecipeMealWorkspace", () => {
 
   it("does not save invalid recipe values", async () => {
     renderWorkspace({ initialRecipes: [] });
+    openRecipeEditor();
 
     fireEvent.click(screen.getByRole("button", { name: "レシピを保存" }));
 

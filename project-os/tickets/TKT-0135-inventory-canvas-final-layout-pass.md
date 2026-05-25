@@ -1,7 +1,7 @@
 ---
 id: TKT-0135-inventory-canvas-final-layout-pass
 title: 食材管理Canvas最終レイアウト寄せ
-status: ready
+status: ready_for_user_browser_test
 goal: 食材管理をCanvas画像11/12に近い、在庫一覧と買い物リスト中心の画面へ整理する
 acceptance:
   - 初期表示はCanvas画像12のように保存場所タブ、並び替え、選択、在庫カードが主役になる
@@ -45,3 +45,9 @@ owner_notes:
 
 食材管理の最終見た目調整チケット。現在は機能フォームが前面に出すぎており、Canvasの「一覧を見て操作する」画面とは印象が違う。
 
+# Implementation Notes
+
+- 初期表示を在庫一覧中心に変更した。
+- `+` から登録待ち・手動追加・写真解析をモーダルで開くようにした。
+- 買い物リスト表示時は買い物リスト画面に集中するようにした。
+- ブラウザ実確認はユーザー指示待ち。

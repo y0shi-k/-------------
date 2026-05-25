@@ -1,7 +1,7 @@
 ---
 id: TKT-0136-recipe-schedule-canvas-final-layout-pass
 title: 献立・レシピCanvas最終レイアウト寄せ
-status: ready
+status: ready_for_user_browser_test
 goal: 献立・レシピをCanvas画像7/8/9のレシピ集と週間スケジュールに近い画面へ整理する
 acceptance:
   - レシピ集はCanvas画像7のように検索、条件チップ、並び替え、レシピカード一覧が主役になる
@@ -45,3 +45,9 @@ owner_notes:
 
 献立・レシピの最終見た目調整チケット。現在はフォーム中心で、Canvasのレシピカード一覧と週間スケジュール中心の体験からずれている。
 
+# Implementation Notes
+
+- `+ 新規レシピ` と編集をレシピ編集モーダルへ移した。
+- レシピ集の通常画面は検索・並び替え・一覧中心にした。
+- スケジュールタブで7日分の朝昼晩枠が空でも見えるようにした。
+- ブラウザ実確認はユーザー指示待ち。

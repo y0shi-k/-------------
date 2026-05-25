@@ -1,7 +1,7 @@
 ---
 id: TKT-0134-web-canvas-frame-visual-regression-cleanup
 title: Web版Canvasフレーム表示崩れ修正
-status: ready
+status: ready_for_user_browser_test
 goal: ブラウザ実確認で見つかった共通フレームのCanvas差分を先に解消し、各画面の再現確認をしやすくする
 acceptance:
   - 各モードで大見出しと英字ラベルが二重表示されない
@@ -45,3 +45,8 @@ owner_notes:
 
 Canvas再現の土台を整えるチケット。現在はモード見出しが二重に出ており、さらに開発進捗カードが通常画面へ露出しているため、Canvas画像との比較がしにくい。
 
+# Implementation Notes
+
+- `SetupStatus` をログイン後の通常画面から外した。
+- 各モード内の重複見出しは視覚表示から外し、Shell側の見出しだけを見せる形にした。
+- ブラウザ実確認はユーザー指示待ち。

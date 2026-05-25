@@ -1,0 +1,17 @@
+{
+  "ticket": "TKT-0134-web-canvas-frame-visual-regression-cleanup",
+  "status": "passed",
+  "commands": [
+    "node node_modules/eslint/bin/eslint.js .",
+    "node node_modules/typescript/bin/tsc --noEmit",
+    "node node_modules/vitest/vitest.mjs run --reporter=dot",
+    "node node_modules/next/dist/bin/next build"
+  ],
+  "result": {
+    "lint": "passed",
+    "typecheck": "passed",
+    "tests": "57 passed",
+    "build": "passed"
+  },
+  "browser_visual_smoke": "skipped_by_user_request"
+}

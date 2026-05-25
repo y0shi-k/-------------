@@ -59,6 +59,10 @@ function renderBoard(props?: Partial<React.ComponentProps<typeof InventoryBoard>
   );
 }
 
+function openIngredientModal() {
+  fireEvent.click(screen.getByRole("button", { name: "食材を追加" }));
+}
+
 describe("InventoryBoard", () => {
   beforeEach(() => {
     from.mockReset();
@@ -78,11 +82,12 @@ describe("InventoryBoard", () => {
     });
 
     expect(screen.getByRole("heading", { name: "在庫と登録待ち" })).toBeTruthy();
-    expect(screen.getByText("牛乳")).toBeTruthy();
     expect(screen.getByText("卵")).toBeTruthy();
+    expect(screen.getByLabelText("在庫の保存場所")).toBeTruthy();
+    openIngredientModal();
+    expect(screen.getByText("牛乳")).toBeTruthy();
     expect(screen.getByRole("button", { name: "在庫へ確定" })).toBeTruthy();
     expect(screen.getByLabelText("写真を撮る")).toBeTruthy();
-    expect(screen.getByLabelText("在庫の保存場所")).toBeTruthy();
     expect(screen.getByRole("heading", { name: "保存場所を管理" })).toBeTruthy();
   });
 
@@ -94,6 +99,7 @@ describe("InventoryBoard", () => {
     from.mockReturnValue({ insert });
 
     renderBoard();
+    openIngredientModal();
 
     fireEvent.change(screen.getByLabelText("追加する保存場所"), { target: { value: "野菜室" } });
     fireEvent.click(screen.getByRole("button", { name: "追加" }));
@@ -103,11 +109,12 @@ describe("InventoryBoard", () => {
       expect(insert).toHaveBeenCalledWith({ user_id: "user-1", name: "野菜室", sort_order: 0 });
     });
     expect(await screen.findByText("野菜室 を保存場所に追加しました。")).toBeTruthy();
-    expect(screen.getByRole("option", { name: "野菜室" })).toBeTruthy();
+    expect(screen.getByText("野菜室")).toBeTruthy();
   });
 
   it("prevents deleting a storage location while it is used", () => {
     renderBoard({ initialInventoryItems: [baseItem], initialStorageLocations: [baseLocation] });
+    openIngredientModal();
 
     const deleteButtons = screen.getAllByRole("button", { name: "削除" }) as HTMLButtonElement[];
     expect(deleteButtons.some((button) => button.disabled)).toBe(true);
@@ -123,6 +130,7 @@ describe("InventoryBoard", () => {
     from.mockReturnValue({ insert });
 
     renderBoard();
+    openIngredientModal();
 
     fireEvent.change(screen.getByLabelText("品名"), { target: { value: "豆腐" } });
     fireEvent.change(screen.getByLabelText("数量"), { target: { value: "2" } });
@@ -152,6 +160,7 @@ describe("InventoryBoard", () => {
 
   it("rejects incomplete unit conversion settings", async () => {
     renderBoard();
+    openIngredientModal();
 
     fireEvent.change(screen.getByLabelText("品名"), { target: { value: "ひき肉" } });
     fireEvent.change(screen.getByLabelText("換算元数量"), { target: { value: "1" } });
@@ -177,6 +186,7 @@ describe("InventoryBoard", () => {
     });
 
     renderBoard({ initialStagingItems: [baseItem] });
+    openIngredientModal();
 
     fireEvent.click(screen.getByRole("button", { name: "在庫へ確定" }));
 
@@ -244,6 +254,7 @@ describe("InventoryBoard", () => {
         { ...baseItem, id: "item-2", name: "チーズ" }
       ]
     });
+    openIngredientModal();
 
     fireEvent.click(screen.getByRole("button", { name: "すべて選択" }));
     fireEvent.click(screen.getByRole("button", { name: "選択削除" }));
@@ -261,6 +272,7 @@ describe("InventoryBoard", () => {
 
   it("previews a selected photo and allows replacing it", () => {
     renderBoard();
+    openIngredientModal();
 
     fireEvent.change(screen.getByLabelText("写真を撮る"), {
       target: {
@@ -304,6 +316,7 @@ describe("InventoryBoard", () => {
     } as Response);
 
     renderBoard();
+    openIngredientModal();
 
     fireEvent.change(screen.getByLabelText("写真を撮る"), {
       target: {
@@ -355,6 +368,7 @@ describe("InventoryBoard", () => {
     });
 
     renderBoard();
+    openIngredientModal();
 
     fireEvent.change(screen.getByLabelText("写真を撮る"), {
       target: {
@@ -394,6 +408,7 @@ describe("InventoryBoard", () => {
     } as Response);
 
     renderBoard();
+    openIngredientModal();
 
     fireEvent.change(screen.getByLabelText("写真を撮る"), {
       target: {
