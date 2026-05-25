@@ -83,7 +83,7 @@ describe("InventoryBoard", () => {
 
     expect(screen.getByRole("heading", { name: "在庫と登録待ち" })).toBeTruthy();
     expect(screen.getByText("卵")).toBeTruthy();
-    expect(screen.getByLabelText("在庫の保存場所")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "期限順 ▲" })).toBeTruthy();
     openIngredientModal();
     expect(screen.getByText("牛乳")).toBeTruthy();
     expect(screen.getByRole("button", { name: "在庫へ確定" })).toBeTruthy();
@@ -155,7 +155,7 @@ describe("InventoryBoard", () => {
     });
     expect(await screen.findByText("登録待ちに追加しました。")).toBeTruthy();
     expect(screen.getByText("豆腐")).toBeTruthy();
-    expect(screen.getByText("換算: 1丁 = 300g")).toBeTruthy();
+    expect(screen.getByText("1丁 = 300g")).toBeTruthy();
   });
 
   it("rejects incomplete unit conversion settings", async () => {
@@ -202,7 +202,7 @@ describe("InventoryBoard", () => {
     expect(await screen.findByText("牛乳 を在庫へ確定しました。")).toBeTruthy();
   });
 
-  it("filters inventory by location and category", () => {
+  it("filters inventory by location tab", () => {
     renderBoard({
       initialInventoryItems: [
         { ...baseItem, id: "inventory-1", name: "卵", unit: "個", quantity: 6, storage_location: "冷蔵庫", category: "食材" },
@@ -210,20 +210,15 @@ describe("InventoryBoard", () => {
       ]
     });
 
-    fireEvent.change(screen.getByLabelText("在庫の保存場所"), { target: { value: "常温棚" } });
+    fireEvent.click(screen.getByRole("button", { name: "常温棚 1" }));
 
     expect(screen.getByText("醤油")).toBeTruthy();
     expect(screen.queryByText("卵")).toBeNull();
-
-    fireEvent.change(screen.getByLabelText("在庫の種別"), { target: { value: "食材" } });
-
-    expect(screen.queryByText("醤油")).toBeNull();
-    expect(screen.getByText("在庫はありません。登録待ちから確定するとここに表示されます。")).toBeTruthy();
   });
 
-  it("marks an inventory item as used up", async () => {
-    const usedUpItem = { ...baseItem, quantity: 0, status_note: "朝食用 / 使い切り" };
-    const single = vi.fn().mockResolvedValue({ data: usedUpItem, error: null });
+  it("decreases inventory quantity from the Canvas-style quantity controls", async () => {
+    const updatedItem = { ...baseItem, quantity: 0 };
+    const single = vi.fn().mockResolvedValue({ data: updatedItem, error: null });
     const select = vi.fn(() => ({ single }));
     const eqUser = vi.fn(() => ({ select }));
     const eqId = vi.fn(() => ({ eq: eqUser }));
@@ -232,14 +227,15 @@ describe("InventoryBoard", () => {
 
     renderBoard({ initialInventoryItems: [baseItem] });
 
-    fireEvent.click(screen.getByRole("button", { name: "使い切り" }));
+    fireEvent.click(screen.getByRole("button", { name: "-" }));
 
     await waitFor(() => {
       expect(from).toHaveBeenCalledWith("inventory_items");
-      expect(update).toHaveBeenCalledWith({ quantity: 0, status_note: "朝食用 / 使い切り" });
+      expect(update).toHaveBeenCalledWith({ quantity: 0 });
     });
-    expect(await screen.findByText("牛乳 を使い切りにしました。")).toBeTruthy();
-    expect(screen.getByText("0本 / 冷蔵庫")).toBeTruthy();
+    await waitFor(() => {
+      expect(screen.getByLabelText("牛乳の数量").textContent).toContain("0本");
+    });
   });
 
   it("bulk deletes selected staging items", async () => {

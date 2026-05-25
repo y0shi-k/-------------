@@ -45,7 +45,7 @@ type InventoryFilters = {
   category: "all" | StockItem["category"];
   storageLocation: string;
   expiry: "all" | "has_expiry" | "no_expiry";
-  sort: "created_desc" | "expiry_asc" | "name_asc";
+  sort: "expiry_asc" | "name_asc" | "created_desc";
 };
 
 type InventoryView = "inventory" | "shopping" | "staging";
@@ -116,8 +116,23 @@ function formatDate(value: string | null) {
   return value;
 }
 
-function itemSubtitle(item: StockItem) {
-  return `${item.quantity}${item.unit} / ${item.storage_location}`;
+function compactDate(value: string | null) {
+  if (!value) return "";
+  const [, month, day] = value.split("-");
+  if (!month || !day) return value;
+  return `${Number(month)}/${Number(day)}`;
+}
+
+function expiryBadge(item: StockItem) {
+  const date = item.effective_expires_on ?? item.display_expires_on;
+  if (!date) return null;
+  const target = new Date(`${date}T00:00:00`);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const diff = Math.ceil((target.getTime() - today.getTime()) / 86400000);
+  const label = diff <= 0 ? `${compactDate(date)} 期限切` : diff <= 3 ? `あと${diff}日 ${compactDate(date)}` : compactDate(date);
+  const tone = diff <= 0 ? "expired" : diff <= 3 ? "soon" : "normal";
+  return { label, tone };
 }
 
 function unitConversionLabel(item: StockItem) {
@@ -179,7 +194,7 @@ export function InventoryBoard({
     category: "all",
     storageLocation: "all",
     expiry: "all",
-    sort: "created_desc"
+    sort: "expiry_asc"
   });
   const [selectedStagingIds, setSelectedStagingIds] = useState<string[]>([]);
   const [selectedInventoryIds, setSelectedInventoryIds] = useState<string[]>([]);
@@ -546,13 +561,14 @@ export function InventoryBoard({
     setFeedback({ tone: "success", message: `${item.name} を在庫へ確定しました。` });
   }
 
-  async function useUpItem(item: StockItem) {
+  async function adjustInventoryQuantity(item: StockItem, delta: number) {
+    const nextQuantity = Math.max(0, Number((item.quantity + delta).toFixed(2)));
     setIsSaving(true);
     setFeedback(null);
 
     const { data, error } = await supabase
       .from("inventory_items")
-      .update({ quantity: 0, status_note: item.status_note ? `${item.status_note} / 使い切り` : "使い切り" })
+      .update({ quantity: nextQuantity })
       .eq("id", item.id)
       .eq("user_id", userId)
       .select()
@@ -561,12 +577,11 @@ export function InventoryBoard({
     setIsSaving(false);
 
     if (error || !data) {
-      setFeedback({ tone: "error", message: "使い切りに更新できませんでした。ログイン状態を確認してください。" });
+      setFeedback({ tone: "error", message: "数量を更新できませんでした。ログイン状態を確認してください。" });
       return;
     }
 
     setInventoryItems((items) => items.map((current) => (current.id === item.id ? (data as StockItem) : current)));
-    setFeedback({ tone: "success", message: `${item.name} を使い切りにしました。` });
   }
 
   async function deleteItem(list: "staging" | "inventory", item: StockItem) {
@@ -617,22 +632,24 @@ export function InventoryBoard({
 
   return (
     <section className="inventory-workspace" aria-labelledby="inventory-heading">
-      <div className="section-heading sr-only">
-        <p className="eyebrow">{activeView === "shopping" ? "SHOPPING" : activeView === "staging" ? "REGISTRATION" : "ALL STORAGE"}</p>
-        <h2 id="inventory-heading">食材管理</h2>
-        <h2 className="sr-only">在庫と登録待ち</h2>
-      </div>
+      <div className="inventory-canvas-header">
+        <div>
+          <h2 id="inventory-heading">食材管理</h2>
+          <p className="eyebrow">{activeView === "shopping" ? "SHOPPING LIST" : activeView === "staging" ? "REGISTRATION HUB" : "ALL STORAGE"}</p>
+          <h2 className="sr-only">在庫と登録待ち</h2>
+        </div>
 
-      <div className="canvas-mode-control" aria-label="食材管理の表示切替">
-        <button className="secondary-button compact-button" data-active={activeView === "inventory"} type="button" onClick={() => setActiveView("inventory")}>
-          食材管理
-        </button>
-        <button className="secondary-button compact-button" data-active={activeView === "shopping"} type="button" onClick={() => setActiveView("shopping")}>
-          買い物リスト
-        </button>
-        <button className="primary-button compact-button icon-action" type="button" onClick={openManualAdd} aria-label="食材を追加">
-          +
-        </button>
+        <div className="canvas-mode-control" aria-label="食材管理の表示切替">
+          <button className="secondary-button compact-button" data-active={activeView === "inventory"} type="button" onClick={() => setActiveView("inventory")}>
+            食材管理
+          </button>
+          <button className="secondary-button compact-button" data-active={activeView === "shopping"} type="button" onClick={() => setActiveView("shopping")}>
+            買い物リスト
+          </button>
+          <button className="primary-button compact-button icon-action" type="button" onClick={openManualAdd} aria-label="食材を追加">
+            +
+          </button>
+        </div>
       </div>
 
       {feedback ? (
@@ -914,15 +931,7 @@ export function InventoryBoard({
         ) : null}
 
         {activeView === "inventory" ? (
-        <section className="stock-panel canvas-panel-wide" aria-labelledby="inventory-list-heading">
-          <div className="panel-title">
-            <div>
-              <span>在庫</span>
-              <h3 id="inventory-list-heading">いま使える食材</h3>
-            </div>
-            <strong>{inventoryItems.length}件</strong>
-          </div>
-
+        <section className="canvas-inventory-list" aria-labelledby="inventory-list-heading">
           <div className="location-tab-row" aria-label="保存場所タブ">
             <button className="location-tab" data-active={inventoryFilters.storageLocation === "all"} type="button" onClick={() => updateInventoryFilter("storageLocation", "all")}>
               すべて <span>{inventoryItems.length}</span>
@@ -943,54 +952,17 @@ export function InventoryBoard({
             ))}
           </div>
 
-          <div className="list-controls compact-list-controls" aria-label="在庫の絞り込み">
-            <label>
-              在庫の保存場所
-              <select
-                value={inventoryFilters.storageLocation}
-                onChange={(event) => updateInventoryFilter("storageLocation", event.target.value)}
-              >
-                <option value="all">すべて</option>
-                {storageLocationOptions.map((location) => (
-                  <option key={location} value={location}>
-                    {location}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              在庫の種別
-              <select
-                value={inventoryFilters.category}
-                onChange={(event) => updateInventoryFilter("category", event.target.value as InventoryFilters["category"])}
-              >
-                <option value="all">すべて</option>
-                <option value="食材">食材</option>
-                <option value="調味料">調味料</option>
-              </select>
-            </label>
-            <label>
-              在庫の期限
-              <select
-                value={inventoryFilters.expiry}
-                onChange={(event) => updateInventoryFilter("expiry", event.target.value as InventoryFilters["expiry"])}
-              >
-                <option value="all">すべて</option>
-                <option value="has_expiry">期限あり</option>
-                <option value="no_expiry">期限なし</option>
-              </select>
-            </label>
-            <label>
-              在庫の並び順
-              <select
-                value={inventoryFilters.sort}
-                onChange={(event) => updateInventoryFilter("sort", event.target.value as InventoryFilters["sort"])}
-              >
-                <option value="created_desc">登録が新しい順</option>
-                <option value="expiry_asc">期限が近い順</option>
-                <option value="name_asc">名前順</option>
-              </select>
-            </label>
+          <div className="canvas-sort-row" aria-label="在庫の並び替え">
+            <span>並び</span>
+            <button data-active={inventoryFilters.sort === "expiry_asc"} type="button" onClick={() => updateInventoryFilter("sort", "expiry_asc")}>
+              期限順 ▲
+            </button>
+            <button data-active={inventoryFilters.sort === "name_asc"} type="button" onClick={() => updateInventoryFilter("sort", "name_asc")}>
+              名前順
+            </button>
+            <button data-active={inventoryFilters.sort === "created_desc"} type="button" onClick={() => updateInventoryFilter("sort", "created_desc")}>
+              購入日順
+            </button>
           </div>
 
           <ItemList
@@ -999,8 +971,8 @@ export function InventoryBoard({
             list="inventory"
             onDelete={(list, item) => requestDelete(item.name, "この在庫を削除します。元には戻せません。", () => deleteItem(list, item))}
             onEdit={startEdit}
+            onQuantityChange={adjustInventoryQuantity}
             onSelect={toggleSelected}
-            onUseUp={useUpItem}
             selectedIds={selectedInventoryIds}
             toolbar={
               <ListToolbar
@@ -1028,13 +1000,13 @@ type ItemListProps = {
   onConfirm?: (item: StockItem) => void;
   onDelete: (list: "staging" | "inventory", item: StockItem) => void;
   onEdit: (list: "staging" | "inventory", item: StockItem) => void;
+  onQuantityChange?: (item: StockItem, delta: number) => void;
   onSelect: (list: "staging" | "inventory", itemId: string) => void;
-  onUseUp?: (item: StockItem) => void;
   selectedIds: string[];
   toolbar: ReactNode;
 };
 
-function ItemList({ disabled, emptyText, items, list, onConfirm, onDelete, onEdit, onSelect, onUseUp, selectedIds, toolbar }: ItemListProps) {
+function ItemList({ disabled, emptyText, items, list, onConfirm, onDelete, onEdit, onQuantityChange, onSelect, selectedIds, toolbar }: ItemListProps) {
   if (items.length === 0) {
     return <p className="empty-list">{emptyText}</p>;
   }
@@ -1054,38 +1026,55 @@ function ItemList({ disabled, emptyText, items, list, onConfirm, onDelete, onEdi
             選択
           </label>
           <div className="item-main">
-            <span>{item.category}</span>
-            <h4>{item.name}</h4>
-            <p>{itemSubtitle(item)}</p>
-            {item.unit_conversion ? <p className="conversion-note">換算: {unitConversionLabel(item)}</p> : null}
+            <div className="item-title-row">
+              <h4>{item.name}</h4>
+              {expiryBadge(item) ? <span className="expiry-chip" data-tone={expiryBadge(item)?.tone}>{expiryBadge(item)?.label}</span> : null}
+              {item.unit_conversion ? <span className="conversion-chip">{unitConversionLabel(item)}</span> : null}
+            </div>
+            <p>{item.storage_location} · 購入 {compactDate(item.created_at.slice(0, 10)) || "-"}</p>
           </div>
-          <dl className="item-meta">
-            <div>
-              <dt>表示期限</dt>
-              <dd>{formatDate(item.display_expires_on)}</dd>
-            </div>
-            <div>
-              <dt>実質期限</dt>
-              <dd>{formatDate(item.effective_expires_on)}</dd>
-            </div>
-          </dl>
+          {list === "staging" ? (
+            <dl className="item-meta">
+              <div>
+                <dt>表示期限</dt>
+                <dd>{formatDate(item.display_expires_on)}</dd>
+              </div>
+              <div>
+                <dt>実質期限</dt>
+                <dd>{formatDate(item.effective_expires_on)}</dd>
+              </div>
+            </dl>
+          ) : null}
           {item.status_note ? <p className="item-note">{item.status_note}</p> : null}
+          {list === "inventory" && onQuantityChange ? (
+            <div className="quantity-stepper" aria-label={`${item.name}の数量`}>
+              <button type="button" disabled={disabled || item.quantity <= 0} onClick={() => onQuantityChange(item, item.unit === "g" || item.unit === "ml" ? -50 : -1)}>
+                -
+              </button>
+              <span>
+                {item.quantity}
+                <small>{item.unit}</small>
+              </span>
+              <button type="button" disabled={disabled} onClick={() => onQuantityChange(item, item.unit === "g" || item.unit === "ml" ? 50 : 1)}>
+                +
+              </button>
+            </div>
+          ) : null}
           <div className="item-actions">
             {list === "staging" && onConfirm ? (
               <button className="primary-button" type="button" disabled={disabled} onClick={() => onConfirm(item)}>
                 在庫へ確定
               </button>
             ) : null}
-            <button className="secondary-button" type="button" disabled={disabled} onClick={() => onEdit(list, item)}>
-              編集
+            <button className="secondary-button icon-button" type="button" disabled={disabled} onClick={() => onEdit(list, item)} aria-label={`${item.name}を編集`}>
+              <svg aria-hidden="true" viewBox="0 0 24 24">
+                <path d="m16.9 4.1 3 3L8 19H5v-3L16.9 4.1Z" />
+              </svg>
             </button>
-            {list === "inventory" && onUseUp ? (
-              <button className="secondary-button" type="button" disabled={disabled || item.quantity === 0} onClick={() => onUseUp(item)}>
-                使い切り
-              </button>
-            ) : null}
-            <button className="danger-button" type="button" disabled={disabled} onClick={() => onDelete(list, item)}>
-              削除
+            <button className="danger-button icon-button" type="button" disabled={disabled} onClick={() => onDelete(list, item)} aria-label={`${item.name}を削除`}>
+              <svg aria-hidden="true" viewBox="0 0 24 24">
+                <path d="M3 6h18M8 6V4h8v2m-9 0 1 14h8l1-14M10 10v6M14 10v6" />
+              </svg>
             </button>
           </div>
         </article>
@@ -1107,7 +1096,15 @@ type ListToolbarProps = {
 function ListToolbar({ disabled, itemIds, onClear, onDeleteSelected, onSelectAll, selectedCount, showDelete = false }: ListToolbarProps) {
   return (
     <div className="bulk-toolbar" aria-label="一括操作">
-      <span>{selectedCount}件選択中</span>
+      <label className="select-row">
+        <input
+          checked={itemIds.length > 0 && selectedCount === itemIds.length}
+          disabled={disabled || itemIds.length === 0}
+          onChange={(event) => (event.currentTarget.checked ? onSelectAll(itemIds) : onClear())}
+          type="checkbox"
+        />
+        すべて選択
+      </label>
       <button className="secondary-button compact-button" type="button" disabled={disabled || itemIds.length === 0} onClick={() => onSelectAll(itemIds)}>
         すべて選択
       </button>

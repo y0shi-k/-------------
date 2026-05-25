@@ -81,12 +81,18 @@ export function WebModeShell({
       <p className="sr-only">{active.status}</p>
 
       <section className="mode-panel" aria-labelledby={`mode-title-${active.id}`}>
-        <div className="mode-heading">
-          <div>
-            <p className="eyebrow">{active.eyebrow}</p>
-            <h2 id={`mode-title-${active.id}`}>{active.label}</h2>
+        {active.id === "ingredients" ? (
+          <h2 className="sr-only" id={`mode-title-${active.id}`}>
+            {active.label}
+          </h2>
+        ) : (
+          <div className="mode-heading">
+            <div>
+              <p className="eyebrow">{active.eyebrow}</p>
+              <h2 id={`mode-title-${active.id}`}>{active.label}</h2>
+            </div>
           </div>
-        </div>
+        )}
         {activeChildren}
       </section>
 

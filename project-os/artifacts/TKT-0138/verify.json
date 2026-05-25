@@ -1,0 +1,31 @@
+{
+  "ticket": "TKT-0138-web-responsive-desktop-shell",
+  "status": "passed_with_browser_smoke_blocked",
+  "commands": [
+    {
+      "name": "lint",
+      "command": "node node_modules/eslint/bin/eslint.js .",
+      "status": "passed"
+    },
+    {
+      "name": "typecheck",
+      "command": "node node_modules/typescript/bin/tsc --noEmit",
+      "status": "passed"
+    },
+    {
+      "name": "test",
+      "command": "node node_modules/vitest/vitest.mjs run",
+      "status": "passed",
+      "summary": "11 files, 57 tests passed"
+    },
+    {
+      "name": "build",
+      "command": "node node_modules/next/dist/bin/next build",
+      "status": "passed"
+    }
+  ],
+  "browser_smoke": {
+    "status": "blocked",
+    "reason": "Browser security policy blocked Codex-side interaction with http://localhost:3001 after the latest correction."
+  }
+}
