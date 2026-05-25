@@ -116,12 +116,6 @@ export default async function Home() {
 
   return (
     <main className="app-shell">
-      <TodayDashboard
-        cookCandidates={(cookCandidates ?? []) as CookCandidate[]}
-        inventoryItems={(inventoryItems ?? []) as StockItem[]}
-        mealSchedules={(mealSchedules ?? []) as MealSchedule[]}
-        shoppingItems={(shoppingItems ?? []) as ShoppingItem[]}
-      />
       <WebModeShell
         childrenByMode={{
           ingredients: (
@@ -145,11 +139,18 @@ export default async function Home() {
             />
           ),
           cooking: (
-            <CookingHistoryBoard
-              initialHistory={cookingHistoryWithPhotos as CookingHistoryItem[]}
-              key="cooking"
-              userId={user.id}
-            />
+            <div className="cooking-record-stack" key="cooking">
+              <TodayDashboard
+                cookCandidates={(cookCandidates ?? []) as CookCandidate[]}
+                inventoryItems={(inventoryItems ?? []) as StockItem[]}
+                mealSchedules={(mealSchedules ?? []) as MealSchedule[]}
+                shoppingItems={(shoppingItems ?? []) as ShoppingItem[]}
+              />
+              <CookingHistoryBoard
+                initialHistory={cookingHistoryWithPhotos as CookingHistoryItem[]}
+                userId={user.id}
+              />
+            </div>
           )
         }}
         historyCount={cookingHistoryWithPhotos.length}

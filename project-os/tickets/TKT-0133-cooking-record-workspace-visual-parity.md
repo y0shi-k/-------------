@@ -1,7 +1,7 @@
 ---
 id: TKT-0133-cooking-record-workspace-visual-parity
 title: 料理・記録画面Canvas表示寄せ
-status: ready_for_spec_review
+status: completed
 goal: Web版の料理・記録モードをCanvas版と同じ今日/調理/履歴の流れで使える画面へ近づける
 acceptance:
   - `料理・記録` から今日の確認、調理開始、料理履歴へ進みやすい

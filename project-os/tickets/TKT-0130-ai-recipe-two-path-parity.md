@@ -1,7 +1,7 @@
 ---
 id: TKT-0130-ai-recipe-two-path-parity
 title: AI考案2択導線Canvas同等化
-status: ready_for_spec_review
+status: completed
 goal: Web版のAI考案をCanvas版と同じ優先消費/指定食材の2択入口へ戻す
 acceptance:
   - レシピ集上部の `AI考案` から2択導線へ進める

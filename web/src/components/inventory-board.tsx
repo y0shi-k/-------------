@@ -48,6 +48,8 @@ type InventoryFilters = {
   sort: "created_desc" | "expiry_asc" | "name_asc";
 };
 
+type InventoryView = "inventory" | "shopping" | "staging";
+
 type NormalizedForm =
   | { data: Omit<StockItem, "id" | "created_at" | "updated_at"> }
   | { error: string };
@@ -181,6 +183,7 @@ export function InventoryBoard({
   });
   const [selectedStagingIds, setSelectedStagingIds] = useState<string[]>([]);
   const [selectedInventoryIds, setSelectedInventoryIds] = useState<string[]>([]);
+  const [activeView, setActiveView] = useState<InventoryView>("inventory");
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const photoInputRef = useRef<HTMLInputElement | null>(null);
@@ -234,6 +237,11 @@ export function InventoryBoard({
   function resetForm() {
     setValues(emptyStockItemFormValues);
     setEditing(null);
+  }
+
+  function openManualAdd() {
+    resetForm();
+    setActiveView("staging");
   }
 
   function updateInventoryFilter<K extends keyof InventoryFilters>(key: K, value: InventoryFilters[K]) {
@@ -604,8 +612,21 @@ export function InventoryBoard({
   return (
     <section className="inventory-workspace" aria-labelledby="inventory-heading">
       <div className="section-heading">
-        <p className="eyebrow">Inventory</p>
-        <h2 id="inventory-heading">在庫と登録待ち</h2>
+        <p className="eyebrow">{activeView === "shopping" ? "SHOPPING" : activeView === "staging" ? "REGISTRATION" : "ALL STORAGE"}</p>
+        <h2 id="inventory-heading">食材管理</h2>
+        <h2 className="sr-only">在庫と登録待ち</h2>
+      </div>
+
+      <div className="canvas-mode-control" aria-label="食材管理の表示切替">
+        <button className="secondary-button compact-button" data-active={activeView === "inventory"} type="button" onClick={() => setActiveView("inventory")}>
+          食材管理
+        </button>
+        <button className="secondary-button compact-button" data-active={activeView === "shopping"} type="button" onClick={() => setActiveView("shopping")}>
+          買い物リスト
+        </button>
+        <button className="primary-button compact-button icon-action" type="button" onClick={openManualAdd} aria-label="食材を追加">
+          +
+        </button>
       </div>
 
       {feedback ? (
@@ -629,7 +650,7 @@ export function InventoryBoard({
       ) : null}
 
       <div className="inventory-grid">
-        <section className="stock-panel" aria-labelledby="staging-heading">
+        <section className="stock-panel canvas-panel-wide" aria-labelledby="staging-heading">
           <div className="panel-title">
             <div>
               <span>登録待ち</span>
@@ -858,7 +879,29 @@ export function InventoryBoard({
           />
         </section>
 
-        <section className="stock-panel" aria-labelledby="inventory-list-heading">
+        {activeView === "shopping" ? (
+        <section className="stock-panel canvas-panel-wide shopping-empty-panel" aria-labelledby="shopping-list-heading">
+          <div className="panel-title">
+            <div>
+              <span>SHOPPING</span>
+              <h3 id="shopping-list-heading">買い物リスト</h3>
+            </div>
+            <div className="segmented-control">
+              <button className="secondary-button compact-button" data-active type="button">出自別</button>
+              <button className="secondary-button compact-button" type="button">材料まとめ</button>
+            </div>
+          </div>
+          <div className="bulk-toolbar" aria-label="買い物リスト操作">
+            <span>0件選択中</span>
+            <button className="secondary-button compact-button" type="button" disabled>すべて選択</button>
+            <button className="secondary-button compact-button" type="button" disabled>購入済み</button>
+            <button className="danger-button compact-button" type="button" disabled>選択削除</button>
+          </div>
+          <p className="empty-list canvas-empty-large">買うものはありません。</p>
+        </section>
+        ) : null}
+
+        <section className="stock-panel canvas-panel-wide" aria-labelledby="inventory-list-heading">
           <div className="panel-title">
             <div>
               <span>在庫</span>
@@ -867,7 +910,27 @@ export function InventoryBoard({
             <strong>{inventoryItems.length}件</strong>
           </div>
 
-          <div className="list-controls" aria-label="在庫の絞り込み">
+          <div className="location-tab-row" aria-label="保存場所タブ">
+            <button className="location-tab" data-active={inventoryFilters.storageLocation === "all"} type="button" onClick={() => updateInventoryFilter("storageLocation", "all")}>
+              すべて <span>{inventoryItems.length}</span>
+            </button>
+            <button className="location-tab" data-active={inventoryFilters.expiry === "has_expiry"} type="button" onClick={() => updateInventoryFilter("expiry", inventoryFilters.expiry === "has_expiry" ? "all" : "has_expiry")}>
+              使い切り <span>{inventoryItems.filter((item) => item.quantity === 0).length}</span>
+            </button>
+            {storageLocationOptions.map((location) => (
+              <button
+                className="location-tab"
+                data-active={inventoryFilters.storageLocation === location}
+                key={location}
+                type="button"
+                onClick={() => updateInventoryFilter("storageLocation", location)}
+              >
+                {location} <span>{inventoryItems.filter((item) => item.storage_location === location).length}</span>
+              </button>
+            ))}
+          </div>
+
+          <div className="list-controls compact-list-controls" aria-label="在庫の絞り込み">
             <label>
               在庫の保存場所
               <select

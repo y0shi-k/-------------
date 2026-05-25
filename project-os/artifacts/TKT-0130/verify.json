@@ -1,0 +1,5 @@
+{
+  "status": "passed",
+  "covered_by": "TKT-0128 verification batch",
+  "notes": "AI two-path entrypoint compiles and existing AI route tests pass."
+}

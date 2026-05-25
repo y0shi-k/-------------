@@ -1,7 +1,7 @@
 ---
 id: TKT-0128-web-canvas-frame-recipe-actions
 title: Web版共通フレームとレシピ集3導線復元
-status: ready_for_implementation
+status: completed
 goal: Web版の確認土台をCanvas版に寄せ、レシピ集上部に新規レシピ/テキストから追加/AI考案の入口を戻す
 acceptance:
   - 主要画面がCanvas版に近い中央カラム幅で表示される

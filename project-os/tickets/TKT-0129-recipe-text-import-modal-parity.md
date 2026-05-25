@@ -1,7 +1,7 @@
 ---
 id: TKT-0129-recipe-text-import-modal-parity
 title: テキストから追加モーダルCanvas同等化
-status: ready_for_spec_review
+status: completed
 goal: Web版のレシピ本文構造化をCanvas版と同じ独立入口/独立モーダル導線へ戻す
 acceptance:
   - レシピ集上部の `テキストから追加` から専用モーダルが開く

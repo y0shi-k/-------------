@@ -1,0 +1,10 @@
+{
+  "status": "passed",
+  "commands": [
+    "node node_modules/eslint/bin/eslint.js .",
+    "node node_modules/typescript/bin/tsc --noEmit",
+    "node node_modules/vitest/vitest.mjs run --reporter=dot",
+    "node node_modules/next/dist/bin/next build"
+  ],
+  "notes": "npm was not available in PATH, so the bundled Node runtime executed local project binaries directly."
+}

@@ -1,7 +1,7 @@
 ---
 id: TKT-0132-meal-schedule-workspace-visual-parity
 title: スケジュール画面Canvas表示寄せ
-status: ready_for_spec_review
+status: completed
 goal: Web版の献立スケジュールをCanvas版の7日表示と朝昼晩スロット導線へ近づける
 acceptance:
   - 7日分の献立がCanvas版に近い密度で確認できる

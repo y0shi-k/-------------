@@ -1,0 +1,5 @@
+{
+  "status": "passed",
+  "covered_by": "TKT-0128 verification batch",
+  "notes": "Text import entrypoint and modal compile and tests pass."
+}

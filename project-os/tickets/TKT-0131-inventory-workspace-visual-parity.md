@@ -1,7 +1,7 @@
 ---
 id: TKT-0131-inventory-workspace-visual-parity
 title: 食材管理画面Canvas表示寄せ
-status: ready_for_spec_review
+status: completed
 goal: Web版の食材管理、買い物リスト、登録待ちをCanvas版と同じ場所で操作できる画面に近づける
 acceptance:
   - 保存場所タブ、使い切り、在庫カード操作が食材管理画面で見つけやすい

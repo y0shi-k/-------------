@@ -56,6 +56,7 @@ type ConsumptionDraft = {
 };
 
 type AiRecipeMode = "generate" | "structure";
+type RecipeWorkspaceView = "recipes" | "schedule";
 
 type RecipeSort = "created_desc" | "name_asc" | "ingredients_desc";
 type CookingIngredientTab = "食材" | "調味料";
@@ -249,6 +250,9 @@ export function RecipeMealWorkspace({
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isAiRunning, setIsAiRunning] = useState(false);
+  const [activeView, setActiveView] = useState<RecipeWorkspaceView>("recipes");
+  const [isTextImportOpen, setIsTextImportOpen] = useState(false);
+  const [isAiMenuOpen, setIsAiMenuOpen] = useState(false);
   const router = useRouter();
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
 
@@ -305,8 +309,12 @@ export function RecipeMealWorkspace({
     }));
   }
 
-  async function runAiRecipe() {
-    if (!aiRequired.trim() && !aiOptional.trim() && !aiSourceText.trim()) {
+  async function runAiRecipe(overrides?: Partial<{ mode: AiRecipeMode; required: string; optional: string; sourceText: string }>) {
+    const mode = overrides?.mode ?? aiMode;
+    const required = overrides?.required ?? aiRequired;
+    const optional = overrides?.optional ?? aiOptional;
+    const sourceText = overrides?.sourceText ?? aiSourceText;
+    if (!required.trim() && !optional.trim() && !sourceText.trim()) {
       setFeedback({
         tone: "error",
         message: "原因: AIに渡す食材や本文が空です。影響: レシピ案を作れません。修正方法: 必須食材、任意食材、またはレシピ本文を入力してください。"
@@ -324,10 +332,10 @@ export function RecipeMealWorkspace({
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          mode: aiMode,
-          required: aiRequired,
-          optional: aiOptional,
-          sourceText: aiSourceText
+          mode,
+          required,
+          optional,
+          sourceText
         })
       });
       const result = (await response.json().catch(() => ({}))) as { recipe?: RecipeFormValues; error?: string };
@@ -356,6 +364,8 @@ export function RecipeMealWorkspace({
     if (!aiPreview) return;
     setRecipeValues(aiPreview);
     setEditingRecipeId(null);
+    setIsTextImportOpen(false);
+    setIsAiMenuOpen(false);
     setFeedback({ tone: "info", message: "AIレシピ案を入力フォームへ反映しました。内容を確認して保存してください。" });
   }
 
@@ -365,6 +375,27 @@ export function RecipeMealWorkspace({
     setSelectedRecipeId(recipe.id);
     setPendingDeleteRecipeId(null);
     setFeedback({ tone: "info", message: `${recipe.name} を編集中です。` });
+  }
+
+  function openNewRecipeEditor() {
+    resetRecipeForm();
+    setActiveView("recipes");
+  }
+
+  async function structureRecipeText() {
+    setAiMode("structure");
+    await runAiRecipe({ mode: "structure", required: "", optional: "", sourceText: aiSourceText });
+  }
+
+  async function generatePriorityRecipe() {
+    const urgentItems = inventoryItemsForMeals
+      .filter((item) => item.effective_expires_on || item.display_expires_on)
+      .sort((a, b) => (a.effective_expires_on ?? a.display_expires_on ?? "").localeCompare(b.effective_expires_on ?? b.display_expires_on ?? ""))
+      .slice(0, 5)
+      .map((item) => `${item.name} ${item.quantity}${item.unit}`)
+      .join(", ");
+    setAiMode("generate");
+    await runAiRecipe({ mode: "generate", required: urgentItems, optional: aiOptional, sourceText: "期限が近い食材を優先して使い切るレシピ" });
   }
 
   function openCookingViewer(recipe: Recipe) {
@@ -1016,9 +1047,27 @@ export function RecipeMealWorkspace({
   return (
     <section className="recipe-meal-workspace" aria-labelledby="recipe-meal-heading">
       <div className="section-heading">
-        <p className="eyebrow">Recipes & Meals</p>
-        <h2 id="recipe-meal-heading">レシピ・献立・買い物</h2>
+        <p className="eyebrow">{activeView === "schedule" ? "MEAL SCHEDULE" : "RECIPE COLLECTION"}</p>
+        <h2 id="recipe-meal-heading">献立・レシピ</h2>
+        <h2 className="sr-only">レシピ・献立・買い物</h2>
       </div>
+
+      <div className="canvas-mode-control recipe-subnav" aria-label="献立とレシピの表示切替">
+        <button className="secondary-button compact-button" data-active={activeView === "recipes"} type="button" onClick={() => setActiveView("recipes")}>
+          レシピ集
+        </button>
+        <button className="secondary-button compact-button" data-active={activeView === "schedule"} type="button" onClick={() => setActiveView("schedule")}>
+          スケジュール
+        </button>
+      </div>
+
+      {activeView === "recipes" ? (
+        <div className="recipe-primary-actions" aria-label="レシピ追加">
+          <button className="primary-button" type="button" onClick={openNewRecipeEditor}>+ 新規レシピ</button>
+          <button className="secondary-button recipe-text-button" type="button" onClick={() => setIsTextImportOpen(true)}>テキストから追加</button>
+          <button className="secondary-button recipe-ai-button" type="button" onClick={() => setIsAiMenuOpen(true)}>AI考案</button>
+        </div>
+      ) : null}
 
       {feedback ? (
         <p className="operation-message" data-tone={feedback.tone} role={feedback.tone === "error" ? "alert" : "status"}>
@@ -1040,12 +1089,77 @@ export function RecipeMealWorkspace({
         />
       ) : null}
 
+      {isTextImportOpen ? (
+        <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="recipe-text-modal-heading">
+          <section className="canvas-modal text-import-modal">
+            <button className="modal-close-button" type="button" onClick={() => setIsTextImportOpen(false)} aria-label="閉じる">×</button>
+            <p className="eyebrow">ADD RECIPE FROM TEXT</p>
+            <h3 id="recipe-text-modal-heading">テキストからレシピを追加</h3>
+            <label>
+              レシピテキスト
+              <textarea rows={8} value={aiSourceText} onChange={(event) => setAiSourceText(event.target.value)} placeholder="Webやメモからコピーしたレシピテキストをここに貼り付けてください..." />
+            </label>
+            <button className="primary-button" type="button" disabled={isAiRunning} onClick={structureRecipeText}>
+              {isAiRunning ? "AIで構造化中" : "AIで構造化"}
+            </button>
+            {aiPreview ? (
+              <div className="ai-preview">
+                <span>構造化結果</span>
+                <strong>{aiPreview.name}</strong>
+                <p>{aiPreview.ingredients.map((item) => `${item.name}${item.amount}${item.unit}`).join(" / ")}</p>
+                <button className="secondary-button compact-button" type="button" onClick={applyAiPreview}>編集モーダルで確認</button>
+              </div>
+            ) : null}
+          </section>
+        </div>
+      ) : null}
+
+      {isAiMenuOpen ? (
+        <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="ai-menu-modal-heading">
+          <section className="canvas-modal ai-add-modal">
+            <button className="modal-close-button" type="button" onClick={() => setIsAiMenuOpen(false)} aria-label="閉じる">×</button>
+            <p className="eyebrow">ADD RECIPE WITH AI</p>
+            <h3 id="ai-menu-modal-heading">AI考案で追加</h3>
+            <div className="ai-choice-grid">
+              <button className="ai-choice-card danger-choice" type="button" disabled={isAiRunning} onClick={generatePriorityRecipe}>
+                <span>優先消費レシピ</span>
+                <small>期限が近い食材から考案</small>
+              </button>
+              <button className="ai-choice-card purple-choice" type="button" onClick={() => setAiMode("generate")}>
+                <span>指定食材から</span>
+                <small>使いたい食材を選んで考案</small>
+              </button>
+            </div>
+            <label>
+              必須食材
+              <textarea rows={2} value={aiRequired} onChange={(event) => setAiRequired(event.target.value)} placeholder="例: 豚肉, キャベツ" />
+            </label>
+            <label>
+              任意食材
+              <textarea rows={2} value={aiOptional} onChange={(event) => setAiOptional(event.target.value)} placeholder="例: にんじん, しょうが" />
+            </label>
+            <button className="primary-button" type="button" disabled={isAiRunning} onClick={() => runAiRecipe({ mode: "generate" })}>
+              {isAiRunning ? "考案中" : "指定食材で考案"}
+            </button>
+            {aiPreview ? (
+              <div className="ai-preview">
+                <span>AIレシピ案</span>
+                <strong>{aiPreview.name}</strong>
+                <p>{aiPreview.ingredients.map((item) => `${item.name}${item.amount}${item.unit}`).join(" / ")}</p>
+                <button className="secondary-button compact-button" type="button" onClick={applyAiPreview}>編集モーダルで確認</button>
+              </div>
+            ) : null}
+          </section>
+        </div>
+      ) : null}
+
       <div className="recipe-meal-grid">
-        <section className="stock-panel" aria-labelledby="recipe-form-heading">
+        {activeView === "recipes" ? (
+        <section className="stock-panel recipe-list-panel" aria-labelledby="recipe-form-heading">
           <div className="panel-title">
             <div>
-              <span>レシピ</span>
-              <h3 id="recipe-form-heading">{editingRecipeId ? "レシピを編集" : "レシピを追加"}</h3>
+              <span>レシピ集</span>
+              <h3 id="recipe-form-heading">{editingRecipeId ? "レシピを編集" : "レシピを探す"}</h3>
             </div>
             <strong>{recipes.length}件</strong>
           </div>
@@ -1142,7 +1256,7 @@ export function RecipeMealWorkspace({
             </div>
           </form>
 
-          <section className="ai-recipe-panel" aria-label="AIレシピ">
+          <section className="ai-recipe-panel inline-ai-panel" aria-label="AIレシピ">
             <div className="panel-title compact-title">
               <div>
                 <span>AI</span>
@@ -1169,7 +1283,7 @@ export function RecipeMealWorkspace({
               レシピ本文・補足
               <textarea rows={4} value={aiSourceText} onChange={(event) => setAiSourceText(event.target.value)} placeholder="貼り付けたレシピ本文や希望を書く" />
             </label>
-            <button className="primary-button" type="button" disabled={isAiRunning} onClick={runAiRecipe}>
+            <button className="primary-button" type="button" disabled={isAiRunning} onClick={() => runAiRecipe()}>
               {isAiRunning ? "AI実行中" : "AIレシピをプレビュー"}
             </button>
             {aiPreview ? (
@@ -1198,8 +1312,10 @@ export function RecipeMealWorkspace({
             onSortChange={setRecipeSort}
           />
         </section>
+        ) : null}
 
-        <section className="stock-panel" aria-labelledby="recipe-detail-heading">
+        {activeView === "recipes" ? (
+        <section className="stock-panel recipe-detail-panel" aria-labelledby="recipe-detail-heading">
           <div className="panel-title">
             <div>
               <span>詳細</span>
@@ -1310,8 +1426,9 @@ export function RecipeMealWorkspace({
             )}
           </section>
         </section>
+        ) : null}
 
-        <section className="stock-panel" aria-labelledby="meal-list-heading">
+        <section className="stock-panel schedule-board-panel" aria-labelledby="meal-list-heading">
           <div className="panel-title">
             <div>
               <span>献立</span>
