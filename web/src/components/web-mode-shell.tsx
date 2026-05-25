@@ -88,8 +88,8 @@ export function WebModeShell({
         ) : (
           <div className="mode-heading">
             <div>
-              <p className="eyebrow">{active.eyebrow}</p>
               <h2 id={`mode-title-${active.id}`}>{active.label}</h2>
+              <p className="eyebrow">{active.eyebrow}</p>
             </div>
           </div>
         )}

@@ -58,7 +58,9 @@ type ConsumptionDraft = {
 type AiRecipeMode = "generate" | "structure";
 type RecipeWorkspaceView = "recipes" | "schedule";
 
-type RecipeSort = "created_desc" | "name_asc" | "ingredients_desc";
+type RecipeSearchLogic = "and" | "or";
+type RecipeSearchMode = "name" | "ingredient" | "all";
+type RecipeSort = "created_desc" | "updated_desc" | "name_asc" | "count_desc" | "ingredients_desc";
 type CookingIngredientTab = "食材" | "調味料";
 type CookingStepTab = "prep" | "steps";
 
@@ -162,25 +164,32 @@ function shoppingSourceLabel(item: ShoppingItem) {
   return "手動追加";
 }
 
-function filterAndSortRecipes(recipes: Recipe[], query: string, sort: RecipeSort) {
+function formatRecipeDate(value: string) {
+  if (!value) return "-";
+  return value.slice(0, 10);
+}
+
+function filterAndSortRecipes(recipes: Recipe[], query: string, sort: RecipeSort, searchMode: RecipeSearchMode, searchLogic: RecipeSearchLogic) {
   const normalizedQuery = query.trim().toLowerCase();
   const filtered = normalizedQuery
     ? recipes.filter((recipe) => {
-        const haystack = [
-          recipe.name,
-          recipe.source,
-          ...recipe.genre,
-          ...recipe.ingredients.map((ingredient) => ingredient.name)
-        ]
-          .join(" ")
-          .toLowerCase();
-        return haystack.includes(normalizedQuery);
+        const keywords = normalizedQuery.split(/\s+/).filter(Boolean);
+        const nameHaystack = [recipe.name, recipe.source, ...recipe.genre].join(" ").toLowerCase();
+        const ingredientHaystack = recipe.ingredients.map((ingredient) => ingredient.name).join(" ").toLowerCase();
+        const matches = keywords.map((keyword) => {
+          if (searchMode === "name") return nameHaystack.includes(keyword);
+          if (searchMode === "ingredient") return ingredientHaystack.includes(keyword);
+          return nameHaystack.includes(keyword) || ingredientHaystack.includes(keyword);
+        });
+        return searchLogic === "and" ? matches.every(Boolean) : matches.some(Boolean);
       })
     : recipes;
 
   return [...filtered].sort((a, b) => {
     if (sort === "name_asc") return a.name.localeCompare(b.name, "ja");
+    if (sort === "count_desc") return b.cook_count - a.cook_count || a.name.localeCompare(b.name, "ja");
     if (sort === "ingredients_desc") return b.ingredients.length - a.ingredients.length || a.name.localeCompare(b.name, "ja");
+    if (sort === "updated_desc") return b.updated_at.localeCompare(a.updated_at) || a.name.localeCompare(b.name, "ja");
     return b.created_at.localeCompare(a.created_at);
   });
 }
@@ -215,6 +224,7 @@ export function RecipeMealWorkspace({
   initialShoppingItems,
   userId
 }: RecipeMealWorkspaceProps) {
+  const initialScheduleStart = initialMealSchedules[0]?.scheduled_on ?? todayValue();
   const [recipes, setRecipes] = useState(initialRecipes);
   const [cookCandidates, setCookCandidates] = useState(initialCookCandidates);
   const [inventoryItemsForMeals, setInventoryItemsForMeals] = useState(initialInventoryItems);
@@ -224,8 +234,8 @@ export function RecipeMealWorkspace({
   const [editingRecipeId, setEditingRecipeId] = useState<string | null>(null);
   const [selectedRecipeId, setSelectedRecipeId] = useState(initialRecipes[0]?.id ?? "");
   const [activeCookingRecipeId, setActiveCookingRecipeId] = useState("");
-  const [scheduleWindowStart, setScheduleWindowStart] = useState(todayValue);
-  const [scheduleDate, setScheduleDate] = useState(todayValue);
+  const [scheduleWindowStart, setScheduleWindowStart] = useState(initialScheduleStart);
+  const [scheduleDate, setScheduleDate] = useState(initialScheduleStart);
   const [scheduleMealType, setScheduleMealType] = useState<MealType>("晩");
   const [scheduleRecipeId, setScheduleRecipeId] = useState(initialRecipes[0]?.id ?? "");
   const [selectedScheduleId, setSelectedScheduleId] = useState(initialMealSchedules[0]?.id ?? "");
@@ -234,6 +244,8 @@ export function RecipeMealWorkspace({
   const [shoppingValues, setShoppingValues] = useState<ShoppingFormValues>({ name: "", required_quantity: "1", unit: "個" });
   const [candidateReasons, setCandidateReasons] = useState("");
   const [recipeSearch, setRecipeSearch] = useState("");
+  const [recipeSearchLogic, setRecipeSearchLogic] = useState<RecipeSearchLogic>("and");
+  const [recipeSearchMode, setRecipeSearchMode] = useState<RecipeSearchMode>("name");
   const [recipeSort, setRecipeSort] = useState<RecipeSort>("created_desc");
   const [pendingDeleteRecipeId, setPendingDeleteRecipeId] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
@@ -259,7 +271,7 @@ export function RecipeMealWorkspace({
 
   const selectedRecipe = recipes.find((recipe) => recipe.id === selectedRecipeId) ?? recipes[0] ?? null;
   const activeCookingRecipe = recipes.find((recipe) => recipe.id === activeCookingRecipeId) ?? null;
-  const visibleRecipes = filterAndSortRecipes(recipes, recipeSearch, recipeSort);
+  const visibleRecipes = filterAndSortRecipes(recipes, recipeSearch, recipeSort, recipeSearchMode, recipeSearchLogic);
   const selectedSchedule = mealSchedules.find((schedule) => schedule.id === selectedScheduleId) ?? mealSchedules[0] ?? null;
   const scheduleDays = Array.from({ length: 7 }, (_, index) => addDays(scheduleWindowStart, index));
   const visibleMealSchedules = mealSchedules
@@ -1264,16 +1276,8 @@ export function RecipeMealWorkspace({
 
       <div className="recipe-meal-grid">
         {activeView === "recipes" ? (
-        <section className="stock-panel recipe-list-panel" aria-labelledby="recipe-form-heading">
-          <div className="panel-title">
-            <div>
-              <span>レシピ集</span>
-              <h3 id="recipe-form-heading">レシピを探す</h3>
-            </div>
-            <strong>{recipes.length}件</strong>
-          </div>
-
-          <section className="ai-recipe-panel inline-ai-panel" aria-label="AIレシピ">
+        <section className="canvas-recipe-collection" aria-label="レシピ集">
+          <section className="ai-recipe-panel inline-ai-panel canvas-hidden-compat" aria-label="AIレシピ">
             <div className="panel-title compact-title">
               <div>
                 <span>AI</span>
@@ -1317,22 +1321,28 @@ export function RecipeMealWorkspace({
 
           <RecipeList
             disabled={isSaving}
+            onCook={openCookingViewer}
             onEdit={startEditRecipe}
             onDelete={(recipe) => requestDelete(recipe.name, "このレシピを削除します。献立に紐づくレシピ参照も外れます。", () => deleteRecipe(recipe))}
             onSelect={setSelectedRecipeId}
             pendingDeleteRecipeId={pendingDeleteRecipeId}
             recipes={visibleRecipes}
             search={recipeSearch}
+            searchLogic={recipeSearchLogic}
+            searchMode={recipeSearchMode}
             selectedRecipeId={selectedRecipe?.id ?? ""}
             sort={recipeSort}
             onSearchChange={setRecipeSearch}
+            onSearchLogicChange={setRecipeSearchLogic}
+            onSearchModeChange={setRecipeSearchMode}
             onSortChange={setRecipeSort}
+            totalCount={visibleRecipes.length}
           />
         </section>
         ) : null}
 
         {activeView === "recipes" && selectedRecipe ? (
-        <section className="stock-panel recipe-detail-panel" aria-labelledby="recipe-detail-heading">
+        <section className="stock-panel recipe-detail-panel canvas-hidden-compat" aria-labelledby="recipe-detail-heading">
           <div className="panel-title">
             <div>
               <span>詳細</span>
@@ -1892,38 +1902,91 @@ function ShoppingListSection({
 
 function RecipeList({
   disabled,
+  onCook,
   onDelete,
   onEdit,
   onSelect,
   onSearchChange,
+  onSearchLogicChange,
+  onSearchModeChange,
   onSortChange,
   pendingDeleteRecipeId,
   recipes,
   search,
+  searchLogic,
+  searchMode,
   selectedRecipeId,
-  sort
+  sort,
+  totalCount
 }: {
   disabled: boolean;
+  onCook: (recipe: Recipe) => void;
   onDelete: (recipe: Recipe) => void;
   onEdit: (recipe: Recipe) => void;
   onSelect: (id: string) => void;
   onSearchChange: (value: string) => void;
+  onSearchLogicChange: (value: RecipeSearchLogic) => void;
+  onSearchModeChange: (value: RecipeSearchMode) => void;
   onSortChange: (value: RecipeSort) => void;
   pendingDeleteRecipeId: string | null;
   recipes: Recipe[];
   search: string;
+  searchLogic: RecipeSearchLogic;
+  searchMode: RecipeSearchMode;
   selectedRecipeId: string;
   sort: RecipeSort;
+  totalCount: number;
 }) {
+  const searchTabs: Array<{ label: string; value: RecipeSearchMode }> = [
+    { label: "レシピ名", value: "name" },
+    { label: "食材", value: "ingredient" },
+    { label: "すべて", value: "all" }
+  ];
+  const sortTabs: Array<{ label: string; value: RecipeSort }> = [
+    { label: "登録日時", value: "created_desc" },
+    { label: "更新日時", value: "updated_desc" },
+    { label: "レシピ名", value: "name_asc" },
+    { label: "調理回数", value: "count_desc" },
+    { label: "材料数", value: "ingredients_desc" }
+  ];
+
   return (
     <section className="recipe-browser" aria-label="レシピ一覧">
-      <div className="recipe-list-controls">
-        <input aria-label="レシピ検索" value={search} onChange={(event) => onSearchChange(event.target.value)} placeholder="レシピ名・ジャンル・材料で検索" />
-        <select aria-label="レシピの並び順" value={sort} onChange={(event) => onSortChange(event.target.value as RecipeSort)}>
+      <div className="recipe-search-controls">
+        <div className="recipe-search-mode-tabs" aria-label="レシピ検索対象">
+          {searchTabs.map((tab) => (
+            <button data-active={searchMode === tab.value} key={tab.value} onClick={() => onSearchModeChange(tab.value)} type="button">
+              {tab.label}
+            </button>
+          ))}
+        </div>
+        <div className="recipe-search-logic" aria-label="検索条件">
+          <button data-active={searchLogic === "and"} onClick={() => onSearchLogicChange("and")} type="button">AND</button>
+          <button data-active={searchLogic === "or"} onClick={() => onSearchLogicChange("or")} type="button">OR</button>
+        </div>
+        <div className="recipe-search-field">
+          <input aria-label="レシピ検索" value={search} onChange={(event) => onSearchChange(event.target.value)} placeholder="検索..." />
+          {search ? <button aria-label="検索をクリア" onClick={() => onSearchChange("")} type="button">×</button> : null}
+        </div>
+        <select className="canvas-hidden-compat" aria-label="レシピの並び順" value={sort} onChange={(event) => onSortChange(event.target.value as RecipeSort)}>
           <option value="created_desc">登録が新しい順</option>
+          <option value="updated_desc">更新が新しい順</option>
           <option value="name_asc">名前順</option>
+          <option value="count_desc">調理回数が多い順</option>
           <option value="ingredients_desc">材料が多い順</option>
         </select>
+      </div>
+      <div className="recipe-sort-row">
+        <span>並び</span>
+        {sortTabs.map((tab) => (
+          <button data-active={sort === tab.value} key={tab.value} onClick={() => onSortChange(tab.value)} type="button">
+            {tab.label}{sort === tab.value ? "▼" : ""}
+          </button>
+        ))}
+      </div>
+      <div className="recipe-count-row">
+        <span>{totalCount} レシピ</span>
+        <small>同期は上部の同期ボタンで一括反映</small>
       </div>
 
       {recipes.length === 0 ? (
@@ -1931,18 +1994,30 @@ function RecipeList({
       ) : (
         <div className="recipe-list">
           {recipes.map((recipe) => (
-            <article className="recipe-card" data-active={selectedRecipeId === recipe.id} key={recipe.id}>
-              <button className="recipe-select-button" type="button" onClick={() => onSelect(recipe.id)}>
-                <span>{recipe.genre.join(", ") || "ジャンル未設定"}</span>
+            <article className="recipe-card" data-active={selectedRecipeId === recipe.id} key={recipe.id} onClick={() => onSelect(recipe.id)}>
+              <div className="recipe-card-icon" aria-hidden="true">III</div>
+              <button className="recipe-select-button" type="button" onClick={(event) => { event.stopPropagation(); onSelect(recipe.id); }}>
                 <strong>{recipe.name}</strong>
-                <small>{recipe.ingredients.length}材料</small>
+                <small>
+                  材料 {recipe.ingredients.length} 品目 | 調理回数 {recipe.cook_count} | 登録 {formatRecipeDate(recipe.created_at)}
+                  {recipe.genre.slice(0, 3).map((genre) => (
+                    <span className="recipe-genre-pill" key={genre}>#{genre}</span>
+                  ))}
+                </small>
               </button>
               <div className="recipe-card-actions">
-                <button className="secondary-button compact-button" type="button" disabled={disabled} onClick={() => onEdit(recipe)}>
-                  編集
+                <button className="recipe-icon-button cook-button" type="button" disabled={disabled} onClick={(event) => { event.stopPropagation(); onCook(recipe); }} aria-label="料理する">
+                  <span aria-hidden="true">III</span>
                 </button>
-                <button className="danger-button compact-button" type="button" disabled={disabled} onClick={() => onDelete(recipe)}>
-                  {pendingDeleteRecipeId === recipe.id ? "削除する" : "削除"}
+                <button className="recipe-icon-button" type="button" disabled={disabled} onClick={(event) => { event.stopPropagation(); onEdit(recipe); }} aria-label="編集">
+                  <svg aria-hidden="true" viewBox="0 0 24 24">
+                    <path d="m16.9 4.1 3 3L8 19H5v-3L16.9 4.1Z" />
+                  </svg>
+                </button>
+                <button className="recipe-icon-button" type="button" disabled={disabled} onClick={(event) => { event.stopPropagation(); onDelete(recipe); }} aria-label={pendingDeleteRecipeId === recipe.id ? "削除する" : "削除"}>
+                  <svg aria-hidden="true" viewBox="0 0 24 24">
+                    <path d="M3 6h18M8 6V4h8v2m-9 0 1 14h8l1-14M10 10v6M14 10v6" />
+                  </svg>
                 </button>
               </div>
             </article>

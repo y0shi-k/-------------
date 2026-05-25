@@ -1,0 +1,28 @@
+{
+  "ticket": "TKT-0139-recipe-collection-canvas-final-layout-pass",
+  "status": "passed",
+  "commands": [
+    {
+      "name": "lint",
+      "command": "node node_modules/eslint/bin/eslint.js .",
+      "result": "passed"
+    },
+    {
+      "name": "typecheck",
+      "command": "node node_modules/typescript/bin/tsc --noEmit",
+      "result": "passed"
+    },
+    {
+      "name": "test",
+      "command": "node node_modules/vitest/vitest.mjs run",
+      "result": "passed",
+      "summary": "57 tests passed"
+    },
+    {
+      "name": "build",
+      "command": "node node_modules/next/dist/bin/next build",
+      "result": "passed"
+    }
+  ],
+  "notes": "npm was not available on PATH, so the bundled Node executable was used to run project-local CLIs directly."
+}
