@@ -678,10 +678,16 @@ export function InventoryBoard({
           <button className="modal-close-button" type="button" onClick={closeStagingModal} aria-label="閉じる">×</button>
           <div className="panel-title">
             <div>
-              <span>登録待ち</span>
-              <h3 id="staging-heading">確認してから在庫へ</h3>
+              {editing ? (
+                <h3 id="staging-heading" style={{ margin: 0 }}>項目の編集</h3>
+              ) : (
+                <>
+                  <span>登録待ち</span>
+                  <h3 id="staging-heading">確認してから在庫へ</h3>
+                </>
+              )}
             </div>
-            <strong>{stagingItems.length}件</strong>
+            {editing ? null : <strong>{stagingItems.length}件</strong>}
           </div>
 
           <section className="location-manager" aria-labelledby="location-manager-heading">
@@ -727,33 +733,17 @@ export function InventoryBoard({
           </section>
 
           <form className="stock-form" onSubmit={saveStaging}>
-            <div className="form-row two-columns">
-              <label>
-                種別
-                <select value={values.category} onChange={(event) => updateValue("category", event.target.value as StockItemFormValues["category"])}>
-                  <option value="食材">食材</option>
-                  <option value="調味料">調味料</option>
-                </select>
-              </label>
-              <label>
-                数量
-                <input
-                  min="0"
-                  step="0.1"
-                  type="number"
-                  value={values.quantity}
-                  onChange={(event) => updateValue("quantity", event.target.value)}
-                />
-              </label>
-            </div>
             <label>
               品名
               <input value={values.name} onChange={(event) => updateValue("name", event.target.value)} placeholder="例: 牛乳" />
             </label>
             <div className="form-row two-columns">
               <label>
-                単位
-                <input value={values.unit} onChange={(event) => updateValue("unit", event.target.value)} placeholder="個" />
+                分類
+                <select value={values.category} onChange={(event) => updateValue("category", event.target.value as StockItemFormValues["category"])}>
+                  <option value="食材">食材</option>
+                  <option value="調味料">調味料</option>
+                </select>
               </label>
               <label>
                 保存場所
@@ -768,6 +758,30 @@ export function InventoryBoard({
                     <option key={location} value={location} />
                   ))}
                 </datalist>
+              </label>
+            </div>
+            <div className="form-row two-columns">
+              <label>
+                数量・単位
+                <div className="qty-unit-wrap">
+                  <input
+                    min="0"
+                    step="0.1"
+                    type="number"
+                    value={values.quantity}
+                    onChange={(event) => updateValue("quantity", event.target.value)}
+                  />
+                  <input
+                    type="text"
+                    value={values.unit}
+                    onChange={(event) => updateValue("unit", event.target.value)}
+                    placeholder="個"
+                  />
+                </div>
+              </label>
+              <label>
+                表示期限
+                <input type="date" value={values.display_expires_on} onChange={(event) => updateValue("display_expires_on", event.target.value)} />
               </label>
             </div>
             <fieldset className="unit-conversion-fields">
@@ -807,7 +821,7 @@ export function InventoryBoard({
                   placeholder="g"
                 />
               </div>
-              <p>例: 1パック = 150g。調理完了時の在庫消費で使います。</p>
+              <p>例: 1パック = 150g。料理完了時に双方向で換算します。</p>
             </fieldset>
             <div className="form-row two-columns">
               <label>
@@ -815,17 +829,28 @@ export function InventoryBoard({
                 <input type="date" value={values.display_expires_on} onChange={(event) => updateValue("display_expires_on", event.target.value)} />
               </label>
               <label>
-                実質期限
+                開封日 (推測用)
                 <input type="date" value={values.effective_expires_on} onChange={(event) => updateValue("effective_expires_on", event.target.value)} />
               </label>
             </div>
             <label>
               メモ
-              <textarea rows={3} value={values.status_note} onChange={(event) => updateValue("status_note", event.target.value)} />
+              <textarea rows={2} value={values.status_note} onChange={(event) => updateValue("status_note", event.target.value)} />
             </label>
+            {editing ? (
+              <div className="ai-limit-card">
+                <label>AI判定済 実質期限</label>
+                <input
+                  type="date"
+                  value={values.effective_expires_on}
+                  onChange={(event) => updateValue("effective_expires_on", event.target.value)}
+                />
+                <span className="ai-limit-badge">AI</span>
+              </div>
+            ) : null}
             <div className="form-actions">
               <button className="primary-button" type="submit" disabled={isSaving}>
-                {editing ? "内容を更新" : "登録待ちに追加"}
+                {editing ? "内容を更新する" : "登録待ちに追加"}
               </button>
               {editing ? (
                 <button className="secondary-button" type="button" onClick={resetForm}>

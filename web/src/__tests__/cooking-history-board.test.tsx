@@ -91,10 +91,10 @@ describe("CookingHistoryBoard", () => {
     });
 
     expect(screen.getByRole("heading", { name: "料理履歴" })).toBeTruthy();
-    expect(screen.getByText("カレー")).toBeTruthy();
+    expect(screen.getAllByText("カレー").length).toBeGreaterThan(0);
     expect(screen.getByAltText("カレーの完成写真")).toBeTruthy();
     expect(screen.getByText("味噌汁")).toBeTruthy();
-    expect(screen.getByText("写真なし")).toBeTruthy();
+    expect(screen.getAllByText("写真なし").length).toBeGreaterThan(0);
   });
 
   it("filters history and switches calendar and analysis views", () => {
@@ -110,19 +110,19 @@ describe("CookingHistoryBoard", () => {
     expect(screen.queryByText("辛さ控えめ")).toBeNull();
 
     fireEvent.change(screen.getByLabelText("料理履歴検索"), { target: { value: "" } });
-    fireEvent.change(screen.getByLabelText("料理履歴評価フィルタ"), { target: { value: "rated" } });
-    expect(screen.getByText("カレー")).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("料理履歴評価フィルタ"), { target: { value: "1" } });
+    expect(screen.getAllByText("カレー").length).toBeGreaterThan(0);
     expect(screen.queryByText("味噌汁")).toBeNull();
 
     fireEvent.change(screen.getByLabelText("料理履歴評価フィルタ"), { target: { value: "all" } });
-    fireEvent.click(screen.getByRole("button", { name: "カレンダー" }));
+    fireEvent.click(screen.getByRole("tab", { name: "カレンダー" }));
     expect(screen.getByLabelText("料理履歴カレンダー")).toBeTruthy();
-    expect(screen.getByText("2026/05/25")).toBeTruthy();
+    expect(screen.getByText("2026年5月")).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("button", { name: "分析" }));
-    expect(screen.getByLabelText("料理履歴分析")).toBeTruthy();
-    expect(screen.getByText("記録数")).toBeTruthy();
-    expect(screen.getByText("よく作る料理")).toBeTruthy();
+    fireEvent.click(screen.getByRole("tab", { name: "振り返り" }));
+    expect(screen.getByLabelText("料理履歴振り返り")).toBeTruthy();
+    expect(screen.getByText("最近よく作った")).toBeTruthy();
+    expect(screen.getByText("ジャンル傾向")).toBeTruthy();
   });
 
   it("adds cooking history without a photo for the authenticated user", async () => {
@@ -148,7 +148,7 @@ describe("CookingHistoryBoard", () => {
       );
     });
     expect(await screen.findByText("写真なしで料理履歴を保存しました。")).toBeTruthy();
-    expect(screen.getByText("親子丼")).toBeTruthy();
+    expect(screen.getAllByText("親子丼").length).toBeGreaterThan(0);
     expect(storageFrom).not.toHaveBeenCalled();
   });
 
@@ -245,8 +245,8 @@ describe("CookingHistoryBoard", () => {
     fireEvent.click(screen.getByRole("button", { name: "料理履歴を保存" }));
 
     expect(await screen.findByText(/原因: 完成写真をStorageへ保存できませんでした。/)).toBeTruthy();
-    expect(screen.getByText("パスタ")).toBeTruthy();
-    expect(screen.getByText("写真なし")).toBeTruthy();
+    expect(screen.getAllByText("パスタ").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("写真なし").length).toBeGreaterThan(0);
     expect(from).not.toHaveBeenCalledWith("photos");
   });
 });

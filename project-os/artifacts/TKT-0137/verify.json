@@ -1,0 +1,31 @@
+{
+  "ticket": "TKT-0137-cooking-record-canvas-final-layout-pass",
+  "status": "passed",
+  "commands": [
+    {
+      "name": "lint",
+      "command": "/Users/y0shi/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node ./node_modules/eslint/bin/eslint.js .",
+      "cwd": "web",
+      "status": "passed"
+    },
+    {
+      "name": "typecheck",
+      "command": "/Users/y0shi/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node ./node_modules/typescript/bin/tsc --noEmit",
+      "cwd": "web",
+      "status": "passed"
+    },
+    {
+      "name": "test",
+      "command": "/Users/y0shi/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node ./node_modules/vitest/vitest.mjs run",
+      "cwd": "web",
+      "status": "passed",
+      "result": "11 files passed, 57 tests passed"
+    },
+    {
+      "name": "build",
+      "command": "/Users/y0shi/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node ./node_modules/next/dist/bin/next build",
+      "cwd": "web",
+      "status": "passed"
+    }
+  ]
+}

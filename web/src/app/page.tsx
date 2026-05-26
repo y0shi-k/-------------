@@ -2,7 +2,6 @@ import { redirect } from "next/navigation";
 import { CookingHistoryBoard } from "@/components/cooking-history-board";
 import { InventoryBoard } from "@/components/inventory-board";
 import { RecipeMealWorkspace } from "@/components/recipe-meal-workspace";
-import { TodayDashboard } from "@/components/today-dashboard";
 import { WebModeShell } from "@/components/web-mode-shell";
 import type { CookingHistoryItem, CookingHistoryPhoto } from "@/lib/cooking-history/types";
 import type { StockItem, StorageLocation } from "@/lib/inventory/types";
@@ -138,12 +137,6 @@ export default async function Home() {
           ),
           cooking: (
             <div className="cooking-record-stack" key="cooking">
-              <TodayDashboard
-                cookCandidates={(cookCandidates ?? []) as CookCandidate[]}
-                inventoryItems={(inventoryItems ?? []) as StockItem[]}
-                mealSchedules={(mealSchedules ?? []) as MealSchedule[]}
-                shoppingItems={(shoppingItems ?? []) as ShoppingItem[]}
-              />
               <CookingHistoryBoard
                 initialHistory={cookingHistoryWithPhotos as CookingHistoryItem[]}
                 userId={user.id}

@@ -466,6 +466,573 @@ h1 {
   gap: 16px;
 }
 
+.cooking-record-stack {
+  display: block;
+}
+
+.cooking-history-workspace {
+  display: grid;
+  gap: 8px;
+  padding: 0;
+}
+
+.cooking-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.cooking-summary-tile {
+  display: grid;
+  min-height: 70px;
+  align-content: center;
+  gap: 4px;
+  min-width: 0;
+  border: 1px solid var(--cream-line);
+  border-radius: 10px;
+  background: #fff;
+  padding: 10px 12px;
+  box-shadow: 0 8px 18px rgb(245 158 11 / 7%);
+}
+
+.cooking-summary-tile span {
+  color: #8a9ab2;
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.cooking-summary-tile strong {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 1.28rem;
+  font-weight: 800;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cooking-summary-tile strong[data-compact="true"] {
+  font-size: 0.92rem;
+  line-height: 1.25;
+}
+
+.summary-orange {
+  color: #c85300;
+}
+
+.summary-green {
+  color: #00856f;
+}
+
+.summary-indigo {
+  color: #4f46e5;
+}
+
+.summary-slate {
+  color: #24324a;
+}
+
+.cooking-view-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  border: 1px solid var(--cream-line);
+  border-radius: 10px;
+  background: #fff;
+  padding: 4px;
+}
+
+.cooking-view-tabs button {
+  min-height: 32px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #52627a;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.cooking-view-tabs button[data-active="true"] {
+  background: #f59e0b;
+  color: #fff;
+}
+
+.cooking-history-controls {
+  display: grid;
+  gap: 8px;
+}
+
+.cooking-history-controls input,
+.cooking-history-controls select {
+  width: 100%;
+  min-height: 38px;
+  min-width: 0;
+  border: 1px solid var(--cream-line);
+  border-radius: 10px;
+  background: #fff;
+  color: #172033;
+  padding: 8px 12px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  outline: none;
+}
+
+.cooking-history-controls input::placeholder {
+  color: #a7b2c2;
+}
+
+.cooking-history-controls input:focus,
+.cooking-history-controls select:focus {
+  border-color: #f59e0b;
+}
+
+.cooking-filter-row {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.cooking-content-panel {
+  display: grid;
+  gap: 10px;
+  overflow: hidden;
+  border: 1px solid var(--cream-line);
+  border-radius: 12px;
+  background: var(--cream);
+  padding: 12px;
+}
+
+.cooking-timeline-view,
+.cooking-calendar-view,
+.cooking-insights-view {
+  display: grid;
+  gap: 12px;
+}
+
+.history-date-group {
+  display: grid;
+  gap: 8px;
+}
+
+.history-date-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 4px;
+}
+
+.history-date-heading h3 {
+  margin: 0;
+  color: #c85300;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.history-date-heading span {
+  color: #7c8da5;
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.history-list {
+  display: grid;
+  gap: 8px;
+}
+
+.history-item {
+  display: grid;
+  grid-template-columns: 80px minmax(0, 1fr);
+  gap: 12px;
+  min-width: 0;
+  border: 1px solid var(--cream-line);
+  border-radius: 12px;
+  background: rgb(255 255 255 / 88%);
+  padding: 14px;
+  box-shadow: 0 6px 14px rgb(15 23 42 / 4%);
+}
+
+.history-photo,
+.history-photo-empty {
+  display: grid;
+  width: 80px;
+  height: 80px;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid var(--cream-line);
+  border-radius: 10px;
+  background: #fff9e8;
+  color: #fbbf24;
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.history-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.history-item-body {
+  display: grid;
+  min-width: 0;
+  gap: 6px;
+}
+
+.history-item-topline {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+
+.history-item-body span {
+  color: #f59e0b;
+  font-size: 0.66rem;
+  font-weight: 700;
+}
+
+.history-item-body h4 {
+  margin: 2px 0 0;
+  overflow: hidden;
+  color: #172033;
+  font-size: 1rem;
+  font-weight: 500;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.history-stars {
+  flex: 0 0 auto;
+  font-size: 0.8rem;
+  line-height: 1;
+}
+
+.star-filled {
+  color: #fbbf24;
+}
+
+.star-empty {
+  color: #dbe4f0;
+}
+
+.history-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.history-tags em {
+  border: 1px solid #e7edf5;
+  border-radius: 999px;
+  background: #f8fafc;
+  color: #64748b;
+  padding: 2px 8px;
+  font-size: 0.66rem;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.history-tags em:first-child {
+  border-color: #bae6fd;
+  background: #eff6ff;
+  color: #0284c7;
+}
+
+.item-note {
+  margin: 0;
+  color: #94a3b8;
+  font-size: 0.78rem;
+  font-weight: 800;
+  line-height: 1.5;
+}
+
+.history-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.history-card-actions button {
+  min-height: 32px;
+  border: 0;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #64748b;
+  padding: 8px 14px;
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.history-card-actions button:first-child {
+  background: #fff7ed;
+  color: #c85300;
+}
+
+.history-card-actions button[data-primary="true"] {
+  background: #009f73;
+  color: #fff;
+}
+
+.calendar-month-bar {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) 36px;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--cream-line);
+  border-radius: 10px;
+  background: #fff;
+  padding: 8px 10px;
+  text-align: center;
+}
+
+.calendar-month-bar button {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  background: #fff9e8;
+  color: #c85300;
+  font-size: 1.1rem;
+  font-weight: 800;
+}
+
+.calendar-month-bar strong {
+  display: block;
+  color: #24324a;
+  font-size: 0.95rem;
+}
+
+.calendar-month-bar span {
+  display: block;
+  color: #8a9ab2;
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.calendar-week-row,
+.calendar-cell-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.calendar-week-row span {
+  color: #8a9ab2;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-align: center;
+}
+
+.calendar-cell {
+  position: relative;
+  min-height: 72px;
+  overflow: hidden;
+  border: 1px solid var(--cream-line);
+  border-radius: 10px;
+  background: #fff;
+  color: #172033;
+  padding: 8px 6px;
+  text-align: left;
+}
+
+.calendar-cell[data-in-month="false"] {
+  background: #f8fafc;
+  color: #cbd5e1;
+}
+
+.calendar-cell[data-selected="true"] {
+  border-color: #f59e0b;
+  background: #f59e0b;
+  color: #fff;
+}
+
+.calendar-cell > span {
+  position: relative;
+  z-index: 1;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.calendar-cell img {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  left: 6px;
+  width: calc(100% - 12px);
+  height: 34px;
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+.calendar-dots {
+  position: absolute;
+  top: 8px;
+  right: 6px;
+  display: flex;
+  gap: 3px;
+}
+
+.calendar-dots i,
+.calendar-legend i {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+}
+
+.calendar-dots i[data-kind="record"],
+.calendar-legend i[data-kind="record"] {
+  background: #f59e0b;
+}
+
+.calendar-dots i[data-kind="photo"],
+.calendar-legend i[data-kind="photo"] {
+  background: #4f46e5;
+}
+
+.calendar-dots i[data-kind="rating"],
+.calendar-legend i[data-kind="rating"] {
+  background: #009f73;
+}
+
+.calendar-cell[data-selected="true"] .calendar-dots i {
+  background: #fff;
+}
+
+.calendar-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: #52627a;
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.calendar-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.insight-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.insight-panel,
+.photo-month-panel {
+  min-width: 0;
+  border: 1px solid var(--cream-line);
+  border-radius: 10px;
+  background: #fff;
+  padding: 16px;
+}
+
+.insight-panel h3,
+.photo-month-panel h3 {
+  margin: 0 0 12px;
+  color: #24324a;
+  font-size: 0.92rem;
+}
+
+.insight-panel ul {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.insight-panel li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+  color: #52627a;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.insight-panel li span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.insight-panel li strong {
+  flex: 0 0 auto;
+  color: #c85300;
+}
+
+.insight-panel li strong[data-green="true"] {
+  color: #009f73;
+}
+
+.insight-panel p,
+.photo-month-panel p {
+  margin: 0;
+  color: #94a3b8;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.photo-month-panel > div:first-child {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.photo-month-panel > div:first-child span {
+  color: #7c8da5;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.photo-month-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.photo-month-grid img {
+  width: 100%;
+  aspect-ratio: 1;
+  border: 1px solid var(--cream-line);
+  border-radius: 10px;
+  object-fit: cover;
+}
+
+.cooking-entry-details {
+  border: 1px solid var(--cream-line);
+  border-radius: 10px;
+  background: #fff;
+  padding: 0;
+}
+
+.cooking-entry-details summary {
+  min-height: 42px;
+  padding: 12px 14px;
+  color: #52627a;
+  font-size: 0.82rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.cooking-entry-form {
+  border-top: 1px solid #f3e7c7;
+  padding: 14px;
+}
+
 .today-grid {
   display: grid;
   gap: 10px;
@@ -2644,4 +3211,291 @@ h1 {
   .canvas-modal {
     padding: 24px 16px;
   }
+}
+
+/* Cooking record Canvas parity overrides must stay after legacy history styles. */
+.cooking-history-workspace .history-item {
+  grid-template-columns: 80px minmax(0, 1fr);
+  align-items: start;
+  gap: 12px;
+  border-color: var(--cream-line);
+  border-radius: 12px;
+  background: rgb(255 255 255 / 88%);
+  padding: 14px;
+}
+
+.cooking-history-workspace .history-photo,
+.cooking-history-workspace .history-photo-empty {
+  width: 80px;
+  height: 80px;
+  min-height: 80px;
+  border-color: var(--cream-line);
+  border-radius: 10px;
+  background: #fff9e8;
+  color: #fbbf24;
+}
+
+.cooking-history-workspace .history-photo img {
+  height: 100%;
+  max-height: none;
+}
+
+.cooking-history-workspace .history-item-body {
+  gap: 6px;
+}
+
+.cooking-history-workspace .history-item-body span {
+  color: #f59e0b;
+  font-size: 0.66rem;
+}
+
+.cooking-history-workspace .history-item-body h4 {
+  margin: 2px 0 0;
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+.cooking-history-workspace .history-item-body p {
+  margin: 0;
+  line-height: 1.5;
+}
+
+@media (max-width: 640px) {
+  .cooking-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .cooking-filter-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .cooking-filter-row select:last-child {
+    grid-column: 1 / -1;
+  }
+
+  .cooking-history-workspace .history-item {
+    grid-template-columns: 68px minmax(0, 1fr);
+    padding: 12px;
+  }
+
+  .cooking-history-workspace .history-photo,
+  .cooking-history-workspace .history-photo-empty {
+    width: 68px;
+    height: 68px;
+    min-height: 68px;
+  }
+
+  .history-card-actions {
+    justify-content: flex-start;
+  }
+
+  .insight-grid,
+  .photo-month-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .calendar-cell {
+    min-height: 58px;
+    padding: 6px 5px;
+  }
+
+  .calendar-cell img {
+    display: none;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Canvas parity: inventory editor modal (TKT-0101-ish)
+   ═══════════════════════════════════════════════════════════ */
+
+/* 1. モーダル本体を Canvas版（max-w-md/p-8/rounded-xl）に寄せる */
+.inventory-editor-modal {
+  width: min(460px, 100%);
+  max-height: calc(100vh - 64px);
+  gap: 20px;
+  padding: 32px;
+  border-radius: 12px;
+}
+
+/* 2. タイトル部 */
+.inventory-editor-modal .panel-title h3 {
+  margin: 4px 0 0;
+  font-size: 1.45rem;
+}
+
+/* 3. フォームラベルを Canvas版風に（小さめ・薄色・uppercase） */
+.inventory-editor-modal .stock-form label {
+  display: block;
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  margin-bottom: 6px;
+  margin-left: 4px;
+}
+
+/* 4. 入力欄を Canvas版風に（slate-50 / rounded-xl / 大きめpadding） */
+.inventory-editor-modal .stock-form input,
+.inventory-editor-modal .stock-form select,
+.inventory-editor-modal .stock-form textarea {
+  width: 100%;
+  min-height: 52px;
+  border: 1px solid #f1f5f9;
+  border-radius: 12px;
+  background: #f8fafc;
+  color: #172033;
+  padding: 16px 20px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  outline: none;
+  transition: all 0.2s;
+}
+
+.inventory-editor-modal .stock-form input:focus,
+.inventory-editor-modal .stock-form select:focus,
+.inventory-editor-modal .stock-form textarea:focus {
+  border-color: #6366f1;
+  outline: 2px solid rgb(99 102 241 / 10%);
+}
+
+.inventory-editor-modal .stock-form textarea {
+  min-height: 86px;
+  resize: none;
+}
+
+/* 5. 2列レイアウトを常に適用 */
+.inventory-editor-modal .form-row.two-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+/* 6. 数量・単位 横並び（Canvas版と同じく同じlabel下） */
+.qty-unit-wrap {
+  display: flex;
+  align-items: stretch;
+}
+
+.qty-unit-wrap input[type="number"] {
+  flex: 1 1 auto;
+  border-radius: 12px 0 0 12px;
+  border-right: 0;
+}
+
+.qty-unit-wrap input[type="text"] {
+  flex: 0 0 5rem;
+  border-radius: 0 12px 12px 0;
+}
+
+/* 7. 単位換算 囲み解除 */
+.inventory-editor-modal .unit-conversion-fields {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+}
+
+.inventory-editor-modal .unit-conversion-fields legend {
+  display: block;
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  margin-bottom: 6px;
+  margin-left: 4px;
+  padding: 0;
+}
+
+.inventory-editor-modal .conversion-row {
+  grid-template-columns: 4.5rem 1fr auto 4.5rem 1fr;
+  gap: 8px;
+  align-items: center;
+}
+
+.inventory-editor-modal .conversion-row span {
+  color: #cbd5e1;
+  font-weight: 700;
+  text-align: center;
+}
+
+.inventory-editor-modal .unit-conversion-fields p {
+  margin: 6px 0 0 4px;
+  color: #94a3b8;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+/* 8. 保存ボタンを黒背景・大きめに */
+.inventory-editor-modal .form-actions .primary-button {
+  min-height: 56px;
+  border: 1px solid #0f172a;
+  border-radius: 12px;
+  background: #0f172a;
+  color: #fff;
+  padding: 16px;
+  font-size: 1.05rem;
+  font-weight: 500;
+  box-shadow: 0 4px 12px rgb(15 23 42 / 18%);
+}
+
+.inventory-editor-modal .form-actions .primary-button:hover {
+  background: #000;
+}
+
+/* 9. 閉じるボタン調整 */
+.inventory-editor-modal .modal-close-button {
+  top: 18px;
+  right: 18px;
+  width: 36px;
+  height: 36px;
+  background: #f1f5f9;
+  color: #cbd5e1;
+  font-size: 1.4rem;
+}
+
+/* 10. AI期限カード風 */
+.ai-limit-card {
+  position: relative;
+  border: 1px solid #c7d2fe;
+  border-radius: 12px;
+  background: rgb(238 242 255 / 50%);
+  padding: 20px;
+}
+
+.ai-limit-card > label {
+  display: block;
+  color: #4f46e5;
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  margin-bottom: 6px;
+  margin-left: 4px;
+}
+
+.inventory-editor-modal .ai-limit-card input[type="date"] {
+  width: 100%;
+  min-height: auto;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  color: #4338ca;
+  font-size: 1.25rem;
+  font-weight: 500;
+  outline: none;
+}
+
+.ai-limit-badge {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  border-radius: 999px;
+  background: #4f46e5;
+  color: #fff;
+  padding: 2px 8px;
+  font-size: 10px;
+  font-weight: 700;
 }
