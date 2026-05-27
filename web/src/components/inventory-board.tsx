@@ -767,6 +767,7 @@ export function InventoryBoard({
                 数量・単位
                 <div className="qty-unit-wrap">
                   <input
+                    aria-label="数量"
                     min="0"
                     step="0.1"
                     type="number"
@@ -774,6 +775,7 @@ export function InventoryBoard({
                     onChange={(event) => updateValue("quantity", event.target.value)}
                   />
                   <input
+                    aria-label="単位"
                     type="text"
                     value={values.unit}
                     onChange={(event) => updateValue("unit", event.target.value)}
