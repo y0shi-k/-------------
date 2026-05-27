@@ -1315,6 +1315,74 @@ h1 {
   width: min(540px, 100%);
 }
 
+.inventory-editor-modal .stock-form {
+  gap: 16px;
+}
+
+.ai-limit-card {
+  position: relative;
+  border: 1px solid #c7d2fe;
+  border-radius: 12px;
+  background: rgb(238 242 255 / 50%);
+  padding: 20px;
+}
+
+.ai-limit-card label {
+  display: block;
+  margin-bottom: 6px;
+  color: #4f46e5;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.ai-limit-input {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: #4338ca;
+  font-size: 1.25rem;
+  font-weight: 500;
+  outline: none;
+}
+
+.ai-limit-badge {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  border-radius: 999px;
+  background: #4f46e5;
+  color: #fff;
+  padding: 2px 8px;
+  font-size: 0.65rem;
+  font-weight: 800;
+}
+
+.indigo-date-label {
+  color: #818cf8;
+}
+
+.indigo-date-input {
+  border-color: #c7d2fe;
+  background: #eef2ff;
+}
+
+.submit-large {
+  min-height: 56px;
+  border-radius: 12px;
+  padding: 16px;
+  font-size: 1.05rem;
+}
+
+.unit-conversion-label {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--ink);
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
 .modal-close-button {
   position: absolute;
   top: 14px;
@@ -1465,6 +1533,10 @@ h1 {
 .form-row {
   display: grid;
   gap: 12px;
+}
+
+.form-row.two-columns {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .unit-conversion-fields {

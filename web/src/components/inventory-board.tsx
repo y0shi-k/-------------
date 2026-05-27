@@ -690,47 +690,49 @@ export function InventoryBoard({
             {editing ? null : <strong>{stagingItems.length}件</strong>}
           </div>
 
-          <section className="location-manager" aria-labelledby="location-manager-heading">
-            <div className="location-manager-heading">
-              <div>
-                <span>保存場所</span>
-                <h4 id="location-manager-heading">保存場所を管理</h4>
+          {!editing ? (
+            <section className="location-manager" aria-labelledby="location-manager-heading">
+              <div className="location-manager-heading">
+                <div>
+                  <span>保存場所</span>
+                  <h4 id="location-manager-heading">保存場所を管理</h4>
+                </div>
+                <div className="location-add-row">
+                  <input
+                    aria-label="追加する保存場所"
+                    value={newLocationName}
+                    onChange={(event) => setNewLocationName(event.target.value)}
+                    placeholder="例: 野菜室"
+                  />
+                  <button className="secondary-button compact-button" disabled={isSaving} onClick={addStorageLocation} type="button">
+                    追加
+                  </button>
+                </div>
               </div>
-              <div className="location-add-row">
-                <input
-                  aria-label="追加する保存場所"
-                  value={newLocationName}
-                  onChange={(event) => setNewLocationName(event.target.value)}
-                  placeholder="例: 野菜室"
-                />
-                <button className="secondary-button compact-button" disabled={isSaving} onClick={addStorageLocation} type="button">
-                  追加
-                </button>
+              <div className="location-chip-list">
+                {storageLocationOptions.map((name) => {
+                  const location = storageLocations.find((item) => item.name === name);
+                  const usageCount = storageLocationUsage[name] ?? 0;
+                  return (
+                    <div className="location-chip" key={name}>
+                      <span>{name}</span>
+                      <small>{usageCount}件</small>
+                      {location ? (
+                        <button
+                          className="danger-button compact-button"
+                          disabled={isSaving || usageCount > 0}
+                          onClick={() => requestDelete(location.name, "この保存場所を削除します。使用中の場所は削除できません。", () => deleteStorageLocation(location))}
+                          type="button"
+                        >
+                          削除
+                        </button>
+                      ) : null}
+                    </div>
+                  );
+                })}
               </div>
-            </div>
-            <div className="location-chip-list">
-              {storageLocationOptions.map((name) => {
-                const location = storageLocations.find((item) => item.name === name);
-                const usageCount = storageLocationUsage[name] ?? 0;
-                return (
-                  <div className="location-chip" key={name}>
-                    <span>{name}</span>
-                    <small>{usageCount}件</small>
-                    {location ? (
-                      <button
-                        className="danger-button compact-button"
-                        disabled={isSaving || usageCount > 0}
-                        onClick={() => requestDelete(location.name, "この保存場所を削除します。使用中の場所は削除できません。", () => deleteStorageLocation(location))}
-                        type="button"
-                      >
-                        削除
-                      </button>
-                    ) : null}
-                  </div>
-                );
-              })}
-            </div>
-          </section>
+            </section>
+          ) : null}
 
           <form className="stock-form" onSubmit={saveStaging}>
             <label>
@@ -784,8 +786,8 @@ export function InventoryBoard({
                 <input type="date" value={values.display_expires_on} onChange={(event) => updateValue("display_expires_on", event.target.value)} />
               </label>
             </div>
-            <fieldset className="unit-conversion-fields">
-              <legend>単位換算</legend>
+            <div className="unit-conversion-fields">
+              <span className="unit-conversion-label">単位換算</span>
               <div className="conversion-row">
                 <input
                   aria-label="換算元数量"
@@ -822,15 +824,15 @@ export function InventoryBoard({
                 />
               </div>
               <p>例: 1パック = 150g。料理完了時に双方向で換算します。</p>
-            </fieldset>
+            </div>
             <div className="form-row two-columns">
               <label>
-                表示期限
-                <input type="date" value={values.display_expires_on} onChange={(event) => updateValue("display_expires_on", event.target.value)} />
+                購入日
+                <input type="date" value={values.purchase_date} onChange={(event) => updateValue("purchase_date", event.target.value)} />
               </label>
-              <label>
+              <label className="indigo-date-label">
                 開封日 (推測用)
-                <input type="date" value={values.effective_expires_on} onChange={(event) => updateValue("effective_expires_on", event.target.value)} />
+                <input className="indigo-date-input" type="date" value={values.effective_expires_on} onChange={(event) => updateValue("effective_expires_on", event.target.value)} />
               </label>
             </div>
             <label>
@@ -841,6 +843,7 @@ export function InventoryBoard({
               <div className="ai-limit-card">
                 <label>AI判定済 実質期限</label>
                 <input
+                  className="ai-limit-input"
                   type="date"
                   value={values.effective_expires_on}
                   onChange={(event) => updateValue("effective_expires_on", event.target.value)}
@@ -849,84 +852,83 @@ export function InventoryBoard({
               </div>
             ) : null}
             <div className="form-actions">
-              <button className="primary-button" type="submit" disabled={isSaving}>
+              <button className="primary-button submit-large" type="submit" disabled={isSaving}>
                 {editing ? "内容を更新する" : "登録待ちに追加"}
               </button>
-              {editing ? (
-                <button className="secondary-button" type="button" onClick={resetForm}>
-                  編集をやめる
-                </button>
-              ) : null}
             </div>
           </form>
 
-          <section className="photo-capture-panel" aria-labelledby="photo-capture-heading">
-            <div className="photo-capture-heading">
-              <div>
-                <span>写真登録</span>
-                <h4 id="photo-capture-heading">写真を解析して登録待ちへ</h4>
+          {!editing ? (
+            <section className="photo-capture-panel" aria-labelledby="photo-capture-heading">
+              <div className="photo-capture-heading">
+                <div>
+                  <span>写真登録</span>
+                  <h4 id="photo-capture-heading">写真を解析して登録待ちへ</h4>
+                </div>
+                <label className="photo-file-button">
+                  写真を撮る
+                  <input
+                    ref={photoInputRef}
+                    accept="image/*"
+                    capture="environment"
+                    type="file"
+                    onChange={selectPhoto}
+                    disabled={isUploadingPhoto}
+                  />
+                </label>
               </div>
-              <label className="photo-file-button">
-                写真を撮る
-                <input
-                  ref={photoInputRef}
-                  accept="image/*"
-                  capture="environment"
-                  type="file"
-                  onChange={selectPhoto}
-                  disabled={isUploadingPhoto}
+
+              {photoPreviewUrl ? (
+                <div className="photo-preview">
+                  {/* Blob URL previews are local-only, so Next Image optimization is not useful here. */}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={photoPreviewUrl} alt="選択した食材写真のプレビュー" />
+                </div>
+              ) : (
+                <p className="photo-empty">写真は非公開で保存し、サーバー側でAI解析します。APIキーはブラウザへ出しません。</p>
+              )}
+
+              {photoFeedback ? (
+                <p className="operation-message photo-message" data-tone={photoFeedback.tone} role={photoFeedback.tone === "error" ? "alert" : "status"}>
+                  {photoFeedback.message}
+                </p>
+              ) : null}
+
+              <div className="photo-actions">
+                <button className="primary-button" type="button" disabled={!selectedPhoto || isUploadingPhoto || isSaving} onClick={scanPhoto}>
+                  {isUploadingPhoto ? "解析中" : "AI解析する"}
+                </button>
+                <button className="secondary-button" type="button" disabled={!selectedPhoto || isUploadingPhoto} onClick={resetPhoto}>
+                  別の写真にする
+                </button>
+              </div>
+            </section>
+          ) : null}
+
+          {!editing ? (
+            <ItemList
+              emptyText="登録待ちはありません。まずは手動で1件追加してください。"
+              items={stagingItems}
+              list="staging"
+              onConfirm={confirmStaging}
+              onDelete={(list, item) => requestDelete(item.name, "この登録待ちを削除します。元には戻せません。", () => deleteItem(list, item))}
+              onEdit={startEdit}
+              onSelect={toggleSelected}
+              selectedIds={selectedStagingIds}
+              toolbar={
+                <ListToolbar
+                  disabled={isSaving}
+                  itemIds={stagingItems.map((item) => item.id)}
+                  onClear={() => clearSelected("staging")}
+                  onDeleteSelected={() => requestDelete(`${selectedStagingIds.length}件の登録待ち`, "選択した登録待ちをまとめて削除します。元には戻せません。", deleteSelectedStaging)}
+                  onSelectAll={(ids) => selectAllVisible("staging", ids)}
+                  selectedCount={selectedStagingIds.length}
+                  showDelete
                 />
-              </label>
-            </div>
-
-            {photoPreviewUrl ? (
-              <div className="photo-preview">
-                {/* Blob URL previews are local-only, so Next Image optimization is not useful here. */}
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={photoPreviewUrl} alt="選択した食材写真のプレビュー" />
-              </div>
-            ) : (
-              <p className="photo-empty">写真は非公開で保存し、サーバー側でAI解析します。APIキーはブラウザへ出しません。</p>
-            )}
-
-            {photoFeedback ? (
-              <p className="operation-message photo-message" data-tone={photoFeedback.tone} role={photoFeedback.tone === "error" ? "alert" : "status"}>
-                {photoFeedback.message}
-              </p>
-            ) : null}
-
-            <div className="photo-actions">
-              <button className="primary-button" type="button" disabled={!selectedPhoto || isUploadingPhoto || isSaving} onClick={scanPhoto}>
-                {isUploadingPhoto ? "解析中" : "AI解析する"}
-              </button>
-              <button className="secondary-button" type="button" disabled={!selectedPhoto || isUploadingPhoto} onClick={resetPhoto}>
-                別の写真にする
-              </button>
-            </div>
-          </section>
-
-          <ItemList
-            emptyText="登録待ちはありません。まずは手動で1件追加してください。"
-            items={stagingItems}
-            list="staging"
-            onConfirm={confirmStaging}
-            onDelete={(list, item) => requestDelete(item.name, "この登録待ちを削除します。元には戻せません。", () => deleteItem(list, item))}
-            onEdit={startEdit}
-            onSelect={toggleSelected}
-            selectedIds={selectedStagingIds}
-            toolbar={
-              <ListToolbar
-                disabled={isSaving}
-                itemIds={stagingItems.map((item) => item.id)}
-                onClear={() => clearSelected("staging")}
-                onDeleteSelected={() => requestDelete(`${selectedStagingIds.length}件の登録待ち`, "選択した登録待ちをまとめて削除します。元には戻せません。", deleteSelectedStaging)}
-                onSelectAll={(ids) => selectAllVisible("staging", ids)}
-                selectedCount={selectedStagingIds.length}
-                showDelete
-              />
-            }
-            disabled={isSaving}
-          />
+              }
+              disabled={isSaving}
+            />
+          ) : null}
         </section>
         </div>
       ) : null}

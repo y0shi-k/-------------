@@ -44,6 +44,7 @@ export type StockItemFormValues = {
   conversion_to_unit: string;
   display_expires_on: string;
   effective_expires_on: string;
+  purchase_date: string;
   storage_location: string;
   status_note: string;
 };
@@ -59,6 +60,7 @@ export const emptyStockItemFormValues: StockItemFormValues = {
   conversion_to_unit: "",
   display_expires_on: "",
   effective_expires_on: "",
+  purchase_date: "",
   storage_location: "冷蔵庫",
   status_note: ""
 };
@@ -75,6 +77,7 @@ export function toFormValues(item: StockItem): StockItemFormValues {
     conversion_to_unit: item.unit_conversion?.toUnit ?? "",
     display_expires_on: item.display_expires_on ?? "",
     effective_expires_on: item.effective_expires_on ?? "",
+    purchase_date: item.created_at ? item.created_at.slice(0, 10) : "",
     storage_location: item.storage_location,
     status_note: item.status_note
   };
