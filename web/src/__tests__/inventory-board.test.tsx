@@ -53,7 +53,6 @@ function renderBoard(props?: Partial<React.ComponentProps<typeof InventoryBoard>
     <InventoryBoard
       initialInventoryItems={props?.initialInventoryItems ?? []}
       initialStorageLocations={props?.initialStorageLocations ?? []}
-      initialStagingItems={props?.initialStagingItems ?? []}
       userId={props?.userId ?? "user-1"}
     />
   );
@@ -61,6 +60,16 @@ function renderBoard(props?: Partial<React.ComponentProps<typeof InventoryBoard>
 
 function openIngredientModal() {
   fireEvent.click(screen.getByRole("button", { name: "食材を追加" }));
+}
+
+function openManualAdd() {
+  openIngredientModal();
+  fireEvent.click(screen.getByRole("button", { name: "手動で追加" }));
+}
+
+function openPhotoScan() {
+  openIngredientModal();
+  fireEvent.click(screen.getByRole("button", { name: "画像スキャン" }));
 }
 
 describe("InventoryBoard", () => {
@@ -75,20 +84,18 @@ describe("InventoryBoard", () => {
     URL.revokeObjectURL = vi.fn();
   });
 
-  it("shows staging and inventory lists", () => {
+  it("shows inventory list and add choices", () => {
     renderBoard({
-      initialInventoryItems: [{ ...baseItem, id: "inventory-1", name: "卵", unit: "個", quantity: 6 }],
-      initialStagingItems: [baseItem]
+      initialInventoryItems: [{ ...baseItem, id: "inventory-1", name: "卵", unit: "個", quantity: 6 }]
     });
 
-    expect(screen.getByRole("heading", { name: "在庫と登録待ち" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "在庫" })).toBeTruthy();
     expect(screen.getByText("卵")).toBeTruthy();
     expect(screen.getByRole("button", { name: "期限順 ▲" })).toBeTruthy();
     openIngredientModal();
-    expect(screen.getByText("牛乳")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "在庫へ確定" })).toBeTruthy();
-    expect(screen.getByLabelText("写真を撮る")).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "保存場所を管理" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "食材を追加" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "画像スキャン" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "手動で追加" })).toBeTruthy();
   });
 
   it("adds a storage location candidate", async () => {
@@ -99,7 +106,7 @@ describe("InventoryBoard", () => {
     from.mockReturnValue({ insert });
 
     renderBoard();
-    openIngredientModal();
+    openManualAdd();
 
     fireEvent.change(screen.getByLabelText("追加する保存場所"), { target: { value: "野菜室" } });
     fireEvent.click(screen.getByRole("button", { name: "追加" }));
@@ -109,19 +116,19 @@ describe("InventoryBoard", () => {
       expect(insert).toHaveBeenCalledWith({ user_id: "user-1", name: "野菜室", sort_order: 0 });
     });
     expect(await screen.findByText("野菜室 を保存場所に追加しました。")).toBeTruthy();
-    expect(screen.getByText("野菜室")).toBeTruthy();
+    expect(screen.getAllByText("野菜室").length).toBeGreaterThan(0);
   });
 
   it("prevents deleting a storage location while it is used", () => {
     renderBoard({ initialInventoryItems: [baseItem], initialStorageLocations: [baseLocation] });
-    openIngredientModal();
+    openManualAdd();
 
     const deleteButtons = screen.getAllByRole("button", { name: "削除" }) as HTMLButtonElement[];
     expect(deleteButtons.some((button) => button.disabled)).toBe(true);
     expect(screen.getAllByText("1件").length).toBeGreaterThan(0);
   });
 
-  it("adds a manual staging item with the authenticated user id", async () => {
+  it("adds a manual inventory item with the authenticated user id", async () => {
     const unitConversion = { fromQty: 1, fromUnit: "丁", toQty: 300, toUnit: "g" };
     const inserted = { ...baseItem, id: "inserted-1", name: "豆腐", quantity: 2, unit: "丁", unit_conversion: unitConversion };
     const single = vi.fn().mockResolvedValue({ data: inserted, error: null });
@@ -130,7 +137,7 @@ describe("InventoryBoard", () => {
     from.mockReturnValue({ insert });
 
     renderBoard();
-    openIngredientModal();
+    openManualAdd();
 
     fireEvent.change(screen.getByLabelText("品名"), { target: { value: "豆腐" } });
     fireEvent.change(screen.getByLabelText("数量"), { target: { value: "2" } });
@@ -139,10 +146,10 @@ describe("InventoryBoard", () => {
     fireEvent.change(screen.getByLabelText("換算元単位"), { target: { value: "丁" } });
     fireEvent.change(screen.getByLabelText("換算先数量"), { target: { value: "300" } });
     fireEvent.change(screen.getByLabelText("換算先単位"), { target: { value: "g" } });
-    fireEvent.click(screen.getByRole("button", { name: "登録待ちに追加" }));
+    fireEvent.click(screen.getByRole("button", { name: "在庫に追加" }));
 
     await waitFor(() => {
-      expect(from).toHaveBeenCalledWith("staging_items");
+      expect(from).toHaveBeenCalledWith("inventory_items");
       expect(insert).toHaveBeenCalledWith(
         expect.objectContaining({
           user_id: "user-1",
@@ -153,53 +160,22 @@ describe("InventoryBoard", () => {
         })
       );
     });
-    expect(await screen.findByText("登録待ちに追加しました。")).toBeTruthy();
+    expect(await screen.findByText("在庫に追加しました。")).toBeTruthy();
     expect(screen.getByText("豆腐")).toBeTruthy();
     expect(screen.getByText("1丁 = 300g")).toBeTruthy();
   });
 
   it("rejects incomplete unit conversion settings", async () => {
     renderBoard();
-    openIngredientModal();
+    openManualAdd();
 
     fireEvent.change(screen.getByLabelText("品名"), { target: { value: "ひき肉" } });
     fireEvent.change(screen.getByLabelText("換算元数量"), { target: { value: "1" } });
     fireEvent.change(screen.getByLabelText("換算元単位"), { target: { value: "パック" } });
-    fireEvent.click(screen.getByRole("button", { name: "登録待ちに追加" }));
+    fireEvent.click(screen.getByRole("button", { name: "在庫に追加" }));
 
     expect(await screen.findByText("単位換算は「1 パック = 150 g」のように数量と単位をすべて入力してください。")).toBeTruthy();
-    expect(from).not.toHaveBeenCalledWith("staging_items");
-  });
-
-  it("moves a staging item into inventory and removes it from staging", async () => {
-    const insertedInventory = { ...baseItem, id: "inventory-1" };
-    const insertSingle = vi.fn().mockResolvedValue({ data: insertedInventory, error: null });
-    const insertSelect = vi.fn(() => ({ single: insertSingle }));
-    const insert = vi.fn(() => ({ select: insertSelect }));
-    const eqSecond = vi.fn().mockResolvedValue({ error: null });
-    const eqFirst = vi.fn(() => ({ eq: eqSecond }));
-    const deleteItem = vi.fn(() => ({ eq: eqFirst }));
-
-    from.mockImplementation((table: string) => {
-      if (table === "inventory_items") return { insert };
-      return { delete: deleteItem };
-    });
-
-    renderBoard({ initialStagingItems: [baseItem] });
-    openIngredientModal();
-
-    fireEvent.click(screen.getByRole("button", { name: "在庫へ確定" }));
-
-    await waitFor(() => {
-      expect(insert).toHaveBeenCalledWith(
-        expect.objectContaining({
-          user_id: "user-1",
-          name: "牛乳"
-        })
-      );
-      expect(deleteItem).toHaveBeenCalled();
-    });
-    expect(await screen.findByText("牛乳 を在庫へ確定しました。")).toBeTruthy();
+    expect(from).not.toHaveBeenCalledWith("inventory_items");
   });
 
   it("filters inventory by location tab", () => {
@@ -238,37 +214,9 @@ describe("InventoryBoard", () => {
     });
   });
 
-  it("bulk deletes selected staging items", async () => {
-    const inIds = vi.fn().mockResolvedValue({ error: null });
-    const eqUser = vi.fn(() => ({ in: inIds }));
-    const deleteRows = vi.fn(() => ({ eq: eqUser }));
-    from.mockReturnValue({ delete: deleteRows });
-
-    renderBoard({
-      initialStagingItems: [
-        baseItem,
-        { ...baseItem, id: "item-2", name: "チーズ" }
-      ]
-    });
-    openIngredientModal();
-
-    fireEvent.click(screen.getByRole("button", { name: "すべて選択" }));
-    fireEvent.click(screen.getByRole("button", { name: "選択削除" }));
-    expect(await screen.findByLabelText("削除確認")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "削除する" }));
-
-    await waitFor(() => {
-      expect(from).toHaveBeenCalledWith("staging_items");
-      expect(inIds).toHaveBeenCalledWith("id", ["item-1", "item-2"]);
-    });
-    expect(await screen.findByText("登録待ちを2件削除しました。")).toBeTruthy();
-    expect(screen.queryByText("牛乳")).toBeNull();
-    expect(screen.queryByText("チーズ")).toBeNull();
-  });
-
   it("previews a selected photo and allows replacing it", () => {
     renderBoard();
-    openIngredientModal();
+    openPhotoScan();
 
     fireEvent.change(screen.getByLabelText("写真を撮る"), {
       target: {
@@ -285,18 +233,37 @@ describe("InventoryBoard", () => {
     expect(screen.getByText("写真は非公開で保存し、サーバー側でAI解析します。APIキーはブラウザへ出しません。")).toBeTruthy();
   });
 
-  it("compresses, uploads, and scans a selected photo into staging items", async () => {
+  it("compresses, uploads, scans a selected photo, and saves selected candidates into inventory", async () => {
     const upload = vi.fn().mockResolvedValue({ error: null });
     const remove = vi.fn().mockResolvedValue({ error: null });
     const photoSingle = vi.fn().mockResolvedValue({ data: { id: "photo-1" }, error: null });
     const photoSelect = vi.fn(() => ({ single: photoSingle }));
-    const insert = vi.fn(() => ({ select: photoSelect }));
+    const photoInsert = vi.fn(() => ({ select: photoSelect }));
+    const inventoryOrder = vi.fn().mockResolvedValue({
+      data: [{ ...baseItem, id: "ai-1", name: "ヨーグルト", source: "ai_photo" }],
+      error: null
+    });
+    const inventorySelect = vi.fn(() => ({ order: inventoryOrder }));
+    const inventoryInsert = vi.fn(() => ({ select: inventorySelect }));
     const compressedBlob = new Blob(["compressed"], { type: "image/jpeg" });
-    const aiItem = { ...baseItem, id: "ai-1", name: "ヨーグルト", source: "ai_photo" };
+    const aiItem = {
+      user_id: "user-1",
+      category: "食材",
+      name: "ヨーグルト",
+      quantity: 1,
+      unit: "個",
+      unit_conversion: null,
+      display_expires_on: null,
+      effective_expires_on: null,
+      storage_location: "冷蔵庫",
+      status_note: "AI解析候補",
+      source: "ai_photo"
+    };
 
     storageFrom.mockReturnValue({ upload, remove });
     from.mockImplementation((table: string) => {
-      if (table === "photos") return { insert };
+      if (table === "photos") return { insert: photoInsert };
+      if (table === "inventory_items") return { insert: inventoryInsert };
       return {};
     });
     compressImageFile.mockResolvedValue({
@@ -312,7 +279,7 @@ describe("InventoryBoard", () => {
     } as Response);
 
     renderBoard();
-    openIngredientModal();
+    openPhotoScan();
 
     fireEvent.change(screen.getByLabelText("写真を撮る"), {
       target: {
@@ -328,7 +295,7 @@ describe("InventoryBoard", () => {
         upsert: false
       });
       expect(from).toHaveBeenCalledWith("photos");
-      expect(insert).toHaveBeenCalledWith(
+      expect(photoInsert).toHaveBeenCalledWith(
         expect.objectContaining({
           user_id: "user-1",
           bucket_id: "photos",
@@ -348,8 +315,15 @@ describe("InventoryBoard", () => {
         body: JSON.stringify({ photoId: "photo-1" })
       });
     });
-    expect(await screen.findByText("1件の候補を登録待ちへ追加しました。確認してから在庫へ確定してください。")).toBeTruthy();
+    expect(await screen.findByText("1件の候補を見つけました。確認してから在庫に追加してください。")).toBeTruthy();
     expect(screen.getByText("ヨーグルト")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "選択した候補を在庫に追加" }));
+
+    await waitFor(() => {
+      expect(from).toHaveBeenCalledWith("inventory_items");
+      expect(inventoryInsert).toHaveBeenCalledWith([aiItem]);
+    });
+    expect(await screen.findByText("1件を在庫に追加しました。")).toBeTruthy();
   });
 
   it("shows a clear error when photo upload fails", async () => {
@@ -364,7 +338,7 @@ describe("InventoryBoard", () => {
     });
 
     renderBoard();
-    openIngredientModal();
+    openPhotoScan();
 
     fireEvent.change(screen.getByLabelText("写真を撮る"), {
       target: {
@@ -399,12 +373,12 @@ describe("InventoryBoard", () => {
     vi.mocked(fetch).mockResolvedValue({
       ok: false,
       json: async () => ({
-        error: "原因: Gemini APIの解析に失敗しました。影響: 登録待ちへ追加できません。修正方法: 時間を置いて再度解析してください。"
+        error: "原因: Gemini APIの解析に失敗しました。影響: 食材候補を作成できません。修正方法: 時間を置いて再度解析してください。"
       })
     } as Response);
 
     renderBoard();
-    openIngredientModal();
+    openPhotoScan();
 
     fireEvent.change(screen.getByLabelText("写真を撮る"), {
       target: {

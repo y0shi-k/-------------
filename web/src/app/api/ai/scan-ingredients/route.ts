@@ -3,7 +3,7 @@ import {
   buildGeminiIngredientScanRequest,
   GEMINI_INGREDIENT_SCAN_MODEL,
   parseGeminiIngredientResponse,
-  toStagingInsert
+  toInventoryInsert
 } from "@/lib/ai/ingredient-scan";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
@@ -32,9 +32,7 @@ const ERROR_MESSAGES = {
   downloadFailed:
     "原因: 非公開Storageから写真を読み出せませんでした。影響: AI解析を実行できません。修正方法: ログイン状態と写真の保存状態を確認してください。",
   geminiFailed:
-    "原因: Gemini APIの解析に失敗しました。影響: 登録待ちへ追加できません。修正方法: 時間を置いて再度解析してください。",
-  stagingFailed:
-    "原因: 解析候補を登録待ちへ保存できませんでした。影響: 候補が画面に残りません。修正方法: ログイン状態を確認して再度解析してください。"
+    "原因: Gemini APIの解析に失敗しました。影響: 食材候補を作成できません。修正方法: 時間を置いて再度解析してください。"
 };
 
 export async function POST(request: Request) {
@@ -103,18 +101,7 @@ export async function POST(request: Request) {
     return errorResponse(parsed.error, 422);
   }
 
-  const inserts = parsed.items.map((item) => toStagingInsert(item, user.id));
-  const { data: stagingItems, error: stagingError } = await supabase
-    .from("staging_items")
-    .insert(inserts)
-    .select()
-    .order("created_at", { ascending: false });
-
-  if (stagingError || !stagingItems) {
-    return errorResponse(ERROR_MESSAGES.stagingFailed, 500);
-  }
-
-  return NextResponse.json({ items: stagingItems });
+  return NextResponse.json({ items: parsed.items.map((item) => toInventoryInsert(item, user.id)) });
 }
 
 function errorResponse(error: string, status: number) {

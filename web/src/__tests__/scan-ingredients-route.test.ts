@@ -31,13 +31,6 @@ function photoQuery(data: unknown, error: unknown = null) {
   return { select };
 }
 
-function stagingQuery(data: unknown, error: unknown = null) {
-  const order = vi.fn().mockResolvedValue({ data, error });
-  const select = vi.fn(() => ({ order }));
-  const insert = vi.fn(() => ({ select }));
-  return { insert };
-}
-
 function imageBlob() {
   return {
     type: "image/jpeg",
@@ -90,7 +83,7 @@ describe("POST /api/ai/scan-ingredients", () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it("does not insert staging items when Gemini fails", async () => {
+  it("does not write items when Gemini fails", async () => {
     getUser.mockResolvedValue({ data: { user: { id: "user-1" } } });
     from.mockReturnValue(
       photoQuery({
@@ -119,14 +112,16 @@ describe("POST /api/ai/scan-ingredients", () => {
     expect(from).toHaveBeenCalledTimes(1);
   });
 
-  it("scans a photo and inserts staging items for the logged-in user", async () => {
-    const inserted = {
-      id: "staging-1",
+  it("scans a photo and returns inventory candidates for the logged-in user", async () => {
+    const candidate = {
       user_id: "user-1",
       category: "食材",
       name: "牛乳",
       quantity: 1,
       unit: "本",
+      unit_conversion: null,
+      display_expires_on: null,
+      effective_expires_on: null,
       storage_location: "冷蔵庫",
       status_note: "AI解析候補",
       source: "ai_photo"
@@ -143,9 +138,6 @@ describe("POST /api/ai/scan-ingredients", () => {
           usage_type: "ingredient_scan",
           content_type: "image/jpeg"
         });
-      }
-      if (table === "staging_items") {
-        return stagingQuery([inserted]);
       }
       return {};
     });
@@ -177,7 +169,8 @@ describe("POST /api/ai/scan-ingredients", () => {
     const response = await POST(request({ photoId: "photo-1" }));
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({ items: [inserted] });
+    await expect(response.json()).resolves.toEqual({ items: [candidate] });
+    expect(from).not.toHaveBeenCalledWith("staging_items");
     expect(fetch).toHaveBeenCalledWith(
       "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent",
       expect.objectContaining({

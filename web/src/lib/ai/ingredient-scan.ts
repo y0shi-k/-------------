@@ -110,7 +110,7 @@ export function parseGeminiIngredientResponse(response: GeminiResponse): GeminiS
   if (!text) {
     return {
       ok: false,
-      error: "原因: AI解析結果が空でした。影響: 登録待ちへ追加できません。修正方法: 写真を撮り直して再度解析してください。"
+      error: "原因: AI解析結果が空でした。影響: 食材候補を作成できません。修正方法: 写真を撮り直して再度解析してください。"
     };
   }
 
@@ -122,7 +122,7 @@ export function parseGeminiIngredientResponse(response: GeminiResponse): GeminiS
   } catch {
     return {
       ok: false,
-      error: "原因: AI解析結果をJSONとして読めませんでした。影響: 登録待ちへ追加できません。修正方法: 別の写真で再度解析してください。"
+      error: "原因: AI解析結果をJSONとして読めませんでした。影響: 食材候補を作成できません。修正方法: 別の写真で再度解析してください。"
     };
   }
 
@@ -130,7 +130,7 @@ export function parseGeminiIngredientResponse(response: GeminiResponse): GeminiS
   if (!rawItems) {
     return {
       ok: false,
-      error: "原因: AI解析結果に食材候補がありませんでした。影響: 登録待ちへ追加できません。修正方法: 食材名が写るように撮り直してください。"
+      error: "原因: AI解析結果に食材候補がありませんでした。影響: 食材候補を作成できません。修正方法: 食材名が写るように撮り直してください。"
     };
   }
 
@@ -139,7 +139,7 @@ export function parseGeminiIngredientResponse(response: GeminiResponse): GeminiS
   if (items.length === 0) {
     return {
       ok: false,
-      error: "原因: 食材として使える候補が見つかりませんでした。影響: 登録待ちへ追加できません。修正方法: 店舗情報ではなく食材名が写る写真を選んでください。"
+      error: "原因: 食材として使える候補が見つかりませんでした。影響: 食材候補を作成できません。修正方法: 店舗情報ではなく食材名が写る写真を選んでください。"
     };
   }
 
@@ -162,6 +162,22 @@ export function toStagingInsert(candidate: IngredientScanCandidate, userId: stri
     status_note: candidate.status_note,
     source: "ai_photo",
     raw_text: candidate.raw_text
+  };
+}
+
+export function toInventoryInsert(candidate: IngredientScanCandidate, userId: string): Omit<StockItem, "id" | "created_at" | "updated_at"> {
+  return {
+    user_id: userId,
+    category: candidate.category,
+    name: candidate.name,
+    quantity: candidate.quantity,
+    unit: candidate.unit,
+    unit_conversion: null,
+    display_expires_on: candidate.display_expires_on,
+    effective_expires_on: candidate.effective_expires_on,
+    storage_location: candidate.storage_location,
+    status_note: candidate.status_note,
+    source: "ai_photo"
   };
 }
 

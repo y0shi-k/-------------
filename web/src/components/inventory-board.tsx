@@ -17,7 +17,6 @@ type InventoryBoardProps = {
   userId: string;
   initialInventoryItems: StockItem[];
   initialStorageLocations?: StorageLocation[];
-  initialStagingItems: StockItem[];
 };
 
 type Feedback = {
@@ -32,14 +31,11 @@ type PendingDelete = {
 };
 
 type ScanIngredientsResponse = {
-  items?: StockItem[];
+  items?: InventoryInsert[];
   error?: string;
 };
 
-type EditingTarget =
-  | { list: "staging"; item: StockItem }
-  | { list: "inventory"; item: StockItem }
-  | null;
+type EditingTarget = { item: StockItem } | null;
 
 type InventoryFilters = {
   category: "all" | StockItem["category"];
@@ -48,10 +44,19 @@ type InventoryFilters = {
   sort: "expiry_asc" | "name_asc" | "created_desc";
 };
 
-type InventoryView = "inventory" | "shopping" | "staging";
+type InventoryView = "inventory" | "shopping";
+
+type AddFlow = "choice" | "manual" | "photo" | null;
+
+type InventoryInsert = Omit<StockItem, "id" | "created_at" | "updated_at">;
+
+type ScanCandidate = {
+  clientId: string;
+  item: InventoryInsert;
+};
 
 type NormalizedForm =
-  | { data: Omit<StockItem, "id" | "created_at" | "updated_at"> }
+  | { data: InventoryInsert }
   | { error: string };
 
 function normalizeUnitConversion(values: StockItemFormValues): UnitConversion | null | { error: string } {
@@ -111,11 +116,6 @@ function normalizeForm(values: StockItemFormValues, userId: string): NormalizedF
   };
 }
 
-function formatDate(value: string | null) {
-  if (!value) return "未設定";
-  return value;
-}
-
 function compactDate(value: string | null) {
   if (!value) return "";
   const [, month, day] = value.split("-");
@@ -141,22 +141,6 @@ function unitConversionLabel(item: StockItem) {
   return `${conversion.fromQty}${conversion.fromUnit} = ${conversion.toQty}${conversion.toUnit}`;
 }
 
-function toInventoryInsert(item: StockItem, userId: string): Omit<StockItem, "id" | "created_at" | "updated_at"> {
-  return {
-    user_id: userId,
-    category: item.category,
-    name: item.name,
-    quantity: item.quantity,
-    unit: item.unit,
-    unit_conversion: item.unit_conversion,
-    display_expires_on: item.display_expires_on,
-    effective_expires_on: item.effective_expires_on,
-    storage_location: item.storage_location,
-    status_note: item.status_note,
-    source: item.source || "manual"
-  };
-}
-
 function sortItems(items: StockItem[], sort: InventoryFilters["sort"]) {
   return [...items].sort((a, b) => {
     if (sort === "expiry_asc") {
@@ -176,27 +160,27 @@ const defaultStorageLocationNames = ["冷蔵庫", "冷凍庫", "常温", "その
 export function InventoryBoard({
   userId,
   initialInventoryItems,
-  initialStorageLocations = [],
-  initialStagingItems
+  initialStorageLocations = []
 }: InventoryBoardProps) {
   const [inventoryItems, setInventoryItems] = useState(initialInventoryItems);
   const [storageLocations, setStorageLocations] = useState(initialStorageLocations);
-  const [stagingItems, setStagingItems] = useState(initialStagingItems);
   const [values, setValues] = useState<StockItemFormValues>(emptyStockItemFormValues);
   const [newLocationName, setNewLocationName] = useState("");
   const [editing, setEditing] = useState<EditingTarget>(null);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
+  const [addFlow, setAddFlow] = useState<AddFlow>(null);
   const [photoFeedback, setPhotoFeedback] = useState<Feedback | null>(null);
   const [selectedPhoto, setSelectedPhoto] = useState<File | null>(null);
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
+  const [scanCandidates, setScanCandidates] = useState<ScanCandidate[]>([]);
+  const [selectedScanCandidateIds, setSelectedScanCandidateIds] = useState<string[]>([]);
   const [inventoryFilters, setInventoryFilters] = useState<InventoryFilters>({
     category: "all",
     storageLocation: "all",
     expiry: "all",
     sort: "expiry_asc"
   });
-  const [selectedStagingIds, setSelectedStagingIds] = useState<string[]>([]);
   const [selectedInventoryIds, setSelectedInventoryIds] = useState<string[]>([]);
   const [activeView, setActiveView] = useState<InventoryView>("inventory");
   const [isSaving, setIsSaving] = useState(false);
@@ -215,18 +199,18 @@ export function InventoryBoard({
           ...defaultStorageLocationNames,
           ...storageLocations.map((location) => location.name),
           ...inventoryItems.map((item) => item.storage_location),
-          ...stagingItems.map((item) => item.storage_location)
+          ...scanCandidates.map((candidate) => candidate.item.storage_location)
         ].filter(Boolean))
       ).sort((a, b) => a.localeCompare(b, "ja")),
-    [inventoryItems, stagingItems, storageLocations]
+    [inventoryItems, scanCandidates, storageLocations]
   );
   const storageLocationUsage = useMemo(
     () =>
-      [...inventoryItems, ...stagingItems].reduce<Record<string, number>>((usage, item) => {
+      inventoryItems.reduce<Record<string, number>>((usage, item) => {
         usage[item.storage_location] = (usage[item.storage_location] ?? 0) + 1;
         return usage;
       }, {}),
-    [inventoryItems, stagingItems]
+    [inventoryItems]
   );
   const filteredInventoryItems = useMemo(() => {
     const filtered = inventoryItems.filter((item) => {
@@ -254,43 +238,50 @@ export function InventoryBoard({
     setEditing(null);
   }
 
-  function openManualAdd() {
+  function openAddChoice() {
     resetForm();
-    setActiveView("staging");
+    resetPhoto();
+    setScanCandidates([]);
+    setSelectedScanCandidateIds([]);
+    setAddFlow("choice");
   }
 
-  function closeStagingModal() {
+  function openManualAdd() {
     resetForm();
-    setActiveView("inventory");
+    setAddFlow("manual");
+  }
+
+  function openPhotoAdd() {
+    resetForm();
+    resetPhoto();
+    setScanCandidates([]);
+    setSelectedScanCandidateIds([]);
+    setAddFlow("photo");
+  }
+
+  function closeAddModal() {
+    resetForm();
+    resetPhoto();
+    setScanCandidates([]);
+    setSelectedScanCandidateIds([]);
+    setAddFlow(null);
   }
 
   function updateInventoryFilter<K extends keyof InventoryFilters>(key: K, value: InventoryFilters[K]) {
     setInventoryFilters((current) => ({ ...current, [key]: value }));
   }
 
-  function toggleSelected(list: "staging" | "inventory", itemId: string) {
+  function toggleSelected(list: "inventory", itemId: string) {
     const update = (ids: string[]) => (ids.includes(itemId) ? ids.filter((id) => id !== itemId) : [...ids, itemId]);
-    if (list === "staging") {
-      setSelectedStagingIds(update);
-    } else {
-      setSelectedInventoryIds(update);
-    }
+    if (list === "inventory") setSelectedInventoryIds(update);
   }
 
-  function selectAllVisible(list: "staging" | "inventory", itemIds: string[]) {
-    if (list === "staging") {
-      setSelectedStagingIds(itemIds);
-    } else {
-      setSelectedInventoryIds(itemIds);
-    }
+  function selectAllVisible(list: "inventory", itemIds: string[]) {
+    if (list === "inventory") setSelectedInventoryIds(itemIds);
   }
 
-  function clearSelected(list: "staging" | "inventory") {
-    if (list === "staging") {
-      setSelectedStagingIds([]);
-    } else {
-      setSelectedInventoryIds([]);
-    }
+  function clearSelected(list: "inventory") {
+    if (list === "inventory") setSelectedInventoryIds([]);
   }
 
   function resetPhoto() {
@@ -338,7 +329,7 @@ export function InventoryBoard({
 
   async function deleteStorageLocation(location: StorageLocation) {
     if ((storageLocationUsage[location.name] ?? 0) > 0) {
-      setFeedback({ tone: "error", message: "使用中の保存場所は削除できません。在庫や登録待ちの保存場所を変更してから削除してください。" });
+      setFeedback({ tone: "error", message: "使用中の保存場所は削除できません。在庫の保存場所を変更してから削除してください。" });
       return;
     }
 
@@ -445,32 +436,59 @@ export function InventoryBoard({
           tone: "error",
           message:
             scanResult.error ||
-            "原因: AI解析結果を取得できませんでした。影響: 登録待ちへ追加できません。修正方法: 時間を置いて再度解析してください。"
+            "原因: AI解析結果を取得できませんでした。影響: 食材候補を作成できません。修正方法: 時間を置いて再度解析してください。"
         });
         return;
       }
 
-      setStagingItems((items) => [...(scanResult.items ?? []), ...items]);
+      const candidates = (scanResult.items ?? []).map((item, index) => ({
+        clientId: `${Date.now()}-${index}`,
+        item
+      }));
+      setScanCandidates(candidates);
+      setSelectedScanCandidateIds(candidates.map((candidate) => candidate.clientId));
       resetPhoto();
-      setPhotoFeedback({ tone: "success", message: `${scanResult.items.length}件の候補を登録待ちへ追加しました。確認してから在庫へ確定してください。` });
+      setPhotoFeedback({ tone: "success", message: `${candidates.length}件の候補を見つけました。確認してから在庫に追加してください。` });
     } catch {
       setPhotoFeedback({
         tone: "error",
-        message: "原因: 写真の保存またはAI解析に失敗しました。影響: 登録待ちへ追加できません。修正方法: 別の写真で撮り直してください。"
+        message: "原因: 写真の保存またはAI解析に失敗しました。影響: 食材候補を作成できません。修正方法: 別の写真で撮り直してください。"
       });
     } finally {
       setIsUploadingPhoto(false);
     }
   }
 
-  function startEdit(list: "staging" | "inventory", item: StockItem) {
+  function startEdit(_list: "inventory", item: StockItem) {
     setValues(toFormValues(item));
-    setEditing({ list, item });
-    setActiveView("staging");
+    setEditing({ item });
+    setAddFlow("manual");
     setFeedback({ tone: "info", message: `${item.name} を編集中です。` });
   }
 
-  async function saveStaging(event: FormEvent<HTMLFormElement>) {
+  function editScanCandidate(candidate: ScanCandidate) {
+    setValues({
+      category: candidate.item.category,
+      name: candidate.item.name,
+      quantity: String(candidate.item.quantity),
+      unit: candidate.item.unit,
+      conversion_from_qty: "",
+      conversion_from_unit: "",
+      conversion_to_qty: "",
+      conversion_to_unit: "",
+      display_expires_on: candidate.item.display_expires_on ?? "",
+      effective_expires_on: candidate.item.effective_expires_on ?? "",
+      purchase_date: "",
+      storage_location: candidate.item.storage_location,
+      status_note: candidate.item.status_note
+    });
+    setScanCandidates((items) => items.filter((item) => item.clientId !== candidate.clientId));
+    setSelectedScanCandidateIds((ids) => ids.filter((id) => id !== candidate.clientId));
+    setAddFlow("manual");
+    setPhotoFeedback({ tone: "info", message: `${candidate.item.name} をフォームで編集中です。保存すると在庫に追加されます。` });
+  }
+
+  async function saveInventory(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const normalized = normalizeForm(values, userId);
     if ("error" in normalized) {
@@ -482,9 +500,8 @@ export function InventoryBoard({
     setFeedback(null);
 
     if (editing) {
-      const table = editing.list === "staging" ? "staging_items" : "inventory_items";
       const { data, error } = await supabase
-        .from(table)
+        .from("inventory_items")
         .update(normalized.data)
         .eq("id", editing.item.id)
         .eq("user_id", userId)
@@ -498,67 +515,62 @@ export function InventoryBoard({
         return;
       }
 
-      if (editing.list === "staging") {
-        setStagingItems((items) => items.map((item) => (item.id === data.id ? (data as StockItem) : item)));
-      } else {
-        setInventoryItems((items) => items.map((item) => (item.id === data.id ? (data as StockItem) : item)));
-      }
+      setInventoryItems((items) => items.map((item) => (item.id === data.id ? (data as StockItem) : item)));
       resetForm();
+      setAddFlow(null);
       setFeedback({ tone: "success", message: "内容を更新しました。" });
       return;
     }
 
-    const { data, error } = await supabase.from("staging_items").insert(normalized.data).select().single();
+    const { data, error } = await supabase.from("inventory_items").insert(normalized.data).select().single();
     setIsSaving(false);
 
     if (error || !data) {
-      setFeedback({ tone: "error", message: "登録待ちに追加できませんでした。ログイン状態と入力内容を確認してください。" });
+      setFeedback({ tone: "error", message: "在庫に追加できませんでした。ログイン状態と入力内容を確認してください。" });
       return;
     }
 
-    setStagingItems((items) => [data as StockItem, ...items]);
+    setInventoryItems((items) => [data as StockItem, ...items]);
     resetForm();
-    setFeedback({ tone: "success", message: "登録待ちに追加しました。" });
+    setAddFlow(null);
+    setFeedback({ tone: "success", message: "在庫に追加しました。" });
   }
 
-  async function confirmStaging(item: StockItem) {
-    setIsSaving(true);
-    setFeedback(null);
+  function toggleScanCandidate(candidateId: string) {
+    setSelectedScanCandidateIds((ids) => (ids.includes(candidateId) ? ids.filter((id) => id !== candidateId) : [...ids, candidateId]));
+  }
 
-    const { data: inventoryData, error: insertError } = await supabase
-      .from("inventory_items")
-      .insert(toInventoryInsert(item, userId))
-      .select()
-      .single();
+  async function saveSelectedScanCandidates() {
+    const selectedItems = scanCandidates
+      .filter((candidate) => selectedScanCandidateIds.includes(candidate.clientId))
+      .map((candidate) => candidate.item);
 
-    if (insertError || !inventoryData) {
-      setIsSaving(false);
-      setFeedback({ tone: "error", message: "在庫へ確定できませんでした。時間を置いて再度お試しください。" });
+    if (selectedItems.length === 0) {
+      setPhotoFeedback({ tone: "error", message: "在庫に追加する候補を1件以上選んでください。" });
       return;
     }
 
-    const { error: deleteError } = await supabase
-      .from("staging_items")
-      .delete()
-      .eq("id", item.id)
-      .eq("user_id", userId);
+    setIsSaving(true);
+    setPhotoFeedback(null);
+
+    const { data, error } = await supabase
+      .from("inventory_items")
+      .insert(selectedItems)
+      .select()
+      .order("created_at", { ascending: false });
 
     setIsSaving(false);
 
-    if (deleteError) {
-      setInventoryItems((items) => [inventoryData as StockItem, ...items]);
-      setFeedback({
-        tone: "error",
-        message: "在庫には追加されましたが、登録待ちから削除できませんでした。画面を更新して確認してください。"
-      });
+    if (error || !data) {
+      setPhotoFeedback({ tone: "error", message: "在庫に追加できませんでした。ログイン状態と候補の内容を確認してください。" });
       return;
     }
 
-    setInventoryItems((items) => [inventoryData as StockItem, ...items]);
-    setStagingItems((items) => items.filter((current) => current.id !== item.id));
-    setSelectedStagingIds((ids) => ids.filter((id) => id !== item.id));
-    if (editing?.item.id === item.id) resetForm();
-    setFeedback({ tone: "success", message: `${item.name} を在庫へ確定しました。` });
+    setInventoryItems((items) => [...(data as StockItem[]), ...items]);
+    setScanCandidates([]);
+    setSelectedScanCandidateIds([]);
+    setAddFlow(null);
+    setFeedback({ tone: "success", message: `${selectedItems.length}件を在庫に追加しました。` });
   }
 
   async function adjustInventoryQuantity(item: StockItem, delta: number) {
@@ -584,12 +596,11 @@ export function InventoryBoard({
     setInventoryItems((items) => items.map((current) => (current.id === item.id ? (data as StockItem) : current)));
   }
 
-  async function deleteItem(list: "staging" | "inventory", item: StockItem) {
+  async function deleteItem(_list: "inventory", item: StockItem) {
     setIsSaving(true);
     setFeedback(null);
 
-    const table = list === "staging" ? "staging_items" : "inventory_items";
-    const { error } = await supabase.from(table).delete().eq("id", item.id).eq("user_id", userId);
+    const { error } = await supabase.from("inventory_items").delete().eq("id", item.id).eq("user_id", userId);
 
     setIsSaving(false);
 
@@ -598,36 +609,10 @@ export function InventoryBoard({
       return;
     }
 
-    if (list === "staging") {
-      setStagingItems((items) => items.filter((current) => current.id !== item.id));
-      setSelectedStagingIds((ids) => ids.filter((id) => id !== item.id));
-    } else {
-      setInventoryItems((items) => items.filter((current) => current.id !== item.id));
-      setSelectedInventoryIds((ids) => ids.filter((id) => id !== item.id));
-    }
+    setInventoryItems((items) => items.filter((current) => current.id !== item.id));
+    setSelectedInventoryIds((ids) => ids.filter((id) => id !== item.id));
     if (editing?.item.id === item.id) resetForm();
     setFeedback({ tone: "info", message: `${item.name} を削除しました。` });
-  }
-
-  async function deleteSelectedStaging() {
-    if (selectedStagingIds.length === 0) return;
-    setIsSaving(true);
-    setFeedback(null);
-
-    const { error } = await supabase.from("staging_items").delete().eq("user_id", userId).in("id", selectedStagingIds);
-
-    setIsSaving(false);
-
-    if (error) {
-      setFeedback({ tone: "error", message: "登録待ちを一括削除できませんでした。ログイン状態を確認してください。" });
-      return;
-    }
-
-    const deletedCount = selectedStagingIds.length;
-    setStagingItems((items) => items.filter((item) => !selectedStagingIds.includes(item.id)));
-    setSelectedStagingIds([]);
-    if (editing && selectedStagingIds.includes(editing.item.id)) resetForm();
-    setFeedback({ tone: "info", message: `登録待ちを${deletedCount}件削除しました。` });
   }
 
   return (
@@ -635,8 +620,8 @@ export function InventoryBoard({
       <div className="inventory-canvas-header">
         <div>
           <h2 id="inventory-heading">食材管理</h2>
-          <p className="eyebrow">{activeView === "shopping" ? "SHOPPING LIST" : activeView === "staging" ? "REGISTRATION HUB" : "ALL STORAGE"}</p>
-          <h2 className="sr-only">在庫と登録待ち</h2>
+          <p className="eyebrow">{activeView === "shopping" ? "SHOPPING LIST" : "ALL STORAGE"}</p>
+          <h2 className="sr-only">在庫</h2>
         </div>
 
         <div className="canvas-mode-control" aria-label="食材管理の表示切替">
@@ -646,7 +631,7 @@ export function InventoryBoard({
           <button className="secondary-button compact-button" data-active={activeView === "shopping"} type="button" onClick={() => setActiveView("shopping")}>
             買い物リスト
           </button>
-          <button className="primary-button compact-button icon-action" type="button" onClick={openManualAdd} aria-label="食材を追加">
+          <button className="primary-button compact-button icon-action" type="button" onClick={openAddChoice} aria-label="食材を追加">
             +
           </button>
         </div>
@@ -672,26 +657,43 @@ export function InventoryBoard({
         />
       ) : null}
 
-      {activeView === "staging" ? (
-        <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="staging-heading">
-        <section className="stock-panel canvas-modal inventory-editor-modal" aria-labelledby="staging-heading">
-          <button className="modal-close-button" type="button" onClick={closeStagingModal} aria-label="閉じる">×</button>
+      {addFlow === "choice" ? (
+        <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="add-choice-heading">
+          <section className="stock-panel canvas-modal add-choice-modal" aria-labelledby="add-choice-heading">
+            <button className="modal-close-button" type="button" onClick={closeAddModal} aria-label="閉じる">×</button>
+            <div className="panel-title">
+              <div>
+                <span>ADD STOCK</span>
+                <h3 id="add-choice-heading">食材を追加</h3>
+              </div>
+            </div>
+            <div className="add-choice-grid">
+              <button className="add-choice-card scan-choice" type="button" onClick={openPhotoAdd} aria-label="画像スキャン">
+                <span>画像スキャン</span>
+                <small>写真からAI候補を作り、確認してから在庫に追加します。</small>
+              </button>
+              <button className="add-choice-card manual-choice" type="button" onClick={openManualAdd} aria-label="手動で追加">
+                <span>手動で追加</span>
+                <small>品名や数量を入力して、在庫へ直接追加します。</small>
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
+
+      {addFlow === "manual" ? (
+        <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="inventory-editor-heading">
+        <section className="stock-panel canvas-modal inventory-editor-modal" aria-labelledby="inventory-editor-heading">
+          <button className="modal-close-button" type="button" onClick={closeAddModal} aria-label="閉じる">×</button>
           <div className="panel-title">
             <div>
-              {editing ? (
-                <h3 id="staging-heading" style={{ margin: 0 }}>項目の編集</h3>
-              ) : (
-                <>
-                  <span>登録待ち</span>
-                  <h3 id="staging-heading">確認してから在庫へ</h3>
-                </>
-              )}
+              <span>{editing ? "EDIT STOCK" : "MANUAL ADD"}</span>
+              <h3 id="inventory-editor-heading">{editing ? "在庫を編集" : "食材をリストへ"}</h3>
             </div>
-            {editing ? null : <strong>{stagingItems.length}件</strong>}
           </div>
 
           {!editing ? (
-            <section className="location-manager" aria-labelledby="location-manager-heading">
+            <section className="location-manager compact-location-manager" aria-labelledby="location-manager-heading">
               <div className="location-manager-heading">
                 <div>
                   <span>保存場所</span>
@@ -734,7 +736,7 @@ export function InventoryBoard({
             </section>
           ) : null}
 
-          <form className="stock-form" onSubmit={saveStaging}>
+          <form className="stock-form" onSubmit={saveInventory}>
             <label>
               品名
               <input value={values.name} onChange={(event) => updateValue("name", event.target.value)} placeholder="例: 牛乳" />
@@ -855,17 +857,23 @@ export function InventoryBoard({
             ) : null}
             <div className="form-actions">
               <button className="primary-button submit-large" type="submit" disabled={isSaving}>
-                {editing ? "内容を更新する" : "登録待ちに追加"}
+                {editing ? "内容を更新する" : "在庫に追加"}
               </button>
             </div>
           </form>
+        </section>
+        </div>
+      ) : null}
 
-          {!editing ? (
-            <section className="photo-capture-panel" aria-labelledby="photo-capture-heading">
+      {addFlow === "photo" ? (
+        <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="photo-capture-heading">
+        <section className="stock-panel canvas-modal inventory-editor-modal photo-scan-modal" aria-labelledby="photo-capture-heading">
+          <button className="modal-close-button" type="button" onClick={closeAddModal} aria-label="閉じる">×</button>
+          <section className="photo-capture-panel" aria-labelledby="photo-capture-heading">
               <div className="photo-capture-heading">
                 <div>
                   <span>写真登録</span>
-                  <h4 id="photo-capture-heading">写真を解析して登録待ちへ</h4>
+                  <h4 id="photo-capture-heading">写真を解析して在庫へ</h4>
                 </div>
                 <label className="photo-file-button">
                   写真を撮る
@@ -904,32 +912,46 @@ export function InventoryBoard({
                   別の写真にする
                 </button>
               </div>
-            </section>
-          ) : null}
+          </section>
 
-          {!editing ? (
-            <ItemList
-              emptyText="登録待ちはありません。まずは手動で1件追加してください。"
-              items={stagingItems}
-              list="staging"
-              onConfirm={confirmStaging}
-              onDelete={(list, item) => requestDelete(item.name, "この登録待ちを削除します。元には戻せません。", () => deleteItem(list, item))}
-              onEdit={startEdit}
-              onSelect={toggleSelected}
-              selectedIds={selectedStagingIds}
-              toolbar={
-                <ListToolbar
-                  disabled={isSaving}
-                  itemIds={stagingItems.map((item) => item.id)}
-                  onClear={() => clearSelected("staging")}
-                  onDeleteSelected={() => requestDelete(`${selectedStagingIds.length}件の登録待ち`, "選択した登録待ちをまとめて削除します。元には戻せません。", deleteSelectedStaging)}
-                  onSelectAll={(ids) => selectAllVisible("staging", ids)}
-                  selectedCount={selectedStagingIds.length}
-                  showDelete
-                />
-              }
-              disabled={isSaving}
-            />
+          {scanCandidates.length > 0 ? (
+            <section className="scan-candidate-panel" aria-labelledby="scan-candidate-heading">
+              <div className="panel-title">
+                <div>
+                  <span>AI候補</span>
+                  <h3 id="scan-candidate-heading">確認して在庫に追加</h3>
+                </div>
+                <strong>{selectedScanCandidateIds.length}件選択中</strong>
+              </div>
+              <div className="scan-candidate-list">
+                {scanCandidates.map((candidate) => (
+                  <article className="scan-candidate-card" key={candidate.clientId}>
+                    <label className="select-row">
+                      <input
+                        checked={selectedScanCandidateIds.includes(candidate.clientId)}
+                        disabled={isSaving}
+                        onChange={() => toggleScanCandidate(candidate.clientId)}
+                        type="checkbox"
+                      />
+                      選択
+                    </label>
+                    <div>
+                      <h4>{candidate.item.name}</h4>
+                      <p>{candidate.item.quantity}{candidate.item.unit} · {candidate.item.storage_location}</p>
+                      {candidate.item.display_expires_on || candidate.item.effective_expires_on ? (
+                        <small>期限 {candidate.item.effective_expires_on ?? candidate.item.display_expires_on}</small>
+                      ) : null}
+                    </div>
+                    <button className="secondary-button compact-button" type="button" disabled={isSaving} onClick={() => editScanCandidate(candidate)}>
+                      編集
+                    </button>
+                  </article>
+                ))}
+              </div>
+              <button className="primary-button submit-large" type="button" disabled={isSaving} onClick={saveSelectedScanCandidates}>
+                選択した候補を在庫に追加
+              </button>
+            </section>
           ) : null}
         </section>
         </div>
@@ -995,7 +1017,7 @@ export function InventoryBoard({
           </div>
 
           <ItemList
-            emptyText="在庫はありません。登録待ちから確定するとここに表示されます。"
+            emptyText="在庫はありません。右上の＋から追加してください。"
             items={filteredInventoryItems}
             list="inventory"
             onDelete={(list, item) => requestDelete(item.name, "この在庫を削除します。元には戻せません。", () => deleteItem(list, item))}
@@ -1025,17 +1047,16 @@ type ItemListProps = {
   disabled: boolean;
   emptyText: string;
   items: StockItem[];
-  list: "staging" | "inventory";
-  onConfirm?: (item: StockItem) => void;
-  onDelete: (list: "staging" | "inventory", item: StockItem) => void;
-  onEdit: (list: "staging" | "inventory", item: StockItem) => void;
+  list: "inventory";
+  onDelete: (list: "inventory", item: StockItem) => void;
+  onEdit: (list: "inventory", item: StockItem) => void;
   onQuantityChange?: (item: StockItem, delta: number) => void;
-  onSelect: (list: "staging" | "inventory", itemId: string) => void;
+  onSelect: (list: "inventory", itemId: string) => void;
   selectedIds: string[];
   toolbar: ReactNode;
 };
 
-function ItemList({ disabled, emptyText, items, list, onConfirm, onDelete, onEdit, onQuantityChange, onSelect, selectedIds, toolbar }: ItemListProps) {
+function ItemList({ disabled, emptyText, items, list, onDelete, onEdit, onQuantityChange, onSelect, selectedIds, toolbar }: ItemListProps) {
   if (items.length === 0) {
     return <p className="empty-list">{emptyText}</p>;
   }
@@ -1062,20 +1083,8 @@ function ItemList({ disabled, emptyText, items, list, onConfirm, onDelete, onEdi
             </div>
             <p>{item.storage_location} · 購入 {compactDate(item.created_at.slice(0, 10)) || "-"}</p>
           </div>
-          {list === "staging" ? (
-            <dl className="item-meta">
-              <div>
-                <dt>表示期限</dt>
-                <dd>{formatDate(item.display_expires_on)}</dd>
-              </div>
-              <div>
-                <dt>実質期限</dt>
-                <dd>{formatDate(item.effective_expires_on)}</dd>
-              </div>
-            </dl>
-          ) : null}
           {item.status_note ? <p className="item-note">{item.status_note}</p> : null}
-          {list === "inventory" && onQuantityChange ? (
+          {onQuantityChange ? (
             <div className="quantity-stepper" aria-label={`${item.name}の数量`}>
               <button type="button" disabled={disabled || item.quantity <= 0} onClick={() => onQuantityChange(item, item.unit === "g" || item.unit === "ml" ? -50 : -1)}>
                 -
@@ -1090,11 +1099,6 @@ function ItemList({ disabled, emptyText, items, list, onConfirm, onDelete, onEdi
             </div>
           ) : null}
           <div className="item-actions">
-            {list === "staging" && onConfirm ? (
-              <button className="primary-button" type="button" disabled={disabled} onClick={() => onConfirm(item)}>
-                在庫へ確定
-              </button>
-            ) : null}
             <button className="secondary-button icon-button" type="button" disabled={disabled} onClick={() => onEdit(list, item)} aria-label={`${item.name}を編集`}>
               <svg aria-hidden="true" viewBox="0 0 24 24">
                 <path d="m16.9 4.1 3 3L8 19H5v-3L16.9 4.1Z" />

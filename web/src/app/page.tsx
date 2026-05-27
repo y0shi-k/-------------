@@ -19,7 +19,6 @@ export default async function Home() {
   }
 
   const [
-    { data: stagingItems },
     { data: inventoryItems },
     { data: cookingHistory },
     { data: recipes },
@@ -29,11 +28,6 @@ export default async function Home() {
     { data: cookCandidates },
     { data: storageLocations }
   ] = await Promise.all([
-    supabase
-      .from("staging_items")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false }),
     supabase
       .from("inventory_items")
       .select("*")
@@ -119,7 +113,6 @@ export default async function Home() {
             <InventoryBoard
               initialInventoryItems={(inventoryItems ?? []) as StockItem[]}
               initialStorageLocations={(storageLocations ?? []) as StorageLocation[]}
-              initialStagingItems={(stagingItems ?? []) as StockItem[]}
               key="ingredients"
               userId={user.id}
             />
@@ -148,7 +141,6 @@ export default async function Home() {
         inventoryCount={(inventoryItems ?? []).length}
         mealCount={(mealSchedules ?? []).length}
         recipeCount={recipesWithIngredients.length}
-        stagingCount={(stagingItems ?? []).length}
         userEmail={user.email ?? "ログイン中のユーザー"}
       />
     </main>

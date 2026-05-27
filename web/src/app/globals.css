@@ -1450,6 +1450,90 @@ h1 {
   font-weight: 800;
 }
 
+.add-choice-modal {
+  width: min(420px, 100%);
+}
+
+.add-choice-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.add-choice-card {
+  display: grid;
+  min-height: 104px;
+  gap: 8px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  padding: 18px;
+  text-align: left;
+}
+
+.add-choice-card span {
+  color: #172033;
+  font-size: 1.05rem;
+  font-weight: 900;
+}
+
+.add-choice-card small {
+  color: #64748b;
+  font-weight: 700;
+  line-height: 1.6;
+}
+
+.scan-choice {
+  border-color: #fecdd3;
+  background: #fff1f2;
+}
+
+.manual-choice {
+  border-color: #fde68a;
+  background: #fffbeb;
+}
+
+.compact-location-manager {
+  padding: 14px;
+}
+
+.photo-scan-modal {
+  width: min(520px, 100%);
+}
+
+.scan-candidate-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.scan-candidate-list {
+  display: grid;
+  gap: 10px;
+}
+
+.scan-candidate-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #f8fafc;
+  padding: 12px;
+}
+
+.scan-candidate-card h4 {
+  margin: 0;
+  color: #172033;
+  font-size: 0.98rem;
+}
+
+.scan-candidate-card p,
+.scan-candidate-card small {
+  margin: 3px 0 0;
+  color: #64748b;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
 .danger-choice {
   background: #fff1f2;
   color: #e11d48;

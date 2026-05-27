@@ -16,7 +16,6 @@ type Mode = {
 type WebModeShellProps = {
   userEmail: string;
   inventoryCount: number;
-  stagingCount: number;
   recipeCount: number;
   mealCount: number;
   historyCount: number;
@@ -30,7 +29,6 @@ type WebModeShellProps = {
 export function WebModeShell({
   userEmail,
   inventoryCount,
-  stagingCount,
   recipeCount,
   mealCount,
   historyCount,
@@ -45,7 +43,7 @@ export function WebModeShell({
         eyebrow: "ALL STORAGE",
         icon: "III",
         shortLabel: "食材",
-        status: `在庫 ${inventoryCount}件 / 登録待ち ${stagingCount}件`
+        status: `在庫 ${inventoryCount}件`
       },
       {
         id: "recipes",
@@ -64,7 +62,7 @@ export function WebModeShell({
         status: `料理履歴 ${historyCount}件`
       }
     ],
-    [historyCount, inventoryCount, mealCount, recipeCount, stagingCount]
+    [historyCount, inventoryCount, mealCount, recipeCount]
   );
   const active = modes.find((mode) => mode.id === activeMode) ?? modes[0];
   const activeChildren = childrenByMode[active.id];

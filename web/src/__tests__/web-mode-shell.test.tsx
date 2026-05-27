@@ -14,7 +14,6 @@ function renderShell() {
       inventoryCount={5}
       mealCount={2}
       recipeCount={4}
-      stagingCount={1}
       userEmail="user@example.com"
     />
   );
@@ -26,7 +25,7 @@ describe("WebModeShell", () => {
 
     expect(screen.getByRole("heading", { name: "料理レシピ・食材管理" })).toBeTruthy();
     expect(screen.getByRole("status").textContent).toContain("食材管理");
-    expect(screen.getAllByText("在庫 5件 / 登録待ち 1件").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("在庫 5件").length).toBeGreaterThan(0);
     expect(screen.getByText("食材管理の中身")).toBeTruthy();
     expect(screen.queryByText("献立レシピの中身")).toBeNull();
   });
