@@ -11,11 +11,13 @@ import {
   UnitConversion,
   toFormValues
 } from "@/lib/inventory/types";
+import type { ShoppingItem } from "@/lib/recipes/types";
 import { buildPhotoStoragePath, compressImageFile } from "@/lib/photos/compress";
 
 type InventoryBoardProps = {
   userId: string;
   initialInventoryItems: StockItem[];
+  initialShoppingItems?: ShoppingItem[];
   initialStorageLocations?: StorageLocation[];
 };
 
@@ -141,6 +143,12 @@ function unitConversionLabel(item: StockItem) {
   return `${conversion.fromQty}${conversion.fromUnit} = ${conversion.toQty}${conversion.toUnit}`;
 }
 
+function shoppingSourceLabel(item: ShoppingItem) {
+  if (item.source_type === "meal_schedule") return item.linked_recipe_name ? `献立: ${item.linked_recipe_name}` : "献立由来";
+  if (item.source_type === "recipe_detail") return item.linked_recipe_name ? `レシピ詳細: ${item.linked_recipe_name}` : "レシピ詳細";
+  return "手動追加";
+}
+
 function sortItems(items: StockItem[], sort: InventoryFilters["sort"]) {
   return [...items].sort((a, b) => {
     if (sort === "expiry_asc") {
@@ -160,12 +168,13 @@ const defaultStorageLocationNames = ["冷蔵庫", "冷凍庫", "常温", "その
 export function InventoryBoard({
   userId,
   initialInventoryItems,
+  initialShoppingItems = [],
   initialStorageLocations = []
 }: InventoryBoardProps) {
   const [inventoryItems, setInventoryItems] = useState(initialInventoryItems);
-  const [storageLocations, setStorageLocations] = useState(initialStorageLocations);
+  const [shoppingItems] = useState(initialShoppingItems);
+  const [storageLocations] = useState(initialStorageLocations);
   const [values, setValues] = useState<StockItemFormValues>(emptyStockItemFormValues);
-  const [newLocationName, setNewLocationName] = useState("");
   const [editing, setEditing] = useState<EditingTarget>(null);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
@@ -204,14 +213,6 @@ export function InventoryBoard({
       ).sort((a, b) => a.localeCompare(b, "ja")),
     [inventoryItems, scanCandidates, storageLocations]
   );
-  const storageLocationUsage = useMemo(
-    () =>
-      inventoryItems.reduce<Record<string, number>>((usage, item) => {
-        usage[item.storage_location] = (usage[item.storage_location] ?? 0) + 1;
-        return usage;
-      }, {}),
-    [inventoryItems]
-  );
   const filteredInventoryItems = useMemo(() => {
     const filtered = inventoryItems.filter((item) => {
       if (inventoryFilters.category !== "all" && item.category !== inventoryFilters.category) return false;
@@ -222,6 +223,7 @@ export function InventoryBoard({
     });
     return sortItems(filtered, inventoryFilters.sort);
   }, [inventoryFilters, inventoryItems]);
+  const openShoppingItems = shoppingItems.filter((item) => item.status === "未購入");
 
   useEffect(() => {
     return () => {
@@ -292,61 +294,6 @@ export function InventoryBoard({
     if (photoInputRef.current) {
       photoInputRef.current.value = "";
     }
-  }
-
-  async function addStorageLocation() {
-    const name = newLocationName.trim();
-    if (!name) {
-      setFeedback({ tone: "error", message: "保存場所名を入力してください。" });
-      return;
-    }
-    if (storageLocationOptions.includes(name)) {
-      setFeedback({ tone: "info", message: `${name} はすでに候補にあります。` });
-      setNewLocationName("");
-      return;
-    }
-
-    setIsSaving(true);
-    setFeedback(null);
-
-    const { data, error } = await supabase
-      .from("storage_locations")
-      .insert({ user_id: userId, name, sort_order: storageLocations.length })
-      .select()
-      .single();
-
-    setIsSaving(false);
-
-    if (error || !data) {
-      setFeedback({ tone: "error", message: "保存場所を追加できませんでした。ログイン状態を確認してください。" });
-      return;
-    }
-
-    setStorageLocations((locations) => [...locations, data as StorageLocation]);
-    setNewLocationName("");
-    setFeedback({ tone: "success", message: `${name} を保存場所に追加しました。` });
-  }
-
-  async function deleteStorageLocation(location: StorageLocation) {
-    if ((storageLocationUsage[location.name] ?? 0) > 0) {
-      setFeedback({ tone: "error", message: "使用中の保存場所は削除できません。在庫の保存場所を変更してから削除してください。" });
-      return;
-    }
-
-    setIsSaving(true);
-    setFeedback(null);
-
-    const { error } = await supabase.from("storage_locations").delete().eq("id", location.id).eq("user_id", userId);
-
-    setIsSaving(false);
-
-    if (error) {
-      setFeedback({ tone: "error", message: "保存場所を削除できませんでした。ログイン状態を確認してください。" });
-      return;
-    }
-
-    setStorageLocations((locations) => locations.filter((current) => current.id !== location.id));
-    setFeedback({ tone: "info", message: `${location.name} を保存場所から削除しました。` });
   }
 
   function selectPhoto(event: ChangeEvent<HTMLInputElement>) {
@@ -692,50 +639,6 @@ export function InventoryBoard({
             </div>
           </div>
 
-          {!editing ? (
-            <section className="location-manager compact-location-manager" aria-labelledby="location-manager-heading">
-              <div className="location-manager-heading">
-                <div>
-                  <span>保存場所</span>
-                  <h4 id="location-manager-heading">保存場所を管理</h4>
-                </div>
-                <div className="location-add-row">
-                  <input
-                    aria-label="追加する保存場所"
-                    value={newLocationName}
-                    onChange={(event) => setNewLocationName(event.target.value)}
-                    placeholder="例: 野菜室"
-                  />
-                  <button className="secondary-button compact-button" disabled={isSaving} onClick={addStorageLocation} type="button">
-                    追加
-                  </button>
-                </div>
-              </div>
-              <div className="location-chip-list">
-                {storageLocationOptions.map((name) => {
-                  const location = storageLocations.find((item) => item.name === name);
-                  const usageCount = storageLocationUsage[name] ?? 0;
-                  return (
-                    <div className="location-chip" key={name}>
-                      <span>{name}</span>
-                      <small>{usageCount}件</small>
-                      {location ? (
-                        <button
-                          className="danger-button compact-button"
-                          disabled={isSaving || usageCount > 0}
-                          onClick={() => requestDelete(location.name, "この保存場所を削除します。使用中の場所は削除できません。", () => deleteStorageLocation(location))}
-                          type="button"
-                        >
-                          削除
-                        </button>
-                      ) : null}
-                    </div>
-                  );
-                })}
-              </div>
-            </section>
-          ) : null}
-
           <form className="stock-form" onSubmit={saveInventory}>
             <label>
               品名
@@ -977,7 +880,25 @@ export function InventoryBoard({
             <button className="secondary-button compact-button" type="button" disabled>購入済み</button>
             <button className="danger-button compact-button" type="button" disabled>選択削除</button>
           </div>
-          <p className="empty-list canvas-empty-large">買うものはありません。</p>
+          {openShoppingItems.length === 0 ? (
+            <p className="empty-list canvas-empty-large">買うものはありません。</p>
+          ) : (
+            <div className="shopping-list">
+              {openShoppingItems.map((item) => (
+                <article className="stock-item compact-stock-item shopping-item" key={item.id}>
+                  <label className="select-row">
+                    <input type="checkbox" disabled />
+                    選択
+                  </label>
+                  <div className="item-main">
+                    <span>{shoppingSourceLabel(item)}</span>
+                    <h4>{item.name}</h4>
+                    <p>{item.required_quantity}{item.unit} / {item.status}</p>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
         </section>
         ) : null}
 

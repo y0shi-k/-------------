@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { InventoryBoard } from "@/components/inventory-board";
-import type { StockItem, StorageLocation } from "@/lib/inventory/types";
+import type { StockItem } from "@/lib/inventory/types";
 
 const from = vi.fn();
 const storageFrom = vi.fn();
@@ -35,15 +35,6 @@ const baseItem: StockItem = {
   storage_location: "冷蔵庫",
   status_note: "朝食用",
   source: "manual",
-  created_at: "2026-05-24T00:00:00Z",
-  updated_at: "2026-05-24T00:00:00Z"
-};
-
-const baseLocation: StorageLocation = {
-  id: "location-1",
-  user_id: "user-1",
-  name: "冷蔵庫",
-  sort_order: 0,
   created_at: "2026-05-24T00:00:00Z",
   updated_at: "2026-05-24T00:00:00Z"
 };
@@ -96,36 +87,6 @@ describe("InventoryBoard", () => {
     expect(screen.getByRole("heading", { name: "食材を追加" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "画像スキャン" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "手動で追加" })).toBeTruthy();
-  });
-
-  it("adds a storage location candidate", async () => {
-    const inserted = { ...baseLocation, id: "location-new", name: "野菜室" };
-    const single = vi.fn().mockResolvedValue({ data: inserted, error: null });
-    const select = vi.fn(() => ({ single }));
-    const insert = vi.fn(() => ({ select }));
-    from.mockReturnValue({ insert });
-
-    renderBoard();
-    openManualAdd();
-
-    fireEvent.change(screen.getByLabelText("追加する保存場所"), { target: { value: "野菜室" } });
-    fireEvent.click(screen.getByRole("button", { name: "追加" }));
-
-    await waitFor(() => {
-      expect(from).toHaveBeenCalledWith("storage_locations");
-      expect(insert).toHaveBeenCalledWith({ user_id: "user-1", name: "野菜室", sort_order: 0 });
-    });
-    expect(await screen.findByText("野菜室 を保存場所に追加しました。")).toBeTruthy();
-    expect(screen.getAllByText("野菜室").length).toBeGreaterThan(0);
-  });
-
-  it("prevents deleting a storage location while it is used", () => {
-    renderBoard({ initialInventoryItems: [baseItem], initialStorageLocations: [baseLocation] });
-    openManualAdd();
-
-    const deleteButtons = screen.getAllByRole("button", { name: "削除" }) as HTMLButtonElement[];
-    expect(deleteButtons.some((button) => button.disabled)).toBe(true);
-    expect(screen.getAllByText("1件").length).toBeGreaterThan(0);
   });
 
   it("adds a manual inventory item with the authenticated user id", async () => {

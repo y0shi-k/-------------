@@ -14,6 +14,7 @@ import {
   RecipeFormValues,
   RecipeIngredient,
   RecipeIngredientFormValues,
+  RecipeIngredientType,
   ShoppingItem,
   splitCsv,
   splitLines,
@@ -47,6 +48,16 @@ type ShoppingFormValues = {
   unit: string;
 };
 
+type RecipeShoppingShortage = {
+  key: string;
+  name: string;
+  recipeName: string;
+  selected: boolean;
+  shortageQuantity: number;
+  type: RecipeIngredientType;
+  unit: string;
+};
+
 type ConsumptionDraft = {
   amount: string;
   ingredientName: string;
@@ -63,6 +74,7 @@ type RecipeSearchMode = "name" | "ingredient" | "all";
 type RecipeSort = "created_desc" | "updated_desc" | "name_asc" | "count_desc" | "ingredients_desc";
 type CookingIngredientTab = "食材" | "調味料";
 type CookingStepTab = "prep" | "steps";
+type ShortageSelectionTab = "all" | "ingredients" | "seasonings";
 
 const mealTypes: MealType[] = ["朝", "昼", "晩", "その他"];
 const mealTypeOrder: Record<MealType, number> = { 朝: 0, 昼: 1, 晩: 2, その他: 3 };
@@ -98,6 +110,11 @@ function addDays(value: string, days: number) {
   const [year, month, day] = value.split("-").map(Number);
   const date = new Date(Date.UTC(year, month - 1, day + days));
   return date.toISOString().slice(0, 10);
+}
+
+function recipeStepRows(value: string) {
+  const rows = value.split(/\r?\n/);
+  return rows.length > 0 ? rows : [""];
 }
 
 function normalizeRecipeForm(values: RecipeFormValues): NormalizedRecipeForm {
@@ -161,6 +178,7 @@ function toShortageKey(name: string, unit: string, recipeName: string) {
 
 function shoppingSourceLabel(item: ShoppingItem) {
   if (item.source_type === "meal_schedule") return item.linked_recipe_name ? `献立: ${item.linked_recipe_name}` : "献立由来";
+  if (item.source_type === "recipe_detail") return item.linked_recipe_name ? `レシピ詳細: ${item.linked_recipe_name}` : "レシピ詳細";
   return "手動追加";
 }
 
@@ -216,6 +234,24 @@ function buildShortageCandidates(schedule: MealSchedule | null, recipes: Recipe[
     .filter((item) => item.shortageQuantity > 0);
 }
 
+function compareRecipeWithInventory(recipe: Recipe, inventoryItems: StockItem[]) {
+  return recipe.ingredients
+    .map((ingredient, index) => {
+      const stockAmount = inventoryAmountByNameAndUnit(inventoryItems, ingredient.name, ingredient.unit);
+      const shortageQuantity = Math.max(0, ingredient.amount - stockAmount);
+      return {
+        key: `${ingredient.name}:${ingredient.unit}:${index}`,
+        name: ingredient.name,
+        selected: false,
+        shortageQuantity,
+        type: ingredient.item_type,
+        unit: ingredient.unit,
+        recipeName: recipe.name
+      };
+    })
+    .filter((item) => item.name && item.shortageQuantity > 0);
+}
+
 export function RecipeMealWorkspace({
   initialCookCandidates,
   initialInventoryItems,
@@ -266,6 +302,9 @@ export function RecipeMealWorkspace({
   const [isTextImportOpen, setIsTextImportOpen] = useState(false);
   const [isAiMenuOpen, setIsAiMenuOpen] = useState(false);
   const [isRecipeEditorOpen, setIsRecipeEditorOpen] = useState(false);
+  const [shortageSelectionItems, setShortageSelectionItems] = useState<RecipeShoppingShortage[]>([]);
+  const [shortageSelectionTab, setShortageSelectionTab] = useState<ShortageSelectionTab>("all");
+  const [shortageSelectionRecipeName, setShortageSelectionRecipeName] = useState("");
   const router = useRouter();
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
 
@@ -282,6 +321,18 @@ export function RecipeMealWorkspace({
   const openShoppingItems = shoppingItems.filter((item) => item.status === "未購入");
   const purchasedShoppingItems = shoppingItems.filter((item) => item.status === "購入済");
   const activeCookCandidates = cookCandidates.filter((item) => item.status === "候補");
+  const recipeIngredientEntries = recipeValues.ingredients.map((ingredient, index) => ({ ingredient, index }));
+  const foodIngredientEntries = recipeIngredientEntries.filter(({ ingredient }) => ingredient.item_type === "食材");
+  const seasoningIngredientEntries = recipeIngredientEntries.filter(({ ingredient }) => ingredient.item_type === "調味料");
+  const prepStepEntries = recipeStepRows(recipeValues.prep_steps);
+  const cookStepEntries = recipeStepRows(recipeValues.steps);
+  const filteredShortageSelectionItems = shortageSelectionItems.filter((item) => {
+    if (shortageSelectionTab === "ingredients") return item.type !== "調味料";
+    if (shortageSelectionTab === "seasonings") return item.type === "調味料";
+    return true;
+  });
+  const selectedShortageSelectionCount = shortageSelectionItems.filter((item) => item.selected).length;
+  const allVisibleShortagesSelected = filteredShortageSelectionItems.length > 0 && filteredShortageSelectionItems.every((item) => item.selected);
 
   function updateShoppingValue<K extends keyof ShoppingFormValues>(key: K, value: ShoppingFormValues[K]) {
     setShoppingValues((current) => ({ ...current, [key]: value }));
@@ -305,10 +356,10 @@ export function RecipeMealWorkspace({
     }));
   }
 
-  function addIngredientRow() {
+  function addIngredientRow(itemType: RecipeIngredientType = "食材") {
     setRecipeValues((current) => ({
       ...current,
-      ingredients: [...current.ingredients, { ...emptyRecipeIngredientFormValues }]
+      ingredients: [...current.ingredients, { ...emptyRecipeIngredientFormValues, item_type: itemType }]
     }));
   }
 
@@ -320,6 +371,49 @@ export function RecipeMealWorkspace({
           ? current.ingredients.filter((_, currentIndex) => currentIndex !== index)
           : current.ingredients
     }));
+  }
+
+  function updateRecipeStep(key: "prep_steps" | "steps", index: number, value: string) {
+    setRecipeValues((current) => {
+      const rows = recipeStepRows(current[key]);
+      const nextValues = value.split(/\r?\n/);
+      rows.splice(index, 1, ...nextValues);
+      return { ...current, [key]: rows.join("\n") };
+    });
+  }
+
+  function addRecipeStep(key: "prep_steps" | "steps") {
+    setRecipeValues((current) => {
+      const rows = recipeStepRows(current[key]);
+      return { ...current, [key]: [...rows, ""].join("\n") };
+    });
+  }
+
+  function removeRecipeStep(key: "prep_steps" | "steps", index: number) {
+    setRecipeValues((current) => {
+      const rows = recipeStepRows(current[key]);
+      const nextRows = rows.length > 1 ? rows.filter((_, currentIndex) => currentIndex !== index) : [""];
+      return { ...current, [key]: nextRows.join("\n") };
+    });
+  }
+
+  function closeShortageSelectionModal() {
+    setShortageSelectionItems([]);
+    setShortageSelectionRecipeName("");
+    setShortageSelectionTab("all");
+  }
+
+  function toggleShortageSelection(key: string, selected: boolean) {
+    setShortageSelectionItems((items) =>
+      items.map((item) => (item.key === key ? { ...item, selected } : item))
+    );
+  }
+
+  function toggleVisibleShortageSelection(selected: boolean) {
+    const visibleKeys = new Set(filteredShortageSelectionItems.map((item) => item.key));
+    setShortageSelectionItems((items) =>
+      items.map((item) => (visibleKeys.has(item.key) ? { ...item, selected } : item))
+    );
   }
 
   async function runAiRecipe(overrides?: Partial<{ mode: AiRecipeMode; required: string; optional: string; sourceText: string }>) {
@@ -820,6 +914,77 @@ export function RecipeMealWorkspace({
     setFeedback({ tone: "success", message: `${data.length}件を買い物リストへ追加しました。` });
   }
 
+  async function addCurrentRecipeToShopping() {
+    if (!editingRecipeId) {
+      setFeedback({
+        tone: "error",
+        message: "原因: レシピがまだ保存されていません。影響: 買い物リストへ追加できません。修正方法: 先にレシピを保存してください。"
+      });
+      return;
+    }
+
+    const recipe = recipes.find((item) => item.id === editingRecipeId);
+    if (!recipe) {
+      setFeedback({
+        tone: "error",
+        message: "原因: 保存済みレシピを見つけられませんでした。影響: 買い物リストへ追加できません。修正方法: レシピを保存し直してから再度お試しください。"
+      });
+      return;
+    }
+
+    const shortages = compareRecipeWithInventory(recipe, inventoryItemsForMeals);
+    if (shortages.length === 0) {
+      setFeedback({ tone: "info", message: "在庫に十分な材料があります。" });
+      return;
+    }
+
+    setShortageSelectionItems(shortages);
+    setShortageSelectionRecipeName(recipe.name);
+    setShortageSelectionTab("all");
+  }
+
+  async function confirmRecipeShortageSelection() {
+    const selectedShortages = shortageSelectionItems.filter((item) => item.selected);
+    if (selectedShortages.length === 0) {
+      closeShortageSelectionModal();
+      setFeedback({ tone: "info", message: "買い物リストには追加していません。" });
+      return;
+    }
+
+    setIsSaving(true);
+    setFeedback(null);
+
+    const { data, error } = await supabase
+      .from("shopping_items")
+      .insert(
+        selectedShortages.map((item) => ({
+          user_id: userId,
+          name: item.name,
+          required_quantity: item.shortageQuantity,
+          unit: item.unit,
+          status: "未購入",
+          linked_recipe_name: item.recipeName,
+          source_type: "recipe_detail"
+        }))
+      )
+      .select();
+
+    setIsSaving(false);
+
+    if (error || !data) {
+      setFeedback({
+        tone: "error",
+        message: "原因: 買い物リストをDBへ保存できませんでした。影響: 不足材料が買い物に残りません。修正方法: ログイン状態を確認してください。"
+      });
+      return;
+    }
+
+    closeShortageSelectionModal();
+    setShoppingItems((items) => [...(data as ShoppingItem[]), ...items]);
+    setFeedback({ tone: "success", message: `${data.length}件の不足材料を買い物リストへ追加しました。` });
+    router.refresh();
+  }
+
   async function addManualShoppingItem(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const quantity = Number(shoppingValues.required_quantity);
@@ -1179,97 +1344,208 @@ export function RecipeMealWorkspace({
         <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="recipe-editor-heading">
           <section className="canvas-modal recipe-editor-modal">
             <button className="modal-close-button" type="button" onClick={closeRecipeEditor} aria-label="閉じる">×</button>
-            <p className="eyebrow">RECIPE EDITOR</p>
             <h3 id="recipe-editor-heading">{editingRecipeId ? "レシピを編集" : "新規レシピ"}</h3>
-            <form className="stock-form" onSubmit={saveRecipe}>
+            <form className="stock-form recipe-editor-form" onSubmit={saveRecipe}>
               <label>
                 レシピ名
                 <input value={recipeValues.name} onChange={(event) => updateRecipeValue("name", event.target.value)} placeholder="例: カレー" />
               </label>
-              <div className="form-row two-columns">
-                <label>
-                  ジャンル
-                  <input value={recipeValues.genre} onChange={(event) => updateRecipeValue("genre", event.target.value)} placeholder="和食, 作り置き" />
-                </label>
-                <label>
-                  参考元
-                  <input value={recipeValues.source} onChange={(event) => updateRecipeValue("source", event.target.value)} placeholder="メモやURL" />
-                </label>
-              </div>
+              <label>
+                ジャンル
+                <input value={recipeValues.genre} onChange={(event) => updateRecipeValue("genre", event.target.value)} placeholder="和食, 作り置き" />
+              </label>
+              <label>
+                出典
+                <textarea
+                  aria-label="参考元"
+                  rows={2}
+                  value={recipeValues.source}
+                  onChange={(event) => updateRecipeValue("source", event.target.value)}
+                  placeholder="例: https://... または本の名前"
+                />
+              </label>
 
               <div className="ingredient-editor" aria-label="材料入力">
                 <div className="ingredient-editor-heading">
                   <span>材料</span>
-                  <button className="secondary-button compact-button" type="button" onClick={addIngredientRow}>
-                    材料を追加
+                  <button className="secondary-button compact-button" type="button" onClick={() => addIngredientRow("食材")}>
+                    ＋ 材料を追加
                   </button>
                 </div>
-                {recipeValues.ingredients.map((ingredient, index) => (
-                  <div className="ingredient-row" key={`${index}-${ingredient.name}`}>
-                    <label>
-                      種別
-                      <select
-                        value={ingredient.item_type}
-                        onChange={(event) => updateIngredient(index, { item_type: event.target.value as RecipeIngredientFormValues["item_type"] })}
-                      >
-                        <option value="食材">食材</option>
-                        <option value="調味料">調味料</option>
-                      </select>
-                    </label>
-                    <label>
-                      品名
-                      <input value={ingredient.name} onChange={(event) => updateIngredient(index, { name: event.target.value })} placeholder="玉ねぎ" />
-                    </label>
-                    <label>
-                      数量
-                      <input
-                        min="0"
-                        step="0.1"
-                        type="number"
-                        value={ingredient.amount}
-                        onChange={(event) => updateIngredient(index, { amount: event.target.value })}
-                      />
-                    </label>
-                    <label>
-                      単位
-                      <input value={ingredient.unit} onChange={(event) => updateIngredient(index, { unit: event.target.value })} placeholder="個" />
-                    </label>
-                    <button className="danger-button compact-button" type="button" onClick={() => removeIngredientRow(index)}>
-                      削除
+                {foodIngredientEntries.map(({ ingredient, index }) => (
+                  <div className="ingredient-row canvas-recipe-item-row" key={`food-${index}-${ingredient.name}`}>
+                    <span className="recipe-row-handle" aria-hidden="true">=</span>
+                    <input aria-label="品名" value={ingredient.name} onChange={(event) => updateIngredient(index, { name: event.target.value, item_type: "食材" })} placeholder="品名" />
+                    <input
+                      aria-label="数量"
+                      min="0"
+                      step="0.1"
+                      type="number"
+                      value={ingredient.amount}
+                      onChange={(event) => updateIngredient(index, { amount: event.target.value, item_type: "食材" })}
+                      placeholder="数量"
+                    />
+                    <input aria-label="単位" value={ingredient.unit} onChange={(event) => updateIngredient(index, { unit: event.target.value, item_type: "食材" })} placeholder="単位" />
+                    <button className="danger-button compact-button" type="button" onClick={() => removeIngredientRow(index)} aria-label="材料を削除">
+                      ×
                     </button>
                   </div>
                 ))}
               </div>
 
-              <div className="form-row two-columns">
-                <label>
-                  下準備
+              <div className="ingredient-editor seasoning-editor" aria-label="調味料入力">
+                <div className="ingredient-editor-heading">
+                  <span>調味料</span>
+                  <button className="secondary-button compact-button seasoning-add-button" type="button" onClick={() => addIngredientRow("調味料")}>
+                    ＋ 調味料を追加
+                  </button>
+                </div>
+                {seasoningIngredientEntries.map(({ ingredient, index }) => (
+                  <div className="ingredient-row canvas-recipe-item-row" key={`seasoning-${index}-${ingredient.name}`}>
+                    <span className="recipe-row-handle" aria-hidden="true">=</span>
+                    <input aria-label="品名" value={ingredient.name} onChange={(event) => updateIngredient(index, { name: event.target.value, item_type: "調味料" })} placeholder="調味料名" />
+                    <input
+                      aria-label="数量"
+                      min="0"
+                      step="0.1"
+                      type="number"
+                      value={ingredient.amount}
+                      onChange={(event) => updateIngredient(index, { amount: event.target.value, item_type: "調味料" })}
+                      placeholder="数量"
+                    />
+                    <input aria-label="単位" value={ingredient.unit} onChange={(event) => updateIngredient(index, { unit: event.target.value, item_type: "調味料" })} placeholder="単位" />
+                    <button className="danger-button compact-button" type="button" onClick={() => removeIngredientRow(index)} aria-label="調味料を削除">
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              <div className="recipe-step-sections">
+                <div className="recipe-step-editor" aria-label="下ごしらえ入力">
+                  <div className="ingredient-editor-heading">
+                    <span>下ごしらえ</span>
+                    <button className="secondary-button compact-button prep-add-button" type="button" onClick={() => addRecipeStep("prep_steps")}>
+                      ＋ 下ごしらえを追加
+                    </button>
+                  </div>
+                  {prepStepEntries.map((step, index) => (
+                    <div className="recipe-step-row prep-step-row" key={`prep-${index}`}>
+                      <span className="recipe-step-number" aria-hidden="true">{index + 1}</span>
+                      <input
+                        aria-label={`下ごしらえ ${index + 1}`}
+                        value={step}
+                        onChange={(event) => updateRecipeStep("prep_steps", index, event.target.value)}
+                        placeholder="下ごしらえを入力"
+                      />
+                      <button className="danger-button compact-button" type="button" onClick={() => removeRecipeStep("prep_steps", index)} aria-label="下ごしらえを削除">
+                        ×
+                      </button>
+                    </div>
+                  ))}
                   <textarea
-                    rows={4}
+                    aria-label="下準備"
+                    className="sr-only"
                     value={recipeValues.prep_steps}
                     onChange={(event) => updateRecipeValue("prep_steps", event.target.value)}
-                    placeholder="1行に1手順"
                   />
-                </label>
-                <label>
-                  調理手順
+                </div>
+
+                <div className="recipe-step-editor" aria-label="調理工程入力">
+                  <div className="ingredient-editor-heading">
+                    <span>調理工程</span>
+                    <button className="secondary-button compact-button cook-add-button" type="button" onClick={() => addRecipeStep("steps")}>
+                      ＋ 工程を追加
+                    </button>
+                  </div>
+                  {cookStepEntries.map((step, index) => (
+                    <div className="recipe-step-row cook-step-row" key={`cook-${index}`}>
+                      <span className="recipe-step-number" aria-hidden="true">{index + 1}</span>
+                      <input
+                        aria-label={`調理工程 ${index + 1}`}
+                        value={step}
+                        onChange={(event) => updateRecipeStep("steps", index, event.target.value)}
+                        placeholder="工程を入力"
+                      />
+                      <button className="danger-button compact-button" type="button" onClick={() => removeRecipeStep("steps", index)} aria-label="工程を削除">
+                        ×
+                      </button>
+                    </div>
+                  ))}
                   <textarea
-                    rows={4}
+                    aria-label="調理手順"
+                    className="sr-only"
                     value={recipeValues.steps}
                     onChange={(event) => updateRecipeValue("steps", event.target.value)}
-                    placeholder="1行に1手順"
                   />
-                </label>
+                </div>
               </div>
               <div className="form-actions">
-                <button className="primary-button" type="submit" disabled={isSaving}>
-                  {editingRecipeId ? "レシピを更新" : "レシピを保存"}
-                </button>
                 <button className="secondary-button" type="button" onClick={closeRecipeEditor}>
                   キャンセル
                 </button>
+                <button className="secondary-button recipe-shopping-button" type="button" disabled={isSaving} onClick={addCurrentRecipeToShopping}>
+                  買い物へ
+                </button>
+                <button className="primary-button" type="submit" disabled={isSaving} aria-label={editingRecipeId ? "レシピを更新" : "レシピを保存"}>
+                  {editingRecipeId ? "更新" : "保存"}
+                </button>
               </div>
             </form>
+          </section>
+        </div>
+      ) : null}
+
+      {shortageSelectionItems.length > 0 ? (
+        <div className="modal-backdrop shortage-select-backdrop" role="dialog" aria-modal="true" aria-labelledby="shopping-shortage-heading">
+          <section className="canvas-modal shopping-shortage-modal">
+            <button className="modal-close-button" type="button" onClick={closeShortageSelectionModal} aria-label="閉じる">×</button>
+            <h3 id="shopping-shortage-heading">買い物に追加するもの</h3>
+            <p className="shopping-shortage-meta">{shortageSelectionRecipeName || "不足分を確認してください"}</p>
+            <div className="shopping-shortage-tabs" aria-label="不足材料の表示切替">
+              {[
+                { count: shortageSelectionItems.length, label: "ALL", value: "all" as const },
+                { count: shortageSelectionItems.filter((item) => item.type !== "調味料").length, label: "食材", value: "ingredients" as const },
+                { count: shortageSelectionItems.filter((item) => item.type === "調味料").length, label: "調味料", value: "seasonings" as const }
+              ].map((tab) => (
+                <button data-active={shortageSelectionTab === tab.value} key={tab.value} onClick={() => setShortageSelectionTab(tab.value)} type="button">
+                  {tab.label} <span>{tab.count}</span>
+                </button>
+              ))}
+            </div>
+            <label className="shopping-shortage-select-all">
+              <input
+                checked={allVisibleShortagesSelected}
+                onChange={(event) => toggleVisibleShortageSelection(event.target.checked)}
+                type="checkbox"
+              />
+              表示中をすべて選択
+            </label>
+            <div className="shopping-shortage-list">
+              {filteredShortageSelectionItems.length === 0 ? (
+                <p className="empty-list">該当する候補はありません。</p>
+              ) : (
+                filteredShortageSelectionItems.map((item) => (
+                  <label className="shopping-shortage-option" key={item.key}>
+                    <input checked={item.selected} onChange={(event) => toggleShortageSelection(item.key, event.target.checked)} type="checkbox" />
+                    <span>
+                      <strong>{item.name}</strong>
+                      <small>不足 {item.shortageQuantity}{item.unit}</small>
+                    </span>
+                    <em data-type={item.type}>{item.type}</em>
+                  </label>
+                ))
+              )}
+            </div>
+            <div className="shopping-shortage-actions">
+              <button className="secondary-button" type="button" onClick={closeShortageSelectionModal}>
+                あとで
+              </button>
+              <button className="primary-button" type="button" disabled={isSaving} onClick={confirmRecipeShortageSelection}>
+                選択したものを追加
+                <span>{selectedShortageSelectionCount}</span>
+              </button>
+            </div>
           </section>
         </div>
       ) : null}

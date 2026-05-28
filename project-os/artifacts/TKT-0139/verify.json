@@ -4,25 +4,30 @@
   "commands": [
     {
       "name": "lint",
-      "command": "node node_modules/eslint/bin/eslint.js .",
+      "command": "npm run lint",
       "result": "passed"
     },
     {
       "name": "typecheck",
-      "command": "node node_modules/typescript/bin/tsc --noEmit",
+      "command": "npm run typecheck",
       "result": "passed"
     },
     {
       "name": "test",
-      "command": "node node_modules/vitest/vitest.mjs run",
+      "command": "npm run test",
       "result": "passed",
-      "summary": "57 tests passed"
+      "summary": "53 tests passed"
     },
     {
       "name": "build",
-      "command": "node node_modules/next/dist/bin/next build",
+      "command": "npm run build",
+      "result": "passed"
+    },
+    {
+      "name": "browser_visual_smoke",
+      "command": "Open http://localhost:3003, open recipe editor, capture desktop and 390px mobile viewport",
       "result": "passed"
     }
   ],
-  "notes": "npm was not available on PATH, so the bundled Node executable was used to run project-local CLIs directly."
+  "notes": "Recipe editor modal was checked against the Canvas-style vertical modal structure. Shopping selection now matches the Canvas flow: calculate shortages, choose with checkboxes, then insert selected shopping_items. InventoryBoard now receives and renders shopping_items, and recipe-side insertion refreshes route data. Existing recipe save paths were not changed."
 }

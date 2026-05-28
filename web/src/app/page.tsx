@@ -112,6 +112,7 @@ export default async function Home() {
           ingredients: (
             <InventoryBoard
               initialInventoryItems={(inventoryItems ?? []) as StockItem[]}
+              initialShoppingItems={(shoppingItems ?? []) as ShoppingItem[]}
               initialStorageLocations={(storageLocations ?? []) as StorageLocation[]}
               key="ingredients"
               userId={user.id}

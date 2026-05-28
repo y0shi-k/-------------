@@ -1,0 +1,41 @@
+{
+  "ticket": "TKT-0142-web-add-modal-remove-location-manager",
+  "status": "passed",
+  "checks": [
+    {
+      "name": "eslint",
+      "command": "cd web && npm run lint",
+      "result": "0 errors, 0 warnings"
+    },
+    {
+      "name": "typecheck",
+      "command": "cd web && npm run typecheck",
+      "result": "passed"
+    },
+    {
+      "name": "vitest",
+      "command": "cd web && npm run test",
+      "result": "11 test files passed, 53 tests passed"
+    },
+    {
+      "name": "next_build",
+      "command": "cd web && npm run build",
+      "result": "compiled successfully"
+    },
+    {
+      "name": "no_location_manager_ui",
+      "command": "rg -n \"location-manager compact-location-manager\" web/src/components/inventory-board.tsx",
+      "result": "no matches"
+    },
+    {
+      "name": "no_addStorageLocation_function",
+      "command": "rg -n \"async function addStorageLocation\" web/src/components/inventory-board.tsx",
+      "result": "no matches"
+    },
+    {
+      "name": "no_deleteStorageLocation_function",
+      "command": "rg -n \"async function deleteStorageLocation\" web/src/components/inventory-board.tsx",
+      "result": "no matches"
+    }
+  ]
+}
