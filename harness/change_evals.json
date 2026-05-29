@@ -2,6 +2,7 @@
   "evals": [
     {
       "id": "schema_change",
+      "status": "reference",
       "change_scope": "Google Spreadsheet のスキーマ変更（カラム追加・削除・リネーム）",
       "match_paths": [
         "app.html",
@@ -49,6 +50,7 @@
     },
     {
       "id": "gas_pattern_change",
+      "status": "reference",
       "change_scope": "GAS通信パターン（executeGAS, setStatus, フォーム送信方式）の改変",
       "match_paths": [
         "app.html"
@@ -95,6 +97,7 @@
     },
     {
       "id": "manual_bulk_sync_policy",
+      "status": "reference",
       "change_scope": "Google Spreadsheet への追加・更新・削除を伴う機能変更",
       "match_paths": [
         "app.html"
@@ -149,6 +152,7 @@
     },
     {
       "id": "ui_component_addition",
+      "status": "reference",
       "change_scope": "新規UIコンポーネント（モーダル、タブ、リスト、ボタン等）の追加",
       "match_paths": [
         "app.html"
@@ -191,6 +195,7 @@
     },
     {
       "id": "phase_transition",
+      "status": "reference",
       "change_scope": "Phase1→2、Phase2→3 等のフェーズ移行（大規模機能追加）",
       "match_paths": [
         "app.html",
@@ -243,6 +248,7 @@
     },
     {
       "id": "canvas_constraint",
+      "status": "reference",
       "change_scope": "GeminiCanvas環境特有の制約（alert/confirm/prompt禁止、APIキー自動提供、FileReader非同期）",
       "match_paths": [
         "app.html"
@@ -287,6 +293,7 @@
     },
     {
       "id": "ai_prompt_change",
+      "status": "reference",
       "change_scope": "AIプロンプト（Gemini API への指示文）の改変",
       "match_paths": [
         "app.html"
@@ -335,6 +342,8 @@
     },
     {
       "id": "web_project_bootstrap",
+      "status": "active",
+      "danger": false,
       "change_scope": "Web版Next.jsプロジェクト土台の作成・変更",
       "match_paths": [
         "web/",
@@ -366,14 +375,10 @@
         "spec_ready",
         "implementation_ready",
         "verify_passed",
-        "manual_smokes_done",
-        "review_ready",
         "report_ready"
       ],
       "artifact_requirements": [
         "verify_summary",
-        "manual_smoke_report",
-        "review_record",
         "user_report_draft"
       ],
       "review_focus": [
@@ -385,6 +390,8 @@
     },
     {
       "id": "supabase_schema_change",
+      "status": "active",
+      "danger": true,
       "change_scope": "Supabase DB/Storage/Auth schema または migration の変更",
       "match_paths": [
         "supabase/",
@@ -435,6 +442,8 @@
     },
     {
       "id": "auth_and_rls_policy",
+      "status": "active",
+      "danger": true,
       "change_scope": "Web版ログイン、セッション、Supabase RLS policy の変更",
       "match_paths": [
         "web/",
@@ -486,6 +495,8 @@
     },
     {
       "id": "photo_upload_storage",
+      "status": "active",
+      "danger": true,
       "change_scope": "スマホ写真取り込み、画像圧縮、Supabase Storage保存の変更",
       "match_paths": [
         "web/",
@@ -537,6 +548,8 @@
     },
     {
       "id": "ai_server_route",
+      "status": "active",
+      "danger": true,
       "change_scope": "Web版AI解析API Route と Gemini連携の変更",
       "match_paths": [
         "web/"
@@ -584,6 +597,8 @@
     },
     {
       "id": "csv_import_migration",
+      "status": "active",
+      "danger": true,
       "change_scope": "Spreadsheet CSV から Supabase への移行スクリプト変更",
       "match_paths": [
         "scripts/",
@@ -633,6 +648,8 @@
     },
     {
       "id": "pwa_mobile_ui",
+      "status": "active",
+      "danger": false,
       "change_scope": "PWA、スマホ、タブレット向けUI変更",
       "match_paths": [
         "web/"
@@ -663,14 +680,10 @@
         "spec_ready",
         "implementation_ready",
         "verify_passed",
-        "manual_smokes_done",
-        "review_ready",
         "report_ready"
       ],
       "artifact_requirements": [
         "verify_summary",
-        "manual_smoke_report",
-        "review_record",
         "user_report_draft"
       ],
       "review_focus": [
