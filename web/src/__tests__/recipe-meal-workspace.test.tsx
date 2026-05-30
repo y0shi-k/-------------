@@ -332,26 +332,28 @@ describe("RecipeMealWorkspace", () => {
     expect(await screen.findByText("献立に追加しました。")).toBeTruthy();
   });
 
-  it("shows a 7 day meal schedule and moves a schedule to the next day", async () => {
-    const movedSchedule: MealSchedule = { ...baseSchedule, scheduled_on: "2026-05-26" };
-    const scheduleUpdate = updateSingleQuery(movedSchedule);
+  it("changes the recipe of a scheduled meal from the slot menu", async () => {
+    const otherRecipe: Recipe = { ...baseRecipe, id: "recipe-2", name: "肉じゃが" };
+    const replaced: MealSchedule = { ...baseSchedule, recipe_id: "recipe-2", recipe_name: "肉じゃが" };
+    const scheduleUpdate = updateSingleQuery(replaced);
     from.mockReturnValue({ update: scheduleUpdate.update });
 
-    renderWorkspace({ initialMealSchedules: [baseSchedule] });
+    renderWorkspace({ initialMealSchedules: [baseSchedule], initialRecipes: [baseRecipe, otherRecipe] });
     openScheduleView();
 
     expect(screen.getByLabelText("7日献立")).toBeTruthy();
     expect(within(screen.getByLabelText("7日献立")).getByText("カレー")).toBeTruthy();
 
-    // カードをタップして操作モーダルを開く（Canvas同様、操作はセル内展開ではなくポップアップ）。
+    // カードをタップ → Canvas版同様「別のレシピに変更」でピッカーを開き差し替える。
     fireEvent.click(within(screen.getByLabelText("7日献立")).getByRole("button", { name: "カレー の操作" }));
-    fireEvent.click(screen.getByRole("button", { name: "翌日へ移動" }));
+    fireEvent.click(screen.getByRole("button", { name: "別のレシピに変更" }));
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: /肉じゃが/ }));
 
     await waitFor(() => {
       expect(from).toHaveBeenCalledWith("meal_schedules");
-      expect(scheduleUpdate.update).toHaveBeenCalledWith({ scheduled_on: "2026-05-26" });
+      expect(scheduleUpdate.update).toHaveBeenCalledWith({ recipe_id: "recipe-2", recipe_name: "肉じゃが" });
     });
-    expect(await screen.findByText("カレー を 2026/05/26 へ移動しました。")).toBeTruthy();
+    expect(await screen.findByText("献立を 肉じゃが に変更しました。")).toBeTruthy();
   });
 
   it("moves a scheduled meal to another slot via drag and drop", async () => {
@@ -482,17 +484,28 @@ describe("RecipeMealWorkspace", () => {
     fireEvent.click(screen.getByRole("button", { name: "調理ビューを開く" }));
 
     const viewer = screen.getByLabelText("調理ビューア");
-    expect(within(viewer).getByText("カレー")).toBeTruthy();
-    expect(within(viewer).getByText("在庫 1個 / 不足")).toBeTruthy();
+    // ALLタブで食材が見える。
+    expect(within(screen.getByLabelText("材料と在庫")).getByText("玉ねぎ")).toBeTruthy();
 
-    fireEvent.click(within(viewer).getByRole("button", { name: "調味料" }));
+    // 在庫トグルで在庫状況（必要量との比較）を表示する。
+    fireEvent.click(within(viewer).getByRole("button", { name: "在庫" }));
+    expect(within(viewer).getByText("在庫: 1個 / 必要: 2個")).toBeTruthy();
+
+    // 調味料タブで調味料に絞る。
+    fireEvent.click(within(viewer).getByRole("button", { name: /^調味料/ }));
     expect(within(screen.getByLabelText("材料と在庫")).getByText("醤油")).toBeTruthy();
 
-    fireEvent.click(within(viewer).getByRole("button", { name: "調理手順" }));
-    expect(within(viewer).getByText("玉ねぎを炒めて醤油を加える")).toBeTruthy();
-    fireEvent.click(within(viewer).getByRole("button", { name: "玉ねぎ" }));
+    // 手順は調理工程タブ、文中の材料はチップ化されてタップで照合できる。
+    fireEvent.click(within(viewer).getByRole("button", { name: /^調理工程/ }));
+    const stepChips = within(viewer).getAllByRole("button", { name: "玉ねぎ" });
+    expect(stepChips.length).toBeGreaterThan(0);
+    fireEvent.click(stepChips[0]);
 
-    expect(await screen.findByText("カレー の調理ビューアを開きました。")).toBeTruthy();
+    // 全画面オーバーレイで開き、戻るで閉じられる（Canvas版同様）。
+    const overlay = screen.getByRole("dialog", { name: "調理ビューア全画面" });
+    expect(overlay).toBeTruthy();
+    fireEvent.click(within(overlay).getByRole("button", { name: "戻る" }));
+    expect(screen.queryByLabelText("調理ビューア")).toBeNull();
   });
 
   it("completes a meal schedule and creates cooking history", async () => {
@@ -513,11 +526,15 @@ describe("RecipeMealWorkspace", () => {
     renderWorkspace({ initialMealSchedules: [baseSchedule] });
     openScheduleView();
 
+    // Canvas版同様、操作モーダルの「調理を開始」で全画面の調理ビューアを開き、完了（消費）はビューア下部の「料理を完了する」で行う。
     fireEvent.click(within(screen.getByLabelText("7日献立")).getByRole("button", { name: "カレー の操作" }));
-    fireEvent.click(screen.getByRole("button", { name: "調理完了" }));
-    expect(await screen.findByText("消費量を確認してから、もう一度「消費して完了」を押してください。")).toBeTruthy();
-    expect(screen.getByLabelText("消費量確認")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "消費して完了" }));
+    fireEvent.click(screen.getByRole("button", { name: "調理を開始" }));
+    const cookingViewer = screen.getByRole("dialog", { name: "調理ビューア全画面" });
+    fireEvent.click(within(cookingViewer).getByRole("button", { name: "料理を完了する" }));
+    expect(await screen.findByText("消費量を確認してから「確定」を押してください。")).toBeTruthy();
+    const consumptionModal = screen.getByRole("dialog", { name: "実際の消費量を調整" });
+    expect(within(consumptionModal).getByLabelText("消費量確認")).toBeTruthy();
+    fireEvent.click(within(consumptionModal).getByRole("button", { name: "確定" }));
 
     await waitFor(() => {
       expect(inventoryUpdate.update).toHaveBeenCalledWith({ quantity: 0 });
