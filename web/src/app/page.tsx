@@ -124,7 +124,6 @@ export default async function Home() {
               initialCookCandidates={(cookCandidates ?? []) as CookCandidate[]}
               initialMealSchedules={(mealSchedules ?? []) as MealSchedule[]}
               initialRecipes={recipesWithIngredients as Recipe[]}
-              initialShoppingItems={(shoppingItems ?? []) as ShoppingItem[]}
               key="recipes"
               userId={user.id}
             />

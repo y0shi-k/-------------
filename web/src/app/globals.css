@@ -2139,6 +2139,403 @@ h1 {
   padding: 0;
 }
 
+/* ------------------------------------------------------------------
+   Canvas parity: schedule board (TKT-0142)
+   app.html renderSchedule の見た目に合わせる
+   ------------------------------------------------------------------ */
+
+.recipe-subnav button[data-tab="recipes"][data-active="true"] {
+  border-color: #4f46e5;
+  background: #4f46e5;
+  color: #fff;
+}
+
+.recipe-subnav button[data-tab="schedule"][data-active="true"] {
+  border-color: #0284c7;
+  background: #0284c7;
+  color: #fff;
+}
+
+.schedule-toolbar {
+  margin-bottom: 12px;
+}
+
+.schedule-nav-button {
+  display: grid;
+  place-items: center;
+  min-height: 48px;
+  border: 1px solid #e0f2fe;
+  border-radius: 12px;
+  background: #f0f9ff;
+  color: #0369a1;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.schedule-nav-today {
+  border-color: #0284c7;
+  background: #0284c7;
+  color: #fff;
+  box-shadow: 0 6px 16px rgb(2 132 199 / 22%);
+}
+
+.schedule-board {
+  display: grid;
+  gap: 10px;
+}
+
+.schedule-shift {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 32px;
+  border: 1px solid #e0f2fe;
+  border-radius: 12px;
+  background: #fff;
+  color: #0284c7;
+  font-size: 0.95rem;
+  font-weight: 700;
+  box-shadow: 0 6px 14px rgb(15 23 42 / 5%);
+}
+
+.schedule-day {
+  display: flex;
+  align-items: stretch;
+  gap: 12px;
+  border: 1px solid #e0f2fe;
+  border-radius: 12px;
+  background: rgb(255 255 255 / 80%);
+  padding: 12px;
+  box-shadow: 0 8px 18px rgb(15 23 42 / 5%);
+}
+
+.schedule-day[data-tone="today"] {
+  border-color: #fcd34d;
+  background: rgb(255 251 235 / 90%);
+  box-shadow: 0 0 0 2px #fde68a, 0 8px 18px rgb(245 158 11 / 12%);
+}
+
+.schedule-day[data-tone="sun"] {
+  border-color: #fecdd3;
+  background: rgb(255 241 242 / 60%);
+}
+
+.schedule-day[data-tone="sat"] {
+  border-color: #bae6fd;
+  background: rgb(240 249 255 / 60%);
+}
+
+.schedule-day-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  flex-shrink: 0;
+  gap: 2px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #f1f5f9;
+  color: #334155;
+  padding: 8px 4px;
+  text-align: center;
+  line-height: 1.15;
+}
+
+.schedule-day-badge span {
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.schedule-day-badge em {
+  color: rgb(255 255 255 / 90%);
+  font-size: 0.62rem;
+  font-style: normal;
+  font-weight: 900;
+}
+
+.schedule-day[data-tone="today"] .schedule-day-badge {
+  border-color: #fbbf24;
+  background: #f59e0b;
+  color: #fff;
+}
+
+.schedule-day[data-tone="sun"] .schedule-day-badge {
+  border-color: #fecdd3;
+  background: #ffe4e6;
+  color: #be123c;
+}
+
+.schedule-day[data-tone="sat"] .schedule-day-badge {
+  border-color: #bae6fd;
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+.schedule-day-slots {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.schedule-slot {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  min-height: 72px;
+  overflow: hidden;
+  border: 1px solid #bae6fd;
+  border-radius: 12px;
+  background: #fff;
+  padding: 8px;
+  transition: background-color 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.schedule-slot[data-empty="true"] {
+  border-color: #e2e8f0;
+}
+
+.schedule-slot.is-dragover {
+  border-color: #7dd3fc;
+  background: #e0f2fe;
+  box-shadow: 0 0 0 2px #7dd3fc inset;
+}
+
+.schedule-slot-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+}
+
+.schedule-slot-head span {
+  flex: 1;
+  min-width: 0;
+  color: #0ea5e9;
+  font-size: 0.62rem;
+  font-weight: 800;
+  text-align: center;
+  line-height: 1;
+}
+
+.schedule-slot[data-empty="true"] .schedule-slot-head span {
+  color: #94a3b8;
+}
+
+.schedule-add-button {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  border: 1px solid #e0f2fe;
+  border-radius: 8px;
+  background: #f0f9ff;
+  color: #0ea5e9;
+  padding: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.schedule-meal-card {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  cursor: grab;
+  transition: opacity 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.schedule-meal-card:active {
+  cursor: grabbing;
+}
+
+.schedule-meal-card.is-dragging {
+  opacity: 0.4;
+  transform: scale(0.97);
+}
+
+.schedule-meal-select {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  min-height: 48px;
+  overflow: hidden;
+  border: 1px solid #e0f2fe;
+  border-radius: 8px;
+  background: #f0f9ff;
+  padding: 0 8px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.schedule-meal-card[data-done="true"] .schedule-meal-select {
+  border-color: #a7f3d0;
+  background: #ecfdf5;
+}
+
+.schedule-meal-card[data-active="true"] .schedule-meal-select {
+  border-color: #0ea5e9;
+  box-shadow: 0 0 0 1px #0ea5e9;
+}
+
+.schedule-meal-handle {
+  flex-shrink: 0;
+  color: #7dd3fc;
+  font-size: 1rem;
+  line-height: 1;
+  user-select: none;
+}
+
+.schedule-meal-card[data-done="true"] .schedule-meal-handle {
+  color: #6ee7b7;
+}
+
+.schedule-meal-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.schedule-meal-body strong {
+  overflow: hidden;
+  color: #075985;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.schedule-meal-card[data-done="true"] .schedule-meal-body strong {
+  color: #065f46;
+}
+
+.schedule-meal-body em {
+  color: #059669;
+  font-size: 0.58rem;
+  font-style: normal;
+  font-weight: 700;
+}
+
+.schedule-slot-menu-modal {
+  width: min(420px, 100%);
+}
+
+.schedule-slot-menu-meta {
+  margin: 0;
+  color: #0284c7;
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+
+.schedule-slot-menu-actions {
+  display: grid;
+  gap: 12px;
+}
+
+.schedule-slot-menu-actions button {
+  min-height: 52px;
+  border-radius: 12px;
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+
+.schedule-picker-modal {
+  width: min(480px, 100%);
+}
+
+.schedule-picker-meta {
+  margin: 0;
+  color: #0284c7;
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.schedule-picker-search {
+  margin: 0;
+}
+
+.schedule-picker-list {
+  display: grid;
+  gap: 8px;
+  max-height: 50vh;
+  overflow: auto;
+}
+
+.schedule-picker-option {
+  display: grid;
+  gap: 2px;
+  border: 1px solid #e0f2fe;
+  border-radius: 8px;
+  background: #f8fafc;
+  padding: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.schedule-picker-option strong {
+  color: #172033;
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.schedule-picker-option small {
+  color: #64748b;
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.schedule-picker-option:hover {
+  border-color: #0284c7;
+  background: #f0f9ff;
+}
+
+/* レイアウトを動かさない一時通知トースト（Canvas版 showToast 相当） */
+.app-toast {
+  position: fixed;
+  top: 24px;
+  left: 50%;
+  z-index: 90;
+  max-width: 90%;
+  border-radius: 12px;
+  background: #1e293b;
+  color: #fff;
+  padding: 12px 20px;
+  font-size: 0.86rem;
+  font-weight: 700;
+  text-align: center;
+  box-shadow: 0 16px 36px rgb(15 23 42 / 28%);
+  transform: translateX(-50%);
+  animation: app-toast-in 0.18s ease;
+  pointer-events: none;
+}
+
+.app-toast[data-tone="success"] {
+  background: #059669;
+}
+
+.app-toast[data-tone="error"] {
+  background: #e11d48;
+}
+
+@keyframes app-toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
 .recipe-browser {
   display: grid;
   gap: 0;

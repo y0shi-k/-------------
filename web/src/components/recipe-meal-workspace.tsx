@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { DeleteConfirmPanel } from "@/components/delete-confirm-panel";
 import type { StockItem } from "@/lib/inventory/types";
@@ -15,7 +15,6 @@ import {
   RecipeIngredient,
   RecipeIngredientFormValues,
   RecipeIngredientType,
-  ShoppingItem,
   splitCsv,
   splitLines,
   toRecipeFormValues
@@ -27,7 +26,6 @@ type RecipeMealWorkspaceProps = {
   initialInventoryItems: StockItem[];
   initialMealSchedules: MealSchedule[];
   initialRecipes: Recipe[];
-  initialShoppingItems: ShoppingItem[];
   userId: string;
 };
 
@@ -40,12 +38,6 @@ type PendingDelete = {
   confirm: () => void;
   message: string;
   target: string;
-};
-
-type ShoppingFormValues = {
-  name: string;
-  required_quantity: string;
-  unit: string;
 };
 
 type RecipeShoppingShortage = {
@@ -166,20 +158,18 @@ function formatScheduleDayLabel(value: string) {
   }).format(new Date(`${value}T00:00:00`));
 }
 
+function scheduleDateTone(value: string): "today" | "sun" | "sat" | "weekday" {
+  if (value === todayValue()) return "today";
+  const weekday = new Date(`${value}T00:00:00`).getDay();
+  if (weekday === 0) return "sun";
+  if (weekday === 6) return "sat";
+  return "weekday";
+}
+
 function inventoryAmountByNameAndUnit(items: StockItem[], name: string, unit: string) {
   return items
     .filter((item) => item.name === name && item.unit === unit)
     .reduce((total, item) => total + Number(item.quantity || 0), 0);
-}
-
-function toShortageKey(name: string, unit: string, recipeName: string) {
-  return `${recipeName}:${name}:${unit}`;
-}
-
-function shoppingSourceLabel(item: ShoppingItem) {
-  if (item.source_type === "meal_schedule") return item.linked_recipe_name ? `献立: ${item.linked_recipe_name}` : "献立由来";
-  if (item.source_type === "recipe_detail") return item.linked_recipe_name ? `レシピ詳細: ${item.linked_recipe_name}` : "レシピ詳細";
-  return "手動追加";
 }
 
 function formatRecipeDate(value: string) {
@@ -212,28 +202,6 @@ function filterAndSortRecipes(recipes: Recipe[], query: string, sort: RecipeSort
   });
 }
 
-function buildShortageCandidates(schedule: MealSchedule | null, recipes: Recipe[], inventoryItems: StockItem[]) {
-  if (!schedule?.recipe_id) return [];
-  const recipe = recipes.find((item) => item.id === schedule.recipe_id);
-  if (!recipe) return [];
-
-  return recipe.ingredients
-    .filter((ingredient) => ingredient.item_type === "食材")
-    .map((ingredient) => {
-      const stockAmount = inventoryAmountByNameAndUnit(inventoryItems, ingredient.name, ingredient.unit);
-      const shortageQuantity = Math.max(0, ingredient.amount - stockAmount);
-      return {
-        key: toShortageKey(ingredient.name, ingredient.unit, recipe.name),
-        name: ingredient.name,
-        requiredQuantity: ingredient.amount,
-        shortageQuantity,
-        unit: ingredient.unit,
-        recipeName: recipe.name
-      };
-    })
-    .filter((item) => item.shortageQuantity > 0);
-}
-
 function compareRecipeWithInventory(recipe: Recipe, inventoryItems: StockItem[]) {
   return recipe.ingredients
     .map((ingredient, index) => {
@@ -257,7 +225,6 @@ export function RecipeMealWorkspace({
   initialInventoryItems,
   initialMealSchedules,
   initialRecipes,
-  initialShoppingItems,
   userId
 }: RecipeMealWorkspaceProps) {
   const initialScheduleStart = initialMealSchedules[0]?.scheduled_on ?? todayValue();
@@ -265,7 +232,6 @@ export function RecipeMealWorkspace({
   const [cookCandidates, setCookCandidates] = useState(initialCookCandidates);
   const [inventoryItemsForMeals, setInventoryItemsForMeals] = useState(initialInventoryItems);
   const [mealSchedules, setMealSchedules] = useState(initialMealSchedules);
-  const [shoppingItems, setShoppingItems] = useState(initialShoppingItems);
   const [recipeValues, setRecipeValues] = useState<RecipeFormValues>(emptyRecipeFormValues);
   const [editingRecipeId, setEditingRecipeId] = useState<string | null>(null);
   const [selectedRecipeId, setSelectedRecipeId] = useState(initialRecipes[0]?.id ?? "");
@@ -275,9 +241,6 @@ export function RecipeMealWorkspace({
   const [scheduleMealType, setScheduleMealType] = useState<MealType>("晩");
   const [scheduleRecipeId, setScheduleRecipeId] = useState(initialRecipes[0]?.id ?? "");
   const [selectedScheduleId, setSelectedScheduleId] = useState(initialMealSchedules[0]?.id ?? "");
-  const [selectedShortageKeys, setSelectedShortageKeys] = useState<string[]>([]);
-  const [selectedShoppingIds, setSelectedShoppingIds] = useState<string[]>([]);
-  const [shoppingValues, setShoppingValues] = useState<ShoppingFormValues>({ name: "", required_quantity: "1", unit: "個" });
   const [candidateReasons, setCandidateReasons] = useState("");
   const [recipeSearch, setRecipeSearch] = useState("");
   const [recipeSearchLogic, setRecipeSearchLogic] = useState<RecipeSearchLogic>("and");
@@ -305,6 +268,11 @@ export function RecipeMealWorkspace({
   const [shortageSelectionItems, setShortageSelectionItems] = useState<RecipeShoppingShortage[]>([]);
   const [shortageSelectionTab, setShortageSelectionTab] = useState<ShortageSelectionTab>("all");
   const [shortageSelectionRecipeName, setShortageSelectionRecipeName] = useState("");
+  const [pickerSlot, setPickerSlot] = useState<{ date: string; meal: MealType } | null>(null);
+  const [pickerQuery, setPickerQuery] = useState("");
+  const [slotMenuId, setSlotMenuId] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string; tone: "info" | "success" | "error" } | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const router = useRouter();
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
 
@@ -312,14 +280,11 @@ export function RecipeMealWorkspace({
   const activeCookingRecipe = recipes.find((recipe) => recipe.id === activeCookingRecipeId) ?? null;
   const visibleRecipes = filterAndSortRecipes(recipes, recipeSearch, recipeSort, recipeSearchMode, recipeSearchLogic);
   const selectedSchedule = mealSchedules.find((schedule) => schedule.id === selectedScheduleId) ?? mealSchedules[0] ?? null;
+  const slotMenuSchedule = slotMenuId ? mealSchedules.find((schedule) => schedule.id === slotMenuId) ?? null : null;
   const scheduleDays = Array.from({ length: 7 }, (_, index) => addDays(scheduleWindowStart, index));
   const visibleMealSchedules = mealSchedules
     .filter((schedule) => scheduleDays.includes(schedule.scheduled_on))
     .sort((a, b) => a.scheduled_on.localeCompare(b.scheduled_on) || mealTypeOrder[a.meal_type] - mealTypeOrder[b.meal_type]);
-  const shortageCandidates = buildShortageCandidates(selectedSchedule, recipes, inventoryItemsForMeals);
-  const activeShortageKeys = selectedShortageKeys.filter((key) => shortageCandidates.some((item) => item.key === key));
-  const openShoppingItems = shoppingItems.filter((item) => item.status === "未購入");
-  const purchasedShoppingItems = shoppingItems.filter((item) => item.status === "購入済");
   const activeCookCandidates = cookCandidates.filter((item) => item.status === "候補");
   const recipeIngredientEntries = recipeValues.ingredients.map((ingredient, index) => ({ ingredient, index }));
   const foodIngredientEntries = recipeIngredientEntries.filter(({ ingredient }) => ingredient.item_type === "食材");
@@ -333,10 +298,6 @@ export function RecipeMealWorkspace({
   });
   const selectedShortageSelectionCount = shortageSelectionItems.filter((item) => item.selected).length;
   const allVisibleShortagesSelected = filteredShortageSelectionItems.length > 0 && filteredShortageSelectionItems.every((item) => item.selected);
-
-  function updateShoppingValue<K extends keyof ShoppingFormValues>(key: K, value: ShoppingFormValues[K]) {
-    setShoppingValues((current) => ({ ...current, [key]: value }));
-  }
 
   function resetRecipeForm() {
     setRecipeValues(emptyRecipeFormValues);
@@ -525,6 +486,17 @@ export function RecipeMealWorkspace({
     setFeedback(null);
   }
 
+  // レイアウトを動かさない一時通知（Canvas版 showToast 相当）。
+  function showToast(message: string, tone: "info" | "success" | "error" = "info") {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    setToast({ message, tone });
+    toastTimer.current = setTimeout(() => setToast(null), 3000);
+  }
+
+  useEffect(() => () => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+  }, []);
+
   function stockOptionsForIngredient(ingredient: RecipeIngredient) {
     return inventoryItemsForMeals.filter((item) => item.category === ingredient.item_type && item.unit === ingredient.unit && item.quantity > 0);
   }
@@ -672,10 +644,9 @@ export function RecipeMealWorkspace({
     setFeedback({ tone: "success", message: editingRecipeId ? "レシピを更新しました。" : "レシピを追加しました。" });
   }
 
-  async function saveSchedule(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const recipe = recipes.find((item) => item.id === scheduleRecipeId);
-    if (!scheduleDate || !recipe) {
+  async function addScheduleEntry(date: string, meal: MealType, recipeId: string) {
+    const recipe = recipes.find((item) => item.id === recipeId);
+    if (!date || !recipe) {
       setFeedback({
         tone: "error",
         message: "原因: 日付またはレシピが未選択です。影響: 献立を保存できません。修正方法: 日付とレシピを選んでください。"
@@ -690,8 +661,8 @@ export function RecipeMealWorkspace({
       .from("meal_schedules")
       .insert({
         user_id: userId,
-        scheduled_on: scheduleDate,
-        meal_type: scheduleMealType,
+        scheduled_on: date,
+        meal_type: meal,
         recipe_id: recipe.id,
         recipe_name: recipe.name,
         status: "未完了"
@@ -714,8 +685,14 @@ export function RecipeMealWorkspace({
     if (!scheduleDays.includes(String(data.scheduled_on))) {
       setScheduleWindowStart(String(data.scheduled_on));
     }
-    setSelectedShortageKeys([]);
+    setPickerSlot(null);
+    setPickerQuery("");
     setFeedback({ tone: "success", message: "献立に追加しました。" });
+  }
+
+  async function saveSchedule(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await addScheduleEntry(scheduleDate, scheduleMealType, scheduleRecipeId);
   }
 
   async function addCookCandidate(event: FormEvent<HTMLFormElement>) {
@@ -810,7 +787,6 @@ export function RecipeMealWorkspace({
     if (!scheduleDays.includes(String(data.scheduled_on))) {
       setScheduleWindowStart(String(data.scheduled_on));
     }
-    setSelectedShortageKeys([]);
     setFeedback({ tone: "success", message: `${candidate.recipe_name || "候補"} を献立に追加しました。` });
   }
 
@@ -842,6 +818,36 @@ export function RecipeMealWorkspace({
     setFeedback({ tone: "success", message: `${schedule.recipe_name || "献立"} を ${formatScheduleDate(nextDate)} へ移動しました。` });
   }
 
+  // Canvas版 handleScheduleDrop 相当: まず画面を即座に書き換え（楽観的更新）、保存はバックグラウンドで行う。
+  // 通知はレイアウトを動かさないトーストにして、ドロップ時のブレと待ち時間をなくす。
+  async function moveScheduleToSlot(schedule: MealSchedule, date: string, meal: MealType) {
+    if (schedule.scheduled_on === date && schedule.meal_type === meal) return;
+
+    const previousSchedules = mealSchedules;
+    setMealSchedules((items) => items.map((item) => (item.id === schedule.id ? { ...item, scheduled_on: date, meal_type: meal } : item)));
+    setSelectedScheduleId(schedule.id);
+    if (!scheduleDays.includes(date)) {
+      setScheduleWindowStart(date);
+    }
+    showToast(`${schedule.recipe_name || "献立"} を ${formatScheduleDate(date)} ${meal} へ移動しました。`, "success");
+
+    const { data, error } = await supabase
+      .from("meal_schedules")
+      .update({ scheduled_on: date, meal_type: meal })
+      .eq("id", schedule.id)
+      .eq("user_id", userId)
+      .select()
+      .single();
+
+    if (error || !data) {
+      setMealSchedules(previousSchedules);
+      showToast("献立を移動できませんでした。ログイン状態を確認してください。", "error");
+      return;
+    }
+
+    setMealSchedules((items) => items.map((item) => (item.id === schedule.id ? (data as MealSchedule) : item)));
+  }
+
   async function deleteSchedule(schedule: MealSchedule) {
     setIsSaving(true);
     setFeedback(null);
@@ -859,59 +865,8 @@ export function RecipeMealWorkspace({
     if (selectedScheduleId === schedule.id) {
       const nextSchedule = mealSchedules.find((item) => item.id !== schedule.id);
       setSelectedScheduleId(nextSchedule?.id ?? "");
-      setSelectedShortageKeys([]);
     }
     setFeedback({ tone: "info", message: `${schedule.recipe_name || "献立"} を献立から削除しました。` });
-  }
-
-  function toggleShortage(key: string, checked: boolean) {
-    setSelectedShortageKeys((current) => {
-      if (checked) return [...new Set([...current, key])];
-      return current.filter((item) => item !== key);
-    });
-  }
-
-  async function addShortagesToShopping() {
-    const selectedCandidates = shortageCandidates.filter((item) => activeShortageKeys.includes(item.key));
-    if (selectedCandidates.length === 0) {
-      setFeedback({
-        tone: "error",
-        message: "原因: 買い物に追加する食材が未選択です。影響: 買い物リストへ追加できません。修正方法: 不足食材にチェックを入れてください。"
-      });
-      return;
-    }
-
-    setIsSaving(true);
-    setFeedback(null);
-
-    const { data, error } = await supabase
-      .from("shopping_items")
-      .insert(
-        selectedCandidates.map((item) => ({
-          user_id: userId,
-          name: item.name,
-          required_quantity: item.shortageQuantity,
-          unit: item.unit,
-          status: "未購入",
-          linked_recipe_name: item.recipeName,
-          source_type: "meal_schedule"
-        }))
-      )
-      .select();
-
-    setIsSaving(false);
-
-    if (error || !data) {
-      setFeedback({
-        tone: "error",
-        message: "原因: 買い物リストをDBへ保存できませんでした。影響: 不足食材が買い物に残りません。修正方法: ログイン状態を確認してください。"
-      });
-      return;
-    }
-
-    setShoppingItems((items) => [...(data as ShoppingItem[]), ...items]);
-    setSelectedShortageKeys([]);
-    setFeedback({ tone: "success", message: `${data.length}件を買い物リストへ追加しました。` });
   }
 
   async function addCurrentRecipeToShopping() {
@@ -980,110 +935,8 @@ export function RecipeMealWorkspace({
     }
 
     closeShortageSelectionModal();
-    setShoppingItems((items) => [...(data as ShoppingItem[]), ...items]);
     setFeedback({ tone: "success", message: `${data.length}件の不足材料を買い物リストへ追加しました。` });
     router.refresh();
-  }
-
-  async function addManualShoppingItem(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const quantity = Number(shoppingValues.required_quantity);
-    const name = shoppingValues.name.trim();
-    const unit = shoppingValues.unit.trim();
-
-    if (!name || !unit || !Number.isFinite(quantity) || quantity <= 0) {
-      setFeedback({
-        tone: "error",
-        message: "原因: 買い物の品名、数量、単位に不備があります。影響: 買い物リストへ追加できません。修正方法: 空欄と0以下の数量を直してください。"
-      });
-      return;
-    }
-
-    setIsSaving(true);
-    setFeedback(null);
-
-    const { data, error } = await supabase
-      .from("shopping_items")
-      .insert({
-        user_id: userId,
-        name,
-        required_quantity: quantity,
-        unit,
-        status: "未購入",
-        linked_recipe_name: "",
-        source_type: "manual"
-      })
-      .select()
-      .single();
-
-    setIsSaving(false);
-
-    if (error || !data) {
-      setFeedback({
-        tone: "error",
-        message: "原因: 買い物をDBへ保存できませんでした。影響: 買い物リストに残りません。修正方法: ログイン状態を確認してください。"
-      });
-      return;
-    }
-
-    setShoppingItems((items) => [data as ShoppingItem, ...items]);
-    setShoppingValues({ name: "", required_quantity: "1", unit: "個" });
-    setFeedback({ tone: "success", message: `${name} を買い物リストへ追加しました。` });
-  }
-
-  async function markShoppingPurchased(item: ShoppingItem) {
-    if (item.status === "購入済") {
-      setFeedback({ tone: "info", message: "この買い物は購入済みです。" });
-      return;
-    }
-
-    setIsSaving(true);
-    setFeedback(null);
-
-    const purchasedAt = new Date().toISOString();
-    const { data, error } = await supabase
-      .from("shopping_items")
-      .update({ status: "購入済", purchased_at: purchasedAt })
-      .eq("id", item.id)
-      .eq("user_id", userId)
-      .select()
-      .single();
-
-    setIsSaving(false);
-
-    if (error || !data) {
-      setFeedback({ tone: "error", message: "原因: 購入済みに更新できませんでした。影響: 買い物が未購入のまま残ります。修正方法: ログイン状態を確認してください。" });
-      return;
-    }
-
-    setShoppingItems((items) => items.map((current) => (current.id === item.id ? (data as ShoppingItem) : current)));
-    setSelectedShoppingIds((ids) => ids.filter((id) => id !== item.id));
-    setFeedback({ tone: "success", message: `${item.name} を購入済みにしました。` });
-  }
-
-  function toggleShoppingSelected(itemId: string) {
-    setSelectedShoppingIds((ids) => (ids.includes(itemId) ? ids.filter((id) => id !== itemId) : [...ids, itemId]));
-  }
-
-  async function deleteSelectedShoppingItems() {
-    if (selectedShoppingIds.length === 0) return;
-
-    setIsSaving(true);
-    setFeedback(null);
-
-    const { error } = await supabase.from("shopping_items").delete().eq("user_id", userId).in("id", selectedShoppingIds);
-
-    setIsSaving(false);
-
-    if (error) {
-      setFeedback({ tone: "error", message: "原因: 買い物を一括削除できませんでした。影響: 選択した買い物が残ります。修正方法: ログイン状態を確認してください。" });
-      return;
-    }
-
-    const deletedCount = selectedShoppingIds.length;
-    setShoppingItems((items) => items.filter((item) => !selectedShoppingIds.includes(item.id)));
-    setSelectedShoppingIds([]);
-    setFeedback({ tone: "info", message: `買い物を${deletedCount}件削除しました。` });
   }
 
   async function completeSchedule(schedule: MealSchedule) {
@@ -1233,6 +1086,12 @@ export function RecipeMealWorkspace({
 
   return (
     <section className="recipe-meal-workspace" aria-labelledby="recipe-meal-heading">
+      {toast ? (
+        <div className="app-toast" data-tone={toast.tone} role="status" aria-live="polite">
+          {toast.message}
+        </div>
+      ) : null}
+
       <div className="section-heading sr-only">
         <p className="eyebrow">{activeView === "schedule" ? "MEAL SCHEDULE" : "RECIPE COLLECTION"}</p>
         <h2 id="recipe-meal-heading">献立・レシピ</h2>
@@ -1240,10 +1099,10 @@ export function RecipeMealWorkspace({
       </div>
 
       <div className="canvas-mode-control recipe-subnav" aria-label="献立とレシピの表示切替">
-        <button className="secondary-button compact-button" data-active={activeView === "recipes"} type="button" onClick={() => setActiveView("recipes")}>
+        <button className="secondary-button compact-button" data-tab="recipes" data-active={activeView === "recipes"} type="button" onClick={() => setActiveView("recipes")}>
           レシピ集
         </button>
-        <button className="secondary-button compact-button" data-active={activeView === "schedule"} type="button" onClick={() => setActiveView("schedule")}>
+        <button className="secondary-button compact-button" data-tab="schedule" data-active={activeView === "schedule"} type="button" onClick={() => setActiveView("schedule")}>
           スケジュール
         </button>
       </div>
@@ -1550,6 +1409,124 @@ export function RecipeMealWorkspace({
         </div>
       ) : null}
 
+      {pickerSlot ? (
+        <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="schedule-picker-heading">
+          <section className="canvas-modal schedule-picker-modal">
+            <button
+              className="modal-close-button"
+              type="button"
+              onClick={() => {
+                setPickerSlot(null);
+                setPickerQuery("");
+              }}
+              aria-label="閉じる"
+            >
+              ×
+            </button>
+            <h3 id="schedule-picker-heading">レシピを選ぶ</h3>
+            <p className="schedule-picker-meta">
+              {formatScheduleDayLabel(pickerSlot.date)} ・ {pickerSlot.meal}
+            </p>
+            {recipes.length === 0 ? (
+              <p className="empty-list">レシピがありません。先に「レシピ集」でレシピを追加してください。</p>
+            ) : (
+              <>
+                <input
+                  className="schedule-picker-search"
+                  type="search"
+                  value={pickerQuery}
+                  onChange={(event) => setPickerQuery(event.target.value)}
+                  placeholder="レシピ名で絞り込み"
+                  aria-label="レシピ名で絞り込み"
+                />
+                <div className="schedule-picker-list">
+                  {recipes
+                    .filter((recipe) => recipe.name.toLowerCase().includes(pickerQuery.trim().toLowerCase()))
+                    .map((recipe) => (
+                      <button
+                        className="schedule-picker-option"
+                        type="button"
+                        key={recipe.id}
+                        disabled={isSaving}
+                        onClick={() => addScheduleEntry(pickerSlot.date, pickerSlot.meal, recipe.id)}
+                      >
+                        <strong>{recipe.name}</strong>
+                        {recipe.genre.length > 0 ? <small>{recipe.genre.join("・")}</small> : null}
+                      </button>
+                    ))}
+                </div>
+              </>
+            )}
+          </section>
+        </div>
+      ) : null}
+
+      {slotMenuSchedule ? (
+        <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="schedule-slot-menu-heading">
+          <section className="canvas-modal schedule-slot-menu-modal">
+            <button className="modal-close-button" type="button" onClick={() => setSlotMenuId(null)} aria-label="閉じる">
+              ×
+            </button>
+            <h3 id="schedule-slot-menu-heading">献立の操作</h3>
+            <p className="schedule-slot-menu-meta">
+              {formatScheduleDayLabel(slotMenuSchedule.scheduled_on)} ・ {slotMenuSchedule.meal_type} ・ {slotMenuSchedule.recipe_name || "レシピ名なし"}
+            </p>
+            <div className="schedule-slot-menu-actions">
+              <button
+                className="secondary-button"
+                type="button"
+                disabled={isSaving}
+                onClick={async () => {
+                  await moveSchedule(slotMenuSchedule, -1);
+                  setSlotMenuId(null);
+                }}
+              >
+                前日へ移動
+              </button>
+              <button
+                className="secondary-button"
+                type="button"
+                disabled={isSaving}
+                onClick={async () => {
+                  await moveSchedule(slotMenuSchedule, 1);
+                  setSlotMenuId(null);
+                }}
+              >
+                翌日へ移動
+              </button>
+              <button
+                className="primary-button"
+                type="button"
+                disabled={isSaving || slotMenuSchedule.status === "完了"}
+                onClick={() => completeSchedule(slotMenuSchedule)}
+              >
+                {pendingConsumptionScheduleId === slotMenuSchedule.id ? "消費して完了" : "調理完了"}
+              </button>
+              <button
+                className="danger-button"
+                type="button"
+                disabled={isSaving}
+                onClick={() => {
+                  const target = slotMenuSchedule;
+                  setSlotMenuId(null);
+                  requestDelete(target.recipe_name || "献立", "この献立予定を削除します。料理履歴は削除されません。", () => deleteSchedule(target));
+                }}
+              >
+                削除する
+              </button>
+            </div>
+            {pendingConsumptionScheduleId === slotMenuSchedule.id ? (
+              <ConsumptionEditor
+                drafts={consumptionDrafts}
+                inventoryItems={inventoryItemsForMeals}
+                onChange={updateConsumptionDraft}
+                recipe={recipes.find((item) => item.id === slotMenuSchedule.recipe_id) ?? null}
+              />
+            ) : null}
+          </section>
+        </div>
+      ) : null}
+
       <div className="recipe-meal-grid">
         {activeView === "recipes" ? (
         <section className="canvas-recipe-collection" aria-label="レシピ集">
@@ -1732,120 +1709,116 @@ export function RecipeMealWorkspace({
         ) : null}
 
         {activeView === "schedule" ? (
-        <section className="stock-panel schedule-board-panel" aria-labelledby="meal-list-heading">
-          <div className="panel-title">
-            <div>
-              <span>献立</span>
-              <h3 id="meal-list-heading">7日予定と買い物候補</h3>
-            </div>
-          </div>
-
+        <section className="stock-panel schedule-board-panel" aria-label="7日スケジュール">
           <div className="schedule-toolbar">
-            <button className="secondary-button compact-button" type="button" onClick={() => setScheduleWindowStart(addDays(scheduleWindowStart, -7))}>
-              前の7日
+            <button className="schedule-nav-button" type="button" onClick={() => setScheduleWindowStart(addDays(scheduleWindowStart, -7))}>
+              ← 前の週
             </button>
             <button
-              className="secondary-button compact-button"
+              className="schedule-nav-button schedule-nav-today"
               type="button"
               onClick={() => {
                 setScheduleWindowStart(todayValue());
                 setScheduleDate(todayValue());
               }}
             >
-              今日
+              今週
             </button>
-            <button className="secondary-button compact-button" type="button" onClick={() => setScheduleWindowStart(addDays(scheduleWindowStart, 7))}>
-              次の7日
+            <button className="schedule-nav-button" type="button" onClick={() => setScheduleWindowStart(addDays(scheduleWindowStart, 7))}>
+              次の週 →
             </button>
           </div>
 
-          <form className="schedule-quick-add" onSubmit={saveSchedule}>
-            <label>
-              日付
-              <input type="date" value={scheduleDate} onChange={(event) => setScheduleDate(event.target.value)} />
-            </label>
-            <label>
-              食事
-              <select value={scheduleMealType} onChange={(event) => setScheduleMealType(event.target.value as MealType)}>
-                {mealTypes.map((mealType) => (
-                  <option key={mealType} value={mealType}>
-                    {mealType}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              レシピ
-              <select value={scheduleRecipeId} onChange={(event) => setScheduleRecipeId(event.target.value)} disabled={recipes.length === 0}>
-                {recipes.map((recipe) => (
-                  <option key={recipe.id} value={recipe.id}>
-                    {recipe.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <button className="primary-button compact-button" type="submit" disabled={isSaving || recipes.length === 0}>
-              追加
+          <div className="schedule-board" aria-label="7日献立">
+            <button
+              className="schedule-shift"
+              type="button"
+              onClick={() => setScheduleWindowStart(addDays(scheduleWindowStart, -1))}
+              aria-label="スケジュールを1日前へ移動"
+              title="1日前へ移動"
+            >
+              ↑
             </button>
-          </form>
-
-          <div className="meal-week canvas-schedule-week" aria-label="7日献立">
             {scheduleDays.map((day) => {
               const daySchedules = visibleMealSchedules.filter((schedule) => schedule.scheduled_on === day);
+              const tone = scheduleDateTone(day);
               return (
-                <section className="meal-day canvas-schedule-day" key={day}>
-                  <button className="meal-day-heading" type="button" onClick={() => setScheduleDate(day)}>
+                <section className="schedule-day" data-tone={tone} key={day}>
+                  <div className="schedule-day-badge">
                     <span>{formatScheduleDayLabel(day)}</span>
-                    {day === todayValue() ? <em>今日</em> : null}
-                  </button>
-                  <div className="meal-list canvas-meal-slots">
+                    {tone === "today" ? <em>今日</em> : null}
+                  </div>
+                  <div className="schedule-day-slots">
                     {(["朝", "昼", "晩"] as MealType[]).map((mealType) => {
                       const schedule = daySchedules.find((item) => item.meal_type === mealType);
+                      const isSelected = Boolean(schedule) && selectedSchedule?.id === schedule?.id;
                       return (
-                        <div className="meal-slot" key={`${day}-${mealType}`}>
-                          <div className="meal-slot-heading">
+                        <div
+                          className="schedule-slot"
+                          data-empty={!schedule}
+                          key={`${day}-${mealType}`}
+                          onDragOver={(event) => {
+                            event.preventDefault();
+                            event.dataTransfer.dropEffect = "move";
+                            event.currentTarget.classList.add("is-dragover");
+                          }}
+                          onDragLeave={(event) => {
+                            if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                              event.currentTarget.classList.remove("is-dragover");
+                            }
+                          }}
+                          onDrop={(event) => {
+                            event.preventDefault();
+                            event.currentTarget.classList.remove("is-dragover");
+                            const id = event.dataTransfer.getData("text/plain");
+                            if (!id) return;
+                            const dragged = mealSchedules.find((item) => item.id === id);
+                            if (dragged) moveScheduleToSlot(dragged, day, mealType);
+                          }}
+                        >
+                          <div className="schedule-slot-head">
                             <span>{mealType}</span>
                             <button
-                              className="secondary-button compact-button meal-add-button"
+                              className="schedule-add-button"
                               type="button"
-                              onClick={() => {
-                                setScheduleDate(day);
-                                setScheduleMealType(mealType);
-                              }}
+                              onClick={() => setPickerSlot({ date: day, meal: mealType })}
                               aria-label={`${formatScheduleDayLabel(day)} ${mealType}に追加`}
                             >
-                              +
+                              ＋
                             </button>
                           </div>
                           {schedule ? (
-                            <article className="meal-item" data-active={selectedSchedule?.id === schedule.id}>
-                              <button className="meal-select-button" type="button" onClick={() => setSelectedScheduleId(schedule.id)}>
-                                <strong>{schedule.recipe_name || "レシピ名なし"}</strong>
-                                <em>{schedule.status}</em>
+                            <article
+                              className="schedule-meal-card"
+                              data-active={isSelected}
+                              data-done={schedule.status === "完了"}
+                              draggable
+                              onDragStart={(event) => {
+                                event.dataTransfer.effectAllowed = "move";
+                                event.dataTransfer.setData("text/plain", schedule.id);
+                                event.currentTarget.classList.add("is-dragging");
+                              }}
+                              onDragEnd={(event) => {
+                                event.currentTarget.classList.remove("is-dragging");
+                              }}
+                            >
+                              <button
+                                className="schedule-meal-select"
+                                type="button"
+                                onClick={() => {
+                                  setSelectedScheduleId(schedule.id);
+                                  setSlotMenuId(schedule.id);
+                                }}
+                                aria-label={`${schedule.recipe_name || "レシピ名なし"} の操作`}
+                              >
+                                <span className="schedule-meal-handle" aria-hidden="true">≡</span>
+                                <span className="schedule-meal-body">
+                                  <strong>{schedule.recipe_name || "レシピ名なし"}</strong>
+                                  {schedule.status === "完了" ? <em>完了</em> : null}
+                                </span>
                               </button>
-                              <div className="meal-actions">
-                                <button className="secondary-button compact-button" type="button" disabled={isSaving} onClick={() => moveSchedule(schedule, -1)}>
-                                  前日
-                                </button>
-                                <button className="secondary-button compact-button" type="button" disabled={isSaving} onClick={() => moveSchedule(schedule, 1)}>
-                                  翌日
-                                </button>
-                                <button className="secondary-button compact-button" type="button" disabled={isSaving || schedule.status === "完了"} onClick={() => completeSchedule(schedule)}>
-                                  {pendingConsumptionScheduleId === schedule.id ? "消費して完了" : "調理完了"}
-                                </button>
-                                <button
-                                  className="danger-button compact-button"
-                                  type="button"
-                                  disabled={isSaving}
-                                  onClick={() => requestDelete(schedule.recipe_name || "献立", "この献立予定を削除します。料理履歴は削除されません。", () => deleteSchedule(schedule))}
-                                >
-                                  削除
-                                </button>
-                              </div>
                             </article>
-                          ) : (
-                            <p className="compact-empty">予定なし</p>
-                          )}
+                          ) : null}
                         </div>
                       );
                     })}
@@ -1853,103 +1826,15 @@ export function RecipeMealWorkspace({
                 </section>
               );
             })}
-          </div>
-
-          {pendingConsumptionScheduleId && selectedSchedule?.id === pendingConsumptionScheduleId ? (
-            <ConsumptionEditor
-              drafts={consumptionDrafts}
-              inventoryItems={inventoryItemsForMeals}
-              onChange={updateConsumptionDraft}
-              recipe={recipes.find((item) => item.id === selectedSchedule.recipe_id) ?? null}
-            />
-          ) : null}
-
-          <div className="shortage-panel">
-            <div className="panel-title compact-title">
-              <div>
-                <span>不足食材</span>
-                <h4>買い物へ追加</h4>
-              </div>
-            </div>
-            {shortageCandidates.length === 0 ? (
-              <p className="empty-list">選択中の献立に不足食材はありません。同じ単位の在庫だけを比較しています。</p>
-            ) : (
-              <div className="shortage-list">
-                {shortageCandidates.map((item) => (
-                  <label className="shortage-item" key={item.key}>
-                    <input
-                      type="checkbox"
-                      checked={activeShortageKeys.includes(item.key)}
-                      onChange={(event) => toggleShortage(item.key, event.target.checked)}
-                    />
-                    <span>
-                      {item.name} {item.shortageQuantity}{item.unit}
-                    </span>
-                    <small>必要量 {item.requiredQuantity}{item.unit}</small>
-                  </label>
-                ))}
-              </div>
-            )}
-            <button className="primary-button" type="button" disabled={isSaving || shortageCandidates.length === 0} onClick={addShortagesToShopping}>
-              選択食材を買い物へ
+            <button
+              className="schedule-shift"
+              type="button"
+              onClick={() => setScheduleWindowStart(addDays(scheduleWindowStart, 1))}
+              aria-label="スケジュールを1日後へ移動"
+              title="1日後へ移動"
+            >
+              ↓
             </button>
-          </div>
-
-          <div className="shopping-preview">
-            <div className="shopping-heading-row">
-              <h4>買い物リスト</h4>
-              <button
-                className="danger-button compact-button"
-                type="button"
-                disabled={isSaving || selectedShoppingIds.length === 0}
-                onClick={() => requestDelete(`${selectedShoppingIds.length}件の買い物`, "選択した買い物を削除します。元には戻せません。", deleteSelectedShoppingItems)}
-              >
-                選択削除
-              </button>
-            </div>
-
-            <form className="shopping-add-form" onSubmit={addManualShoppingItem}>
-              <input
-                aria-label="買い物の品名"
-                value={shoppingValues.name}
-                onChange={(event) => updateShoppingValue("name", event.target.value)}
-                placeholder="買うもの"
-              />
-              <input
-                aria-label="買い物の数量"
-                min="0"
-                step="0.1"
-                type="number"
-                value={shoppingValues.required_quantity}
-                onChange={(event) => updateShoppingValue("required_quantity", event.target.value)}
-                placeholder="1"
-              />
-              <input
-                aria-label="買い物の単位"
-                value={shoppingValues.unit}
-                onChange={(event) => updateShoppingValue("unit", event.target.value)}
-                placeholder="個"
-              />
-              <button className="primary-button compact-button" type="submit" disabled={isSaving}>
-                手動追加
-              </button>
-            </form>
-
-            <ShoppingListSection
-              emptyText="未購入の買い物はありません。"
-              items={openShoppingItems}
-              onMarkPurchased={markShoppingPurchased}
-              onSelect={toggleShoppingSelected}
-              selectedIds={selectedShoppingIds}
-              title="未購入"
-            />
-            <ShoppingListSection
-              emptyText="購入済みの買い物はありません。"
-              items={purchasedShoppingItems}
-              onSelect={toggleShoppingSelected}
-              selectedIds={selectedShoppingIds}
-              title="購入済み"
-            />
           </div>
         </section>
         ) : null}
@@ -2126,55 +2011,6 @@ function CookingViewer({
 }
 
 const mealIngredientTabs: CookingIngredientTab[] = ["食材", "調味料"];
-
-function ShoppingListSection({
-  emptyText,
-  items,
-  onMarkPurchased,
-  onSelect,
-  selectedIds,
-  title
-}: {
-  emptyText: string;
-  items: ShoppingItem[];
-  onMarkPurchased?: (item: ShoppingItem) => void;
-  onSelect: (id: string) => void;
-  selectedIds: string[];
-  title: string;
-}) {
-  return (
-    <section className="shopping-list-section" aria-label={title}>
-      <div className="shopping-list-title">
-        <span>{title}</span>
-        <strong>{items.length}件</strong>
-      </div>
-      {items.length === 0 ? (
-        <p className="empty-list">{emptyText}</p>
-      ) : (
-        <div className="stock-list">
-          {items.map((item) => (
-            <article className="stock-item compact-stock-item shopping-item" key={item.id}>
-              <label className="select-row">
-                <input checked={selectedIds.includes(item.id)} onChange={() => onSelect(item.id)} type="checkbox" />
-                選択
-              </label>
-              <div className="item-main">
-                <span>{shoppingSourceLabel(item)}</span>
-                <h4>{item.name}</h4>
-                <p>{item.required_quantity}{item.unit} / {item.status}</p>
-              </div>
-              {onMarkPurchased ? (
-                <button className="secondary-button compact-button" type="button" onClick={() => onMarkPurchased(item)}>
-                  購入済み
-                </button>
-              ) : null}
-            </article>
-          ))}
-        </div>
-      )}
-    </section>
-  );
-}
 
 function RecipeList({
   disabled,

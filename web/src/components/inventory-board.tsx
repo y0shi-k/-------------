@@ -1,7 +1,9 @@
 "use client";
 
 import { ChangeEvent, FormEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { DeleteConfirmPanel } from "@/components/delete-confirm-panel";
+import { ShoppingListSection } from "@/components/shopping-list-section";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import {
   emptyStockItemFormValues,
@@ -47,6 +49,12 @@ type InventoryFilters = {
 };
 
 type InventoryView = "inventory" | "shopping";
+
+type ShoppingFormValues = {
+  name: string;
+  required_quantity: string;
+  unit: string;
+};
 
 type AddFlow = "choice" | "manual" | "photo" | null;
 
@@ -143,12 +151,6 @@ function unitConversionLabel(item: StockItem) {
   return `${conversion.fromQty}${conversion.fromUnit} = ${conversion.toQty}${conversion.toUnit}`;
 }
 
-function shoppingSourceLabel(item: ShoppingItem) {
-  if (item.source_type === "meal_schedule") return item.linked_recipe_name ? `献立: ${item.linked_recipe_name}` : "献立由来";
-  if (item.source_type === "recipe_detail") return item.linked_recipe_name ? `レシピ詳細: ${item.linked_recipe_name}` : "レシピ詳細";
-  return "手動追加";
-}
-
 function sortItems(items: StockItem[], sort: InventoryFilters["sort"]) {
   return [...items].sort((a, b) => {
     if (sort === "expiry_asc") {
@@ -172,7 +174,9 @@ export function InventoryBoard({
   initialStorageLocations = []
 }: InventoryBoardProps) {
   const [inventoryItems, setInventoryItems] = useState(initialInventoryItems);
-  const [shoppingItems] = useState(initialShoppingItems);
+  const [shoppingItems, setShoppingItems] = useState(initialShoppingItems);
+  const [selectedShoppingIds, setSelectedShoppingIds] = useState<string[]>([]);
+  const [shoppingValues, setShoppingValues] = useState<ShoppingFormValues>({ name: "", required_quantity: "1", unit: "個" });
   const [storageLocations] = useState(initialStorageLocations);
   const [values, setValues] = useState<StockItemFormValues>(emptyStockItemFormValues);
   const [editing, setEditing] = useState<EditingTarget>(null);
@@ -196,10 +200,119 @@ export function InventoryBoard({
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const photoInputRef = useRef<HTMLInputElement | null>(null);
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
+  const router = useRouter();
 
   function requestDelete(target: string, message: string, confirm: () => void) {
     setPendingDelete({ target, message, confirm });
     setFeedback(null);
+  }
+
+  function updateShoppingValue<K extends keyof ShoppingFormValues>(key: K, value: ShoppingFormValues[K]) {
+    setShoppingValues((current) => ({ ...current, [key]: value }));
+  }
+
+  function toggleShoppingSelected(itemId: string) {
+    setSelectedShoppingIds((ids) => (ids.includes(itemId) ? ids.filter((id) => id !== itemId) : [...ids, itemId]));
+  }
+
+  async function addManualShoppingItem(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const quantity = Number(shoppingValues.required_quantity);
+    const name = shoppingValues.name.trim();
+    const unit = shoppingValues.unit.trim();
+
+    if (!name || !unit || !Number.isFinite(quantity) || quantity <= 0) {
+      setFeedback({
+        tone: "error",
+        message: "原因: 買い物の品名、数量、単位に不備があります。影響: 買い物リストへ追加できません。修正方法: 空欄と0以下の数量を直してください。"
+      });
+      return;
+    }
+
+    setIsSaving(true);
+    setFeedback(null);
+
+    const { data, error } = await supabase
+      .from("shopping_items")
+      .insert({
+        user_id: userId,
+        name,
+        required_quantity: quantity,
+        unit,
+        status: "未購入",
+        linked_recipe_name: "",
+        source_type: "manual"
+      })
+      .select()
+      .single();
+
+    setIsSaving(false);
+
+    if (error || !data) {
+      setFeedback({
+        tone: "error",
+        message: "原因: 買い物をDBへ保存できませんでした。影響: 買い物リストに残りません。修正方法: ログイン状態を確認してください。"
+      });
+      return;
+    }
+
+    setShoppingItems((items) => [data as ShoppingItem, ...items]);
+    setShoppingValues({ name: "", required_quantity: "1", unit: "個" });
+    setFeedback({ tone: "success", message: `${name} を買い物リストへ追加しました。` });
+    router.refresh();
+  }
+
+  async function markShoppingPurchased(item: ShoppingItem) {
+    if (item.status === "購入済") {
+      setFeedback({ tone: "info", message: "この買い物は購入済みです。" });
+      return;
+    }
+
+    setIsSaving(true);
+    setFeedback(null);
+
+    const purchasedAt = new Date().toISOString();
+    const { data, error } = await supabase
+      .from("shopping_items")
+      .update({ status: "購入済", purchased_at: purchasedAt })
+      .eq("id", item.id)
+      .eq("user_id", userId)
+      .select()
+      .single();
+
+    setIsSaving(false);
+
+    if (error || !data) {
+      setFeedback({ tone: "error", message: "原因: 購入済みに更新できませんでした。影響: 買い物が未購入のまま残ります。修正方法: ログイン状態を確認してください。" });
+      return;
+    }
+
+    setShoppingItems((items) => items.map((current) => (current.id === item.id ? (data as ShoppingItem) : current)));
+    setSelectedShoppingIds((ids) => ids.filter((id) => id !== item.id));
+    setFeedback({ tone: "success", message: `${item.name} を購入済みにしました。` });
+    router.refresh();
+  }
+
+  async function deleteSelectedShoppingItems() {
+    if (selectedShoppingIds.length === 0) return;
+
+    setIsSaving(true);
+    setFeedback(null);
+
+    const { error } = await supabase.from("shopping_items").delete().eq("user_id", userId).in("id", selectedShoppingIds);
+
+    setIsSaving(false);
+
+    if (error) {
+      setFeedback({ tone: "error", message: "原因: 買い物を一括削除できませんでした。影響: 選択した買い物が残ります。修正方法: ログイン状態を確認してください。" });
+      return;
+    }
+
+    const deletedCount = selectedShoppingIds.length;
+    setShoppingItems((items) => items.filter((item) => !selectedShoppingIds.includes(item.id)));
+    setSelectedShoppingIds([]);
+    setFeedback({ tone: "info", message: `買い物を${deletedCount}件削除しました。` });
+    router.refresh();
   }
   const storageLocationOptions = useMemo(
     () =>
@@ -224,6 +337,7 @@ export function InventoryBoard({
     return sortItems(filtered, inventoryFilters.sort);
   }, [inventoryFilters, inventoryItems]);
   const openShoppingItems = shoppingItems.filter((item) => item.status === "未購入");
+  const purchasedShoppingItems = shoppingItems.filter((item) => item.status === "購入済");
 
   useEffect(() => {
     return () => {
@@ -864,41 +978,60 @@ export function InventoryBoard({
 
         {activeView === "shopping" ? (
         <section className="stock-panel canvas-panel-wide shopping-empty-panel" aria-labelledby="shopping-list-heading">
-          <div className="panel-title">
-            <div>
-              <span>SHOPPING</span>
-              <h3 id="shopping-list-heading">買い物リスト</h3>
-            </div>
-            <div className="segmented-control">
-              <button className="secondary-button compact-button" data-active type="button">出自別</button>
-              <button className="secondary-button compact-button" type="button">材料まとめ</button>
-            </div>
+          <div className="shopping-heading-row">
+            <h3 id="shopping-list-heading">買い物リスト</h3>
+            <button
+              className="danger-button compact-button"
+              type="button"
+              disabled={isSaving || selectedShoppingIds.length === 0}
+              onClick={() => requestDelete(`${selectedShoppingIds.length}件の買い物`, "選択した買い物を削除します。元には戻せません。", deleteSelectedShoppingItems)}
+            >
+              選択削除
+            </button>
           </div>
-          <div className="bulk-toolbar" aria-label="買い物リスト操作">
-            <span>0件選択中</span>
-            <button className="secondary-button compact-button" type="button" disabled>すべて選択</button>
-            <button className="secondary-button compact-button" type="button" disabled>購入済み</button>
-            <button className="danger-button compact-button" type="button" disabled>選択削除</button>
-          </div>
-          {openShoppingItems.length === 0 ? (
-            <p className="empty-list canvas-empty-large">買うものはありません。</p>
-          ) : (
-            <div className="shopping-list">
-              {openShoppingItems.map((item) => (
-                <article className="stock-item compact-stock-item shopping-item" key={item.id}>
-                  <label className="select-row">
-                    <input type="checkbox" disabled />
-                    選択
-                  </label>
-                  <div className="item-main">
-                    <span>{shoppingSourceLabel(item)}</span>
-                    <h4>{item.name}</h4>
-                    <p>{item.required_quantity}{item.unit} / {item.status}</p>
-                  </div>
-                </article>
-              ))}
-            </div>
-          )}
+
+          <form className="shopping-add-form" onSubmit={addManualShoppingItem}>
+            <input
+              aria-label="買い物の品名"
+              value={shoppingValues.name}
+              onChange={(event) => updateShoppingValue("name", event.target.value)}
+              placeholder="買うもの"
+            />
+            <input
+              aria-label="買い物の数量"
+              min="0"
+              step="0.1"
+              type="number"
+              value={shoppingValues.required_quantity}
+              onChange={(event) => updateShoppingValue("required_quantity", event.target.value)}
+              placeholder="1"
+            />
+            <input
+              aria-label="買い物の単位"
+              value={shoppingValues.unit}
+              onChange={(event) => updateShoppingValue("unit", event.target.value)}
+              placeholder="個"
+            />
+            <button className="primary-button compact-button" type="submit" disabled={isSaving}>
+              手動追加
+            </button>
+          </form>
+
+          <ShoppingListSection
+            emptyText="未購入の買い物はありません。"
+            items={openShoppingItems}
+            onMarkPurchased={markShoppingPurchased}
+            onSelect={toggleShoppingSelected}
+            selectedIds={selectedShoppingIds}
+            title="未購入"
+          />
+          <ShoppingListSection
+            emptyText="購入済みの買い物はありません。"
+            items={purchasedShoppingItems}
+            onSelect={toggleShoppingSelected}
+            selectedIds={selectedShoppingIds}
+            title="購入済み"
+          />
         </section>
         ) : null}
 

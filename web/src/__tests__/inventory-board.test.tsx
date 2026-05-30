@@ -1,12 +1,20 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { InventoryBoard } from "@/components/inventory-board";
 import type { StockItem } from "@/lib/inventory/types";
+import type { ShoppingItem } from "@/lib/recipes/types";
 
 const from = vi.fn();
 const storageFrom = vi.fn();
 const compressImageFile = vi.fn();
 const buildPhotoStoragePath = vi.fn();
+const refresh = vi.fn();
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({
+    refresh
+  })
+}));
 
 vi.mock("@/lib/supabase/browser", () => ({
   createBrowserSupabaseClient: () => ({
@@ -39,14 +47,56 @@ const baseItem: StockItem = {
   updated_at: "2026-05-24T00:00:00Z"
 };
 
+const baseShoppingItem: ShoppingItem = {
+  id: "shopping-1",
+  user_id: "user-1",
+  name: "玉ねぎ",
+  required_quantity: 1,
+  unit: "個",
+  status: "未購入",
+  linked_recipe_name: "カレー",
+  source_type: "meal_schedule",
+  purchased_at: null,
+  created_at: "2026-05-24T00:00:00.000Z",
+  updated_at: "2026-05-24T00:00:00.000Z"
+};
+
+function insertSingleQuery(data: unknown, error: unknown = null) {
+  const single = vi.fn().mockResolvedValue({ data, error });
+  const select = vi.fn(() => ({ single }));
+  const insert = vi.fn(() => ({ select }));
+  return { insert, select, single };
+}
+
+function updateSingleQuery(data: unknown, error: unknown = null) {
+  const single = vi.fn().mockResolvedValue({ data, error });
+  const select = vi.fn(() => ({ single }));
+  const eqUser = vi.fn(() => ({ select }));
+  const eqId = vi.fn(() => ({ eq: eqUser }));
+  const update = vi.fn(() => ({ eq: eqId }));
+  return { update, eqId, eqUser, select, single };
+}
+
+function deleteInQuery(error: unknown = null) {
+  const inIds = vi.fn().mockResolvedValue({ error });
+  const eqUser = vi.fn(() => ({ in: inIds }));
+  const deleteRows = vi.fn(() => ({ eq: eqUser }));
+  return { deleteRows, eqUser, inIds };
+}
+
 function renderBoard(props?: Partial<React.ComponentProps<typeof InventoryBoard>>) {
   return render(
     <InventoryBoard
       initialInventoryItems={props?.initialInventoryItems ?? []}
+      initialShoppingItems={props?.initialShoppingItems ?? []}
       initialStorageLocations={props?.initialStorageLocations ?? []}
       userId={props?.userId ?? "user-1"}
     />
   );
+}
+
+function openShoppingView() {
+  fireEvent.click(screen.getByRole("button", { name: "買い物リスト" }));
 }
 
 function openIngredientModal() {
@@ -350,5 +400,83 @@ describe("InventoryBoard", () => {
 
     expect(await screen.findByText(/原因: Gemini APIの解析に失敗しました。/)).toBeTruthy();
     expect(screen.queryByText("ヨーグルト")).toBeNull();
+  });
+
+  it("adds a manual shopping item from the shopping tab", async () => {
+    const manualShopping = { ...baseShoppingItem, id: "shopping-manual", name: "牛乳", required_quantity: 2, unit: "本", linked_recipe_name: "", source_type: "manual" };
+    const shoppingInsert = insertSingleQuery(manualShopping);
+    from.mockReturnValue({ insert: shoppingInsert.insert });
+
+    renderBoard();
+    openShoppingView();
+
+    fireEvent.change(screen.getByLabelText("買い物の品名"), { target: { value: "牛乳" } });
+    fireEvent.change(screen.getByLabelText("買い物の数量"), { target: { value: "2" } });
+    fireEvent.change(screen.getByLabelText("買い物の単位"), { target: { value: "本" } });
+    fireEvent.click(screen.getByRole("button", { name: "手動追加" }));
+
+    await waitFor(() => {
+      expect(from).toHaveBeenCalledWith("shopping_items");
+      expect(shoppingInsert.insert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          user_id: "user-1",
+          name: "牛乳",
+          required_quantity: 2,
+          unit: "本",
+          status: "未購入",
+          linked_recipe_name: "",
+          source_type: "manual"
+        })
+      );
+    });
+    expect(await screen.findByText("牛乳 を買い物リストへ追加しました。")).toBeTruthy();
+  });
+
+  it("marks a shopping item as purchased", async () => {
+    const purchased = { ...baseShoppingItem, status: "購入済", purchased_at: "2026-05-24T10:00:00.000Z" };
+    const shoppingUpdate = updateSingleQuery(purchased);
+    from.mockReturnValue({ update: shoppingUpdate.update });
+
+    renderBoard({ initialShoppingItems: [baseShoppingItem] });
+    openShoppingView();
+
+    fireEvent.click(screen.getByRole("button", { name: "購入済み" }));
+
+    await waitFor(() => {
+      expect(from).toHaveBeenCalledWith("shopping_items");
+      expect(shoppingUpdate.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: "購入済",
+          purchased_at: expect.any(String)
+        })
+      );
+    });
+    expect(await screen.findByText("玉ねぎ を購入済みにしました。")).toBeTruthy();
+    expect(within(screen.getByLabelText("購入済み")).getByText("玉ねぎ")).toBeTruthy();
+  });
+
+  it("bulk deletes selected shopping items", async () => {
+    const deleteRows = deleteInQuery();
+    from.mockReturnValue({ delete: deleteRows.deleteRows });
+
+    renderBoard({
+      initialShoppingItems: [
+        baseShoppingItem,
+        { ...baseShoppingItem, id: "shopping-2", name: "じゃがいも" }
+      ]
+    });
+    openShoppingView();
+
+    fireEvent.click(screen.getAllByLabelText("選択")[0]);
+    fireEvent.click(screen.getAllByLabelText("選択")[1]);
+    fireEvent.click(screen.getByRole("button", { name: "選択削除" }));
+    expect(await screen.findByLabelText("削除確認")).toBeTruthy();
+    fireEvent.click(within(screen.getByLabelText("削除確認")).getByRole("button", { name: "削除する" }));
+
+    await waitFor(() => {
+      expect(from).toHaveBeenCalledWith("shopping_items");
+      expect(deleteRows.inIds).toHaveBeenCalledWith("id", ["shopping-1", "shopping-2"]);
+    });
+    expect(await screen.findByText("買い物を2件削除しました。")).toBeTruthy();
   });
 });

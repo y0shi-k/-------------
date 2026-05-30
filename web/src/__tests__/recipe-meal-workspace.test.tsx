@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { RecipeMealWorkspace } from "@/components/recipe-meal-workspace";
 import type { StockItem } from "@/lib/inventory/types";
-import type { CookCandidate, MealSchedule, Recipe, RecipeIngredient, ShoppingItem } from "@/lib/recipes/types";
+import type { CookCandidate, MealSchedule, Recipe, RecipeIngredient } from "@/lib/recipes/types";
 
 const from = vi.fn();
 const refresh = vi.fn();
@@ -77,20 +77,6 @@ const baseSchedule: MealSchedule = {
   updated_at: "2026-05-24T00:00:00.000Z"
 };
 
-const baseShoppingItem: ShoppingItem = {
-  id: "shopping-1",
-  user_id: "user-1",
-  name: "玉ねぎ",
-  required_quantity: 1,
-  unit: "個",
-  status: "未購入",
-  linked_recipe_name: "カレー",
-  source_type: "meal_schedule",
-  purchased_at: null,
-  created_at: "2026-05-24T00:00:00.000Z",
-  updated_at: "2026-05-24T00:00:00.000Z"
-};
-
 const baseCandidate: CookCandidate = {
   id: "candidate-1",
   user_id: "user-1",
@@ -109,7 +95,6 @@ function renderWorkspace(props?: Partial<React.ComponentProps<typeof RecipeMealW
       initialInventoryItems={props?.initialInventoryItems ?? [baseInventory]}
       initialMealSchedules={props?.initialMealSchedules ?? []}
       initialRecipes={props?.initialRecipes ?? [baseRecipe]}
-      initialShoppingItems={props?.initialShoppingItems ?? []}
       userId={props?.userId ?? "user-1"}
     />
   );
@@ -151,13 +136,6 @@ function deleteQuery(error: unknown = null) {
   const eqRecipe = vi.fn(() => ({ eq: eqUser }));
   const deleteRows = vi.fn(() => ({ eq: eqRecipe }));
   return { deleteRows, eqRecipe, eqUser };
-}
-
-function deleteInQuery(error: unknown = null) {
-  const inIds = vi.fn().mockResolvedValue({ error });
-  const eqUser = vi.fn(() => ({ in: inIds }));
-  const deleteRows = vi.fn(() => ({ eq: eqUser }));
-  return { deleteRows, eqUser, inIds };
 }
 
 function insertListQuery(data: unknown[], error: unknown = null) {
@@ -331,12 +309,12 @@ describe("RecipeMealWorkspace", () => {
     const scheduleInsert = insertSingleQuery(baseSchedule);
     from.mockReturnValue({ insert: scheduleInsert.insert });
 
-    renderWorkspace();
+    renderWorkspace({ initialMealSchedules: [baseSchedule] });
     openScheduleView();
 
-    fireEvent.change(screen.getByLabelText("日付"), { target: { value: "2026-05-25" } });
-    fireEvent.change(screen.getByLabelText("食事"), { target: { value: "晩" } });
-    fireEvent.click(screen.getByRole("button", { name: "追加" }));
+    // ＋ボタンからレシピピッカーを開いて追加する（クイック追加フォームは廃止）。
+    fireEvent.click(screen.getAllByRole("button", { name: /朝に追加/ })[0]);
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: /カレー/ }));
 
     await waitFor(() => {
       expect(from).toHaveBeenCalledWith("meal_schedules");
@@ -344,7 +322,7 @@ describe("RecipeMealWorkspace", () => {
         expect.objectContaining({
           user_id: "user-1",
           scheduled_on: "2026-05-25",
-          meal_type: "晩",
+          meal_type: "朝",
           recipe_id: "recipe-1",
           recipe_name: "カレー",
           status: "未完了"
@@ -363,16 +341,48 @@ describe("RecipeMealWorkspace", () => {
     openScheduleView();
 
     expect(screen.getByLabelText("7日献立")).toBeTruthy();
-    expect(screen.getAllByText("予定なし").length).toBeGreaterThan(0);
     expect(within(screen.getByLabelText("7日献立")).getByText("カレー")).toBeTruthy();
 
-    fireEvent.click(within(screen.getByLabelText("7日献立")).getByRole("button", { name: "翌日" }));
+    // カードをタップして操作モーダルを開く（Canvas同様、操作はセル内展開ではなくポップアップ）。
+    fireEvent.click(within(screen.getByLabelText("7日献立")).getByRole("button", { name: "カレー の操作" }));
+    fireEvent.click(screen.getByRole("button", { name: "翌日へ移動" }));
 
     await waitFor(() => {
       expect(from).toHaveBeenCalledWith("meal_schedules");
       expect(scheduleUpdate.update).toHaveBeenCalledWith({ scheduled_on: "2026-05-26" });
     });
     expect(await screen.findByText("カレー を 2026/05/26 へ移動しました。")).toBeTruthy();
+  });
+
+  it("moves a scheduled meal to another slot via drag and drop", async () => {
+    const movedSchedule: MealSchedule = { ...baseSchedule, scheduled_on: "2026-05-26", meal_type: "朝" };
+    const scheduleUpdate = updateSingleQuery(movedSchedule);
+    from.mockReturnValue({ update: scheduleUpdate.update });
+
+    renderWorkspace({ initialMealSchedules: [baseSchedule] });
+    openScheduleView();
+
+    let transferred = "";
+    const dataTransfer = {
+      setData: (_type: string, value: string) => {
+        transferred = value;
+      },
+      getData: () => transferred,
+      effectAllowed: "",
+      dropEffect: ""
+    };
+    const card = within(screen.getByLabelText("7日献立")).getByRole("button", { name: "カレー の操作" }).closest("article");
+    const targetSlot = screen.getByRole("button", { name: "5/26(火) 朝に追加" }).closest(".schedule-slot");
+
+    fireEvent.dragStart(card as Element, { dataTransfer });
+    fireEvent.dragOver(targetSlot as Element, { dataTransfer });
+    fireEvent.drop(targetSlot as Element, { dataTransfer });
+
+    await waitFor(() => {
+      expect(from).toHaveBeenCalledWith("meal_schedules");
+      expect(scheduleUpdate.update).toHaveBeenCalledWith({ scheduled_on: "2026-05-26", meal_type: "朝" });
+    });
+    expect(await screen.findByText("カレー を 2026/05/26 朝 へ移動しました。")).toBeTruthy();
   });
 
   it("deletes a meal schedule", async () => {
@@ -382,9 +392,10 @@ describe("RecipeMealWorkspace", () => {
     renderWorkspace({ initialMealSchedules: [baseSchedule] });
     openScheduleView();
 
-    fireEvent.click(within(screen.getByLabelText("7日献立")).getByRole("button", { name: "削除" }));
-    expect(await screen.findByLabelText("削除確認")).toBeTruthy();
+    fireEvent.click(within(screen.getByLabelText("7日献立")).getByRole("button", { name: "カレー の操作" }));
     fireEvent.click(screen.getByRole("button", { name: "削除する" }));
+    expect(await screen.findByLabelText("削除確認")).toBeTruthy();
+    fireEvent.click(within(screen.getByLabelText("削除確認")).getByRole("button", { name: "削除する" }));
 
     await waitFor(() => {
       expect(from).toHaveBeenCalledWith("meal_schedules");
@@ -484,113 +495,6 @@ describe("RecipeMealWorkspace", () => {
     expect(await screen.findByText("カレー の調理ビューアを開きました。")).toBeTruthy();
   });
 
-  it("adds selected shortages to shopping items", async () => {
-    const shoppingInsert = insertListQuery([baseShoppingItem]);
-    from.mockReturnValue({ insert: shoppingInsert.insert });
-
-    renderWorkspace({ initialMealSchedules: [baseSchedule] });
-    openScheduleView();
-
-    fireEvent.click(screen.getByLabelText(/玉ねぎ 1個/));
-    fireEvent.click(screen.getByRole("button", { name: "選択食材を買い物へ" }));
-
-    await waitFor(() => {
-      expect(from).toHaveBeenCalledWith("shopping_items");
-      expect(shoppingInsert.insert).toHaveBeenCalledWith([
-        expect.objectContaining({
-          user_id: "user-1",
-          name: "玉ねぎ",
-          required_quantity: 1,
-          unit: "個",
-          linked_recipe_name: "カレー",
-          source_type: "meal_schedule"
-        })
-      ]);
-    });
-    expect(await screen.findByText("1件を買い物リストへ追加しました。")).toBeTruthy();
-  });
-
-  it("adds a manual shopping item", async () => {
-    const manualShopping = { ...baseShoppingItem, id: "shopping-manual", name: "牛乳", required_quantity: 2, unit: "本", linked_recipe_name: "", source_type: "manual" };
-    const shoppingInsert = insertSingleQuery(manualShopping);
-    from.mockReturnValue({ insert: shoppingInsert.insert });
-
-    renderWorkspace();
-    openScheduleView();
-
-    fireEvent.change(screen.getByLabelText("買い物の品名"), { target: { value: "牛乳" } });
-    fireEvent.change(screen.getByLabelText("買い物の数量"), { target: { value: "2" } });
-    fireEvent.change(screen.getByLabelText("買い物の単位"), { target: { value: "本" } });
-    fireEvent.click(screen.getByRole("button", { name: "手動追加" }));
-
-    await waitFor(() => {
-      expect(from).toHaveBeenCalledWith("shopping_items");
-      expect(shoppingInsert.insert).toHaveBeenCalledWith(
-        expect.objectContaining({
-          user_id: "user-1",
-          name: "牛乳",
-          required_quantity: 2,
-          unit: "本",
-          status: "未購入",
-          linked_recipe_name: "",
-          source_type: "manual"
-        })
-      );
-    });
-    expect(await screen.findByText("牛乳 を買い物リストへ追加しました。")).toBeTruthy();
-    expect(screen.getAllByText("手動追加").length).toBeGreaterThan(0);
-  });
-
-  it("marks a shopping item as purchased", async () => {
-    const purchased = { ...baseShoppingItem, status: "購入済", purchased_at: "2026-05-24T10:00:00.000Z" };
-    const shoppingUpdate = updateSingleQuery(purchased);
-    from.mockReturnValue({ update: shoppingUpdate.update });
-
-    renderWorkspace({ initialShoppingItems: [baseShoppingItem] });
-    openScheduleView();
-
-    fireEvent.click(screen.getByRole("button", { name: "購入済み" }));
-
-    await waitFor(() => {
-      expect(from).toHaveBeenCalledWith("shopping_items");
-      expect(shoppingUpdate.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          status: "購入済",
-          purchased_at: expect.any(String)
-        })
-      );
-    });
-    expect(await screen.findByText("玉ねぎ を購入済みにしました。")).toBeTruthy();
-    expect(within(screen.getByLabelText("購入済み")).getByText("玉ねぎ")).toBeTruthy();
-  });
-
-  it("bulk deletes selected shopping items", async () => {
-    const deleteRows = deleteInQuery();
-    from.mockReturnValue({ delete: deleteRows.deleteRows });
-
-    renderWorkspace({
-      initialShoppingItems: [
-        baseShoppingItem,
-        { ...baseShoppingItem, id: "shopping-2", name: "じゃがいも" }
-      ]
-    });
-    openScheduleView();
-
-    fireEvent.click(screen.getAllByLabelText("選択")[0]);
-    fireEvent.click(screen.getAllByLabelText("選択")[1]);
-    fireEvent.click(screen.getByRole("button", { name: "選択削除" }));
-    expect(await screen.findByLabelText("削除確認")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "削除する" }));
-
-    await waitFor(() => {
-      expect(from).toHaveBeenCalledWith("shopping_items");
-      expect(deleteRows.inIds).toHaveBeenCalledWith("id", ["shopping-1", "shopping-2"]);
-    });
-    expect(await screen.findByText("買い物を2件削除しました。")).toBeTruthy();
-    expect(screen.queryByText("玉ねぎ")).toBeNull();
-    expect(screen.queryByText("じゃがいも")).toBeNull();
-  });
-
   it("completes a meal schedule and creates cooking history", async () => {
     const completed = { ...baseSchedule, status: "完了", completed_at: "2026-05-24T10:00:00.000Z" };
     const scheduleUpdate = updateSingleQuery(completed);
@@ -609,6 +513,7 @@ describe("RecipeMealWorkspace", () => {
     renderWorkspace({ initialMealSchedules: [baseSchedule] });
     openScheduleView();
 
+    fireEvent.click(within(screen.getByLabelText("7日献立")).getByRole("button", { name: "カレー の操作" }));
     fireEvent.click(screen.getByRole("button", { name: "調理完了" }));
     expect(await screen.findByText("消費量を確認してから、もう一度「消費して完了」を押してください。")).toBeTruthy();
     expect(screen.getByLabelText("消費量確認")).toBeTruthy();
