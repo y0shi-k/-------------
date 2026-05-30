@@ -14,6 +14,12 @@
 - 失敗時は「どこで止まったか」と「何を守るために止めたか」を平易に書く
 - required gate が未達なら、完了表現を使わず open gate 名をそのまま書く
 
+## 報告後のナレッジ更新
+- 重要な決定をしたら `project-os/knowledge/decisions.md` に「決定/理由/却下案/次に確認」を追記する。
+- 踏んだ地雷・再発防止があれば `project-os/knowledge/learnings.md` に追記する。
+- 優先順位が動いたら `project-os/backlog.md` の「現在のフォーカス/次にやる候補」を更新する。
+- これらは `/finalize` でまとめて行ってよい。
+
 ## artifact
 - 下書きは `project-os/artifacts/TKT-xxxx/report.md` に残す
 - `project-os/artifacts/TKT-xxxx/` 配下に残す `verify.json` / `manual-smokes.md` / `review.md` / `report.md` は、ユーザーが読む前提で必ず日本語で記述する。

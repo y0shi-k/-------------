@@ -1,0 +1,345 @@
+{
+  "note": "Canvas版 app.html は凍結・参照専用。これらは過去実装の参照用で、現役の判定対象ではない（check_gates.py / route_model.py は status==active のみ評価）。",
+  "evals": [
+    {
+      "id": "schema_change",
+      "status": "reference",
+      "change_scope": "Google Spreadsheet のスキーマ変更（カラム追加・削除・リネーム）",
+      "match_paths": [
+        "app.html",
+        "要件定義書.md"
+      ],
+      "match_rules": {
+        "paths_any": [
+          "app.html",
+          "要件定義書.md"
+        ],
+        "diff_regex_any": [
+          "appendRow",
+          "getSheetByName",
+          "ID|分類|品名|数量|単位|購入日|開封日|表示期限|実質期限|保存場所|状態メモ",
+          "レシピID|レシピ名|材料JSON|手順JSON|出典|調理回数|調理日履歴",
+          "予定日|食事区分|ステータス",
+          "履歴ID|調理日時|感想|写真URL|評価",
+          "リストID|必要数量|紐づくレシピ名"
+        ]
+      },
+      "required_verify": [
+        "html_syntax",
+        "schema_marker"
+      ],
+      "required_manual_smokes": [
+        "schema_integrity"
+      ],
+      "phase_gate_tags": [
+        "verify_passed",
+        "manual_smokes_done",
+        "review_ready",
+        "report_ready"
+      ],
+      "artifact_requirements": [
+        "verify_summary",
+        "manual_smoke_report",
+        "review_record",
+        "user_report_draft"
+      ],
+      "review_focus": [
+        "スキーマ定義が変更されていないか",
+        "カラム名・順序が要件定義書と一致しているか"
+      ],
+      "notes": "スキーマ変更は絶対禁止。誤って変更を含んだ場合は即座に差し戻す。"
+    },
+    {
+      "id": "gas_pattern_change",
+      "status": "reference",
+      "change_scope": "GAS通信パターン（executeGAS, setStatus, フォーム送信方式）の改変",
+      "match_paths": [
+        "app.html"
+      ],
+      "match_rules": {
+        "paths_any": [
+          "app.html"
+        ],
+        "diff_regex_any": [
+          "executeGAS",
+          "setStatus",
+          "createElement.*form",
+          "callback",
+          "requestId",
+          "poll",
+          "fetch.*GAS_URL"
+        ]
+      },
+      "required_verify": [
+        "html_syntax",
+        "gas_pattern_marker"
+      ],
+      "required_manual_smokes": [
+        "gas_communication_pattern"
+      ],
+      "phase_gate_tags": [
+        "verify_passed",
+        "manual_smokes_done",
+        "review_ready",
+        "report_ready"
+      ],
+      "artifact_requirements": [
+        "verify_summary",
+        "manual_smoke_report",
+        "review_record",
+        "user_report_draft"
+      ],
+      "review_focus": [
+        "executeGAS が改変されていないか",
+        "二重送信防止機構が残っているか",
+        "タイムアウト処理が残っているか"
+      ],
+      "notes": "GAS通信方式はプロジェクトの根幹。改変は厳重にレビューする。"
+    },
+    {
+      "id": "manual_bulk_sync_policy",
+      "status": "reference",
+      "change_scope": "Google Spreadsheet への追加・更新・削除を伴う機能変更",
+      "match_paths": [
+        "app.html"
+      ],
+      "match_rules": {
+        "paths_any": [
+          "app.html"
+        ],
+        "diff_regex_any": [
+          "SpreadsheetApp",
+          "appendRow",
+          "deleteRow",
+          "setValue",
+          "setValues",
+          "executeGAS\\(payload",
+          "state\\.pendingSync",
+          "syncPendingChanges",
+          "inventoryCreates|inventoryUpdates|inventoryDeletes",
+          "recipeCreates|recipeUpdates|recipeDeletes",
+          "shoppingPurchases"
+        ]
+      },
+      "required_verify": [
+        "html_syntax",
+        "gas_pattern_marker",
+        "manual_bulk_sync_marker"
+      ],
+      "required_manual_smokes": [
+        "gas_communication_pattern",
+        "manual_bulk_sync"
+      ],
+      "phase_gate_tags": [
+        "verify_passed",
+        "manual_smokes_done",
+        "review_ready",
+        "report_ready"
+      ],
+      "artifact_requirements": [
+        "verify_summary",
+        "manual_smoke_report",
+        "review_record",
+        "user_report_draft"
+      ],
+      "review_focus": [
+        "初期読込/承認/`syncPendingChanges()` 以外で個別 `executeGAS(payload...)` が増えていないか",
+        "スプシ書き込み系の操作が `state.pendingSync` に積まれるか",
+        "未同期件数、行バッジ、破棄、同期ボタンなど状態表示があるか",
+        "同期失敗時に `state.pendingSync` を消していないか",
+        "同期成功時にGASから返った最新一覧で画面状態を置き換えているか"
+      ],
+      "notes": "スプレッドシート変更は必ず手動一括同期に載せる。操作ごとの即時GAS通信は待ち時間と二重反映の原因になるため禁止。"
+    },
+    {
+      "id": "ui_component_addition",
+      "status": "reference",
+      "change_scope": "新規UIコンポーネント（モーダル、タブ、リスト、ボタン等）の追加",
+      "match_paths": [
+        "app.html"
+      ],
+      "match_rules": {
+        "paths_any": [
+          "app.html"
+        ],
+        "diff_regex_any": [
+          "insertAdjacentHTML",
+          "classList\\.add",
+          "getElementById",
+          "querySelector",
+          "rounded-\\[|shadow-|bg-|text-",
+          "hidden|opacity-0|transition"
+        ]
+      },
+      "required_verify": [
+        "html_syntax",
+        "ui_consistency_marker"
+      ],
+      "required_manual_smokes": [
+        "ui_consistency"
+      ],
+      "phase_gate_tags": [
+        "verify_passed",
+        "manual_smokes_done",
+        "review_ready"
+      ],
+      "artifact_requirements": [
+        "verify_summary",
+        "manual_smoke_report",
+        "review_record"
+      ],
+      "review_focus": [
+        "Tailwindクラスが既存パターンと一致しているか",
+        "アクセシビリティ（disabled 制御）が機能しているか"
+      ],
+      "notes": "UI追加は既存のカード・ボタン・バッジのクラス構成を踏襲すること。"
+    },
+    {
+      "id": "phase_transition",
+      "status": "reference",
+      "change_scope": "Phase1→2、Phase2→3 等のフェーズ移行（大規模機能追加）",
+      "match_paths": [
+        "app.html",
+        "要件定義書.md",
+        "AGENTS.md"
+      ],
+      "match_rules": {
+        "paths_any": [
+          "app.html",
+          "要件定義書.md",
+          "AGENTS.md"
+        ],
+        "diff_regex_any": [
+          "Phase [23]",
+          "モードB|モードC",
+          "献立|レシピ集|クッキング|料理履歴"
+        ]
+      },
+      "required_verify": [
+        "html_syntax",
+        "schema_marker",
+        "gas_pattern_marker"
+      ],
+      "required_manual_smokes": [
+        "html_syntax_check",
+        "gas_communication_pattern",
+        "schema_integrity",
+        "ui_consistency"
+      ],
+      "phase_gate_tags": [
+        "spec_ready",
+        "implementation_ready",
+        "verify_passed",
+        "manual_smokes_done",
+        "review_ready",
+        "report_ready"
+      ],
+      "artifact_requirements": [
+        "verify_summary",
+        "manual_smoke_report",
+        "review_record",
+        "user_report_draft"
+      ],
+      "review_focus": [
+        "Phase移行の条件を満たしているか",
+        "新規スキーマ定義が既存と整合しているか",
+        "1ファイル制約を守っているか"
+      ],
+      "notes": "フェーズ移行は複数ファイルにまたがる大規模変更の可能性がある。全 gate を開けるまで完了としない。"
+    },
+    {
+      "id": "canvas_constraint",
+      "status": "reference",
+      "change_scope": "GeminiCanvas環境特有の制約（alert/confirm/prompt禁止、APIキー自動提供、FileReader非同期）",
+      "match_paths": [
+        "app.html"
+      ],
+      "match_rules": {
+        "paths_any": [
+          "app.html"
+        ],
+        "diff_regex_any": [
+          "alert\\(",
+          "confirm\\(",
+          "prompt\\(",
+          "FileReader",
+          "GEMINI_API_KEY"
+        ]
+      },
+      "required_verify": [
+        "html_syntax",
+        "canvas_constraint_marker"
+      ],
+      "required_manual_smokes": [
+        "canvas_notification",
+        "gemini_api_key_handling"
+      ],
+      "phase_gate_tags": [
+        "verify_passed",
+        "manual_smokes_done",
+        "review_ready"
+      ],
+      "artifact_requirements": [
+        "verify_summary",
+        "manual_smoke_report",
+        "review_record"
+      ],
+      "review_focus": [
+        "alert/confirm/prompt が追加・残存していないか",
+        "GEMINI_API_KEY の空チェックでエラーにしていないか",
+        "FileReader が Promiseラップされているか",
+        "コード行数が無闇に肥大化していないか（既存パターンの再利用確認）"
+      ],
+      "notes": "Canvasのsandbox制約はフリーズの直接原因になる。コード肥大化も単一ファイル維持の観点から厳密にレビューする。"
+    },
+    {
+      "id": "ai_prompt_change",
+      "status": "reference",
+      "change_scope": "AIプロンプト（Gemini API への指示文）の改変",
+      "match_paths": [
+        "app.html"
+      ],
+      "match_rules": {
+        "paths_any": [
+          "app.html"
+        ],
+        "diff_regex_any": [
+          "ingredients.*含む",
+          "seasonings.*含む",
+          "合わせ調味料",
+          "generateContent",
+          "responseMimeType",
+          "generateAiRecipeFromPlan",
+          "parseRecipeTextWithAI"
+        ]
+      },
+      "required_verify": [
+        "html_syntax",
+        "canvas_constraint_marker"
+      ],
+      "required_manual_smokes": [
+        "canvas_notification",
+        "gemini_api_key_handling"
+      ],
+      "phase_gate_tags": [
+        "verify_passed",
+        "manual_smokes_done",
+        "review_ready",
+        "report_ready"
+      ],
+      "artifact_requirements": [
+        "verify_summary",
+        "manual_smoke_report",
+        "review_record",
+        "user_report_draft"
+      ],
+      "review_focus": [
+        "プロンプト変更が JSON 構造を壊していないか",
+        "ingredients / seasonings / prepSteps / steps の定義が矛盾していないか",
+        "既存のプロンプトパターン（テキスト解析・AI考案）両方に反映されているか",
+        "JSON出力指示（responseMimeType: application/json）が維持されているか"
+      ],
+      "notes": "AIプロンプトは 'jsonで出力' 指示と実際の出力の間で微妙な齟齬が起きやすい。プロンプト変更後は必ず実際のAI通信で構造化結果を検証すること。"
+    }
+  ]
+}

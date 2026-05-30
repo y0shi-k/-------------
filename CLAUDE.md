@@ -15,10 +15,20 @@
 
 ## ワークフロー（Claude Code Skills）
 
+- `/new-ticket` … `.agents/templates/ticket.md` から次番 TKT を雛形生成（着手前に `project-os/backlog.md` の「次」を見る）。
+- `/implement [TKT-xxxx]` … 危険度に応じ Opus(impl-deep)/Sonnet(impl-fast) に振り分けて実装 → verify → check-gates。
 - `/verify [TKT-xxxx]` … Web版の lint/typecheck/test/build + policy チェックを実行し `verify.json` を残す。
 - `/check-gates [TKT-xxxx]` … git diff から required_evals を自動判定し、未閉の phase gate を表示。
-- `/new-ticket` … `.agents/templates/ticket.md` から次番 TKT を雛形生成。
-- `/finalize [TKT-xxxx]` … `report.md` を生成（危険変更時のみ `review.md` / `manual-smokes.md` も）。
+- `/finalize [TKT-xxxx]` … `report.md` を生成（危険変更時のみ `review.md` / `manual-smokes.md` も）。decisions/backlog も更新。
+- `/glossary` … ドメイン用語・判断基準を `project-os/knowledge/glossary.md` で確認。
+
+## 状態とナレッジ（マクロ層・Project OS）
+
+- **今/次/優先順位**: `project-os/backlog.md`（live な作業の正本。長期ロードマップは `knowledge/phase-map.md`）。
+- **決定の記録**: `project-os/knowledge/decisions.md`（決定・理由・却下案。同じ議論のやり直しを防ぐ）。
+- **学び/失敗**: `project-os/knowledge/learnings.md`（踏んだ地雷と再発防止）。
+- **用語・判断基準**: `project-os/knowledge/glossary.md`。
+- 重要な決定をしたら decisions.md に、優先順位が動いたら backlog.md に残す（`/finalize` でも追記）。
 
 ## プロセス（軽量化済み）
 

@@ -31,7 +31,7 @@
 - Gemini APIをブラウザから直接呼び、APIキーが露出する
 
 ### Canvas版（凍結・参照のみ）
-- Canvas版は編集しないため停止条件の対象外。過去のCanvas停止条件は `harness/change_evals.json` の reference eval を参照。
+- Canvas版は編集しないため停止条件の対象外。過去のCanvas停止条件は `harness/legacy/canvas_evals.json` を参照。
 
 ## phase gate の意味
 - `spec_ready`: 関連 spec と acceptance がある
@@ -76,7 +76,7 @@
   - 複数画面にまたがる機能追加や契約変更
 
 ## スプシ同期 policy check（Canvas・参照のみ）
-- Canvas版は凍結のため対象外。過去のスプシ手動一括同期ポリシーは `harness/change_evals.json` の reference eval `manual_bulk_sync_policy` を参照。
+- Canvas版は凍結のため対象外。過去のスプシ手動一括同期ポリシーは `harness/legacy/canvas_evals.json` の `manual_bulk_sync_policy` を参照。
 
 ## Web版 policy check（`/verify` に自動化済み）
 - 以下は `harness/bin/verify_web.sh` が自動実行する。手動で再掲する必要はない。

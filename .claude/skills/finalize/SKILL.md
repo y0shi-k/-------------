@@ -16,7 +16,11 @@ description: チケットの完了成果物（report.md、危険変更時はrevi
    - `review.md` ← `.agents/templates/review.md`（危険変更時。front-matter `status: passed`、セクション checked_diff_paths / checked_artifacts / findings / open_risks / verdict）
 4. すべて**日本語**で記入する（識別子だけ英語可）。テンプレの example 値は残さない。
 5. 再度 `/check-gates <TKT>` を実行し、**全 gate が ✅ になるまで**埋める。
-6. ticket の `status` を `completed` に更新する。
+6. **ナレッジ層を更新する**:
+   - `project-os/knowledge/decisions.md` に今回の決定（決定/理由/却下案/次に確認）を追記（重要な判断があった場合）。
+   - 踏んだ地雷・再発防止があれば `project-os/knowledge/learnings.md` に追記。
+   - `project-os/backlog.md` の「現在のフォーカス」「次にやる候補」を更新（完了項目を外し、次を繰り上げ）。
+7. ticket の `status` を `completed` に更新する。
 
 ## 注意
 - 成果物は会話の要約ではなく、後から `project-os/` だけを読んで判定できる内容にする。

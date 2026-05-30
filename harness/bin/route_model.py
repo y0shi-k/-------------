@@ -21,6 +21,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 TICKETS = REPO_ROOT / "project-os" / "tickets"
 CHANGE_EVALS = REPO_ROOT / "harness" / "change_evals.json"
+LEGACY_EVALS = REPO_ROOT / "harness" / "legacy" / "canvas_evals.json"
 
 
 def parse_front_matter(text: str) -> dict:
@@ -70,6 +71,11 @@ def main() -> int:
 
     evals = json.loads(CHANGE_EVALS.read_text(encoding="utf-8"))["evals"]
     danger_map = {e["id"]: bool(e.get("danger")) for e in evals}
+    # legacy(Canvas)eval も既知として扱う。Canvas は凍結のため非危険・実装振り分けの対象外。
+    # これにより、古い Canvas eval が残るチケットを「未知」と誤判定して deep に倒さずに済む。
+    if LEGACY_EVALS.exists():
+        for e in json.loads(LEGACY_EVALS.read_text(encoding="utf-8")).get("evals", []):
+            danger_map.setdefault(e["id"], False)
     known = set(danger_map)
 
     print("=== route-model ===")
