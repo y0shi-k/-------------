@@ -1311,9 +1311,9 @@ export function RecipeMealWorkspace({
                 レシピ名
                 <input value={recipeValues.name} onChange={(event) => updateRecipeValue("name", event.target.value)} placeholder="例: カレー" />
               </label>
-              <label>
+              <label className="genre-field-label">
                 ジャンル
-                <input value={recipeValues.genre} onChange={(event) => updateRecipeValue("genre", event.target.value)} placeholder="和食, 作り置き" />
+                <GenreTagPicker value={recipeValues.genre} recipes={recipes} onChange={(csv) => updateRecipeValue("genre", csv)} />
               </label>
               <label>
                 出典
@@ -1910,6 +1910,159 @@ export function RecipeMealWorkspace({
         ) : null}
       </div>
     </section>
+  );
+}
+
+const DEFAULT_RECIPE_GENRES = ["和食", "洋食", "中華", "韓国", "イタリアン", "エスニック", "その他"];
+
+function genrePaletteIndex(genre: string) {
+  const sum = Array.from(genre).reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
+  return sum % 7;
+}
+
+// Canvas版（AppSheet風）ジャンル選択UI: タグ表示＋検索/追加＋チェックリスト・ポップオーバー。
+function GenreTagPicker({ value, onChange, recipes }: { value: string; onChange: (csv: string) => void; recipes: Recipe[] }) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const selected = useMemo(() => splitCsv(value), [value]);
+  const candidates = useMemo(() => {
+    const set = new Set<string>();
+    DEFAULT_RECIPE_GENRES.forEach((genre) => set.add(genre));
+    recipes.forEach((recipe) => recipe.genre.forEach((genre) => genre && set.add(genre)));
+    selected.forEach((genre) => set.add(genre));
+    return Array.from(set);
+  }, [recipes, selected]);
+
+  const normalizedQuery = query.trim();
+  const filtered = candidates.filter((genre) => !normalizedQuery || genre.toLowerCase().includes(normalizedQuery.toLowerCase()));
+  const canCreate = Boolean(normalizedQuery) && !candidates.some((genre) => genre.toLowerCase() === normalizedQuery.toLowerCase());
+
+  useEffect(() => {
+    if (!open) return;
+    const handlePointerDown = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => document.removeEventListener("mousedown", handlePointerDown);
+  }, [open]);
+
+  const commit = (next: string[]) => onChange(next.join(", "));
+  const toggle = (genre: string) => commit(selected.includes(genre) ? selected.filter((item) => item !== genre) : [...selected, genre]);
+  const addNew = (name: string) => {
+    const genre = name.trim();
+    setQuery("");
+    if (!genre || selected.includes(genre)) return;
+    commit([...selected, genre]);
+  };
+  const remove = (genre: string) => commit(selected.filter((item) => item !== genre));
+
+  return (
+    <div className="genre-picker" ref={containerRef}>
+      <div className="genre-field" onClick={() => setOpen(true)}>
+        {selected.length > 0 ? (
+          <div className="genre-tags">
+            {selected.map((genre) => (
+              <span className="genre-tag" data-palette={genrePaletteIndex(genre)} key={genre}>
+                <span className="genre-tag-name">#{genre}</span>
+                <button
+                  className="genre-tag-remove"
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    remove(genre);
+                  }}
+                  aria-label={`${genre} を外す`}
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+        ) : null}
+        <input
+          className="genre-input"
+          value={query}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            setOpen(true);
+          }}
+          onFocus={() => setOpen(true)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              const first = filtered.find((genre) => !selected.includes(genre));
+              if (first) toggle(first);
+              else if (canCreate) addNew(normalizedQuery);
+            } else if (event.key === "Escape") {
+              setOpen(false);
+            } else if (event.key === "Backspace" && !query && selected.length > 0) {
+              remove(selected[selected.length - 1]);
+            }
+          }}
+          placeholder="ジャンルを検索・追加"
+          aria-label="ジャンルを検索・追加"
+        />
+        <button
+          className="genre-icon-button genre-clear"
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            if (query) setQuery("");
+            else setOpen(false);
+          }}
+          aria-label="検索をクリア"
+        >
+          ×
+        </button>
+        <button
+          className="genre-icon-button genre-add"
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            if (normalizedQuery) addNew(normalizedQuery);
+            else setOpen(true);
+          }}
+          aria-label="ジャンルを追加"
+        >
+          ＋
+        </button>
+      </div>
+      {open ? (
+        <div className="genre-popover">
+          <div className="genre-popover-head">
+            <span className="genre-selected-count">
+              <span className="genre-selected-check" aria-hidden="true">✓</span>
+              {selected.length} Selected
+            </span>
+            <span className="genre-popover-eyebrow">GENRE</span>
+          </div>
+          <div className="genre-popover-list">
+            {filtered.map((genre) => {
+              const isSelected = selected.includes(genre);
+              return (
+                <button className="genre-option" data-selected={isSelected} type="button" key={genre} onClick={() => toggle(genre)}>
+                  <span className="genre-option-check" data-on={isSelected} aria-hidden="true">
+                    ✓
+                  </span>
+                  <span className="genre-option-name">{genre}</span>
+                </button>
+              );
+            })}
+            {canCreate ? (
+              <button className="genre-option genre-option-create" type="button" onClick={() => addNew(normalizedQuery)}>
+                <span className="genre-option-check genre-option-create-icon" aria-hidden="true">
+                  ＋
+                </span>
+                <span className="genre-option-name">新規ジャンル「{normalizedQuery}」を追加</span>
+              </button>
+            ) : null}
+            {filtered.length === 0 && !canCreate ? <p className="genre-popover-empty">該当するジャンルはありません</p> : null}
+          </div>
+        </div>
+      ) : null}
+    </div>
   );
 }
 

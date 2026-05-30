@@ -177,7 +177,12 @@ describe("RecipeMealWorkspace", () => {
     openRecipeEditor();
 
     fireEvent.change(screen.getByLabelText("レシピ名"), { target: { value: "親子丼" } });
-    fireEvent.change(screen.getByLabelText("ジャンル"), { target: { value: "和食, 丼" } });
+    // Canvas版（AppSheet風）ジャンルピッカー: 既存候補はEnterで選択、新規は入力してEnterで作成。
+    const genreInput = screen.getByLabelText("ジャンルを検索・追加");
+    fireEvent.change(genreInput, { target: { value: "和食" } });
+    fireEvent.keyDown(genreInput, { key: "Enter" });
+    fireEvent.change(genreInput, { target: { value: "丼" } });
+    fireEvent.keyDown(genreInput, { key: "Enter" });
     fireEvent.change(screen.getByLabelText("参考元"), { target: { value: "母のメモ" } });
     const ingredientEditor = screen.getByLabelText("材料入力");
     fireEvent.change(within(ingredientEditor).getByLabelText("品名"), { target: { value: "卵" } });
