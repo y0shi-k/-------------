@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { RecipeMealWorkspace } from "@/components/recipe-meal-workspace";
 import type { StockItem } from "@/lib/inventory/types";
 import type { CookCandidate, MealSchedule, Recipe, RecipeIngredient } from "@/lib/recipes/types";
@@ -146,9 +146,18 @@ function insertListQuery(data: unknown[], error: unknown = null) {
 
 describe("RecipeMealWorkspace", () => {
   beforeEach(() => {
+    // スケジュールは今日中心（today-3〜today+3）で描画されるため、固定日付の
+    // テストスケジュール（5/25・5/26）が窓内に入るよう today を 2026-05-28 に固定する。
+    // Date のみ偽装し、setTimeout 等は実タイマーのまま（waitFor を壊さない）。
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-05-28T12:00:00"));
     from.mockReset();
     refresh.mockReset();
     global.fetch = vi.fn();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it("shows recipes and recipe details", () => {

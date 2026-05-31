@@ -228,7 +228,6 @@ export function RecipeMealWorkspace({
   initialRecipes,
   userId
 }: RecipeMealWorkspaceProps) {
-  const initialScheduleStart = initialMealSchedules[0]?.scheduled_on ?? todayValue();
   const [recipes, setRecipes] = useState(initialRecipes);
   const [cookCandidates, setCookCandidates] = useState(initialCookCandidates);
   const [inventoryItemsForMeals, setInventoryItemsForMeals] = useState(initialInventoryItems);
@@ -237,8 +236,9 @@ export function RecipeMealWorkspace({
   const [editingRecipeId, setEditingRecipeId] = useState<string | null>(null);
   const [selectedRecipeId, setSelectedRecipeId] = useState(initialRecipes[0]?.id ?? "");
   const [activeCookingRecipeId, setActiveCookingRecipeId] = useState("");
-  const [scheduleWindowStart, setScheduleWindowStart] = useState(initialScheduleStart);
-  const [scheduleDate, setScheduleDate] = useState(initialScheduleStart);
+  // Canvas版同様、7日ウィンドウは常に今日を中央（today-3〜today+3）に置く。
+  const [scheduleWindowStart, setScheduleWindowStart] = useState(() => addDays(todayValue(), -3));
+  const [scheduleDate, setScheduleDate] = useState(() => todayValue());
   const [scheduleMealType, setScheduleMealType] = useState<MealType>("晩");
   const [scheduleRecipeId, setScheduleRecipeId] = useState(initialRecipes[0]?.id ?? "");
   const [selectedScheduleId, setSelectedScheduleId] = useState(initialMealSchedules[0]?.id ?? "");
@@ -1791,7 +1791,7 @@ export function RecipeMealWorkspace({
               className="schedule-nav-button schedule-nav-today"
               type="button"
               onClick={() => {
-                setScheduleWindowStart(todayValue());
+                setScheduleWindowStart(addDays(todayValue(), -3));
                 setScheduleDate(todayValue());
               }}
             >
