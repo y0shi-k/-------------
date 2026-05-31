@@ -28,6 +28,14 @@ type Feedback = {
   message: string;
 };
 
+const inventorySaveErrorMessage =
+  "原因: 在庫をDBへ保存できませんでした。影響: 入力した食材は在庫一覧に追加されません。修正方法: ログイン状態と入力内容を確認してください。";
+
+function logInventorySaveError(action: "insert" | "update", error: unknown) {
+  if (!error) return;
+  console.error(`[InventoryBoard] inventory_items ${action} failed`, error);
+}
+
 type PendingDelete = {
   confirm: () => void;
   message: string;
@@ -177,7 +185,7 @@ export function InventoryBoard({
   const [shoppingItems, setShoppingItems] = useState(initialShoppingItems);
   const [selectedShoppingIds, setSelectedShoppingIds] = useState<string[]>([]);
   const [shoppingValues, setShoppingValues] = useState<ShoppingFormValues>({ name: "", required_quantity: "1", unit: "個" });
-  const [storageLocations] = useState(initialStorageLocations);
+  const [storageLocations, setStorageLocations] = useState(initialStorageLocations);
   const [values, setValues] = useState<StockItemFormValues>(emptyStockItemFormValues);
   const [editing, setEditing] = useState<EditingTarget>(null);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
@@ -213,6 +221,24 @@ export function InventoryBoard({
 
   function toggleShoppingSelected(itemId: string) {
     setSelectedShoppingIds((ids) => (ids.includes(itemId) ? ids.filter((id) => id !== itemId) : [...ids, itemId]));
+  }
+
+  // 新規保存場所をマスタ(storage_locations)へ登録する。食材0件でも上部タブに残すため。
+  async function addStorageLocation(name: string) {
+    const trimmed = name.trim();
+    if (!trimmed || storageLocations.some((location) => location.name === trimmed)) return;
+
+    const sortOrder = storageLocations.reduce((max, location) => Math.max(max, location.sort_order), 0) + 1;
+    const { data, error } = await supabase
+      .from("storage_locations")
+      .insert({ user_id: userId, name: trimmed, sort_order: sortOrder })
+      .select()
+      .single();
+
+    if (error || !data) return;
+
+    setStorageLocations((items) => [...items, data as StorageLocation]);
+    router.refresh();
   }
 
   async function addManualShoppingItem(event: FormEvent<HTMLFormElement>) {
@@ -572,7 +598,12 @@ export function InventoryBoard({
       setIsSaving(false);
 
       if (error || !data) {
-        setFeedback({ tone: "error", message: "更新できませんでした。ログイン状態と入力内容を確認してください。" });
+        logInventorySaveError("update", error);
+        setFeedback({
+          tone: "error",
+          message:
+            "原因: 在庫をDBで更新できませんでした。影響: 入力した変更は在庫一覧に反映されません。修正方法: ログイン状態と入力内容を確認してください。"
+        });
         return;
       }
 
@@ -587,7 +618,8 @@ export function InventoryBoard({
     setIsSaving(false);
 
     if (error || !data) {
-      setFeedback({ tone: "error", message: "在庫に追加できませんでした。ログイン状態と入力内容を確認してください。" });
+      logInventorySaveError("insert", error);
+      setFeedback({ tone: "error", message: inventorySaveErrorMessage });
       return;
     }
 
@@ -698,7 +730,7 @@ export function InventoryBoard({
         </div>
       </div>
 
-      {feedback ? (
+      {feedback && addFlow !== "manual" ? (
         <p className="operation-message" data-tone={feedback.tone} role={feedback.tone === "error" ? "alert" : "status"}>
           {feedback.message}
         </p>
@@ -754,6 +786,11 @@ export function InventoryBoard({
           </div>
 
           <form className="stock-form" onSubmit={saveInventory}>
+            {feedback ? (
+              <p className="operation-message modal-operation-message" data-tone={feedback.tone} role={feedback.tone === "error" ? "alert" : "status"}>
+                {feedback.message}
+              </p>
+            ) : null}
             <label>
               品名
               <input value={values.name} onChange={(event) => updateValue("name", event.target.value)} placeholder="例: 牛乳" />
@@ -766,19 +803,14 @@ export function InventoryBoard({
                   <option value="調味料">調味料</option>
                 </select>
               </label>
-              <label>
+              <label className="genre-field-label">
                 保存場所
-                <input
-                  list="storage-location-options"
+                <LocationTagPicker
                   value={values.storage_location}
-                  onChange={(event) => updateValue("storage_location", event.target.value)}
-                  placeholder="冷蔵庫"
+                  candidates={storageLocationOptions}
+                  onSelect={(name) => updateValue("storage_location", name)}
+                  onCreate={addStorageLocation}
                 />
-                <datalist id="storage-location-options">
-                  {storageLocationOptions.map((location) => (
-                    <option key={location} value={location} />
-                  ))}
-                </datalist>
               </label>
             </div>
             <div className="form-row two-columns">
@@ -1202,6 +1234,158 @@ function ListToolbar({ disabled, itemIds, onClear, onDeleteSelected, onSelectAll
         <button className="danger-button compact-button" type="button" disabled={disabled || selectedCount === 0} onClick={onDeleteSelected}>
           選択削除
         </button>
+      ) : null}
+    </div>
+  );
+}
+
+function locationPaletteIndex(name: string) {
+  const sum = Array.from(name).reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
+  return sum % 7;
+}
+
+// レシピのジャンルタグ(AppSheet風)と同じUI・CSSを流用した、保存場所用の単一選択タグピッカー。
+function LocationTagPicker({
+  value,
+  candidates,
+  onSelect,
+  onCreate
+}: {
+  value: string;
+  candidates: string[];
+  onSelect: (name: string) => void;
+  onCreate: (name: string) => void | Promise<void>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const normalizedQuery = query.trim();
+  const filtered = candidates.filter((name) => !normalizedQuery || name.toLowerCase().includes(normalizedQuery.toLowerCase()));
+  const canCreate = Boolean(normalizedQuery) && !candidates.some((name) => name.toLowerCase() === normalizedQuery.toLowerCase());
+
+  useEffect(() => {
+    if (!open) return;
+    const handlePointerDown = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => document.removeEventListener("mousedown", handlePointerDown);
+  }, [open]);
+
+  const select = (name: string) => {
+    onSelect(name);
+    setQuery("");
+    setOpen(false);
+  };
+  const create = (name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    onSelect(trimmed);
+    void onCreate(trimmed);
+    setQuery("");
+    setOpen(false);
+  };
+
+  return (
+    <div className="genre-picker" ref={containerRef}>
+      <div className="genre-field" onClick={() => setOpen(true)}>
+        {value ? (
+          <div className="genre-tags">
+            <span className="genre-tag" data-palette={locationPaletteIndex(value)}>
+              <span className="genre-tag-name">{value}</span>
+              <button
+                className="genre-tag-remove"
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onSelect("");
+                }}
+                aria-label="保存場所を外す"
+              >
+                ×
+              </button>
+            </span>
+          </div>
+        ) : null}
+        <input
+          className="genre-input"
+          value={query}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            setOpen(true);
+          }}
+          onFocus={() => setOpen(true)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              const first = filtered[0];
+              if (first) select(first);
+              else if (canCreate) create(normalizedQuery);
+            } else if (event.key === "Escape") {
+              setOpen(false);
+            }
+          }}
+          placeholder="保存場所を検索・追加"
+          aria-label="保存場所を検索・追加"
+        />
+        <button
+          className="genre-icon-button genre-clear"
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            if (query) setQuery("");
+            else setOpen(false);
+          }}
+          aria-label="検索をクリア"
+        >
+          ×
+        </button>
+        <button
+          className="genre-icon-button genre-add"
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            if (normalizedQuery) create(normalizedQuery);
+            else setOpen(true);
+          }}
+          aria-label="保存場所を追加"
+        >
+          ＋
+        </button>
+      </div>
+      {open ? (
+        <div className="genre-popover">
+          <div className="genre-popover-head">
+            <span className="genre-selected-count">
+              <span className="genre-selected-check" aria-hidden="true">✓</span>
+              {value ? value : "未選択"}
+            </span>
+            <span className="genre-popover-eyebrow">PLACE</span>
+          </div>
+          <div className="genre-popover-list">
+            {filtered.map((name) => {
+              const isSelected = value === name;
+              return (
+                <button className="genre-option" data-selected={isSelected} type="button" key={name} onClick={() => select(name)}>
+                  <span className="genre-option-check" data-on={isSelected} aria-hidden="true">
+                    ✓
+                  </span>
+                  <span className="genre-option-name">{name}</span>
+                </button>
+              );
+            })}
+            {canCreate ? (
+              <button className="genre-option genre-option-create" type="button" onClick={() => create(normalizedQuery)}>
+                <span className="genre-option-check genre-option-create-icon" aria-hidden="true">
+                  ＋
+                </span>
+                <span className="genre-option-name">新規作成「{normalizedQuery}」を追加</span>
+              </button>
+            ) : null}
+            {filtered.length === 0 && !canCreate ? <p className="genre-popover-empty">該当する保存場所はありません</p> : null}
+          </div>
+        </div>
       ) : null}
     </div>
   );

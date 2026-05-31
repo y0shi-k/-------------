@@ -176,6 +176,64 @@ describe("InventoryBoard", () => {
     expect(screen.getByText("1丁 = 300g")).toBeTruthy();
   });
 
+  it("shows inventory insert errors inside the modal and logs details for debugging", async () => {
+    const dbError = { code: "42703", message: "column inventory_items.unit_conversion does not exist" };
+    const single = vi.fn().mockResolvedValue({ data: null, error: dbError });
+    const select = vi.fn(() => ({ single }));
+    const insert = vi.fn(() => ({ select }));
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    from.mockReturnValue({ insert });
+
+    renderBoard();
+    openManualAdd();
+
+    fireEvent.change(screen.getByLabelText("品名"), { target: { value: "豆腐" } });
+    fireEvent.click(screen.getByRole("button", { name: "在庫に追加" }));
+
+    const dialog = screen.getByRole("dialog", { name: "食材をリストへ" });
+    expect(
+      await within(dialog).findByText(
+        "原因: 在庫をDBへ保存できませんでした。影響: 入力した食材は在庫一覧に追加されません。修正方法: ログイン状態と入力内容を確認してください。"
+      )
+    ).toBeTruthy();
+    expect(consoleError).toHaveBeenCalledWith("[InventoryBoard] inventory_items insert failed", dbError);
+
+    consoleError.mockRestore();
+  });
+
+  it("creates a new storage location from the picker and saves it to the master table", async () => {
+    const newLocation = {
+      id: "loc-1",
+      user_id: "user-1",
+      name: "床下収納",
+      sort_order: 1,
+      created_at: "2026-05-31T00:00:00.000Z",
+      updated_at: "2026-05-31T00:00:00.000Z"
+    };
+    const locationInsert = insertSingleQuery(newLocation);
+    from.mockImplementation((table: string) => {
+      if (table === "storage_locations") return { insert: locationInsert.insert };
+      return {};
+    });
+
+    renderBoard();
+    openManualAdd();
+
+    // ジャンルと同じタグピッカーで、未存在の保存場所を入力→Enterで新規作成。
+    const locationInput = screen.getByLabelText("保存場所を検索・追加");
+    fireEvent.change(locationInput, { target: { value: "床下収納" } });
+    fireEvent.keyDown(locationInput, { key: "Enter" });
+
+    await waitFor(() => {
+      expect(from).toHaveBeenCalledWith("storage_locations");
+      expect(locationInsert.insert).toHaveBeenCalledWith(
+        expect.objectContaining({ user_id: "user-1", name: "床下収納", sort_order: expect.any(Number) })
+      );
+    });
+    // 選択値としてチップ表示される。
+    expect(screen.getByText("床下収納", { selector: ".genre-tag-name" })).toBeTruthy();
+  });
+
   it("rejects incomplete unit conversion settings", async () => {
     renderBoard();
     openManualAdd();
