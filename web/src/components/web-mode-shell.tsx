@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactNode, useMemo, useState } from "react";
+import { createContext, type ReactNode, useCallback, useEffect, useMemo, useRef, useState, useContext } from "react";
 
 type ModeId = "ingredients" | "recipes" | "cooking";
 
@@ -26,6 +26,23 @@ type WebModeShellProps = {
   };
 };
 
+type ShellStatusMessage = {
+  message: string;
+  tone: "success" | "error" | "info";
+};
+
+type ShellStatusContextValue = {
+  showStatusMessage: (message: ShellStatusMessage) => void;
+};
+
+const ShellStatusContext = createContext<ShellStatusContextValue>({
+  showStatusMessage: () => {}
+});
+
+export function useShellStatusMessage() {
+  return useContext(ShellStatusContext);
+}
+
 export function WebModeShell({
   userEmail,
   inventoryCount,
@@ -35,6 +52,8 @@ export function WebModeShell({
   childrenByMode
 }: WebModeShellProps) {
   const [activeMode, setActiveMode] = useState<ModeId>("ingredients");
+  const [statusMessage, setStatusMessage] = useState<ShellStatusMessage | null>(null);
+  const statusTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const modes = useMemo<Mode[]>(
     () => [
       {
@@ -66,13 +85,30 @@ export function WebModeShell({
   );
   const active = modes.find((mode) => mode.id === activeMode) ?? modes[0];
   const activeChildren = childrenByMode[active.id];
+  const showStatusMessage = useCallback((message: ShellStatusMessage) => {
+    if (statusTimer.current) clearTimeout(statusTimer.current);
+    setStatusMessage(message);
+    statusTimer.current = setTimeout(() => setStatusMessage(null), 3000);
+  }, []);
+  const statusLabel = statusMessage
+    ? statusMessage.tone === "success"
+      ? "完了"
+      : statusMessage.tone === "error"
+        ? "エラー"
+        : "通知"
+    : "待機中";
+  const statusText = statusMessage?.message ?? `${active.label}: ${active.status}`;
+
+  useEffect(() => () => {
+    if (statusTimer.current) clearTimeout(statusTimer.current);
+  }, []);
 
   return (
-    <>
-      <div className="canvas-status-bar" role="status" aria-live="polite">
-        <strong>待機中</strong>
+    <ShellStatusContext.Provider value={{ showStatusMessage }}>
+      <div className="canvas-status-bar" data-tone={statusMessage?.tone ?? "idle"} role="status" aria-live="polite">
+        <strong>{statusLabel}</strong>
         <span>|</span>
-        <span>{active.label}: {active.status}</span>
+        <span className="canvas-status-text">{statusText}</span>
         <small>{userEmail}</small>
       </div>
       <h1 className="sr-only">料理レシピ・食材管理</h1>
@@ -108,6 +144,6 @@ export function WebModeShell({
           </button>
         ))}
       </nav>
-    </>
+    </ShellStatusContext.Provider>
   );
 }

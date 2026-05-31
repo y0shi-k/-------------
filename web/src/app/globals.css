@@ -86,6 +86,25 @@ button:disabled {
   display: none;
 }
 
+.canvas-status-text {
+  overflow: hidden;
+  max-width: min(72vw, 520px);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.canvas-status-bar[data-tone="success"] {
+  color: #059669;
+}
+
+.canvas-status-bar[data-tone="error"] {
+  color: #e11d48;
+}
+
+.canvas-status-bar[data-tone="info"] {
+  color: #4f46e5;
+}
+
 .hero,
 .app-topbar {
   display: grid;
@@ -3254,7 +3273,7 @@ h1 {
 /* レイアウトを動かさない一時通知トースト（Canvas版 showToast 相当） */
 .app-toast {
   position: fixed;
-  top: 24px;
+  top: 44px;
   left: 50%;
   z-index: 90;
   max-width: 90%;
@@ -3878,31 +3897,6 @@ h1 {
 .ai-mode-row button[data-active="true"] {
   border-color: var(--accent);
   background: #eef8f2;
-}
-
-.ai-preview {
-  display: grid;
-  gap: 6px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #fbfcfa;
-  padding: 12px;
-}
-
-.ai-preview span {
-  color: var(--accent);
-  font-size: 0.78rem;
-  font-weight: 800;
-}
-
-.ai-preview strong {
-  font-size: 1rem;
-}
-
-.ai-preview p {
-  margin: 0;
-  color: var(--muted);
-  line-height: 1.6;
 }
 
 .shopping-heading-row,

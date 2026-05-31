@@ -278,7 +278,7 @@ describe("RecipeMealWorkspace", () => {
     expect(within(screen.getByLabelText("レシピ一覧")).queryByText("カレー")).toBeNull();
   });
 
-  it("previews an AI recipe and applies it to the form", async () => {
+  it("opens the editor directly after inline AI recipe generation", async () => {
     vi.mocked(fetch).mockResolvedValue({
       ok: true,
       json: async () => ({
@@ -297,17 +297,59 @@ describe("RecipeMealWorkspace", () => {
 
     fireEvent.change(screen.getByLabelText("必須食材"), { target: { value: "豚肉" } });
     fireEvent.change(screen.getByLabelText("任意食材"), { target: { value: "キャベツ" } });
-    fireEvent.click(screen.getByRole("button", { name: "AIレシピをプレビュー" }));
+    fireEvent.click(screen.getByRole("button", { name: "AIレシピを編集モーダルで開く" }));
 
     await waitFor(() => {
       expect(fetch).toHaveBeenCalledWith("/api/ai/recipes", expect.objectContaining({ method: "POST" }));
     });
-    expect(await screen.findByText("豚キャベツ炒め")).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("button", { name: "フォームへ反映" }));
-
+    expect(await screen.findByRole("heading", { name: "新規レシピ" })).toBeTruthy();
     expect(screen.getByLabelText("レシピ名")).toHaveProperty("value", "豚キャベツ炒め");
-    expect(await screen.findByText("AIレシピ案を入力フォームへ反映しました。内容を確認して保存してください。")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "フォームへ反映" })).toBeNull();
+    expect(await screen.findByText("AIレシピ案を編集モーダルで開きました。内容を確認して保存してください。")).toBeTruthy();
+  });
+
+  it("structures pasted recipe text and opens the editor without an intermediate preview", async () => {
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        recipe: {
+          name: "鶏そぼろ丼",
+          genre: "和食",
+          source: "メモ",
+          prep_steps: "調味料を混ぜる",
+          steps: "鶏ひき肉を炒める\nご飯にのせる",
+          ingredients: [{ item_type: "食材", name: "鶏ひき肉", amount: "200", unit: "g" }]
+        }
+      })
+    } as Response);
+
+    renderWorkspace();
+
+    fireEvent.click(screen.getByRole("button", { name: "テキストから追加" }));
+    fireEvent.change(screen.getByLabelText("レシピテキスト"), { target: { value: "鶏そぼろ丼の作り方" } });
+    fireEvent.click(screen.getByRole("button", { name: "AIで構造化" }));
+
+    await waitFor(() => {
+      expect(fetch).toHaveBeenCalledWith("/api/ai/recipes", expect.objectContaining({ method: "POST" }));
+    });
+
+    expect(await screen.findByRole("heading", { name: "新規レシピ" })).toBeTruthy();
+    expect(screen.getByLabelText("レシピ名")).toHaveProperty("value", "鶏そぼろ丼");
+    expect(screen.queryByRole("button", { name: "編集モーダルで確認" })).toBeNull();
+  });
+
+  it("clears the text import body whenever the modal is reopened", () => {
+    renderWorkspace();
+
+    fireEvent.click(screen.getByRole("button", { name: "テキストから追加" }));
+    fireEvent.change(screen.getByLabelText("レシピテキスト"), { target: { value: "前回の貼り付けテキスト" } });
+    expect(screen.getByLabelText("レシピテキスト")).toHaveProperty("value", "前回の貼り付けテキスト");
+
+    fireEvent.click(screen.getByRole("button", { name: "閉じる" }));
+    fireEvent.click(screen.getByRole("button", { name: "テキストから追加" }));
+
+    expect(screen.getByLabelText("レシピテキスト")).toHaveProperty("value", "");
   });
 
   it("adds a recipe to the meal schedule", async () => {

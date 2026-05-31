@@ -1,8 +1,9 @@
 "use client";
 
-import { FormEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { DeleteConfirmPanel } from "@/components/delete-confirm-panel";
+import { useShellStatusMessage } from "@/components/web-mode-shell";
 import type { StockItem } from "@/lib/inventory/types";
 import {
   CookCandidate,
@@ -258,7 +259,6 @@ export function RecipeMealWorkspace({
   const [aiRequired, setAiRequired] = useState("");
   const [aiOptional, setAiOptional] = useState("");
   const [aiSourceText, setAiSourceText] = useState("");
-  const [aiPreview, setAiPreview] = useState<RecipeFormValues | null>(null);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isAiRunning, setIsAiRunning] = useState(false);
@@ -276,6 +276,7 @@ export function RecipeMealWorkspace({
   const [toast, setToast] = useState<{ message: string; tone: "info" | "success" | "error" } | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const router = useRouter();
+  const { showStatusMessage } = useShellStatusMessage();
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
 
   const selectedRecipe = recipes.find((recipe) => recipe.id === selectedRecipeId) ?? recipes[0] ?? null;
@@ -380,7 +381,7 @@ export function RecipeMealWorkspace({
     );
   }
 
-  async function runAiRecipe(overrides?: Partial<{ mode: AiRecipeMode; required: string; optional: string; sourceText: string }>) {
+  async function runAiRecipe(overrides?: Partial<{ mode: AiRecipeMode; required: string; optional: string; sourceText: string }>): Promise<RecipeFormValues | null> {
     const mode = overrides?.mode ?? aiMode;
     const required = overrides?.required ?? aiRequired;
     const optional = overrides?.optional ?? aiOptional;
@@ -390,7 +391,7 @@ export function RecipeMealWorkspace({
         tone: "error",
         message: "原因: AIに渡す食材や本文が空です。影響: レシピ案を作れません。修正方法: 必須食材、任意食材、またはレシピ本文を入力してください。"
       });
-      return;
+      return null;
     }
 
     setIsAiRunning(true);
@@ -414,31 +415,31 @@ export function RecipeMealWorkspace({
       if (!response.ok || !result.recipe) {
         setFeedback({
           tone: "error",
-          message: result.error || "原因: AIレシピの取得に失敗しました。影響: プレビューを表示できません。修正方法: 時間を置いて再度お試しください。"
+          message: result.error || "原因: AIレシピの取得に失敗しました。影響: 編集モーダルを開けません。修正方法: 時間を置いて再度お試しください。"
         });
-        return;
+        return null;
       }
 
-      setAiPreview(result.recipe);
-      setFeedback({ tone: "success", message: "AIレシピ案を作成しました。内容を確認してからフォームへ反映してください。" });
+      return result.recipe;
     } catch {
       setFeedback({
         tone: "error",
-        message: "原因: AIレシピ通信に失敗しました。影響: プレビューを表示できません。修正方法: 通信状態を確認してください。"
+        message: "原因: AIレシピ通信に失敗しました。影響: 編集モーダルを開けません。修正方法: 通信状態を確認してください。"
       });
+      return null;
     } finally {
       setIsAiRunning(false);
     }
   }
 
-  function applyAiPreview() {
-    if (!aiPreview) return;
-    setRecipeValues(aiPreview);
+  function applyRecipeToEditor(recipe: RecipeFormValues) {
+    setRecipeValues(recipe);
     setEditingRecipeId(null);
     setIsTextImportOpen(false);
     setIsAiMenuOpen(false);
+    setAiSourceText("");
     setIsRecipeEditorOpen(true);
-    setFeedback({ tone: "info", message: "AIレシピ案を入力フォームへ反映しました。内容を確認して保存してください。" });
+    setFeedback({ tone: "info", message: "AIレシピ案を編集モーダルで開きました。内容を確認して保存してください。" });
   }
 
   function startEditRecipe(recipe: Recipe) {
@@ -463,7 +464,8 @@ export function RecipeMealWorkspace({
 
   async function structureRecipeText() {
     setAiMode("structure");
-    await runAiRecipe({ mode: "structure", required: "", optional: "", sourceText: aiSourceText });
+    const recipe = await runAiRecipe({ mode: "structure", required: "", optional: "", sourceText: aiSourceText });
+    if (recipe) applyRecipeToEditor(recipe);
   }
 
   async function generatePriorityRecipe() {
@@ -474,7 +476,19 @@ export function RecipeMealWorkspace({
       .map((item) => `${item.name} ${item.quantity}${item.unit}`)
       .join(", ");
     setAiMode("generate");
-    await runAiRecipe({ mode: "generate", required: urgentItems, optional: aiOptional, sourceText: "期限が近い食材を優先して使い切るレシピ" });
+    const recipe = await runAiRecipe({ mode: "generate", required: urgentItems, optional: aiOptional, sourceText: "期限が近い食材を優先して使い切るレシピ" });
+    if (recipe) applyRecipeToEditor(recipe);
+  }
+
+  async function generateFromIngredients() {
+    setAiMode("generate");
+    const recipe = await runAiRecipe({ mode: "generate" });
+    if (recipe) applyRecipeToEditor(recipe);
+  }
+
+  async function runInlineAiRecipe() {
+    const recipe = await runAiRecipe();
+    if (recipe) applyRecipeToEditor(recipe);
   }
 
   function openCookingViewer(recipe: Recipe) {
@@ -495,15 +509,24 @@ export function RecipeMealWorkspace({
   }
 
   // レイアウトを動かさない一時通知（Canvas版 showToast 相当）。
-  function showToast(message: string, tone: "info" | "success" | "error" = "info") {
+  const showToast = useCallback((message: string, tone: "info" | "success" | "error" = "info") => {
     if (toastTimer.current) clearTimeout(toastTimer.current);
     setToast({ message, tone });
     toastTimer.current = setTimeout(() => setToast(null), 3000);
-  }
+  }, []);
 
   useEffect(() => () => {
     if (toastTimer.current) clearTimeout(toastTimer.current);
   }, []);
+
+  useEffect(() => {
+    if (!feedback) return;
+    if (feedback.tone === "error") {
+      showToast(feedback.message, "error");
+      return;
+    }
+    showStatusMessage(feedback);
+  }, [feedback, showStatusMessage, showToast]);
 
   function stockOptionsForIngredient(ingredient: RecipeIngredient) {
     return inventoryItemsForMeals.filter((item) => item.category === ingredient.item_type && item.unit === ingredient.unit && item.quantity > 0);
@@ -1212,13 +1235,16 @@ export function RecipeMealWorkspace({
       {activeView === "recipes" ? (
         <div className="recipe-primary-actions" aria-label="レシピ追加">
           <button className="primary-button" type="button" onClick={openNewRecipeEditor}>+ 新規レシピ</button>
-          <button className="secondary-button recipe-text-button" type="button" onClick={() => setIsTextImportOpen(true)}>テキストから追加</button>
+          <button className="secondary-button recipe-text-button" type="button" onClick={() => {
+            setAiSourceText("");
+            setIsTextImportOpen(true);
+          }}>テキストから追加</button>
           <button className="secondary-button recipe-ai-button" type="button" onClick={() => setIsAiMenuOpen(true)}>AI考案</button>
         </div>
       ) : null}
 
-      {feedback ? (
-        <p className="operation-message" data-tone={feedback.tone} role={feedback.tone === "error" ? "alert" : "status"}>
+      {feedback && feedback.tone !== "error" ? (
+        <p className="sr-only" role="status">
           {feedback.message}
         </p>
       ) : null}
@@ -1240,7 +1266,10 @@ export function RecipeMealWorkspace({
       {isTextImportOpen ? (
         <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="recipe-text-modal-heading">
           <section className="canvas-modal text-import-modal">
-            <button className="modal-close-button" type="button" onClick={() => setIsTextImportOpen(false)} aria-label="閉じる">×</button>
+            <button className="modal-close-button" type="button" onClick={() => {
+              setAiSourceText("");
+              setIsTextImportOpen(false);
+            }} aria-label="閉じる">×</button>
             <p className="eyebrow">ADD RECIPE FROM TEXT</p>
             <h3 id="recipe-text-modal-heading">テキストからレシピを追加</h3>
             <label>
@@ -1250,14 +1279,6 @@ export function RecipeMealWorkspace({
             <button className="primary-button" type="button" disabled={isAiRunning} onClick={structureRecipeText}>
               {isAiRunning ? "AIで構造化中" : "AIで構造化"}
             </button>
-            {aiPreview ? (
-              <div className="ai-preview">
-                <span>構造化結果</span>
-                <strong>{aiPreview.name}</strong>
-                <p>{aiPreview.ingredients.map((item) => `${item.name}${item.amount}${item.unit}`).join(" / ")}</p>
-                <button className="secondary-button compact-button" type="button" onClick={applyAiPreview}>編集モーダルで確認</button>
-              </div>
-            ) : null}
           </section>
         </div>
       ) : null}
@@ -1286,17 +1307,9 @@ export function RecipeMealWorkspace({
               任意食材
               <textarea rows={2} value={aiOptional} onChange={(event) => setAiOptional(event.target.value)} placeholder="例: にんじん, しょうが" />
             </label>
-            <button className="primary-button" type="button" disabled={isAiRunning} onClick={() => runAiRecipe({ mode: "generate" })}>
+            <button className="primary-button" type="button" disabled={isAiRunning} onClick={generateFromIngredients}>
               {isAiRunning ? "考案中" : "指定食材で考案"}
             </button>
-            {aiPreview ? (
-              <div className="ai-preview">
-                <span>AIレシピ案</span>
-                <strong>{aiPreview.name}</strong>
-                <p>{aiPreview.ingredients.map((item) => `${item.name}${item.amount}${item.unit}`).join(" / ")}</p>
-                <button className="secondary-button compact-button" type="button" onClick={applyAiPreview}>編集モーダルで確認</button>
-              </div>
-            ) : null}
           </section>
         </div>
       ) : null}
@@ -1640,19 +1653,9 @@ export function RecipeMealWorkspace({
               レシピ本文・補足
               <textarea rows={4} value={aiSourceText} onChange={(event) => setAiSourceText(event.target.value)} placeholder="貼り付けたレシピ本文や希望を書く" />
             </label>
-            <button className="primary-button" type="button" disabled={isAiRunning} onClick={() => runAiRecipe()}>
-              {isAiRunning ? "AI実行中" : "AIレシピをプレビュー"}
+            <button className="primary-button" type="button" disabled={isAiRunning} onClick={runInlineAiRecipe}>
+              {isAiRunning ? "AI実行中" : "AIレシピを編集モーダルで開く"}
             </button>
-            {aiPreview ? (
-              <div className="ai-preview">
-                <span>{aiPreview.genre || "ジャンル未設定"}</span>
-                <strong>{aiPreview.name}</strong>
-                <p>{aiPreview.ingredients.map((item) => `${item.name}${item.amount}${item.unit}`).join(" / ")}</p>
-                <button className="secondary-button compact-button" type="button" onClick={applyAiPreview}>
-                  フォームへ反映
-                </button>
-              </div>
-            ) : null}
           </section>
 
           <RecipeList
