@@ -787,11 +787,6 @@ h1 {
   font-weight: 800;
 }
 
-.history-card-actions button:first-child {
-  background: #fff7ed;
-  color: #c85300;
-}
-
 .history-card-actions button[data-primary="true"] {
   background: #009f73;
   color: #fff;
@@ -1029,22 +1024,6 @@ h1 {
   border: 1px solid var(--cream-line);
   border-radius: 10px;
   object-fit: cover;
-}
-
-.cooking-entry-details {
-  border: 1px solid var(--cream-line);
-  border-radius: 10px;
-  background: #fff;
-  padding: 0;
-}
-
-.cooking-entry-details summary {
-  min-height: 42px;
-  padding: 12px 14px;
-  color: #52627a;
-  font-size: 0.82rem;
-  font-weight: 800;
-  cursor: pointer;
 }
 
 .cooking-entry-form {

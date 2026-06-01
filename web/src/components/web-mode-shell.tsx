@@ -31,16 +31,34 @@ type ShellStatusMessage = {
   tone: "success" | "error" | "info";
 };
 
+type RecipeViewerOrigin = "recipes" | "cooking";
+
 type ShellStatusContextValue = {
+  clearPendingRecipe: () => void;
+  pendingRecipeId: string | null;
+  pendingRecipeOrigin: RecipeViewerOrigin;
+  requestViewRecipe: (recipeId: string, origin?: RecipeViewerOrigin) => void;
+  returnToMode: (modeId: ModeId) => void;
   showStatusMessage: (message: ShellStatusMessage) => void;
 };
 
 const ShellStatusContext = createContext<ShellStatusContextValue>({
+  clearPendingRecipe: () => {},
+  pendingRecipeId: null,
+  pendingRecipeOrigin: "recipes",
+  requestViewRecipe: () => {},
+  returnToMode: () => {},
   showStatusMessage: () => {}
 });
 
 export function useShellStatusMessage() {
   return useContext(ShellStatusContext);
+}
+
+export function useShellNavigation() {
+  const { clearPendingRecipe, pendingRecipeId, pendingRecipeOrigin, requestViewRecipe, returnToMode } =
+    useContext(ShellStatusContext);
+  return { clearPendingRecipe, pendingRecipeId, pendingRecipeOrigin, requestViewRecipe, returnToMode };
 }
 
 export function WebModeShell({
@@ -52,6 +70,8 @@ export function WebModeShell({
   childrenByMode
 }: WebModeShellProps) {
   const [activeMode, setActiveMode] = useState<ModeId>("ingredients");
+  const [pendingRecipeId, setPendingRecipeId] = useState<string | null>(null);
+  const [pendingRecipeOrigin, setPendingRecipeOrigin] = useState<RecipeViewerOrigin>("recipes");
   const [statusMessage, setStatusMessage] = useState<ShellStatusMessage | null>(null);
   const statusTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const modes = useMemo<Mode[]>(
@@ -90,6 +110,29 @@ export function WebModeShell({
     setStatusMessage(message);
     statusTimer.current = setTimeout(() => setStatusMessage(null), 3000);
   }, []);
+  const requestViewRecipe = useCallback((recipeId: string, origin: RecipeViewerOrigin = "recipes") => {
+    setActiveMode("recipes");
+    setPendingRecipeId(recipeId);
+    setPendingRecipeOrigin(origin);
+  }, []);
+  const clearPendingRecipe = useCallback(() => {
+    setPendingRecipeId(null);
+    setPendingRecipeOrigin("recipes");
+  }, []);
+  const returnToMode = useCallback((modeId: ModeId) => {
+    setActiveMode(modeId);
+  }, []);
+  const shellContextValue = useMemo(
+    () => ({
+      clearPendingRecipe,
+      pendingRecipeId,
+      pendingRecipeOrigin,
+      requestViewRecipe,
+      returnToMode,
+      showStatusMessage
+    }),
+    [clearPendingRecipe, pendingRecipeId, pendingRecipeOrigin, requestViewRecipe, returnToMode, showStatusMessage]
+  );
   const statusLabel = statusMessage
     ? statusMessage.tone === "success"
       ? "完了"
@@ -104,7 +147,7 @@ export function WebModeShell({
   }, []);
 
   return (
-    <ShellStatusContext.Provider value={{ showStatusMessage }}>
+    <ShellStatusContext.Provider value={shellContextValue}>
       <div className="canvas-status-bar" data-tone={statusMessage?.tone ?? "idle"} role="status" aria-live="polite">
         <strong>{statusLabel}</strong>
         <span>|</span>

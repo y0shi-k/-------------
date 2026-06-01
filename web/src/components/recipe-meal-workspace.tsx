@@ -3,7 +3,7 @@
 import { FormEvent, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { DeleteConfirmPanel } from "@/components/delete-confirm-panel";
-import { useShellStatusMessage } from "@/components/web-mode-shell";
+import { useShellNavigation, useShellStatusMessage } from "@/components/web-mode-shell";
 import type { StockItem } from "@/lib/inventory/types";
 import {
   CookCandidate,
@@ -68,6 +68,7 @@ type RecipeSort = "created_desc" | "updated_desc" | "name_asc" | "count_desc" | 
 type CookingIngredientTab = "all" | "食材" | "調味料";
 type CookingStepTab = "all" | "prep" | "steps";
 type ShortageSelectionTab = "all" | "ingredients" | "seasonings";
+type CookingViewerOrigin = "recipes" | "cooking";
 
 const mealTypes: MealType[] = ["朝", "昼", "晩", "その他"];
 const mealTypeOrder: Record<MealType, number> = { 朝: 0, 昼: 1, 晩: 2, その他: 3 };
@@ -272,10 +273,12 @@ export function RecipeMealWorkspace({
   const [pickerSlot, setPickerSlot] = useState<{ date: string; meal: MealType; replaceId?: string } | null>(null);
   const [pickerQuery, setPickerQuery] = useState("");
   const [cookingScheduleId, setCookingScheduleId] = useState<string | null>(null);
+  const [cookingViewerOrigin, setCookingViewerOrigin] = useState<CookingViewerOrigin>("recipes");
   const [slotMenuId, setSlotMenuId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; tone: "info" | "success" | "error" } | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const router = useRouter();
+  const { clearPendingRecipe, pendingRecipeId, pendingRecipeOrigin, returnToMode } = useShellNavigation();
   const { showStatusMessage } = useShellStatusMessage();
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
 
@@ -491,16 +494,22 @@ export function RecipeMealWorkspace({
     if (recipe) applyRecipeToEditor(recipe);
   }
 
-  function openCookingViewer(recipe: Recipe) {
+  const openCookingViewer = useCallback((recipe: Recipe, origin: CookingViewerOrigin = "recipes") => {
     setActiveCookingRecipeId(recipe.id);
     setSelectedRecipeId(recipe.id);
     setHighlightedIngredientName("");
-  }
+    setCookingViewerOrigin(origin);
+  }, []);
 
   function closeCookingViewer() {
+    const shouldReturnToCooking = cookingViewerOrigin === "cooking";
     setActiveCookingRecipeId("");
     setCookingScheduleId(null);
     setPendingConsumptionScheduleId(null);
+    setCookingViewerOrigin("recipes");
+    if (shouldReturnToCooking) {
+      returnToMode("cooking");
+    }
   }
 
   function requestDelete(target: string, message: string, confirm: () => void) {
@@ -527,6 +536,17 @@ export function RecipeMealWorkspace({
     }
     showStatusMessage(feedback);
   }, [feedback, showStatusMessage, showToast]);
+
+  useEffect(() => {
+    if (!pendingRecipeId) return;
+    const recipe = recipes.find((item) => item.id === pendingRecipeId);
+    if (recipe) {
+      openCookingViewer(recipe, pendingRecipeOrigin);
+    } else {
+      showStatusMessage({ message: "レシピが見つかりません", tone: "error" });
+    }
+    clearPendingRecipe();
+  }, [clearPendingRecipe, openCookingViewer, pendingRecipeId, pendingRecipeOrigin, recipes, showStatusMessage]);
 
   function stockOptionsForIngredient(ingredient: RecipeIngredient) {
     return inventoryItemsForMeals.filter((item) => item.category === ingredient.item_type && item.unit === ingredient.unit && item.quantity > 0);

@@ -6,6 +6,13 @@ import type { CookCandidate, MealSchedule, Recipe, RecipeIngredient } from "@/li
 
 const from = vi.fn();
 const refresh = vi.fn();
+const shellMocks = vi.hoisted(() => ({
+  clearPendingRecipe: vi.fn(),
+  pendingRecipeId: null as string | null,
+  pendingRecipeOrigin: "recipes" as "recipes" | "cooking",
+  returnToMode: vi.fn(),
+  showStatusMessage: vi.fn()
+}));
 
 vi.mock("@/lib/supabase/browser", () => ({
   createBrowserSupabaseClient: () => ({
@@ -16,6 +23,19 @@ vi.mock("@/lib/supabase/browser", () => ({
 vi.mock("next/navigation", () => ({
   useRouter: () => ({
     refresh
+  })
+}));
+
+vi.mock("@/components/web-mode-shell", () => ({
+  useShellNavigation: () => ({
+    clearPendingRecipe: shellMocks.clearPendingRecipe,
+    pendingRecipeId: shellMocks.pendingRecipeId,
+    pendingRecipeOrigin: shellMocks.pendingRecipeOrigin,
+    requestViewRecipe: vi.fn(),
+    returnToMode: shellMocks.returnToMode
+  }),
+  useShellStatusMessage: () => ({
+    showStatusMessage: shellMocks.showStatusMessage
   })
 }));
 
@@ -153,6 +173,11 @@ describe("RecipeMealWorkspace", () => {
     vi.setSystemTime(new Date("2026-05-28T12:00:00"));
     from.mockReset();
     refresh.mockReset();
+    shellMocks.clearPendingRecipe.mockReset();
+    shellMocks.pendingRecipeId = null;
+    shellMocks.pendingRecipeOrigin = "recipes";
+    shellMocks.returnToMode.mockReset();
+    shellMocks.showStatusMessage.mockReset();
     global.fetch = vi.fn();
   });
 
@@ -562,6 +587,20 @@ describe("RecipeMealWorkspace", () => {
     expect(overlay).toBeTruthy();
     fireEvent.click(within(overlay).getByRole("button", { name: "戻る" }));
     expect(screen.queryByLabelText("調理ビューア")).toBeNull();
+    expect(shellMocks.returnToMode).not.toHaveBeenCalled();
+  });
+
+  it("returns to cooking records when the viewer was opened from history", async () => {
+    shellMocks.pendingRecipeId = "recipe-1";
+    shellMocks.pendingRecipeOrigin = "cooking";
+
+    renderWorkspace();
+
+    const overlay = await screen.findByRole("dialog", { name: "調理ビューア全画面" });
+    expect(shellMocks.clearPendingRecipe).toHaveBeenCalled();
+
+    fireEvent.click(within(overlay).getByRole("button", { name: "戻る" }));
+    expect(shellMocks.returnToMode).toHaveBeenCalledWith("cooking");
   });
 
   it("completes a meal schedule and creates cooking history", async () => {
