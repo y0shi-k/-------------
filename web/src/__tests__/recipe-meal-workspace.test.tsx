@@ -275,6 +275,46 @@ describe("RecipeMealWorkspace", () => {
     expect(await screen.findByText("レシピを更新しました。")).toBeTruthy();
   });
 
+  it("toggles selected genres from the whole option row", () => {
+    renderWorkspace({ initialRecipes: [{ ...baseRecipe, genre: ["和食", "洋食", "中華"] }] });
+
+    fireEvent.click(screen.getByRole("button", { name: "編集" }));
+    fireEvent.focus(screen.getByLabelText("ジャンルを検索・追加"));
+
+    expect(screen.getByText("3 Selected")).toBeTruthy();
+
+    const genrePopover = document.querySelector(".genre-popover");
+    expect(genrePopover).toBeTruthy();
+    const japaneseGenreRow = within(genrePopover as HTMLElement).getByRole("button", { name: /和食/ });
+
+    fireEvent.click(japaneseGenreRow);
+    expect(screen.getByText("2 Selected")).toBeTruthy();
+  });
+
+  it("renders selected genre tags as draggable chips", () => {
+    renderWorkspace({ initialRecipes: [{ ...baseRecipe, genre: ["和食", "洋食", "中華"] }] });
+
+    fireEvent.click(screen.getByRole("button", { name: "編集" }));
+
+    const tagContainer = document.querySelector(".genre-tags") as HTMLElement;
+    const japaneseTag = tagContainer.querySelector('[data-genre="和食"]') as HTMLElement;
+    const westernTag = tagContainer.querySelector('[data-genre="洋食"]') as HTMLElement;
+    const chineseTag = tagContainer.querySelector('[data-genre="中華"]') as HTMLElement;
+
+    expect(japaneseTag.draggable).toBe(true);
+    expect(westernTag.draggable).toBe(true);
+    expect(chineseTag.draggable).toBe(true);
+  });
+
+  it("summarizes overflowing recipe card genres with a tooltip chip", () => {
+    renderWorkspace({ initialRecipes: [{ ...baseRecipe, genre: ["和食", "洋食", "中華", "韓国", "イタリアン"] }] });
+
+    const recipeList = screen.getByLabelText("レシピ一覧");
+    const moreChip = within(recipeList).getByText("+2");
+
+    expect(moreChip.getAttribute("data-tooltip")).toBe("韓国\nイタリアン");
+  });
+
   it("searches, sorts, and deletes recipes safely", async () => {
     const secondRecipe: Recipe = {
       ...baseRecipe,

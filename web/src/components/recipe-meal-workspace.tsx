@@ -1514,10 +1514,10 @@ export function RecipeMealWorkspace({
                 レシピ名
                 <input value={recipeValues.name} onChange={(event) => updateRecipeValue("name", event.target.value)} placeholder="例: カレー" />
               </label>
-              <label className="genre-field-label">
-                ジャンル
+              <div className="genre-field-label">
+                <span>ジャンル</span>
                 <GenreTagPicker value={recipeValues.genre} recipes={recipes} onChange={(csv) => updateRecipeValue("genre", csv)} />
-              </label>
+              </div>
               <label>
                 出典
                 <textarea
@@ -2117,7 +2117,10 @@ function genrePaletteIndex(genre: string) {
 function GenreTagPicker({ value, onChange, recipes }: { value: string; onChange: (csv: string) => void; recipes: Recipe[] }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [draggingGenre, setDraggingGenre] = useState<string | null>(null);
+  const [dragOverGenre, setDragOverGenre] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const draggingGenreRef = useRef<string | null>(null);
 
   const selected = useMemo(() => splitCsv(value), [value]);
   const candidates = useMemo(() => {
@@ -2150,14 +2153,67 @@ function GenreTagPicker({ value, onChange, recipes }: { value: string; onChange:
     commit([...selected, genre]);
   };
   const remove = (genre: string) => commit(selected.filter((item) => item !== genre));
+  const reorder = (dragged: string, before: string | null) => {
+    if (dragged === before) return;
+    const withoutDragged = selected.filter((item) => item !== dragged);
+    const beforeIndex = before ? withoutDragged.indexOf(before) : -1;
+    const next = [...withoutDragged];
+    if (beforeIndex >= 0) next.splice(beforeIndex, 0, dragged);
+    else next.push(dragged);
+    commit(next);
+  };
+  const getDropTarget = (container: HTMLElement, x: number, y: number) => {
+    const chips = Array.from(container.querySelectorAll<HTMLElement>("[data-genre]:not(.dragging)"));
+    return chips.find((chip) => {
+      const rect = chip.getBoundingClientRect();
+      const sameRowBefore = y >= rect.top && y <= rect.bottom && x < rect.left + rect.width / 2;
+      const beforeRow = y < rect.top + rect.height / 2;
+      return sameRowBefore || beforeRow;
+    }) ?? null;
+  };
 
   return (
     <div className="genre-picker" ref={containerRef}>
       <div className="genre-field" onClick={() => setOpen(true)}>
         {selected.length > 0 ? (
-          <div className="genre-tags">
+          <div
+            className="genre-tags"
+            onDragOver={(event) => {
+              if (!draggingGenreRef.current) return;
+              event.preventDefault();
+              const target = getDropTarget(event.currentTarget, event.clientX, event.clientY);
+              setDragOverGenre(target?.dataset.genre ?? null);
+            }}
+            onDrop={(event) => {
+              const dragged = draggingGenreRef.current || event.dataTransfer.getData("text/plain");
+              if (!dragged) return;
+              event.preventDefault();
+              const target = getDropTarget(event.currentTarget, event.clientX, event.clientY);
+              reorder(dragged, target?.dataset.genre ?? null);
+              draggingGenreRef.current = null;
+              setDraggingGenre(null);
+              setDragOverGenre(null);
+            }}
+          >
             {selected.map((genre) => (
-              <span className="genre-tag" data-palette={genrePaletteIndex(genre)} key={genre}>
+              <span
+                className={`genre-tag${draggingGenre === genre ? " dragging" : ""}${dragOverGenre === genre ? " genre-drag-over" : ""}`}
+                data-genre={genre}
+                data-palette={genrePaletteIndex(genre)}
+                draggable
+                key={genre}
+                onDragStart={(event) => {
+                  draggingGenreRef.current = genre;
+                  setDraggingGenre(genre);
+                  event.dataTransfer.effectAllowed = "move";
+                  event.dataTransfer.setData("text/plain", genre);
+                }}
+                onDragEnd={() => {
+                  draggingGenreRef.current = null;
+                  setDraggingGenre(null);
+                  setDragOverGenre(null);
+                }}
+              >
                 <span className="genre-tag-name">#{genre}</span>
                 <button
                   className="genre-tag-remove"
@@ -2704,35 +2760,58 @@ function RecipeList({
           {recipes.map((recipe) => (
             <article className="recipe-card" data-active={selectedRecipeId === recipe.id} key={recipe.id} onClick={() => onSelect(recipe.id)}>
               <div className="recipe-card-icon" aria-hidden="true">III</div>
-              <button className="recipe-select-button" type="button" onClick={(event) => { event.stopPropagation(); onSelect(recipe.id); }}>
-                <strong>{recipe.name}</strong>
-                <small>
-                  材料 {recipe.ingredients.length} 品目 | 調理回数 {recipe.cook_count} | 登録 {formatRecipeDate(recipe.created_at)}
-                  {recipe.genre.slice(0, 3).map((genre) => (
-                    <span className="recipe-genre-pill" key={genre}>#{genre}</span>
-                  ))}
-                </small>
-              </button>
-              <div className="recipe-card-actions">
-                <button className="recipe-icon-button cook-button" type="button" disabled={disabled} onClick={(event) => { event.stopPropagation(); onCook(recipe); }} aria-label="料理する">
-                  <span aria-hidden="true">III</span>
-                </button>
-                <button className="recipe-icon-button" type="button" disabled={disabled} onClick={(event) => { event.stopPropagation(); onEdit(recipe); }} aria-label="編集">
-                  <svg aria-hidden="true" viewBox="0 0 24 24">
-                    <path d="m16.9 4.1 3 3L8 19H5v-3L16.9 4.1Z" />
-                  </svg>
-                </button>
-                <button className="recipe-icon-button" type="button" disabled={disabled} onClick={(event) => { event.stopPropagation(); onDelete(recipe); }} aria-label={pendingDeleteRecipeId === recipe.id ? "削除する" : "削除"}>
-                  <svg aria-hidden="true" viewBox="0 0 24 24">
-                    <path d="M3 6h18M8 6V4h8v2m-9 0 1 14h8l1-14M10 10v6M14 10v6" />
-                  </svg>
-                </button>
+              <div className="recipe-card-main">
+                <div className="recipe-card-heading">
+                  <button className="recipe-select-button" type="button" onClick={(event) => { event.stopPropagation(); onSelect(recipe.id); }}>
+                    <strong>{recipe.name}</strong>
+                  </button>
+                  <div className="recipe-card-actions">
+                    <button className="recipe-icon-button cook-button" type="button" disabled={disabled} onClick={(event) => { event.stopPropagation(); onCook(recipe); }} aria-label="料理する">
+                      <span aria-hidden="true">III</span>
+                    </button>
+                    <button className="recipe-icon-button" type="button" disabled={disabled} onClick={(event) => { event.stopPropagation(); onEdit(recipe); }} aria-label="編集">
+                      <svg aria-hidden="true" viewBox="0 0 24 24">
+                        <path d="m16.9 4.1 3 3L8 19H5v-3L16.9 4.1Z" />
+                      </svg>
+                    </button>
+                    <button className="recipe-icon-button" type="button" disabled={disabled} onClick={(event) => { event.stopPropagation(); onDelete(recipe); }} aria-label={pendingDeleteRecipeId === recipe.id ? "削除する" : "削除"}>
+                      <svg aria-hidden="true" viewBox="0 0 24 24">
+                        <path d="M3 6h18M8 6V4h8v2m-9 0 1 14h8l1-14M10 10v6M14 10v6" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+                <div className="recipe-card-meta-row">
+                  <p className="recipe-card-meta">材料 {recipe.ingredients.length} 品目 | 調理回数 {recipe.cook_count} | 登録 {formatRecipeDate(recipe.created_at)}</p>
+                  <RecipeListGenreSummary genres={recipe.genre} />
+                </div>
               </div>
             </article>
           ))}
         </div>
       )}
     </section>
+  );
+}
+
+function RecipeListGenreSummary({ genres }: { genres: string[] }) {
+  if (genres.length === 0) return null;
+  const visibleGenres = genres.slice(0, Math.min(3, genres.length));
+  const hiddenGenres = genres.slice(visibleGenres.length);
+
+  return (
+    <div className="recipe-list-genre-summary">
+      {visibleGenres.map((genre) => (
+        <span className="recipe-genre-pill" data-palette={genrePaletteIndex(genre)} key={genre}>
+          <span>#{genre}</span>
+        </span>
+      ))}
+      {hiddenGenres.length > 0 ? (
+        <span className="recipe-genre-more" data-tooltip={hiddenGenres.join("\n")} tabIndex={0}>
+          +{hiddenGenres.length}
+        </span>
+      ) : null}
+    </div>
   );
 }
 
