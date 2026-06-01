@@ -121,6 +121,7 @@ describe("InventoryBoard", () => {
     buildPhotoStoragePath.mockReset();
     buildPhotoStoragePath.mockReturnValue("user-1/ingredient-scan/photo-1.jpg");
     global.fetch = vi.fn();
+    localStorage.clear();
     URL.createObjectURL = vi.fn(() => "blob:preview");
     URL.revokeObjectURL = vi.fn();
   });
@@ -299,10 +300,27 @@ describe("InventoryBoard", () => {
     fireEvent.click(screen.getByRole("button", { name: "別の写真にする" }));
 
     expect(screen.queryByAltText("選択した食材写真のプレビュー")).toBeNull();
-    expect(screen.getByText("写真は非公開で保存し、サーバー側でAI解析します。APIキーはブラウザへ出しません。")).toBeTruthy();
+    expect(screen.getByText("写真は非公開で保存し、入力したGemini APIキーでAI解析します。APIキーはDBに保存しません。")).toBeTruthy();
+  });
+
+  it("requires a user-owned Gemini API key before scanning a photo", async () => {
+    renderBoard();
+    openPhotoScan();
+
+    fireEvent.change(screen.getByLabelText("写真を撮る"), {
+      target: {
+        files: [new File(["photo"], "ingredient.jpg", { type: "image/jpeg" })]
+      }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "AI解析する" }));
+
+    expect(await screen.findByText(/原因: ユーザー自身のGemini APIキーが未入力です。/)).toBeTruthy();
+    expect(storageFrom).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
   });
 
   it("compresses, uploads, scans a selected photo, and saves selected candidates into inventory", async () => {
+    localStorage.setItem("stock-master:user-gemini-api-key", "user-owned-test-key");
     const upload = vi.fn().mockResolvedValue({ error: null });
     const remove = vi.fn().mockResolvedValue({ error: null });
     const photoSingle = vi.fn().mockResolvedValue({ data: { id: "photo-1" }, error: null });
@@ -381,7 +399,7 @@ describe("InventoryBoard", () => {
         headers: {
           "Content-Type": "application/json"
         },
-        body: JSON.stringify({ photoId: "photo-1" })
+        body: JSON.stringify({ photoId: "photo-1", geminiApiKey: "user-owned-test-key" })
       });
     });
     expect(await screen.findByText("1件の候補を見つけました。確認してから在庫に追加してください。")).toBeTruthy();
@@ -396,6 +414,7 @@ describe("InventoryBoard", () => {
   });
 
   it("shows a clear error when photo upload fails", async () => {
+    localStorage.setItem("stock-master:user-gemini-api-key", "user-owned-test-key");
     const upload = vi.fn().mockResolvedValue({ error: new Error("upload failed") });
     storageFrom.mockReturnValue({ upload });
     compressImageFile.mockResolvedValue({
@@ -421,6 +440,7 @@ describe("InventoryBoard", () => {
   });
 
   it("shows a clear error when ingredient scan fails", async () => {
+    localStorage.setItem("stock-master:user-gemini-api-key", "user-owned-test-key");
     const upload = vi.fn().mockResolvedValue({ error: null });
     const remove = vi.fn().mockResolvedValue({ error: null });
     const photoSingle = vi.fn().mockResolvedValue({ data: { id: "photo-1" }, error: null });

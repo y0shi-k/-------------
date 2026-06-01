@@ -44,13 +44,12 @@ describe("POST /api/ai/scan-ingredients", () => {
     from.mockReset();
     storageFrom.mockReset();
     global.fetch = vi.fn();
-    process.env.GEMINI_API_KEY = "test-gemini-key";
   });
 
   it("returns 401 when the user is not logged in", async () => {
     getUser.mockResolvedValue({ data: { user: null } });
 
-    const response = await POST(request({ photoId: "photo-1" }));
+    const response = await POST(request({ photoId: "photo-1", geminiApiKey: "user-owned-test-key" }));
 
     expect(response.status).toBe(401);
     await expect(response.json()).resolves.toEqual({
@@ -58,15 +57,15 @@ describe("POST /api/ai/scan-ingredients", () => {
     });
   });
 
-  it("returns 500 when GEMINI_API_KEY is missing", async () => {
-    delete process.env.GEMINI_API_KEY;
-
+  it("returns 400 when the user-owned Gemini API key is missing", async () => {
     const response = await POST(request({ photoId: "photo-1" }));
 
-    expect(response.status).toBe(500);
-    await expect(response.json()).resolves.toEqual({
-      error: expect.stringContaining("原因: Gemini APIキーがサーバーに設定されていません。")
+    expect(response.status).toBe(400);
+    const body = await response.json();
+    expect(body).toEqual({
+      error: expect.stringContaining("原因: ユーザー自身のGemini APIキーが未入力です。")
     });
+    expect(JSON.stringify(body)).not.toContain("user-owned-test-key");
     expect(getUser).not.toHaveBeenCalled();
   });
 
@@ -74,7 +73,7 @@ describe("POST /api/ai/scan-ingredients", () => {
     getUser.mockResolvedValue({ data: { user: { id: "user-1" } } });
     from.mockReturnValue(photoQuery(null, new Error("not found")));
 
-    const response = await POST(request({ photoId: "other-photo" }));
+    const response = await POST(request({ photoId: "other-photo", geminiApiKey: "user-owned-test-key" }));
 
     expect(response.status).toBe(404);
     await expect(response.json()).resolves.toEqual({
@@ -103,7 +102,7 @@ describe("POST /api/ai/scan-ingredients", () => {
     });
     vi.mocked(fetch).mockResolvedValue({ ok: false } as Response);
 
-    const response = await POST(request({ photoId: "photo-1" }));
+    const response = await POST(request({ photoId: "photo-1", geminiApiKey: "user-owned-test-key" }));
 
     expect(response.status).toBe(502);
     await expect(response.json()).resolves.toEqual({
@@ -166,17 +165,19 @@ describe("POST /api/ai/scan-ingredients", () => {
       })
     } as Response);
 
-    const response = await POST(request({ photoId: "photo-1" }));
+    const response = await POST(request({ photoId: "photo-1", geminiApiKey: "user-owned-test-key" }));
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({ items: [candidate] });
+    const body = await response.json();
+    expect(body).toEqual({ items: [candidate] });
+    expect(JSON.stringify(body)).not.toContain("user-owned-test-key");
     expect(from).not.toHaveBeenCalledWith("staging_items");
     expect(fetch).toHaveBeenCalledWith(
       "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent",
       expect.objectContaining({
         method: "POST",
         headers: expect.objectContaining({
-          "x-goog-api-key": "test-gemini-key"
+          "x-goog-api-key": "user-owned-test-key"
         })
       })
     );

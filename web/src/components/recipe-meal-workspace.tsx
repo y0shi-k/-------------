@@ -3,6 +3,7 @@
 import { type ChangeEvent, FormEvent, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { DeleteConfirmPanel } from "@/components/delete-confirm-panel";
+import { GeminiApiKeyPanel } from "@/components/gemini-api-key-panel";
 import { useShellNavigation, useShellStatusMessage } from "@/components/web-mode-shell";
 import type { StockItem } from "@/lib/inventory/types";
 import {
@@ -265,6 +266,7 @@ export function RecipeMealWorkspace({
   const [cookingStockCheck, setCookingStockCheck] = useState(false);
   const [highlightedIngredientName, setHighlightedIngredientName] = useState("");
   const [aiMode, setAiMode] = useState<AiRecipeMode>("generate");
+  const [geminiApiKey, setGeminiApiKey] = useState("");
   const [aiRequired, setAiRequired] = useState("");
   const [aiOptional, setAiOptional] = useState("");
   const [aiSourceText, setAiSourceText] = useState("");
@@ -406,6 +408,15 @@ export function RecipeMealWorkspace({
       return null;
     }
 
+    const trimmedApiKey = geminiApiKey.trim();
+    if (!trimmedApiKey) {
+      setFeedback({
+        tone: "error",
+        message: "原因: ユーザー自身のGemini APIキーが未入力です。影響: AIレシピを実行できません。修正方法: Gemini APIキーを入力してから再度お試しください。"
+      });
+      return null;
+    }
+
     setIsAiRunning(true);
     setFeedback(null);
 
@@ -417,6 +428,7 @@ export function RecipeMealWorkspace({
         },
         body: JSON.stringify({
           mode,
+          geminiApiKey: trimmedApiKey,
           required,
           optional,
           sourceText
@@ -1462,6 +1474,7 @@ export function RecipeMealWorkspace({
             }} aria-label="閉じる">×</button>
             <p className="eyebrow">ADD RECIPE FROM TEXT</p>
             <h3 id="recipe-text-modal-heading">テキストからレシピを追加</h3>
+            <GeminiApiKeyPanel apiKey={geminiApiKey} disabled={isAiRunning} id="recipe-text-gemini-api-key" onChange={setGeminiApiKey} />
             <label>
               レシピテキスト
               <textarea rows={8} value={aiSourceText} onChange={(event) => setAiSourceText(event.target.value)} placeholder="Webやメモからコピーしたレシピテキストをここに貼り付けてください..." />
@@ -1479,6 +1492,7 @@ export function RecipeMealWorkspace({
             <button className="modal-close-button" type="button" onClick={() => setIsAiMenuOpen(false)} aria-label="閉じる">×</button>
             <p className="eyebrow">ADD RECIPE WITH AI</p>
             <h3 id="ai-menu-modal-heading">AI考案で追加</h3>
+            <GeminiApiKeyPanel apiKey={geminiApiKey} disabled={isAiRunning} id="recipe-menu-gemini-api-key" onChange={setGeminiApiKey} />
             <div className="ai-choice-grid">
               <button className="ai-choice-card danger-choice" type="button" disabled={isAiRunning} onClick={generatePriorityRecipe}>
                 <span>優先消費レシピ</span>
@@ -1823,6 +1837,7 @@ export function RecipeMealWorkspace({
                 <h4>レシピ案を作る</h4>
               </div>
             </div>
+            <GeminiApiKeyPanel apiKey={geminiApiKey} disabled={isAiRunning} id="inline-recipe-gemini-api-key" onChange={setGeminiApiKey} />
             <div className="ai-mode-row">
               <button className="secondary-button compact-button" data-active={aiMode === "generate"} type="button" onClick={() => setAiMode("generate")}>
                 食材から考案

@@ -179,6 +179,7 @@ describe("RecipeMealWorkspace", () => {
     shellMocks.returnToMode.mockReset();
     shellMocks.showStatusMessage.mockReset();
     global.fetch = vi.fn();
+    localStorage.clear();
   });
 
   afterEach(() => {
@@ -353,6 +354,7 @@ describe("RecipeMealWorkspace", () => {
   });
 
   it("opens the editor directly after inline AI recipe generation", async () => {
+    localStorage.setItem("stock-master:user-gemini-api-key", "user-owned-test-key");
     vi.mocked(fetch).mockResolvedValue({
       ok: true,
       json: async () => ({
@@ -374,7 +376,19 @@ describe("RecipeMealWorkspace", () => {
     fireEvent.click(screen.getByRole("button", { name: "AIレシピを編集モーダルで開く" }));
 
     await waitFor(() => {
-      expect(fetch).toHaveBeenCalledWith("/api/ai/recipes", expect.objectContaining({ method: "POST" }));
+      expect(fetch).toHaveBeenCalledWith(
+        "/api/ai/recipes",
+        expect.objectContaining({
+          body: JSON.stringify({
+            mode: "generate",
+            geminiApiKey: "user-owned-test-key",
+            required: "豚肉",
+            optional: "キャベツ",
+            sourceText: ""
+          }),
+          method: "POST"
+        })
+      );
     });
 
     expect(await screen.findByRole("heading", { name: "新規レシピ" })).toBeTruthy();
@@ -383,7 +397,18 @@ describe("RecipeMealWorkspace", () => {
     expect(await screen.findByText("AIレシピ案を編集モーダルで開きました。内容を確認して保存してください。")).toBeTruthy();
   });
 
+  it("shows a clear error when the Gemini API key is missing", async () => {
+    renderWorkspace();
+
+    fireEvent.change(screen.getByLabelText("必須食材"), { target: { value: "豚肉" } });
+    fireEvent.click(screen.getByRole("button", { name: "AIレシピを編集モーダルで開く" }));
+
+    expect(await screen.findByText(/原因: ユーザー自身のGemini APIキーが未入力です。/)).toBeTruthy();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it("structures pasted recipe text and opens the editor without an intermediate preview", async () => {
+    localStorage.setItem("stock-master:user-gemini-api-key", "user-owned-test-key");
     vi.mocked(fetch).mockResolvedValue({
       ok: true,
       json: async () => ({
@@ -405,7 +430,19 @@ describe("RecipeMealWorkspace", () => {
     fireEvent.click(screen.getByRole("button", { name: "AIで構造化" }));
 
     await waitFor(() => {
-      expect(fetch).toHaveBeenCalledWith("/api/ai/recipes", expect.objectContaining({ method: "POST" }));
+      expect(fetch).toHaveBeenCalledWith(
+        "/api/ai/recipes",
+        expect.objectContaining({
+          body: JSON.stringify({
+            mode: "structure",
+            geminiApiKey: "user-owned-test-key",
+            required: "",
+            optional: "",
+            sourceText: "鶏そぼろ丼の作り方"
+          }),
+          method: "POST"
+        })
+      );
     });
 
     expect(await screen.findByRole("heading", { name: "新規レシピ" })).toBeTruthy();

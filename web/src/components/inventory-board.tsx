@@ -3,6 +3,7 @@
 import { ChangeEvent, FormEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { DeleteConfirmPanel } from "@/components/delete-confirm-panel";
+import { GeminiApiKeyPanel } from "@/components/gemini-api-key-panel";
 import { ShoppingListSection } from "@/components/shopping-list-section";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import {
@@ -192,6 +193,7 @@ export function InventoryBoard({
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
   const [addFlow, setAddFlow] = useState<AddFlow>(null);
   const [photoFeedback, setPhotoFeedback] = useState<Feedback | null>(null);
+  const [geminiApiKey, setGeminiApiKey] = useState("");
   const [selectedPhoto, setSelectedPhoto] = useState<File | null>(null);
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
   const [scanCandidates, setScanCandidates] = useState<ScanCandidate[]>([]);
@@ -464,6 +466,15 @@ export function InventoryBoard({
       return;
     }
 
+    const trimmedApiKey = geminiApiKey.trim();
+    if (!trimmedApiKey) {
+      setPhotoFeedback({
+        tone: "error",
+        message: "原因: ユーザー自身のGemini APIキーが未入力です。影響: AI解析を実行できません。修正方法: Gemini APIキーを入力してから再度お試しください。"
+      });
+      return;
+    }
+
     setIsUploadingPhoto(true);
     setPhotoFeedback(null);
 
@@ -514,7 +525,7 @@ export function InventoryBoard({
         headers: {
           "Content-Type": "application/json"
         },
-        body: JSON.stringify({ photoId: photo.id })
+        body: JSON.stringify({ photoId: photo.id, geminiApiKey: trimmedApiKey })
       });
       const scanResult = (await scanResponse.json().catch(() => ({}))) as ScanIngredientsResponse;
 
@@ -944,8 +955,10 @@ export function InventoryBoard({
                   <img src={photoPreviewUrl} alt="選択した食材写真のプレビュー" />
                 </div>
               ) : (
-                <p className="photo-empty">写真は非公開で保存し、サーバー側でAI解析します。APIキーはブラウザへ出しません。</p>
+                <p className="photo-empty">写真は非公開で保存し、入力したGemini APIキーでAI解析します。APIキーはDBに保存しません。</p>
               )}
+
+              <GeminiApiKeyPanel apiKey={geminiApiKey} disabled={isUploadingPhoto} id="ingredient-scan-gemini-api-key" onChange={setGeminiApiKey} />
 
               {photoFeedback ? (
                 <p className="operation-message photo-message" data-tone={photoFeedback.tone} role={photoFeedback.tone === "error" ? "alert" : "status"}>

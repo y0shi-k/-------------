@@ -7,6 +7,7 @@ import {
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 type RecipeAiRequest = {
+  geminiApiKey?: unknown;
   mode?: unknown;
   required?: unknown;
   optional?: unknown;
@@ -17,7 +18,7 @@ const ERROR_MESSAGES = {
   unauthorized:
     "原因: ログイン状態を確認できませんでした。影響: AIレシピを実行できません。修正方法: 再ログインしてから再度お試しください。",
   missingApiKey:
-    "原因: Gemini APIキーがサーバーに設定されていません。影響: AIレシピを実行できません。修正方法: web/.env.local またはVercel環境変数に GEMINI_API_KEY を設定してください。",
+    "原因: ユーザー自身のGemini APIキーが未入力です。影響: AIレシピを実行できません。修正方法: Gemini APIキーを入力してから再度お試しください。",
   invalidRequest:
     "原因: AIレシピの入力が空です。影響: レシピ案を作れません。修正方法: 食材やレシピ本文を入力してください。",
   geminiFailed:
@@ -30,14 +31,14 @@ export async function POST(request: Request) {
   const required = typeof body?.required === "string" ? body.required.trim().slice(0, 1000) : "";
   const optional = typeof body?.optional === "string" ? body.optional.trim().slice(0, 1000) : "";
   const sourceText = typeof body?.sourceText === "string" ? body.sourceText.trim().slice(0, 5000) : "";
+  const apiKey = typeof body?.geminiApiKey === "string" ? body.geminiApiKey.trim().slice(0, 300) : "";
 
   if (!required && !optional && !sourceText) {
     return errorResponse(ERROR_MESSAGES.invalidRequest, 400);
   }
 
-  const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    return errorResponse(ERROR_MESSAGES.missingApiKey, 500);
+    return errorResponse(ERROR_MESSAGES.missingApiKey, 400);
   }
 
   const supabase = await createServerSupabaseClient();

@@ -1546,6 +1546,59 @@ h1 {
   display: none !important;
 }
 
+.gemini-key-panel {
+  display: grid;
+  gap: 10px;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  background: #eff6ff;
+  padding: 12px;
+}
+
+.gemini-key-heading,
+.gemini-key-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.gemini-key-heading div {
+  display: grid;
+  gap: 3px;
+}
+
+.gemini-key-heading span {
+  color: #1d4ed8;
+  font-size: 0.74rem;
+  font-weight: 900;
+}
+
+.gemini-key-heading strong {
+  color: #172033;
+  font-size: 0.92rem;
+}
+
+.gemini-key-panel label {
+  display: grid;
+  gap: 7px;
+  color: #334155;
+  font-weight: 800;
+}
+
+.gemini-key-panel input {
+  width: 100%;
+}
+
+.gemini-key-actions small,
+.gemini-key-message {
+  margin: 0;
+  color: #475569;
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
 .panel-title {
   display: flex;
   gap: 12px;
@@ -4704,6 +4757,17 @@ h1 {
 }
 
 @media (max-width: 640px) {
+  .gemini-key-heading,
+  .gemini-key-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .gemini-key-heading .secondary-button,
+  .gemini-key-actions .secondary-button {
+    width: 100%;
+  }
+
   .app-shell {
     width: min(660px, 100%);
     padding: 88px 16px 104px;

@@ -8,6 +8,7 @@ import {
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 type ScanRequest = {
+  geminiApiKey?: unknown;
   photoId?: unknown;
 };
 
@@ -26,7 +27,7 @@ const ERROR_MESSAGES = {
   unauthorized:
     "原因: ログイン状態を確認できませんでした。影響: 写真を解析できません。修正方法: 再ログインしてから再度お試しください。",
   missingApiKey:
-    "原因: Gemini APIキーがサーバーに設定されていません。影響: AI解析を実行できません。修正方法: web/.env.local またはVercel環境変数に GEMINI_API_KEY を設定してください。",
+    "原因: ユーザー自身のGemini APIキーが未入力です。影響: AI解析を実行できません。修正方法: Gemini APIキーを入力してから再度お試しください。",
   photoNotFound:
     "原因: 解析対象の写真が見つかりませんでした。影響: AI解析を実行できません。修正方法: 写真を撮り直して保存してください。",
   downloadFailed:
@@ -38,14 +39,14 @@ const ERROR_MESSAGES = {
 export async function POST(request: Request) {
   const body = (await request.json().catch(() => null)) as ScanRequest | null;
   const photoId = typeof body?.photoId === "string" ? body.photoId.trim() : "";
+  const apiKey = typeof body?.geminiApiKey === "string" ? body.geminiApiKey.trim().slice(0, 300) : "";
 
   if (!photoId) {
     return errorResponse(ERROR_MESSAGES.invalidRequest, 400);
   }
 
-  const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    return errorResponse(ERROR_MESSAGES.missingApiKey, 500);
+    return errorResponse(ERROR_MESSAGES.missingApiKey, 400);
   }
 
   const supabase = await createServerSupabaseClient();
