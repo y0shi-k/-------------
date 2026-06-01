@@ -663,6 +663,53 @@ describe("RecipeMealWorkspace", () => {
     expect(await screen.findByText("カレー を調理完了にしました。料理履歴にも記録済みです。")).toBeTruthy();
   });
 
+  it("lets users choose consumption rows and save rating/comment with cooking history", async () => {
+    const completed = { ...baseSchedule, status: "完了", completed_at: "2026-05-24T10:00:00.000Z" };
+    const scheduleUpdate = updateSingleQuery(completed);
+    const inventoryUpdate = updateEqQuery();
+    const historyInsert = insertSingleQuery({ id: "history-1" });
+    const consumptionInsert = vi.fn().mockResolvedValue({ error: null });
+
+    from.mockImplementation((table: string) => {
+      if (table === "meal_schedules") return { update: scheduleUpdate.update };
+      if (table === "inventory_items") return { update: inventoryUpdate.update };
+      if (table === "cooking_history") return { insert: historyInsert.insert };
+      if (table === "cooking_consumption_events") return { insert: consumptionInsert };
+      return {};
+    });
+
+    renderWorkspace({ initialMealSchedules: [baseSchedule] });
+    openScheduleView();
+
+    fireEvent.click(within(screen.getByLabelText("7日献立")).getByRole("button", { name: "カレー の操作" }));
+    fireEvent.click(screen.getByRole("button", { name: "調理を開始" }));
+    const cookingViewer = screen.getByRole("dialog", { name: "調理ビューア全画面" });
+    fireEvent.click(within(cookingViewer).getByRole("button", { name: "料理を完了する" }));
+
+    const consumptionModal = await screen.findByRole("dialog", { name: "実際の消費量を調整" });
+    expect(within(consumptionModal).getByRole("tab", { name: "全" })).toBeTruthy();
+    expect(within(consumptionModal).getByRole("button", { name: "全選択" })).toBeTruthy();
+    expect(within(consumptionModal).getByRole("button", { name: "全解除" })).toBeTruthy();
+    fireEvent.change(within(consumptionModal).getByLabelText("消費量"), { target: { value: "2" } });
+    expect(within(consumptionModal).getByText(/在庫不足: 玉ねぎ/)).toBeTruthy();
+
+    fireEvent.click(within(consumptionModal).getByRole("checkbox", { name: /玉ねぎ/ }));
+    fireEvent.click(within(consumptionModal).getAllByRole("button", { name: "★" })[3]);
+    fireEvent.change(within(consumptionModal).getByLabelText("一言コメント"), { target: { value: "家族に好評" } });
+    fireEvent.click(within(consumptionModal).getByRole("button", { name: "確定" }));
+
+    await waitFor(() => {
+      expect(inventoryUpdate.update).not.toHaveBeenCalled();
+      expect(historyInsert.insert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          note: "家族に好評",
+          rating: 4
+        })
+      );
+      expect(consumptionInsert).not.toHaveBeenCalled();
+    });
+  });
+
   it("does not save invalid recipe values", async () => {
     renderWorkspace({ initialRecipes: [] });
     openRecipeEditor();

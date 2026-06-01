@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type ChangeEvent, FormEvent, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { DeleteConfirmPanel } from "@/components/delete-confirm-panel";
 import { useShellNavigation, useShellStatusMessage } from "@/components/web-mode-shell";
@@ -21,6 +21,7 @@ import {
   toRecipeFormValues
 } from "@/lib/recipes/types";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
+import { buildCookingHistoryPhotoStoragePath, compressImageFile } from "@/lib/photos/compress";
 
 type RecipeMealWorkspaceProps = {
   initialCookCandidates: CookCandidate[];
@@ -56,6 +57,7 @@ type ConsumptionDraft = {
   ingredientName: string;
   requestedAmount: number;
   requestedUnit: string;
+  selected: boolean;
   stockItemId: string;
 };
 
@@ -69,6 +71,7 @@ type CookingIngredientTab = "all" | "食材" | "調味料";
 type CookingStepTab = "all" | "prep" | "steps";
 type ShortageSelectionTab = "all" | "ingredients" | "seasonings";
 type CookingViewerOrigin = "recipes" | "cooking";
+type ConsumptionTab = "all" | "食材" | "調味料";
 
 const mealTypes: MealType[] = ["朝", "昼", "晩", "その他"];
 const mealTypeOrder: Record<MealType, number> = { 朝: 0, 昼: 1, 晩: 2, その他: 3 };
@@ -252,6 +255,11 @@ export function RecipeMealWorkspace({
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
   const [pendingConsumptionScheduleId, setPendingConsumptionScheduleId] = useState<string | null>(null);
   const [consumptionDrafts, setConsumptionDrafts] = useState<ConsumptionDraft[]>([]);
+  const [consumptionTab, setConsumptionTab] = useState<ConsumptionTab>("all");
+  const [selectedCookingPhoto, setSelectedCookingPhoto] = useState<File | null>(null);
+  const [cookingPhotoPreviewUrl, setCookingPhotoPreviewUrl] = useState<string | null>(null);
+  const [cookingRating, setCookingRating] = useState("");
+  const [cookingComment, setCookingComment] = useState("");
   const [cookingIngredientTab, setCookingIngredientTab] = useState<CookingIngredientTab>("all");
   const [cookingStepTab, setCookingStepTab] = useState<CookingStepTab>("all");
   const [cookingStockCheck, setCookingStockCheck] = useState(false);
@@ -277,6 +285,7 @@ export function RecipeMealWorkspace({
   const [slotMenuId, setSlotMenuId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; tone: "info" | "success" | "error" } | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cookingPhotoInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
   const { clearPendingRecipe, pendingRecipeId, pendingRecipeOrigin, returnToMode } = useShellNavigation();
   const { showStatusMessage } = useShellStatusMessage();
@@ -512,6 +521,57 @@ export function RecipeMealWorkspace({
     }
   }
 
+  function resetCookingPhoto() {
+    if (cookingPhotoPreviewUrl) URL.revokeObjectURL(cookingPhotoPreviewUrl);
+    setSelectedCookingPhoto(null);
+    setCookingPhotoPreviewUrl(null);
+    if (cookingPhotoInputRef.current) {
+      cookingPhotoInputRef.current.value = "";
+    }
+  }
+
+  function resetCookingRecordDraft() {
+    resetCookingPhoto();
+    setCookingRating("");
+    setCookingComment("");
+  }
+
+  function closeConsumptionModal() {
+    setPendingConsumptionScheduleId(null);
+    setConsumptionDrafts([]);
+    setConsumptionTab("all");
+    resetCookingRecordDraft();
+  }
+
+  function selectCookingPhoto(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0] ?? null;
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      resetCookingRecordDraft();
+      setFeedback({
+        tone: "error",
+        message: "原因: 画像ではないファイルです。影響: 完成写真を保存できません。修正方法: カメラで撮影するか画像を選んでください。"
+      });
+      return;
+    }
+
+    if (cookingPhotoPreviewUrl) URL.revokeObjectURL(cookingPhotoPreviewUrl);
+    setSelectedCookingPhoto(file);
+    setCookingPhotoPreviewUrl(URL.createObjectURL(file));
+  }
+
+  function setVisibleConsumptionSelected(selected: boolean) {
+    if (!activeCookingRecipe) return;
+    setConsumptionDrafts((items) =>
+      items.map((draft) => {
+        const ingredient = activeCookingRecipe.ingredients.find((item) => item.name === draft.ingredientName && item.unit === draft.requestedUnit);
+        const visible = consumptionTab === "all" || ingredient?.item_type === consumptionTab;
+        return visible ? { ...draft, selected } : draft;
+      })
+    );
+  }
+
   function requestDelete(target: string, message: string, confirm: () => void) {
     setPendingDelete({ target, message, confirm });
     setFeedback(null);
@@ -527,6 +587,10 @@ export function RecipeMealWorkspace({
   useEffect(() => () => {
     if (toastTimer.current) clearTimeout(toastTimer.current);
   }, []);
+
+  useEffect(() => () => {
+    if (cookingPhotoPreviewUrl) URL.revokeObjectURL(cookingPhotoPreviewUrl);
+  }, [cookingPhotoPreviewUrl]);
 
   useEffect(() => {
     if (!feedback) return;
@@ -563,6 +627,7 @@ export function RecipeMealWorkspace({
         requestedAmount: ingredient.amount,
         requestedUnit: ingredient.unit,
         amount: exactStock ? String(Math.min(ingredient.amount, exactStock.quantity)) : "0",
+        selected: Boolean(exactStock) && Number(ingredient.amount) > 0,
         stockItemId: exactStock?.id ?? ""
       };
     });
@@ -1018,6 +1083,8 @@ export function RecipeMealWorkspace({
     if (pendingConsumptionScheduleId !== schedule.id) {
       setPendingConsumptionScheduleId(schedule.id);
       setConsumptionDrafts(buildConsumptionDrafts(schedule));
+      setConsumptionTab("all");
+      resetCookingRecordDraft();
       setSelectedScheduleId(schedule.id);
       setFeedback({ tone: "info", message: "消費量を確認してから「確定」を押してください。" });
       return;
@@ -1027,9 +1094,14 @@ export function RecipeMealWorkspace({
       ...draft,
       consumedAmount: Number(draft.amount)
     }));
-    const invalidDraft = normalizedDrafts.find((draft) => !Number.isFinite(draft.consumedAmount) || draft.consumedAmount < 0);
+    const invalidDraft = normalizedDrafts.find((draft) => draft.selected && (!Number.isFinite(draft.consumedAmount) || draft.consumedAmount < 0));
     if (invalidDraft) {
       setFeedback({ tone: "error", message: "原因: 消費量に不備があります。影響: 在庫を減算できません。修正方法: 0以上の数値に直してください。" });
+      return;
+    }
+    const ratingValue = cookingRating ? Number(cookingRating) : null;
+    if (ratingValue !== null && (!Number.isInteger(ratingValue) || ratingValue < 1 || ratingValue > 5)) {
+      setFeedback({ tone: "error", message: "原因: 評価の値に不備があります。影響: 料理履歴を保存できません。修正方法: ★1〜5の範囲で選んでください。" });
       return;
     }
 
@@ -1042,7 +1114,7 @@ export function RecipeMealWorkspace({
       stockItem: StockItem;
     }> = [];
     for (const draft of normalizedDrafts) {
-      if (!draft.stockItemId || draft.consumedAmount === 0) continue;
+      if (!draft.selected || !draft.stockItemId || draft.consumedAmount === 0) continue;
       const stockItem = inventoryItemsForMeals.find((item) => item.id === draft.stockItemId);
       if (!stockItem) continue;
       consumedRows.push({
@@ -1095,15 +1167,14 @@ export function RecipeMealWorkspace({
         recipe_id: schedule.recipe_id,
         recipe_name: schedule.recipe_name,
         meal_schedule_id: schedule.id,
-        note: "献立から調理完了",
-        rating: null
+        note: cookingComment.trim() || "献立から調理完了",
+        rating: ratingValue
       })
       .select()
       .single();
 
-    setIsSaving(false);
-
     if (historyError || !historyData) {
+      setIsSaving(false);
       setMealSchedules((items) => items.map((item) => (item.id === schedule.id ? (updatedSchedule as MealSchedule) : item)));
       setFeedback({
         tone: "error",
@@ -1140,6 +1211,41 @@ export function RecipeMealWorkspace({
       }
     }
 
+    let photoWarning = "";
+    if (selectedCookingPhoto) {
+      try {
+        const compressed = await compressImageFile(selectedCookingPhoto);
+        const storagePath = buildCookingHistoryPhotoStoragePath(userId);
+        const { error: uploadError } = await supabase.storage.from("photos").upload(storagePath, compressed.blob, {
+          contentType: compressed.contentType,
+          upsert: false
+        });
+
+        if (uploadError) {
+          photoWarning = "写真の保存に失敗しました。料理履歴は写真なしで保存済みです。";
+        } else {
+          const { error: photoInsertError } = await supabase.from("photos").insert({
+            user_id: userId,
+            bucket_id: "photos",
+            storage_path: storagePath,
+            usage_type: "cooking_history",
+            cooking_history_id: String(historyData.id),
+            content_type: compressed.contentType,
+            byte_size: compressed.byteSize,
+            width: compressed.width,
+            height: compressed.height
+          });
+
+          if (photoInsertError) {
+            await supabase.storage.from("photos").remove([storagePath]);
+            photoWarning = "写真情報の保存に失敗しました。料理履歴は写真なしで保存済みです。";
+          }
+        }
+      } catch {
+        photoWarning = "写真の処理に失敗しました。料理履歴は写真なしで保存済みです。";
+      }
+    }
+
     setMealSchedules((items) => items.map((item) => (item.id === schedule.id ? (updatedSchedule as MealSchedule) : item)));
     setInventoryItemsForMeals((items) =>
       items.map((item) => {
@@ -1147,12 +1253,15 @@ export function RecipeMealWorkspace({
         return consumed ? { ...item, quantity: consumed.nextQuantity } : item;
       })
     );
+    setIsSaving(false);
     setPendingConsumptionScheduleId(null);
     setConsumptionDrafts([]);
+    setConsumptionTab("all");
+    resetCookingRecordDraft();
     setActiveCookingRecipeId("");
     setCookingScheduleId(null);
     router.refresh();
-    showToast(`${schedule.recipe_name} を調理完了にしました。料理履歴にも記録済みです。`, "success");
+    showToast(photoWarning || `${schedule.recipe_name} を調理完了にしました。料理履歴にも記録済みです。`, photoWarning ? "error" : "success");
   }
 
   return (
@@ -1213,7 +1322,7 @@ export function RecipeMealWorkspace({
             <button
               className="modal-close-button"
               type="button"
-              onClick={() => setPendingConsumptionScheduleId(null)}
+              onClick={closeConsumptionModal}
               aria-label="閉じる"
             >
               ×
@@ -1223,10 +1332,71 @@ export function RecipeMealWorkspace({
               drafts={consumptionDrafts}
               inventoryItems={inventoryItemsForMeals}
               onChange={updateConsumptionDraft}
+              onSelectVisible={setVisibleConsumptionSelected}
+              onTabChange={setConsumptionTab}
               recipe={activeCookingRecipe}
+              tab={consumptionTab}
             />
+            <section className="cooking-record-panel" aria-label="料理記録">
+              <div className="panel-title compact-title">
+                <div>
+                  <span>料理記録</span>
+                  <h4>写真・評価・コメント</h4>
+                </div>
+              </div>
+              <div className="cooking-photo-picker">
+                <label className="photo-file-button">
+                  完成写真を撮る / 選ぶ
+                  <input
+                    accept="image/*"
+                    capture="environment"
+                    disabled={isSaving}
+                    onChange={selectCookingPhoto}
+                    ref={cookingPhotoInputRef}
+                    type="file"
+                  />
+                </label>
+                {cookingPhotoPreviewUrl ? (
+                  <div className="photo-preview">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img alt="完成写真のプレビュー" src={cookingPhotoPreviewUrl} />
+                  </div>
+                ) : (
+                  <p className="photo-empty">写真なしでも完了できます。</p>
+                )}
+                {selectedCookingPhoto ? (
+                  <button className="secondary-button compact-button" type="button" onClick={resetCookingPhoto} disabled={isSaving}>
+                    写真を外す
+                  </button>
+                ) : null}
+              </div>
+              <div className="cooking-rating-picker" aria-label="評価">
+                {[1, 2, 3, 4, 5].map((value) => (
+                  <button
+                    aria-pressed={Number(cookingRating) === value}
+                    data-active={Number(cookingRating) >= value}
+                    disabled={isSaving}
+                    key={value}
+                    onClick={() => setCookingRating(cookingRating === String(value) ? "" : String(value))}
+                    type="button"
+                  >
+                    ★
+                  </button>
+                ))}
+              </div>
+              <label className="cooking-comment-field">
+                一言コメント
+                <textarea
+                  disabled={isSaving}
+                  onChange={(event) => setCookingComment(event.target.value)}
+                  placeholder="例：少し薄味。次回は味噌を多めにする"
+                  rows={3}
+                  value={cookingComment}
+                />
+              </label>
+            </section>
             <div className="consumption-modal-actions">
-              <button className="secondary-button" type="button" onClick={() => setPendingConsumptionScheduleId(null)}>
+              <button className="secondary-button" type="button" onClick={closeConsumptionModal}>
                 キャンセル
               </button>
               <button className="primary-button consumption-confirm" type="button" disabled={isSaving} onClick={() => completeSchedule(cookingSchedule)}>
@@ -2093,16 +2263,41 @@ function ConsumptionEditor({
   drafts,
   inventoryItems,
   onChange,
-  recipe
+  onSelectVisible,
+  onTabChange,
+  recipe,
+  tab
 }: {
   drafts: ConsumptionDraft[];
   inventoryItems: StockItem[];
   onChange: (index: number, values: Partial<ConsumptionDraft>) => void;
+  onSelectVisible: (selected: boolean) => void;
+  onTabChange: (tab: ConsumptionTab) => void;
   recipe: Recipe | null;
+  tab: ConsumptionTab;
 }) {
   if (!recipe) {
     return <p className="empty-list">レシピが見つからないため、消費量を作成できません。</p>;
   }
+
+  const rows = drafts
+    .map((draft, index) => {
+      const ingredient = recipe.ingredients.find((item) => item.name === draft.ingredientName && item.unit === draft.requestedUnit);
+      const stockItem = inventoryItems.find((item) => item.id === draft.stockItemId);
+      const amount = Number(draft.amount);
+      return {
+        draft,
+        index,
+        ingredient,
+        isShortage: Boolean(draft.selected && stockItem && Number.isFinite(amount) && amount > Number(stockItem.quantity || 0)),
+        options: ingredient
+          ? inventoryItems.filter((item) => item.category === ingredient.item_type && item.unit === ingredient.unit && item.quantity > 0)
+          : [],
+        stockItem
+      };
+    })
+    .filter((row) => tab === "all" || row.ingredient?.item_type === tab);
+  const shortageNames = rows.filter((row) => row.isShortage).map((row) => row.draft.ingredientName);
 
   return (
     <section className="consumption-editor" aria-label="消費量確認">
@@ -2112,20 +2307,56 @@ function ConsumptionEditor({
           <h4>在庫から減らす量</h4>
         </div>
       </div>
+      <div className="consumption-toolbar">
+        <div className="consumption-tabs" role="tablist" aria-label="材料カテゴリ">
+          {(["all", "食材", "調味料"] as ConsumptionTab[]).map((value) => (
+            <button
+              aria-selected={tab === value}
+              data-active={tab === value}
+              key={value}
+              onClick={() => onTabChange(value)}
+              role="tab"
+              type="button"
+            >
+              {value === "all" ? "全" : value}
+            </button>
+          ))}
+        </div>
+        <div className="consumption-bulk-actions">
+          <button className="secondary-button compact-button" type="button" onClick={() => onSelectVisible(true)}>
+            全選択
+          </button>
+          <button className="secondary-button compact-button" type="button" onClick={() => onSelectVisible(false)}>
+            全解除
+          </button>
+        </div>
+      </div>
+      {shortageNames.length ? (
+        <p className="consumption-shortage">
+          在庫不足: {shortageNames.join("、")} は確定すると在庫が0で止まります。
+        </p>
+      ) : null}
       {drafts.length === 0 ? (
         <p className="empty-list">減算対象の材料はありません。このまま完了できます。</p>
+      ) : rows.length === 0 ? (
+        <p className="empty-list">このカテゴリの材料はありません。</p>
       ) : (
         <div className="consumption-list">
-          {drafts.map((draft, index) => {
-            const ingredient = recipe.ingredients.find((item) => item.name === draft.ingredientName && item.unit === draft.requestedUnit);
-            const options = ingredient
-              ? inventoryItems.filter((item) => item.category === ingredient.item_type && item.unit === ingredient.unit && item.quantity > 0)
-              : [];
+          {rows.map(({ draft, index, ingredient, isShortage, options, stockItem }) => {
             return (
-              <article className="consumption-item" key={`${draft.ingredientName}-${draft.requestedUnit}-${index}`}>
+              <article className="consumption-item" data-selected={draft.selected} key={`${draft.ingredientName}-${draft.requestedUnit}-${index}`}>
                 <div className="item-main">
-                  <span>必要 {draft.requestedAmount}{draft.requestedUnit}</span>
-                  <h4>{draft.ingredientName}</h4>
+                  <label className="consumption-check">
+                    <input
+                      checked={draft.selected}
+                      onChange={(event) => onChange(index, { selected: event.target.checked })}
+                      type="checkbox"
+                    />
+                    <span>
+                      <small>必要 {draft.requestedAmount}{draft.requestedUnit} / {ingredient?.item_type ?? "未分類"}</small>
+                      <strong>{draft.ingredientName}</strong>
+                    </span>
+                  </label>
                 </div>
                 <label>
                   減らす在庫
@@ -2142,6 +2373,11 @@ function ConsumptionEditor({
                   消費量
                   <input min="0" step="0.1" type="number" value={draft.amount} onChange={(event) => onChange(index, { amount: event.target.value })} />
                 </label>
+                {isShortage && stockItem ? (
+                  <p className="consumption-item-warning">
+                    在庫 {stockItem.quantity}{stockItem.unit} に対して消費量が多いです。
+                  </p>
+                ) : null}
               </article>
             );
           })}
