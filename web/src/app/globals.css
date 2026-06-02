@@ -5344,7 +5344,7 @@ h1 {
 /* Recipe editor: Canvas app visual parity */
 .recipe-editor-modal {
   display: flex;
-  width: min(672px, 100%);
+  width: min(720px, 100%);
   max-height: 90vh;
   flex-direction: column;
   gap: 0;
@@ -5455,7 +5455,7 @@ h1 {
 
 .canvas-recipe-item-row {
   display: grid;
-  grid-template-columns: 20px minmax(0, 1fr) 64px 64px 36px;
+  grid-template-columns: 20px minmax(0, 1fr) 5rem 10rem 36px;
   gap: 8px;
   align-items: center;
   border: 0;
@@ -5469,6 +5469,28 @@ h1 {
   background: #f8fafc;
   padding: 9px 12px;
   font-size: 0.82rem;
+}
+
+/* 単位ピッカーを1行内に収める（在庫モーダルの .qty-unit-wrap を踏襲） */
+.canvas-recipe-item-row .genre-field {
+  flex-wrap: nowrap;
+  min-height: 40px;
+  padding: 4px 8px;
+}
+
+.canvas-recipe-item-row .genre-tags {
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+}
+
+.canvas-recipe-item-row .genre-input {
+  min-width: 0;
+  flex: 1 1 2rem;
+}
+
+.canvas-recipe-item-row .genre-icon-button {
+  width: 28px;
+  height: 28px;
 }
 
 .canvas-recipe-item-row .danger-button {
@@ -5796,7 +5818,7 @@ h1 {
   }
 
   .canvas-recipe-item-row {
-    grid-template-columns: 18px minmax(86px, 1fr) minmax(58px, 0.55fr) minmax(74px, 0.7fr) 34px;
+    grid-template-columns: 18px minmax(64px, 1fr) 3.5rem minmax(6rem, 0.9fr) 32px;
     gap: 6px;
   }
 
@@ -5812,7 +5834,7 @@ h1 {
   }
 
   .canvas-recipe-item-row .genre-input {
-    min-width: 2.5rem;
+    min-width: 0;
     font-size: 0.8rem;
   }
 

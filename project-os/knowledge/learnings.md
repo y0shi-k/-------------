@@ -5,6 +5,24 @@
 
 ---
 
+## 2026-06-03 直接修正依頼で /new-ticket を飛ばして実装してしまった（TKT-0155）
+
+### 事象
+ユーザーの「この画面を直して」という直接依頼に対し、プラン承認後そのまま実装→verifyを進め、
+本来先行すべき `/new-ticket`（着手前のチケット起票）を飛ばした。チケット・spec・report が後追いになった。
+
+### 原因
+`check_gates.py` は「最後に artifact が揃っているか」だけを見て、「実装前にチケットがあったか」の順序は
+強制しない。規約（CLAUDE.md/AGENTS.md の `/new-ticket → /implement → /verify → /finalize`）はあるが
+機械ゲートが無いため、直接依頼だと順序を省略しやすい。
+
+### 再発防止
+非trivialなWeb版変更は、直接修正依頼でも**実装前に `/new-ticket` を起票**し、spec/required_evals を先に決める。
+完了時は `/finalize` で report.md まで揃える。順序強制が欲しい場合は、`web/` への Edit 時に対応する
+in-progress チケットが無ければ警告する PreToolUse hook の導入を検討（未実装）。
+
+---
+
 ## 2026-05-29 verify の秘密チェックがテストのモック秘密を誤検出した
 
 ### 事象
