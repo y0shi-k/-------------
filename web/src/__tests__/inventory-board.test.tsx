@@ -3,13 +3,17 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { InventoryBoard } from "@/components/inventory-board";
 import type { StockItem } from "@/lib/inventory/types";
 import type { ShoppingItem } from "@/lib/recipes/types";
+import type { AiUsageSummary } from "@/lib/ai/usage";
 
 const from = vi.fn();
 const storageFrom = vi.fn();
-const rpc = vi.fn();
 const compressImageFile = vi.fn();
 const buildPhotoStoragePath = vi.fn();
 const refresh = vi.fn();
+const shellAiMocks = vi.hoisted(() => ({
+  aiUsageSummary: null as AiUsageSummary | null,
+  refreshAiUsage: vi.fn(async () => {})
+}));
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({
@@ -22,8 +26,14 @@ vi.mock("@/lib/supabase/browser", () => ({
     from,
     storage: {
       from: storageFrom
-    },
-    rpc
+    }
+  })
+}));
+
+vi.mock("@/components/web-mode-shell", () => ({
+  useShellAiUsage: () => ({
+    aiUsageSummary: shellAiMocks.aiUsageSummary,
+    refreshAiUsage: shellAiMocks.refreshAiUsage
   })
 }));
 
@@ -119,8 +129,9 @@ describe("InventoryBoard", () => {
   beforeEach(() => {
     from.mockReset();
     storageFrom.mockReset();
-    rpc.mockReset();
-    rpc.mockResolvedValue({ data: { ok: false }, error: null });
+    shellAiMocks.aiUsageSummary = null;
+    shellAiMocks.refreshAiUsage.mockReset();
+    shellAiMocks.refreshAiUsage.mockResolvedValue(undefined);
     compressImageFile.mockReset();
     buildPhotoStoragePath.mockReset();
     buildPhotoStoragePath.mockReturnValue("user-1/ingredient-scan/photo-1.jpg");
@@ -308,15 +319,12 @@ describe("InventoryBoard", () => {
   });
 
   it("disables the AI scan button when the daily scan limit is reached", async () => {
-    rpc.mockResolvedValue({
-      data: {
-        ok: true,
-        recipe_generation: { used: 5, limit: 20, remaining: 15 },
-        ingredient_scan: { used: 10, limit: 10, remaining: 0 },
-        total: { used: 15, limit: 30, remaining: 15 }
-      },
-      error: null
-    });
+    shellAiMocks.aiUsageSummary = {
+      ok: true,
+      recipe_generation: { used: 5, limit: 20, remaining: 15 },
+      ingredient_scan: { used: 10, limit: 10, remaining: 0 },
+      total: { used: 15, limit: 30, remaining: 15 }
+    };
     renderBoard();
     openPhotoScan();
 
@@ -431,6 +439,10 @@ describe("InventoryBoard", () => {
       });
     });
     expect(await screen.findByText("1件の候補を見つけました。確認してから在庫に追加してください。")).toBeTruthy();
+    // AI解析後に context の refreshAiUsage が呼ばれること
+    await waitFor(() => {
+      expect(shellAiMocks.refreshAiUsage).toHaveBeenCalled();
+    });
     expect(screen.getByText("ヨーグルト")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "選択した候補を在庫に追加" }));
 

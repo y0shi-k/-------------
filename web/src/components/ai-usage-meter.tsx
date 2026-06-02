@@ -4,8 +4,10 @@ import type { AiUsageSummary } from "@/lib/ai/usage";
 
 type AiUsageMeterProps = {
   summary: AiUsageSummary | null;
-  // 強調する機能。該当機能の残り0なら理由文を出す。
+  // 強調する機能。該当機能の残り0なら理由文を出す（panel variant のみ有効）。
   feature?: "recipe_generation" | "ingredient_scan";
+  // "panel"（既定）: ラベル・注記あり。"statusbar": ラベル・注記なし、バッジのみ。
+  variant?: "panel" | "statusbar";
 };
 
 function reasonText(summary: AiUsageSummary, feature?: AiUsageMeterProps["feature"]) {
@@ -19,7 +21,7 @@ function reasonText(summary: AiUsageSummary, feature?: AiUsageMeterProps["featur
   return "";
 }
 
-export function AiUsageMeter({ summary, feature }: AiUsageMeterProps) {
+export function AiUsageMeter({ summary, feature, variant = "panel" }: AiUsageMeterProps) {
   if (!summary || !summary.ok) {
     return null;
   }
@@ -27,17 +29,23 @@ export function AiUsageMeter({ summary, feature }: AiUsageMeterProps) {
   const recipe = summary.recipe_generation;
   const scan = summary.ingredient_scan;
   const total = summary.total;
-  const message = reasonText(summary, feature);
+  const isStatusbar = variant === "statusbar";
   const exhausted =
-    total.remaining <= 0 || (feature ? summary[feature].remaining <= 0 : false);
+    !isStatusbar && (total.remaining <= 0 || (feature ? summary[feature].remaining <= 0 : false));
+  const message = exhausted ? reasonText(summary, feature) : "";
 
   return (
-    <div className="ai-usage-meter" role="status" aria-label="本日のAI利用残り回数">
-      <span className="ai-usage-meter-label">本日のAI残り</span>
-      <span className="ai-usage-badge" data-empty={recipe.remaining <= 0}>
+    <div
+      className="ai-usage-meter"
+      data-variant={variant}
+      role="status"
+      aria-label="本日のAI利用残り回数"
+    >
+      {!isStatusbar && <span className="ai-usage-meter-label">本日のAI残り</span>}
+      <span className="ai-usage-badge ai-usage-badge-recipe" data-empty={recipe.remaining <= 0}>
         レシピ {recipe.remaining}/{recipe.limit}
       </span>
-      <span className="ai-usage-badge" data-empty={scan.remaining <= 0}>
+      <span className="ai-usage-badge ai-usage-badge-scan" data-empty={scan.remaining <= 0}>
         写真 {scan.remaining}/{scan.limit}
       </span>
       <span className="ai-usage-badge ai-usage-badge-total" data-empty={total.remaining <= 0}>

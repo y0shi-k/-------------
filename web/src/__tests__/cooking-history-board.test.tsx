@@ -17,6 +17,21 @@ vi.mock("@/components/web-mode-shell", () => ({
   })
 }));
 
+vi.mock("@/components/cooking-record-edit-modal", () => ({
+  CookingRecordEditModal: ({ item, onClose }: { item: CookingHistoryItem; onClose: () => void }) => (
+    <div role="dialog" aria-label="料理記録を編集">
+      <p>{item.recipe_name}を編集中</p>
+      <button onClick={onClose} type="button">閉じる</button>
+    </div>
+  )
+}));
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({
+    refresh: vi.fn()
+  })
+}));
+
 const baseHistory: CookingHistoryItem = {
   id: "history-1",
   user_id: "user-1",
@@ -32,7 +47,13 @@ const baseHistory: CookingHistoryItem = {
 };
 
 function renderBoard(props?: Partial<React.ComponentProps<typeof CookingHistoryBoard>>) {
-  return render(<CookingHistoryBoard initialHistory={props?.initialHistory ?? []} />);
+  return render(
+    <CookingHistoryBoard
+      initialHistory={props?.initialHistory ?? []}
+      initialInventoryItems={props?.initialInventoryItems ?? []}
+      userId={props?.userId ?? "user-1"}
+    />
+  );
 }
 
 describe("CookingHistoryBoard", () => {
@@ -109,6 +130,20 @@ describe("CookingHistoryBoard", () => {
     expect(screen.queryByLabelText("料理名")).toBeNull();
     expect(screen.queryByLabelText("写真を選ぶ")).toBeNull();
     expect(screen.getByText("料理履歴はまだありません。献立の「料理を完了する」から記録できます。")).toBeTruthy();
+  });
+
+  it("shows the edit action for every history card and opens the edit modal", () => {
+    renderBoard({
+      initialHistory: [
+        baseHistory,
+        { ...baseHistory, id: "history-2", recipe_id: null, recipe_name: "手入力の記録" }
+      ]
+    });
+
+    expect(screen.getAllByRole("button", { name: "編集" })).toHaveLength(2);
+    fireEvent.click(screen.getAllByRole("button", { name: "編集" })[1]);
+    expect(screen.getByRole("dialog", { name: "料理記録を編集" })).toBeTruthy();
+    expect(screen.getByText("手入力の記録を編集中")).toBeTruthy();
   });
 
   it("shows only the recipe viewer action when recipe_id exists", () => {

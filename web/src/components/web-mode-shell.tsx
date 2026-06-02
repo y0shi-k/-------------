@@ -1,6 +1,9 @@
 "use client";
 
 import { createContext, type ReactNode, useCallback, useEffect, useMemo, useRef, useState, useContext } from "react";
+import { AiUsageMeter } from "@/components/ai-usage-meter";
+import { getAiUsageSummary, type AiUsageSummary } from "@/lib/ai/usage";
+import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 
 type ModeId = "ingredients" | "recipes" | "cooking";
 
@@ -34,18 +37,22 @@ type ShellStatusMessage = {
 type RecipeViewerOrigin = "recipes" | "cooking";
 
 type ShellStatusContextValue = {
+  aiUsageSummary: AiUsageSummary | null;
   clearPendingRecipe: () => void;
   pendingRecipeId: string | null;
   pendingRecipeOrigin: RecipeViewerOrigin;
+  refreshAiUsage: () => Promise<void>;
   requestViewRecipe: (recipeId: string, origin?: RecipeViewerOrigin) => void;
   returnToMode: (modeId: ModeId) => void;
   showStatusMessage: (message: ShellStatusMessage) => void;
 };
 
 const ShellStatusContext = createContext<ShellStatusContextValue>({
+  aiUsageSummary: null,
   clearPendingRecipe: () => {},
   pendingRecipeId: null,
   pendingRecipeOrigin: "recipes",
+  refreshAiUsage: async () => {},
   requestViewRecipe: () => {},
   returnToMode: () => {},
   showStatusMessage: () => {}
@@ -61,6 +68,11 @@ export function useShellNavigation() {
   return { clearPendingRecipe, pendingRecipeId, pendingRecipeOrigin, requestViewRecipe, returnToMode };
 }
 
+export function useShellAiUsage() {
+  const { aiUsageSummary, refreshAiUsage } = useContext(ShellStatusContext);
+  return { aiUsageSummary, refreshAiUsage };
+}
+
 export function WebModeShell({
   userEmail,
   inventoryCount,
@@ -73,7 +85,9 @@ export function WebModeShell({
   const [pendingRecipeId, setPendingRecipeId] = useState<string | null>(null);
   const [pendingRecipeOrigin, setPendingRecipeOrigin] = useState<RecipeViewerOrigin>("recipes");
   const [statusMessage, setStatusMessage] = useState<ShellStatusMessage | null>(null);
+  const [aiUsageSummary, setAiUsageSummary] = useState<AiUsageSummary | null>(null);
   const statusTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const supabase = useMemo(() => createBrowserSupabaseClient(), []);
   const modes = useMemo<Mode[]>(
     () => [
       {
@@ -122,16 +136,31 @@ export function WebModeShell({
   const returnToMode = useCallback((modeId: ModeId) => {
     setActiveMode(modeId);
   }, []);
+  const refreshAiUsage = useCallback(async () => {
+    setAiUsageSummary(await getAiUsageSummary(supabase));
+  }, [supabase]);
+
   const shellContextValue = useMemo(
     () => ({
+      aiUsageSummary,
       clearPendingRecipe,
       pendingRecipeId,
       pendingRecipeOrigin,
+      refreshAiUsage,
       requestViewRecipe,
       returnToMode,
       showStatusMessage
     }),
-    [clearPendingRecipe, pendingRecipeId, pendingRecipeOrigin, requestViewRecipe, returnToMode, showStatusMessage]
+    [
+      aiUsageSummary,
+      clearPendingRecipe,
+      pendingRecipeId,
+      pendingRecipeOrigin,
+      refreshAiUsage,
+      requestViewRecipe,
+      returnToMode,
+      showStatusMessage
+    ]
   );
   const statusLabel = statusMessage
     ? statusMessage.tone === "success"
@@ -141,6 +170,10 @@ export function WebModeShell({
         : "通知"
     : "待機中";
   const statusText = statusMessage?.message ?? `${active.label}: ${active.status}`;
+
+  useEffect(() => {
+    void refreshAiUsage();
+  }, [refreshAiUsage]);
 
   useEffect(() => () => {
     if (statusTimer.current) clearTimeout(statusTimer.current);
@@ -152,6 +185,7 @@ export function WebModeShell({
         <strong>{statusLabel}</strong>
         <span>|</span>
         <span className="canvas-status-text">{statusText}</span>
+        <AiUsageMeter variant="statusbar" summary={aiUsageSummary} />
         <small>{userEmail}</small>
       </div>
       <h1 className="sr-only">料理レシピ・食材管理</h1>

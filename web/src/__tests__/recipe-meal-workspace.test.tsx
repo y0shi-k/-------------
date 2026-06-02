@@ -2,23 +2,24 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { RecipeMealWorkspace } from "@/components/recipe-meal-workspace";
 import type { StockItem } from "@/lib/inventory/types";
+import type { AiUsageSummary } from "@/lib/ai/usage";
 import type { CookCandidate, MealSchedule, Recipe, RecipeIngredient } from "@/lib/recipes/types";
 
 const from = vi.fn();
-const rpc = vi.fn();
 const refresh = vi.fn();
 const shellMocks = vi.hoisted(() => ({
   clearPendingRecipe: vi.fn(),
   pendingRecipeId: null as string | null,
   pendingRecipeOrigin: "recipes" as "recipes" | "cooking",
   returnToMode: vi.fn(),
-  showStatusMessage: vi.fn()
+  showStatusMessage: vi.fn(),
+  aiUsageSummary: null as AiUsageSummary | null,
+  refreshAiUsage: vi.fn(async () => {})
 }));
 
 vi.mock("@/lib/supabase/browser", () => ({
   createBrowserSupabaseClient: () => ({
-    from,
-    rpc
+    from
   })
 }));
 
@@ -38,6 +39,10 @@ vi.mock("@/components/web-mode-shell", () => ({
   }),
   useShellStatusMessage: () => ({
     showStatusMessage: shellMocks.showStatusMessage
+  }),
+  useShellAiUsage: () => ({
+    aiUsageSummary: shellMocks.aiUsageSummary,
+    refreshAiUsage: shellMocks.refreshAiUsage
   })
 }));
 
@@ -174,14 +179,15 @@ describe("RecipeMealWorkspace", () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date("2026-05-28T12:00:00"));
     from.mockReset();
-    rpc.mockReset();
-    rpc.mockResolvedValue({ data: { ok: false }, error: null });
     refresh.mockReset();
     shellMocks.clearPendingRecipe.mockReset();
     shellMocks.pendingRecipeId = null;
     shellMocks.pendingRecipeOrigin = "recipes";
     shellMocks.returnToMode.mockReset();
     shellMocks.showStatusMessage.mockReset();
+    shellMocks.aiUsageSummary = null;
+    shellMocks.refreshAiUsage.mockReset();
+    shellMocks.refreshAiUsage.mockResolvedValue(undefined);
     global.fetch = vi.fn();
     localStorage.clear();
   });
@@ -412,15 +418,12 @@ describe("RecipeMealWorkspace", () => {
   });
 
   it("disables the AI recipe button and shows remaining counts when the recipe limit is reached", async () => {
-    rpc.mockResolvedValue({
-      data: {
-        ok: true,
-        recipe_generation: { used: 20, limit: 20, remaining: 0 },
-        ingredient_scan: { used: 2, limit: 10, remaining: 8 },
-        total: { used: 22, limit: 30, remaining: 8 }
-      },
-      error: null
-    });
+    shellMocks.aiUsageSummary = {
+      ok: true,
+      recipe_generation: { used: 20, limit: 20, remaining: 0 },
+      ingredient_scan: { used: 2, limit: 10, remaining: 8 },
+      total: { used: 22, limit: 30, remaining: 8 }
+    };
     renderWorkspace();
 
     expect(await screen.findByText("レシピ 0/20")).toBeTruthy();
@@ -474,6 +477,10 @@ describe("RecipeMealWorkspace", () => {
     expect(await screen.findByRole("heading", { name: "新規レシピ" })).toBeTruthy();
     expect(screen.getByLabelText("レシピ名")).toHaveProperty("value", "鶏そぼろ丼");
     expect(screen.queryByRole("button", { name: "編集モーダルで確認" })).toBeNull();
+    // AI実行後に context の refreshAiUsage が呼ばれること
+    await waitFor(() => {
+      expect(shellMocks.refreshAiUsage).toHaveBeenCalled();
+    });
   });
 
   it("clears the text import body whenever the modal is reopened", () => {

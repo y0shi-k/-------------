@@ -130,7 +130,11 @@ export default async function Home() {
           ),
           cooking: (
             <div className="cooking-record-stack" key="cooking">
-              <CookingHistoryBoard initialHistory={cookingHistoryWithPhotos as CookingHistoryItem[]} />
+              <CookingHistoryBoard
+                initialHistory={cookingHistoryWithPhotos as CookingHistoryItem[]}
+                initialInventoryItems={(inventoryItems ?? []) as StockItem[]}
+                userId={user.id}
+              />
             </div>
           )
         }}

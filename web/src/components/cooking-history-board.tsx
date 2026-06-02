@@ -1,11 +1,16 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { CookingRecordEditModal } from "@/components/cooking-record-edit-modal";
 import { useShellNavigation } from "@/components/web-mode-shell";
 import { CookingHistoryItem, CookingHistoryPhoto } from "@/lib/cooking-history/types";
+import type { StockItem } from "@/lib/inventory/types";
 
 type CookingHistoryBoardProps = {
   initialHistory: CookingHistoryItem[];
+  initialInventoryItems: StockItem[];
+  userId: string;
 };
 
 type HistoryView = "timeline" | "calendar" | "insights";
@@ -84,7 +89,8 @@ function renderStars(rating: number | null) {
   ));
 }
 
-export function CookingHistoryBoard({ initialHistory }: CookingHistoryBoardProps) {
+export function CookingHistoryBoard({ initialHistory, initialInventoryItems, userId }: CookingHistoryBoardProps) {
+  const router = useRouter();
   const history = initialHistory;
   const [historyView, setHistoryView] = useState<HistoryView>("timeline");
   const [historySearch, setHistorySearch] = useState("");
@@ -96,6 +102,7 @@ export function CookingHistoryBoard({ initialHistory }: CookingHistoryBoardProps
   const today = useMemo(() => new Date(), []);
   const [calendarMonth, setCalendarMonth] = useState(monthKey(today));
   const [selectedDate, setSelectedDate] = useState(localDateKey(today));
+  const [editingItem, setEditingItem] = useState<CookingHistoryItem | null>(null);
   const { requestViewRecipe } = useShellNavigation();
   const visibleHistory = history.filter((item) => {
     const query = historySearch.trim().toLowerCase();
@@ -169,6 +176,11 @@ export function CookingHistoryBoard({ initialHistory }: CookingHistoryBoardProps
     const nextMonth = monthKey(next);
     setCalendarMonth(nextMonth);
     setSelectedDate(`${nextMonth}-01`);
+  }
+
+  function handleSaved() {
+    setEditingItem(null);
+    router.refresh();
   }
 
   return (
@@ -280,7 +292,12 @@ export function CookingHistoryBoard({ initialHistory }: CookingHistoryBoardProps
               <span><i data-kind="rating" />高評価</span>
               <span>予定のみ</span>
             </div>
-            <HistoryDateGroup items={selectedItems} onViewRecipe={requestViewRecipe} title={formatCookingDateLabel(selectedDate)} />
+            <HistoryDateGroup
+              items={selectedItems}
+              onEdit={setEditingItem}
+              onViewRecipe={requestViewRecipe}
+              title={formatCookingDateLabel(selectedDate)}
+            />
           </div>
         ) : historyView === "insights" ? (
           <div className="cooking-insights-view" aria-label="料理履歴振り返り">
@@ -316,6 +333,7 @@ export function CookingHistoryBoard({ initialHistory }: CookingHistoryBoardProps
               <HistoryDateGroup
                 items={groupedHistory[key]}
                 key={key}
+                onEdit={setEditingItem}
                 onViewRecipe={requestViewRecipe}
                 title={formatCookingDateLabel(key)}
               />
@@ -323,6 +341,16 @@ export function CookingHistoryBoard({ initialHistory }: CookingHistoryBoardProps
           </div>
         )}
       </section>
+
+      {editingItem ? (
+        <CookingRecordEditModal
+          inventoryItems={initialInventoryItems}
+          item={editingItem}
+          onClose={() => setEditingItem(null)}
+          onSaved={handleSaved}
+          userId={userId}
+        />
+      ) : null}
     </section>
   );
 }
@@ -338,10 +366,12 @@ function SummaryTile({ compact, label, tone, value }: { compact?: boolean; label
 
 function HistoryDateGroup({
   items,
+  onEdit,
   onViewRecipe,
   title
 }: {
   items: CookingHistoryItem[];
+  onEdit: (item: CookingHistoryItem) => void;
   onViewRecipe: (recipeId: string, origin?: "recipes" | "cooking") => void;
   title: string;
 }) {
@@ -355,6 +385,9 @@ function HistoryDateGroup({
         <div className="history-list">
           {items.map((item) => (
             <article className="history-item" key={item.id}>
+              <button className="history-edit-button" onClick={() => onEdit(item)} type="button">
+                編集
+              </button>
               <HistoryPhoto photos={item.photos} recipeName={displayRecipeName(item.recipe_name)} />
               <div className="history-item-body">
                 <div className="history-item-topline">

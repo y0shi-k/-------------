@@ -1,12 +1,12 @@
 "use client";
 
-import { ChangeEvent, FormEvent, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ChangeEvent, FormEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AiUsageMeter } from "@/components/ai-usage-meter";
 import { DeleteConfirmPanel } from "@/components/delete-confirm-panel";
 import { GeminiApiKeyPanel } from "@/components/gemini-api-key-panel";
 import { ShoppingListSection } from "@/components/shopping-list-section";
-import { getAiUsageSummary, type AiUsageSummary } from "@/lib/ai/usage";
+import { useShellAiUsage } from "@/components/web-mode-shell";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import {
   emptyStockItemFormValues,
@@ -210,21 +210,13 @@ export function InventoryBoard({
   const [activeView, setActiveView] = useState<InventoryView>("inventory");
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
-  const [aiUsage, setAiUsage] = useState<AiUsageSummary | null>(null);
   const photoInputRef = useRef<HTMLInputElement | null>(null);
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
   const router = useRouter();
+  const { aiUsageSummary, refreshAiUsage } = useShellAiUsage();
   const scanLimitReached = Boolean(
-    aiUsage?.ok && (aiUsage.ingredient_scan.remaining <= 0 || aiUsage.total.remaining <= 0)
+    aiUsageSummary?.ok && (aiUsageSummary.ingredient_scan.remaining <= 0 || aiUsageSummary.total.remaining <= 0)
   );
-
-  const refreshAiUsage = useCallback(async () => {
-    setAiUsage(await getAiUsageSummary(supabase));
-  }, [supabase]);
-
-  useEffect(() => {
-    void refreshAiUsage();
-  }, [refreshAiUsage]);
 
   function requestDelete(target: string, message: string, confirm: () => void) {
     setPendingDelete({ target, message, confirm });
@@ -985,7 +977,7 @@ export function InventoryBoard({
 
               <GeminiApiKeyPanel apiKey={geminiApiKey} disabled={isUploadingPhoto} id="ingredient-scan-gemini-api-key" onChange={setGeminiApiKey} />
 
-              <AiUsageMeter summary={aiUsage} feature="ingredient_scan" />
+              <AiUsageMeter summary={aiUsageSummary} feature="ingredient_scan" />
 
               {photoFeedback ? (
                 <p className="operation-message photo-message" data-tone={photoFeedback.tone} role={photoFeedback.tone === "error" ? "alert" : "status"}>

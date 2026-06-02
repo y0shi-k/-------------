@@ -28,6 +28,38 @@ export type CookingHistoryItem = {
   photos: CookingHistoryPhoto[];
 };
 
+export type CookingConsumptionEvent = {
+  id: string;
+  user_id: string;
+  cooking_history_id: string | null;
+  meal_schedule_id: string | null;
+  recipe_id: string | null;
+  ingredient_name: string;
+  requested_amount: number;
+  requested_unit: string;
+  consumed_amount: number;
+  consumed_unit: string;
+  stock_item_id: string | null;
+  stock_item_name: string;
+  substitute_for: string;
+  created_at: string;
+};
+
+export type ConsumptionEditDraft = {
+  id: string;
+  ingredientName: string;
+  requestedAmount: number;
+  requestedUnit: string;
+  originalConsumedAmount: number;
+  consumedUnit: string;
+  originalStockItemId: string;
+  stockItemId: string;
+  stockItemName: string;
+  substituteFor: string;
+  amount: string;
+  selected: boolean;
+};
+
 export type CookingHistoryFormValues = {
   cooked_at: string;
   recipe_name: string;
