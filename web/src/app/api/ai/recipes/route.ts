@@ -4,6 +4,7 @@ import {
   GEMINI_RECIPE_MODEL,
   parseGeminiRecipeResponse
 } from "@/lib/ai/recipe-generation";
+import { consumeAiUsage, refundAiUsage } from "@/lib/ai/usage";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 type RecipeAiRequest = {
@@ -22,8 +23,16 @@ const ERROR_MESSAGES = {
   invalidRequest:
     "原因: AIレシピの入力が空です。影響: レシピ案を作れません。修正方法: 食材やレシピ本文を入力してください。",
   geminiFailed:
-    "原因: Gemini APIのレシピ生成に失敗しました。影響: レシピ案を表示できません。修正方法: 時間を置いて再度お試しください。"
+    "原因: Gemini APIのレシピ生成に失敗しました。影響: レシピ案を表示できません。修正方法: 時間を置いて再度お試しください。",
+  featureLimit:
+    "原因: 本日のAIレシピ生成の上限に達しました。影響: 今日はAIレシピ生成を実行できません。修正方法: 明日再度お試しください。",
+  totalLimit:
+    "原因: 本日のAI利用の合計上限に達しました。影響: 今日はAI機能を実行できません。修正方法: 明日再度お試しください。"
 };
+
+function limitErrorMessage(reason: string | undefined) {
+  return reason === "total_limit" ? ERROR_MESSAGES.totalLimit : ERROR_MESSAGES.featureLimit;
+}
 
 export async function POST(request: Request) {
   const body = (await request.json().catch(() => null)) as RecipeAiRequest | null;
@@ -50,6 +59,12 @@ export async function POST(request: Request) {
     return errorResponse(ERROR_MESSAGES.unauthorized, 401);
   }
 
+  // Gemini送信前に原子的に1回分を予約する。上限超過時はGeminiへ送らない。
+  const reservation = await consumeAiUsage(supabase, "recipe_generation");
+  if (!reservation.ok || !reservation.event_id) {
+    return errorResponse(limitErrorMessage(reservation.reason), 429);
+  }
+
   const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_RECIPE_MODEL}:generateContent`, {
     method: "POST",
     headers: {
@@ -59,10 +74,13 @@ export async function POST(request: Request) {
     body: JSON.stringify(buildGeminiRecipeRequest({ mode, required, optional, sourceText }))
   });
 
+  // 通信失敗（Geminiが処理する前）は予約を返金して当日枠を消費しない。
   if (!geminiResponse.ok) {
+    await refundAiUsage(supabase, reservation.event_id);
     return errorResponse(ERROR_MESSAGES.geminiFailed, 502);
   }
 
+  // ok応答後のparse失敗はGoogle quotaを実際に消費しているため消費したままにする。
   const parsed = parseGeminiRecipeResponse(await geminiResponse.json());
   if (!parsed.ok) {
     return errorResponse(parsed.error, 422);

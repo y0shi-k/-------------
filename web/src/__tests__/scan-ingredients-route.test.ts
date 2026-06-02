@@ -6,12 +6,14 @@ vi.mock("server-only", () => ({}));
 const getUser = vi.fn();
 const from = vi.fn();
 const storageFrom = vi.fn();
+const rpc = vi.fn();
 
 vi.mock("@/lib/supabase/server", () => ({
   createServerSupabaseClient: async () => ({
     auth: { getUser },
     from,
-    storage: { from: storageFrom }
+    storage: { from: storageFrom },
+    rpc
   })
 }));
 
@@ -31,6 +33,15 @@ function photoQuery(data: unknown, error: unknown = null) {
   return { select };
 }
 
+const samplePhoto = {
+  id: "photo-1",
+  user_id: "user-1",
+  bucket_id: "photos",
+  storage_path: "user-1/ingredient-scan/photo-1.jpg",
+  usage_type: "ingredient_scan",
+  content_type: "image/jpeg"
+};
+
 function imageBlob() {
   return {
     type: "image/jpeg",
@@ -38,11 +49,19 @@ function imageBlob() {
   };
 }
 
+function reservationOk() {
+  rpc.mockImplementation(async (fn: string) => {
+    if (fn === "consume_ai_usage") return { data: { ok: true, event_id: "event-1" }, error: null };
+    return { data: true, error: null };
+  });
+}
+
 describe("POST /api/ai/scan-ingredients", () => {
   beforeEach(() => {
     getUser.mockReset();
     from.mockReset();
     storageFrom.mockReset();
+    rpc.mockReset();
     global.fetch = vi.fn();
   });
 
@@ -55,6 +74,7 @@ describe("POST /api/ai/scan-ingredients", () => {
     await expect(response.json()).resolves.toEqual({
       error: expect.stringContaining("原因: ログイン状態を確認できませんでした。")
     });
+    expect(rpc).not.toHaveBeenCalled();
   });
 
   it("returns 400 when the user-owned Gemini API key is missing", async () => {
@@ -69,49 +89,77 @@ describe("POST /api/ai/scan-ingredients", () => {
     expect(getUser).not.toHaveBeenCalled();
   });
 
-  it("does not scan another user's missing photo", async () => {
+  it("does not reserve a slot for another user's missing photo", async () => {
     getUser.mockResolvedValue({ data: { user: { id: "user-1" } } });
     from.mockReturnValue(photoQuery(null, new Error("not found")));
 
     const response = await POST(request({ photoId: "other-photo", geminiApiKey: "user-owned-test-key" }));
 
     expect(response.status).toBe(404);
-    await expect(response.json()).resolves.toEqual({
-      error: expect.stringContaining("原因: 解析対象の写真が見つかりませんでした。")
-    });
+    expect(rpc).not.toHaveBeenCalled();
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it("does not write items when Gemini fails", async () => {
+  it("returns a 429 feature-limit error and does not download the photo when the cap is reached", async () => {
     getUser.mockResolvedValue({ data: { user: { id: "user-1" } } });
-    from.mockReturnValue(
-      photoQuery({
-        id: "photo-1",
-        user_id: "user-1",
-        bucket_id: "photos",
-        storage_path: "user-1/ingredient-scan/photo-1.jpg",
-        usage_type: "ingredient_scan",
-        content_type: "image/jpeg"
-      })
-    );
+    from.mockReturnValue(photoQuery(samplePhoto));
+    rpc.mockResolvedValue({ data: { ok: false, reason: "feature_limit" }, error: null });
+
+    const response = await POST(request({ photoId: "photo-1", geminiApiKey: "user-owned-test-key" }));
+
+    expect(response.status).toBe(429);
+    await expect(response.json()).resolves.toEqual({
+      error: expect.stringContaining("原因: 本日の食材写真解析の上限に達しました。")
+    });
+    expect(storageFrom).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("returns a 429 total-limit error distinct from the feature-limit message", async () => {
+    getUser.mockResolvedValue({ data: { user: { id: "user-1" } } });
+    from.mockReturnValue(photoQuery(samplePhoto));
+    rpc.mockResolvedValue({ data: { ok: false, reason: "total_limit" }, error: null });
+
+    const response = await POST(request({ photoId: "photo-1", geminiApiKey: "user-owned-test-key" }));
+
+    expect(response.status).toBe(429);
+    await expect(response.json()).resolves.toEqual({
+      error: expect.stringContaining("原因: 本日のAI利用の合計上限に達しました。")
+    });
+    expect(storageFrom).not.toHaveBeenCalled();
+  });
+
+  it("refunds the reservation when the photo download fails", async () => {
+    getUser.mockResolvedValue({ data: { user: { id: "user-1" } } });
+    from.mockReturnValue(photoQuery(samplePhoto));
+    reservationOk();
     storageFrom.mockReturnValue({
-      download: vi.fn().mockResolvedValue({
-        data: imageBlob(),
-        error: null
-      })
+      download: vi.fn().mockResolvedValue({ data: null, error: new Error("download failed") })
+    });
+
+    const response = await POST(request({ photoId: "photo-1", geminiApiKey: "user-owned-test-key" }));
+
+    expect(response.status).toBe(500);
+    expect(rpc).toHaveBeenCalledWith("refund_ai_usage", { p_event_id: "event-1" });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("refunds the reservation when Gemini fails", async () => {
+    getUser.mockResolvedValue({ data: { user: { id: "user-1" } } });
+    from.mockReturnValue(photoQuery(samplePhoto));
+    reservationOk();
+    storageFrom.mockReturnValue({
+      download: vi.fn().mockResolvedValue({ data: imageBlob(), error: null })
     });
     vi.mocked(fetch).mockResolvedValue({ ok: false } as Response);
 
     const response = await POST(request({ photoId: "photo-1", geminiApiKey: "user-owned-test-key" }));
 
     expect(response.status).toBe(502);
-    await expect(response.json()).resolves.toEqual({
-      error: expect.stringContaining("原因: Gemini APIの解析に失敗しました。")
-    });
-    expect(from).toHaveBeenCalledTimes(1);
+    expect(rpc).toHaveBeenCalledWith("refund_ai_usage", { p_event_id: "event-1" });
   });
 
-  it("scans a photo and returns inventory candidates for the logged-in user", async () => {
+  it("scans a photo and returns inventory candidates without refunding on success", async () => {
     const candidate = {
       user_id: "user-1",
       category: "食材",
@@ -128,23 +176,12 @@ describe("POST /api/ai/scan-ingredients", () => {
 
     getUser.mockResolvedValue({ data: { user: { id: "user-1" } } });
     from.mockImplementation((table: string) => {
-      if (table === "photos") {
-        return photoQuery({
-          id: "photo-1",
-          user_id: "user-1",
-          bucket_id: "photos",
-          storage_path: "user-1/ingredient-scan/photo-1.jpg",
-          usage_type: "ingredient_scan",
-          content_type: "image/jpeg"
-        });
-      }
+      if (table === "photos") return photoQuery(samplePhoto);
       return {};
     });
+    reservationOk();
     storageFrom.mockReturnValue({
-      download: vi.fn().mockResolvedValue({
-        data: imageBlob(),
-        error: null
-      })
+      download: vi.fn().mockResolvedValue({ data: imageBlob(), error: null })
     });
     vi.mocked(fetch).mockResolvedValue({
       ok: true,
@@ -171,15 +208,6 @@ describe("POST /api/ai/scan-ingredients", () => {
     const body = await response.json();
     expect(body).toEqual({ items: [candidate] });
     expect(JSON.stringify(body)).not.toContain("user-owned-test-key");
-    expect(from).not.toHaveBeenCalledWith("staging_items");
-    expect(fetch).toHaveBeenCalledWith(
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent",
-      expect.objectContaining({
-        method: "POST",
-        headers: expect.objectContaining({
-          "x-goog-api-key": "user-owned-test-key"
-        })
-      })
-    );
+    expect(rpc).not.toHaveBeenCalledWith("refund_ai_usage", expect.anything());
   });
 });

@@ -5,13 +5,14 @@
 > 着手時にここの「次」を見て `/new-ticket` する。完了時に `/finalize` がここを更新する。
 
 ## 現在のフォーカス
-- ハーネス整備（Claude Code移行 + ナレッジ/マクロ層 + ガードレール）。本タスクで一段落。
+- 公開前セキュリティ整備（TKT-0149/0150/0151）が一段落。次は本番Supabase/Vercelへの適用・手動確認。
 
 ## 次にやる候補（優先度つき・要ユーザー確認）
-1. (P1) Web版の実装継続 — 直近チケット（例: TKT-0143 レシピスケジュール）の後続UI調整。
-2. (P2) 画像スキャンからのAI一括登録（参照: phase-map「画像スキャン」, TKT-0003系）。
-3. (P2) ボトムナビゲーション基礎UI（参照: phase-map, TKT-0002系）。
-4. (P3) Canvas版CSV → Supabase 移行（危険変更: `csv_import_migration`）。
+1. (P1) 公開前の本番適用ゲート — Supabase Dashboard Auth設定（TKT-0149）、`ai_usage_events` migration適用（TKT-0151 `supabase db push`）、実DB/実機での手動スモーク。
+2. (P2) 横断リスク対応 — 緩いCSP（`unsafe-inline`/`unsafe-eval`）× localStorageのGeminiキー保存（XSS時の鍵流出）。CSP nonce化 or sessionStorageオプションを別チケットで検討。
+3. (P2) 画像スキャンからのAI一括登録（参照: phase-map「画像スキャン」, TKT-0003系）。
+4. (P3) `ai_usage_events` の古い行の定期削除（保全）。
+5. (P3) Canvas版CSV → Supabase 移行（危険変更: `csv_import_migration`）。
 
 > 上記の並びは仮。実際の優先順位はユーザーが確定する。
 

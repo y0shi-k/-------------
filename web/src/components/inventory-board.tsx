@@ -1,10 +1,12 @@
 "use client";
 
-import { ChangeEvent, FormEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { ChangeEvent, FormEvent, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { AiUsageMeter } from "@/components/ai-usage-meter";
 import { DeleteConfirmPanel } from "@/components/delete-confirm-panel";
 import { GeminiApiKeyPanel } from "@/components/gemini-api-key-panel";
 import { ShoppingListSection } from "@/components/shopping-list-section";
+import { getAiUsageSummary, type AiUsageSummary } from "@/lib/ai/usage";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import {
   emptyStockItemFormValues,
@@ -208,9 +210,21 @@ export function InventoryBoard({
   const [activeView, setActiveView] = useState<InventoryView>("inventory");
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [aiUsage, setAiUsage] = useState<AiUsageSummary | null>(null);
   const photoInputRef = useRef<HTMLInputElement | null>(null);
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
   const router = useRouter();
+  const scanLimitReached = Boolean(
+    aiUsage?.ok && (aiUsage.ingredient_scan.remaining <= 0 || aiUsage.total.remaining <= 0)
+  );
+
+  const refreshAiUsage = useCallback(async () => {
+    setAiUsage(await getAiUsageSummary(supabase));
+  }, [supabase]);
+
+  useEffect(() => {
+    void refreshAiUsage();
+  }, [refreshAiUsage]);
 
   function requestDelete(target: string, message: string, confirm: () => void) {
     setPendingDelete({ target, message, confirm });
@@ -475,6 +489,14 @@ export function InventoryBoard({
       return;
     }
 
+    if (scanLimitReached) {
+      setPhotoFeedback({
+        tone: "error",
+        message: "原因: 本日の食材写真解析の上限に達しました。影響: 今日は食材写真解析を実行できません。修正方法: 明日再度お試しください。"
+      });
+      return;
+    }
+
     setIsUploadingPhoto(true);
     setPhotoFeedback(null);
 
@@ -528,6 +550,9 @@ export function InventoryBoard({
         body: JSON.stringify({ photoId: photo.id, geminiApiKey: trimmedApiKey })
       });
       const scanResult = (await scanResponse.json().catch(() => ({}))) as ScanIngredientsResponse;
+
+      // 成功・429いずれの場合も残り回数表示を更新する。
+      void refreshAiUsage();
 
       if (!scanResponse.ok || scanResult.error || !scanResult.items) {
         setPhotoFeedback({
@@ -960,6 +985,8 @@ export function InventoryBoard({
 
               <GeminiApiKeyPanel apiKey={geminiApiKey} disabled={isUploadingPhoto} id="ingredient-scan-gemini-api-key" onChange={setGeminiApiKey} />
 
+              <AiUsageMeter summary={aiUsage} feature="ingredient_scan" />
+
               {photoFeedback ? (
                 <p className="operation-message photo-message" data-tone={photoFeedback.tone} role={photoFeedback.tone === "error" ? "alert" : "status"}>
                   {photoFeedback.message}
@@ -967,7 +994,7 @@ export function InventoryBoard({
               ) : null}
 
               <div className="photo-actions">
-                <button className="primary-button" type="button" disabled={!selectedPhoto || isUploadingPhoto || isSaving} onClick={scanPhoto}>
+                <button className="primary-button" type="button" disabled={!selectedPhoto || isUploadingPhoto || isSaving || scanLimitReached} onClick={scanPhoto}>
                   {isUploadingPhoto ? "解析中" : "AI解析する"}
                 </button>
                 <button className="secondary-button" type="button" disabled={!selectedPhoto || isUploadingPhoto} onClick={resetPhoto}>

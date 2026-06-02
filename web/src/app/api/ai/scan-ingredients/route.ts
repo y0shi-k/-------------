@@ -5,6 +5,7 @@ import {
   parseGeminiIngredientResponse,
   toInventoryInsert
 } from "@/lib/ai/ingredient-scan";
+import { consumeAiUsage, refundAiUsage } from "@/lib/ai/usage";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 type ScanRequest = {
@@ -33,8 +34,16 @@ const ERROR_MESSAGES = {
   downloadFailed:
     "原因: 非公開Storageから写真を読み出せませんでした。影響: AI解析を実行できません。修正方法: ログイン状態と写真の保存状態を確認してください。",
   geminiFailed:
-    "原因: Gemini APIの解析に失敗しました。影響: 食材候補を作成できません。修正方法: 時間を置いて再度解析してください。"
+    "原因: Gemini APIの解析に失敗しました。影響: 食材候補を作成できません。修正方法: 時間を置いて再度解析してください。",
+  featureLimit:
+    "原因: 本日の食材写真解析の上限に達しました。影響: 今日は食材写真解析を実行できません。修正方法: 明日再度お試しください。",
+  totalLimit:
+    "原因: 本日のAI利用の合計上限に達しました。影響: 今日はAI機能を実行できません。修正方法: 明日再度お試しください。"
 };
+
+function limitErrorMessage(reason: string | undefined) {
+  return reason === "total_limit" ? ERROR_MESSAGES.totalLimit : ERROR_MESSAGES.featureLimit;
+}
 
 export async function POST(request: Request) {
   const body = (await request.json().catch(() => null)) as ScanRequest | null;
@@ -70,12 +79,21 @@ export async function POST(request: Request) {
     return errorResponse(ERROR_MESSAGES.photoNotFound, 404);
   }
 
+  // Gemini送信前（写真ダウンロード前）に原子的に1回分を予約する。超過時はStorage I/Oを行わない。
+  const reservation = await consumeAiUsage(supabase, "ingredient_scan");
+  if (!reservation.ok || !reservation.event_id) {
+    return errorResponse(limitErrorMessage(reservation.reason), 429);
+  }
+
+  const eventId = reservation.event_id;
   const metadata = photo as PhotoMetadata;
   const { data: file, error: downloadError } = await supabase.storage
     .from(metadata.bucket_id)
     .download(metadata.storage_path);
 
+  // 写真取得失敗時は予約を返金して当日枠を消費しない。
   if (downloadError || !file) {
+    await refundAiUsage(supabase, eventId);
     return errorResponse(ERROR_MESSAGES.downloadFailed, 500);
   }
 
@@ -93,10 +111,13 @@ export async function POST(request: Request) {
     }
   );
 
+  // 通信失敗（Geminiが処理する前）は予約を返金して当日枠を消費しない。
   if (!geminiResponse.ok) {
+    await refundAiUsage(supabase, eventId);
     return errorResponse(ERROR_MESSAGES.geminiFailed, 502);
   }
 
+  // ok応答後のparse失敗はGoogle quotaを実際に消費しているため消費したままにする。
   const parsed = parseGeminiIngredientResponse(await geminiResponse.json());
   if (!parsed.ok) {
     return errorResponse(parsed.error, 422);

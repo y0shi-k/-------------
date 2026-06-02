@@ -2,9 +2,11 @@
 
 import { type ChangeEvent, FormEvent, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { AiUsageMeter } from "@/components/ai-usage-meter";
 import { DeleteConfirmPanel } from "@/components/delete-confirm-panel";
 import { GeminiApiKeyPanel } from "@/components/gemini-api-key-panel";
 import { useShellNavigation, useShellStatusMessage } from "@/components/web-mode-shell";
+import { getAiUsageSummary, type AiUsageSummary } from "@/lib/ai/usage";
 import type { StockItem } from "@/lib/inventory/types";
 import {
   CookCandidate,
@@ -273,6 +275,7 @@ export function RecipeMealWorkspace({
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isAiRunning, setIsAiRunning] = useState(false);
+  const [aiUsage, setAiUsage] = useState<AiUsageSummary | null>(null);
   const [activeView, setActiveView] = useState<RecipeWorkspaceView>("recipes");
   const [isTextImportOpen, setIsTextImportOpen] = useState(false);
   const [isAiMenuOpen, setIsAiMenuOpen] = useState(false);
@@ -292,6 +295,17 @@ export function RecipeMealWorkspace({
   const { clearPendingRecipe, pendingRecipeId, pendingRecipeOrigin, returnToMode } = useShellNavigation();
   const { showStatusMessage } = useShellStatusMessage();
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
+  const recipeLimitReached = Boolean(
+    aiUsage?.ok && (aiUsage.recipe_generation.remaining <= 0 || aiUsage.total.remaining <= 0)
+  );
+
+  const refreshAiUsage = useCallback(async () => {
+    setAiUsage(await getAiUsageSummary(supabase));
+  }, [supabase]);
+
+  useEffect(() => {
+    void refreshAiUsage();
+  }, [refreshAiUsage]);
 
   const selectedRecipe = recipes.find((recipe) => recipe.id === selectedRecipeId) ?? recipes[0] ?? null;
   const activeCookingRecipe = recipes.find((recipe) => recipe.id === activeCookingRecipeId) ?? null;
@@ -417,6 +431,14 @@ export function RecipeMealWorkspace({
       return null;
     }
 
+    if (recipeLimitReached) {
+      setFeedback({
+        tone: "error",
+        message: "原因: 本日のAIレシピ生成の上限に達しました。影響: 今日はAIレシピ生成を実行できません。修正方法: 明日再度お試しください。"
+      });
+      return null;
+    }
+
     setIsAiRunning(true);
     setFeedback(null);
 
@@ -453,6 +475,8 @@ export function RecipeMealWorkspace({
       return null;
     } finally {
       setIsAiRunning(false);
+      // 成功・429いずれの場合も残り回数表示を更新する。
+      void refreshAiUsage();
     }
   }
 
@@ -1475,11 +1499,12 @@ export function RecipeMealWorkspace({
             <p className="eyebrow">ADD RECIPE FROM TEXT</p>
             <h3 id="recipe-text-modal-heading">テキストからレシピを追加</h3>
             <GeminiApiKeyPanel apiKey={geminiApiKey} disabled={isAiRunning} id="recipe-text-gemini-api-key" onChange={setGeminiApiKey} />
+            <AiUsageMeter summary={aiUsage} feature="recipe_generation" />
             <label>
               レシピテキスト
               <textarea rows={8} value={aiSourceText} onChange={(event) => setAiSourceText(event.target.value)} placeholder="Webやメモからコピーしたレシピテキストをここに貼り付けてください..." />
             </label>
-            <button className="primary-button" type="button" disabled={isAiRunning} onClick={structureRecipeText}>
+            <button className="primary-button" type="button" disabled={isAiRunning || recipeLimitReached} onClick={structureRecipeText}>
               {isAiRunning ? "AIで構造化中" : "AIで構造化"}
             </button>
           </section>
@@ -1493,8 +1518,9 @@ export function RecipeMealWorkspace({
             <p className="eyebrow">ADD RECIPE WITH AI</p>
             <h3 id="ai-menu-modal-heading">AI考案で追加</h3>
             <GeminiApiKeyPanel apiKey={geminiApiKey} disabled={isAiRunning} id="recipe-menu-gemini-api-key" onChange={setGeminiApiKey} />
+            <AiUsageMeter summary={aiUsage} feature="recipe_generation" />
             <div className="ai-choice-grid">
-              <button className="ai-choice-card danger-choice" type="button" disabled={isAiRunning} onClick={generatePriorityRecipe}>
+              <button className="ai-choice-card danger-choice" type="button" disabled={isAiRunning || recipeLimitReached} onClick={generatePriorityRecipe}>
                 <span>優先消費レシピ</span>
                 <small>期限が近い食材から考案</small>
               </button>
@@ -1511,7 +1537,7 @@ export function RecipeMealWorkspace({
               任意食材
               <textarea rows={2} value={aiOptional} onChange={(event) => setAiOptional(event.target.value)} placeholder="例: にんじん, しょうが" />
             </label>
-            <button className="primary-button" type="button" disabled={isAiRunning} onClick={generateFromIngredients}>
+            <button className="primary-button" type="button" disabled={isAiRunning || recipeLimitReached} onClick={generateFromIngredients}>
               {isAiRunning ? "考案中" : "指定食材で考案"}
             </button>
           </section>
@@ -1838,6 +1864,7 @@ export function RecipeMealWorkspace({
               </div>
             </div>
             <GeminiApiKeyPanel apiKey={geminiApiKey} disabled={isAiRunning} id="inline-recipe-gemini-api-key" onChange={setGeminiApiKey} />
+            <AiUsageMeter summary={aiUsage} feature="recipe_generation" />
             <div className="ai-mode-row">
               <button className="secondary-button compact-button" data-active={aiMode === "generate"} type="button" onClick={() => setAiMode("generate")}>
                 食材から考案
@@ -1858,7 +1885,7 @@ export function RecipeMealWorkspace({
               レシピ本文・補足
               <textarea rows={4} value={aiSourceText} onChange={(event) => setAiSourceText(event.target.value)} placeholder="貼り付けたレシピ本文や希望を書く" />
             </label>
-            <button className="primary-button" type="button" disabled={isAiRunning} onClick={runInlineAiRecipe}>
+            <button className="primary-button" type="button" disabled={isAiRunning || recipeLimitReached} onClick={runInlineAiRecipe}>
               {isAiRunning ? "AI実行中" : "AIレシピを編集モーダルで開く"}
             </button>
           </section>

@@ -5,6 +5,7 @@ import type { StockItem } from "@/lib/inventory/types";
 import type { CookCandidate, MealSchedule, Recipe, RecipeIngredient } from "@/lib/recipes/types";
 
 const from = vi.fn();
+const rpc = vi.fn();
 const refresh = vi.fn();
 const shellMocks = vi.hoisted(() => ({
   clearPendingRecipe: vi.fn(),
@@ -16,7 +17,8 @@ const shellMocks = vi.hoisted(() => ({
 
 vi.mock("@/lib/supabase/browser", () => ({
   createBrowserSupabaseClient: () => ({
-    from
+    from,
+    rpc
   })
 }));
 
@@ -172,6 +174,8 @@ describe("RecipeMealWorkspace", () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date("2026-05-28T12:00:00"));
     from.mockReset();
+    rpc.mockReset();
+    rpc.mockResolvedValue({ data: { ok: false }, error: null });
     refresh.mockReset();
     shellMocks.clearPendingRecipe.mockReset();
     shellMocks.pendingRecipeId = null;
@@ -404,6 +408,28 @@ describe("RecipeMealWorkspace", () => {
     fireEvent.click(screen.getByRole("button", { name: "AIレシピを編集モーダルで開く" }));
 
     expect(await screen.findByText(/原因: ユーザー自身のGemini APIキーが未入力です。/)).toBeTruthy();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("disables the AI recipe button and shows remaining counts when the recipe limit is reached", async () => {
+    rpc.mockResolvedValue({
+      data: {
+        ok: true,
+        recipe_generation: { used: 20, limit: 20, remaining: 0 },
+        ingredient_scan: { used: 2, limit: 10, remaining: 8 },
+        total: { used: 22, limit: 30, remaining: 8 }
+      },
+      error: null
+    });
+    renderWorkspace();
+
+    expect(await screen.findByText("レシピ 0/20")).toBeTruthy();
+    await waitFor(() => {
+      expect(
+        (screen.getByRole("button", { name: "AIレシピを編集モーダルで開く" }) as HTMLButtonElement).disabled
+      ).toBe(true);
+    });
+    expect(screen.getAllByText(/AIレシピ生成の上限に達しました/).length).toBeGreaterThan(0);
     expect(fetch).not.toHaveBeenCalled();
   });
 

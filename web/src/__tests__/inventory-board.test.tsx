@@ -6,6 +6,7 @@ import type { ShoppingItem } from "@/lib/recipes/types";
 
 const from = vi.fn();
 const storageFrom = vi.fn();
+const rpc = vi.fn();
 const compressImageFile = vi.fn();
 const buildPhotoStoragePath = vi.fn();
 const refresh = vi.fn();
@@ -21,7 +22,8 @@ vi.mock("@/lib/supabase/browser", () => ({
     from,
     storage: {
       from: storageFrom
-    }
+    },
+    rpc
   })
 }));
 
@@ -117,6 +119,8 @@ describe("InventoryBoard", () => {
   beforeEach(() => {
     from.mockReset();
     storageFrom.mockReset();
+    rpc.mockReset();
+    rpc.mockResolvedValue({ data: { ok: false }, error: null });
     compressImageFile.mockReset();
     buildPhotoStoragePath.mockReset();
     buildPhotoStoragePath.mockReturnValue("user-1/ingredient-scan/photo-1.jpg");
@@ -301,6 +305,30 @@ describe("InventoryBoard", () => {
 
     expect(screen.queryByAltText("選択した食材写真のプレビュー")).toBeNull();
     expect(screen.getByText("写真は非公開で保存し、入力したGemini APIキーでAI解析します。APIキーはDBに保存しません。")).toBeTruthy();
+  });
+
+  it("disables the AI scan button when the daily scan limit is reached", async () => {
+    rpc.mockResolvedValue({
+      data: {
+        ok: true,
+        recipe_generation: { used: 5, limit: 20, remaining: 15 },
+        ingredient_scan: { used: 10, limit: 10, remaining: 0 },
+        total: { used: 15, limit: 30, remaining: 15 }
+      },
+      error: null
+    });
+    renderBoard();
+    openPhotoScan();
+
+    expect(await screen.findByText("写真 0/10")).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("写真を撮る"), {
+      target: { files: [new File(["photo"], "ingredient.jpg", { type: "image/jpeg" })] }
+    });
+
+    await waitFor(() => {
+      expect((screen.getByRole("button", { name: "AI解析する" }) as HTMLButtonElement).disabled).toBe(true);
+    });
+    expect(screen.getByText(/食材写真解析の上限に達しました/)).toBeTruthy();
   });
 
   it("requires a user-owned Gemini API key before scanning a photo", async () => {

@@ -1599,6 +1599,53 @@ h1 {
   line-height: 1.5;
 }
 
+.ai-usage-meter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.ai-usage-meter-label {
+  color: #475569;
+  font-size: 0.74rem;
+  font-weight: 800;
+}
+
+.ai-usage-badge {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  background: #f8fafc;
+  padding: 2px 8px;
+  color: #334155;
+  font-size: 0.74rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.ai-usage-badge-total {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.ai-usage-badge[data-empty="true"] {
+  border-color: #fca5a5;
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.ai-usage-meter-note {
+  flex-basis: 100%;
+  margin: 0;
+  color: #b91c1c;
+  font-size: 0.74rem;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
 .panel-title {
   display: flex;
   gap: 12px;
