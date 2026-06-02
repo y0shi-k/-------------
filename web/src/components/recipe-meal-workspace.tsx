@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { AiUsageMeter } from "@/components/ai-usage-meter";
 import { DeleteConfirmPanel } from "@/components/delete-confirm-panel";
 import { GeminiApiKeyPanel } from "@/components/gemini-api-key-panel";
+import { NumberField } from "@/components/number-field";
 import { UnitPicker } from "@/components/unit-picker";
 import { useShellAiUsage, useShellNavigation, useShellStatusMessage } from "@/components/web-mode-shell";
 import type { StockItem } from "@/lib/inventory/types";
@@ -1572,15 +1573,12 @@ export function RecipeMealWorkspace({
                   <div className="ingredient-row canvas-recipe-item-row" key={`food-${index}-${ingredient.name}`}>
                     <span className="recipe-row-handle" aria-hidden="true">=</span>
                     <input aria-label="品名" value={ingredient.name} onChange={(event) => updateIngredient(index, { name: event.target.value, item_type: "食材" })} placeholder="品名" />
-                    <input
-                      aria-label="数量"
-                      inputMode="decimal"
-                      min="0"
-                      step="any"
-                      type="number"
-                      value={ingredient.amount}
-                      onChange={(event) => updateIngredient(index, { amount: event.target.value, item_type: "食材" })}
+                    <NumberField
+                      ariaLabel="数量"
                       placeholder="数量"
+                      showSteppers={false}
+                      value={ingredient.amount}
+                      onChange={(next) => updateIngredient(index, { amount: next, item_type: "食材" })}
                     />
                     <UnitPicker value={ingredient.unit} onSelect={(unit) => updateIngredient(index, { unit, item_type: "食材" })} />
                     <button className="danger-button compact-button" type="button" onClick={() => removeIngredientRow(index)} aria-label="材料を削除">
@@ -1601,15 +1599,12 @@ export function RecipeMealWorkspace({
                   <div className="ingredient-row canvas-recipe-item-row" key={`seasoning-${index}-${ingredient.name}`}>
                     <span className="recipe-row-handle" aria-hidden="true">=</span>
                     <input aria-label="品名" value={ingredient.name} onChange={(event) => updateIngredient(index, { name: event.target.value, item_type: "調味料" })} placeholder="調味料名" />
-                    <input
-                      aria-label="数量"
-                      inputMode="decimal"
-                      min="0"
-                      step="any"
-                      type="number"
-                      value={ingredient.amount}
-                      onChange={(event) => updateIngredient(index, { amount: event.target.value, item_type: "調味料" })}
+                    <NumberField
+                      ariaLabel="数量"
                       placeholder="数量"
+                      showSteppers={false}
+                      value={ingredient.amount}
+                      onChange={(next) => updateIngredient(index, { amount: next, item_type: "調味料" })}
                     />
                     <UnitPicker value={ingredient.unit} onSelect={(unit) => updateIngredient(index, { unit, item_type: "調味料" })} />
                     <button className="danger-button compact-button" type="button" onClick={() => removeIngredientRow(index)} aria-label="調味料を削除">

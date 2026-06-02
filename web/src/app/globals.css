@@ -5192,6 +5192,53 @@ h1 {
 }
 
 /* 6. 数量・単位 横並び（Canvas版と同じく同じlabel下） */
+/* 数量入力（NumberField）: type=text + 全角→半角正規化 + 1刻みスピン矢印 */
+.number-field {
+  display: inline-flex;
+  align-items: stretch;
+  gap: 4px;
+  width: 100%;
+}
+
+.number-field-input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.number-field-steppers {
+  flex: 0 0 22px;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  background: #f1f5f9;
+}
+
+.number-field-step {
+  flex: 1 1 50%;
+  display: grid;
+  place-items: center;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: #64748b;
+  font-size: 8px;
+  line-height: 1;
+}
+
+.number-field-step:hover {
+  background: #e2e8f0;
+}
+
+.number-field-step:active {
+  background: #cbd5e1;
+}
+
+.number-field-step + .number-field-step {
+  border-top: 1px solid var(--line);
+}
+
 .qty-unit-wrap {
   display: flex;
   flex-wrap: nowrap;
@@ -5199,8 +5246,11 @@ h1 {
   gap: 8px;
 }
 
-.qty-unit-wrap input[type="number"] {
+.qty-unit-wrap .number-field {
   flex: 0 0 7rem;
+}
+
+.qty-unit-wrap .number-field-input {
   border-radius: 12px;
 }
 
@@ -5282,7 +5332,7 @@ h1 {
     grid-template-columns: minmax(78px, auto) auto minmax(80px, 0.8fr) minmax(104px, 1.2fr);
   }
 
-  .inventory-editor-modal .qty-unit-wrap input[type="number"] {
+  .inventory-editor-modal .qty-unit-wrap .number-field {
     flex-basis: 6rem;
   }
 

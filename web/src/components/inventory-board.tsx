@@ -6,6 +6,7 @@ import { AiUsageMeter } from "@/components/ai-usage-meter";
 import { DeleteConfirmPanel } from "@/components/delete-confirm-panel";
 import { GeminiApiKeyPanel } from "@/components/gemini-api-key-panel";
 import { ShoppingListSection } from "@/components/shopping-list-section";
+import { NumberField } from "@/components/number-field";
 import { UnitPicker } from "@/components/unit-picker";
 import { useShellAiUsage } from "@/components/web-mode-shell";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
@@ -845,15 +846,7 @@ export function InventoryBoard({
               <label>
                 数量・単位
                 <div className="qty-unit-wrap">
-                  <input
-                    aria-label="数量"
-                    inputMode="decimal"
-                    min="0"
-                    step="any"
-                    type="number"
-                    value={values.quantity}
-                    onChange={(event) => updateValue("quantity", event.target.value)}
-                  />
+                  <NumberField ariaLabel="数量" value={values.quantity} onChange={(next) => updateValue("quantity", next)} />
                   <UnitPicker value={values.unit} onSelect={(unit) => updateValue("unit", unit)} />
                 </div>
               </label>
@@ -867,15 +860,11 @@ export function InventoryBoard({
               <div className="conversion-row">
                 <span className="conversion-from-label">1{values.unit || "—"}</span>
                 <span className="conversion-equals">=</span>
-                <input
-                  aria-label="換算先数量"
-                  inputMode="decimal"
-                  min="0"
-                  step="any"
-                  type="number"
-                  value={values.conversion_to_qty}
-                  onChange={(event) => updateValue("conversion_to_qty", event.target.value)}
+                <NumberField
+                  ariaLabel="換算先数量"
                   placeholder="1000"
+                  value={values.conversion_to_qty}
+                  onChange={(next) => updateValue("conversion_to_qty", next)}
                 />
                 <UnitPicker value={values.conversion_to_unit} onSelect={(unit) => updateValue("conversion_to_unit", unit)} ariaLabel="換算先単位" />
               </div>
@@ -1036,15 +1025,11 @@ export function InventoryBoard({
               onChange={(event) => updateShoppingValue("name", event.target.value)}
               placeholder="買うもの"
             />
-            <input
-              aria-label="買い物の数量"
-              inputMode="decimal"
-              min="0"
-              step="any"
-              type="number"
-              value={shoppingValues.required_quantity}
-              onChange={(event) => updateShoppingValue("required_quantity", event.target.value)}
+            <NumberField
+              ariaLabel="買い物の数量"
               placeholder="1"
+              value={shoppingValues.required_quantity}
+              onChange={(next) => updateShoppingValue("required_quantity", next)}
             />
             <UnitPicker value={shoppingValues.unit} onSelect={(unit) => updateShoppingValue("unit", unit)} ariaLabel="買い物の単位" />
             <button className="primary-button compact-button" type="submit" disabled={isSaving}>
