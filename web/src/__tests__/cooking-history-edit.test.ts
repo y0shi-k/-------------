@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { applyAdjustmentsToQuantities, buildEditDrafts, computeInventoryAdjustments } from "@/lib/cooking-history/edit";
+import { applyAdjustmentsToQuantities, buildDraftsFromRecipeIngredients, buildEditDrafts, computeInventoryAdjustments } from "@/lib/cooking-history/edit";
 import type { CookingConsumptionEvent } from "@/lib/cooking-history/types";
 import type { StockItem } from "@/lib/inventory/types";
+import type { RecipeIngredient } from "@/lib/recipes/types";
 
 const baseEvent: CookingConsumptionEvent = {
   id: "event-1",
@@ -33,6 +34,19 @@ const baseStockItem: StockItem = {
   storage_location: "冷蔵庫",
   status_note: "",
   source: "manual",
+  created_at: "2026-06-01T00:00:00.000Z",
+  updated_at: "2026-06-01T00:00:00.000Z"
+};
+
+const baseIngredient: RecipeIngredient = {
+  id: "ingredient-1",
+  user_id: "user-1",
+  recipe_id: "recipe-1",
+  item_type: "食材",
+  name: "牛肉パック",
+  amount: 200,
+  unit: "g",
+  sort_order: 1,
   created_at: "2026-06-01T00:00:00.000Z",
   updated_at: "2026-06-01T00:00:00.000Z"
 };
@@ -96,5 +110,24 @@ describe("cooking history edit helpers", () => {
       { id: "stock-a", missing: false, previousQuantity: 20, nextQuantity: 0 },
       { id: "deleted-stock", missing: true, previousQuantity: 0, nextQuantity: 0 }
     ]);
+  });
+
+  it("rebuilds new editable drafts from recipe ingredients when no consumption events exist", () => {
+    const [draft] = buildDraftsFromRecipeIngredients([baseIngredient], [{ ...baseStockItem, quantity: 150 }]);
+
+    expect(draft).toEqual(
+      expect.objectContaining({
+        id: "new-ingredient-1",
+        isNew: true,
+        ingredientName: "牛肉パック",
+        requestedAmount: 200,
+        originalConsumedAmount: 0,
+        originalStockItemId: "",
+        stockItemId: "stock-a",
+        amount: "150",
+        selected: true
+      })
+    );
+    expect(computeInventoryAdjustments([draft])).toEqual([{ stockItemId: "stock-a", deltaQuantity: -150 }]);
   });
 });

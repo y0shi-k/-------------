@@ -1,9 +1,10 @@
 "use client";
 
 import { ChangeEvent, useEffect, useMemo, useState } from "react";
-import { applyAdjustmentsToQuantities, buildEditDrafts, computeInventoryAdjustments } from "@/lib/cooking-history/edit";
+import { applyAdjustmentsToQuantities, buildDraftsFromRecipeIngredients, buildEditDrafts, computeInventoryAdjustments } from "@/lib/cooking-history/edit";
 import type { ConsumptionEditDraft, CookingConsumptionEvent, CookingHistoryItem, CookingHistoryPhoto } from "@/lib/cooking-history/types";
 import type { StockItem } from "@/lib/inventory/types";
+import type { RecipeIngredient } from "@/lib/recipes/types";
 import { buildCookingHistoryPhotoStoragePath, compressImageFile } from "@/lib/photos/compress";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 
@@ -11,6 +12,8 @@ type Feedback = {
   message: string;
   tone: "error" | "info" | "success";
 };
+
+type ConsumptionTab = "all" | "食材" | "調味料";
 
 type CookingRecordEditModalProps = {
   inventoryItems: StockItem[];
@@ -30,6 +33,8 @@ export function CookingRecordEditModal({ inventoryItems, item, onClose, onSaved,
   const [rating, setRating] = useState(item.rating ? String(item.rating) : "");
   const [deletedPhotoIds, setDeletedPhotoIds] = useState<string[]>([]);
   const [newPhotos, setNewPhotos] = useState<File[]>([]);
+  const [consumptionTab, setConsumptionTab] = useState<ConsumptionTab>("all");
+  const [isRebuiltFromRecipe, setIsRebuiltFromRecipe] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -55,7 +60,33 @@ export function CookingRecordEditModal({ inventoryItems, item, onClose, onSaved,
         return;
       }
 
-      setDrafts(buildEditDrafts((data ?? []) as CookingConsumptionEvent[]));
+      const events = (data ?? []) as CookingConsumptionEvent[];
+      if (events.length > 0 || !item.recipe_id) {
+        setIsRebuiltFromRecipe(false);
+        setDrafts(buildEditDrafts(events));
+        return;
+      }
+
+      const { data: ingredients, error: ingredientsError } = await supabase
+        .from("recipe_ingredients")
+        .select("*")
+        .eq("user_id", userId)
+        .eq("recipe_id", item.recipe_id)
+        .order("sort_order", { ascending: true });
+
+      if (!mounted) return;
+
+      if (ingredientsError) {
+        setFeedback({
+          tone: "error",
+          message: "原因: レシピ材料を読み込めませんでした。影響: 消費量の入力欄を復元できません。修正方法: ログイン状態とレシピデータを確認してください。"
+        });
+        setDrafts([]);
+        return;
+      }
+
+      setIsRebuiltFromRecipe(true);
+      setDrafts(buildDraftsFromRecipeIngredients((ingredients ?? []) as RecipeIngredient[], inventoryItems));
     }
 
     loadConsumptionEvents();
@@ -63,10 +94,20 @@ export function CookingRecordEditModal({ inventoryItems, item, onClose, onSaved,
     return () => {
       mounted = false;
     };
-  }, [item.id, supabase, userId]);
+  }, [inventoryItems, item.id, item.recipe_id, supabase, userId]);
 
   function updateDraft(index: number, values: Partial<ConsumptionEditDraft>) {
     setDrafts((current) => current.map((draft, draftIndex) => (draftIndex === index ? { ...draft, ...values } : draft)));
+  }
+
+  function setVisibleConsumptionSelected(selected: boolean) {
+    setDrafts((current) =>
+      current.map((draft) => {
+        const stockItem = inventoryItems.find((item) => item.id === draft.stockItemId);
+        const category = stockItem?.category ?? "食材";
+        return consumptionTab === "all" || consumptionTab === category ? { ...draft, selected } : draft;
+      })
+    );
   }
 
   function toggleDeletedPhoto(photoId: string) {
@@ -120,6 +161,7 @@ export function CookingRecordEditModal({ inventoryItems, item, onClose, onSaved,
 
     for (const draft of normalizedDrafts) {
       if (!draft.selected) {
+        if (draft.isNew) continue;
         const { error } = await supabase.from("cooking_consumption_events").delete().eq("id", draft.id).eq("user_id", userId);
         if (error) {
           setIsSaving(false);
@@ -131,6 +173,30 @@ export function CookingRecordEditModal({ inventoryItems, item, onClose, onSaved,
 
       const stockItem = inventoryItems.find((entry) => entry.id === draft.stockItemId);
       const stockItemName = stockItem?.name ?? draft.stockItemName;
+      if (draft.isNew) {
+        const { error } = await supabase.from("cooking_consumption_events").insert({
+          user_id: userId,
+          cooking_history_id: item.id,
+          meal_schedule_id: item.meal_schedule_id,
+          recipe_id: item.recipe_id,
+          ingredient_name: draft.ingredientName,
+          requested_amount: Number.isFinite(draft.requestedAmount) ? Math.max(0, draft.requestedAmount) : 0,
+          requested_unit: draft.requestedUnit,
+          consumed_amount: Math.max(0, draft.consumedAmount),
+          consumed_unit: draft.consumedUnit || draft.requestedUnit,
+          stock_item_id: draft.stockItemId || null,
+          stock_item_name: stockItemName,
+          substitute_for: stockItemName && stockItemName !== draft.ingredientName ? draft.ingredientName : ""
+        });
+
+        if (error) {
+          setIsSaving(false);
+          setFeedback({ tone: "error", message: "原因: 新しい消費明細を保存できませんでした。影響: 在庫だけ更新済みの可能性があります。修正方法: 画面を再読み込みし、必要なら再編集してください。" });
+          return;
+        }
+        continue;
+      }
+
       const { error } = await supabase
         .from("cooking_consumption_events")
         .update({
@@ -231,17 +297,23 @@ export function CookingRecordEditModal({ inventoryItems, item, onClose, onSaved,
   }
 
   return (
-    <div className="modal-backdrop consumption-backdrop" role="presentation">
-      <section aria-label="料理記録を編集" aria-modal="true" className="canvas-modal consumption-modal cooking-record-edit-modal" role="dialog">
-        <div className="modal-heading">
-          <div>
-            <span>料理履歴</span>
-            <h3>料理記録を編集</h3>
-          </div>
-          <button aria-label="閉じる" className="icon-button" disabled={isSaving} onClick={onClose} type="button">
-            ×
-          </button>
-        </div>
+    <div className="modal-backdrop consumption-backdrop" role="dialog" aria-modal="true" aria-labelledby="consumption-edit-heading">
+      <section className="canvas-modal consumption-modal cooking-record-edit-modal">
+        <button
+          className="modal-close-button"
+          type="button"
+          onClick={onClose}
+          aria-label="閉じる"
+          disabled={isSaving}
+        >
+          ×
+        </button>
+        <h3 id="consumption-edit-heading">実際の消費量を調整</h3>
+        <p className="consumption-edit-note">
+          {isRebuiltFromRecipe
+            ? "前回の消費量明細がないため、レシピ材料から調理完了時と同じ入力欄を復元しています。"
+            : "履歴を編集しています。前回確定した消費量が入った状態で開いています。"}
+        </p>
 
         {feedback ? (
           <div className="inline-feedback" data-tone={feedback.tone} role="status">
@@ -252,54 +324,76 @@ export function CookingRecordEditModal({ inventoryItems, item, onClose, onSaved,
         {isLoading ? (
           <p className="empty-list">消費量を読み込んでいます...</p>
         ) : (
-          <ConsumptionEditList drafts={drafts} inventoryItems={inventoryItems} onChange={updateDraft} />
+          <ConsumptionEditList
+            drafts={drafts}
+            inventoryItems={inventoryItems}
+            onChange={updateDraft}
+            onSelectVisible={setVisibleConsumptionSelected}
+            onTabChange={setConsumptionTab}
+            tab={consumptionTab}
+          />
         )}
 
-        <section className="cooking-record-panel" aria-label="写真・評価・コメント">
+        <section className="cooking-record-panel" aria-label="料理記録">
           <div className="panel-title compact-title">
             <div>
-              <span>記録</span>
+              <span>料理記録</span>
               <h4>写真・評価・コメント</h4>
             </div>
           </div>
 
           <ExistingPhotoList deletedPhotoIds={deletedPhotoIds} photos={item.photos} onToggleDeleted={toggleDeletedPhoto} />
 
-          <label className="cooking-photo-picker">
-            新しい写真を追加
-            <input accept="image/*" capture="environment" multiple onChange={handleNewPhotosChange} type="file" />
-          </label>
+          <div className="cooking-photo-picker">
+            <label className="photo-file-button">
+              完成写真を撮る / 選ぶ
+              <input accept="image/*" capture="environment" disabled={isSaving} multiple onChange={handleNewPhotosChange} type="file" />
+            </label>
+            {item.photos.length === 0 && newPhotos.length === 0 ? <p className="photo-empty">写真なしでも完了できます。</p> : null}
+          </div>
           {newPhotos.length ? (
             <div className="new-photo-list">
               {newPhotos.map((photo, index) => (
-                <button key={`${photo.name}-${index}`} onClick={() => removeNewPhoto(index)} type="button">
+                <button className="secondary-button compact-button" disabled={isSaving} key={`${photo.name}-${index}`} onClick={() => removeNewPhoto(index)} type="button">
                   {photo.name} を取り消す
                 </button>
               ))}
             </div>
           ) : null}
 
-          <div className="cooking-rating-picker" role="group" aria-label="評価">
-            <button data-active={rating === ""} onClick={() => setRating("")} type="button">未</button>
+          <div className="cooking-rating-picker" aria-label="評価">
             {[1, 2, 3, 4, 5].map((value) => (
-              <button data-active={Number(rating) >= value} key={value} onClick={() => setRating(String(value))} type="button">
+              <button
+                aria-pressed={Number(rating) === value}
+                data-active={Number(rating) >= value}
+                disabled={isSaving}
+                key={value}
+                onClick={() => setRating(rating === String(value) ? "" : String(value))}
+                type="button"
+              >
                 ★
               </button>
             ))}
           </div>
 
           <label className="cooking-comment-field">
-            コメント
-            <textarea rows={3} value={note} onChange={(event) => setNote(event.target.value)} placeholder="感想や次回のメモ" />
+            一言コメント
+            <textarea
+              disabled={isSaving}
+              rows={3}
+              value={note}
+              onChange={(event) => setNote(event.target.value)}
+              placeholder="例：少し薄味。次回は味噌を多めにする"
+            />
           </label>
         </section>
 
         <div className="consumption-modal-actions">
-          <button disabled={isSaving} onClick={onClose} type="button">
+          <button className="secondary-button" disabled={isSaving} onClick={onClose} type="button">
             キャンセル
           </button>
-          <button className="consumption-confirm" disabled={isSaving || isLoading || Boolean(feedback?.tone === "error" && drafts.length === 0)} onClick={saveRecord} type="button">
-            {isSaving ? "保存中..." : "保存"}
+          <button className="primary-button consumption-confirm" disabled={isSaving || isLoading || Boolean(feedback?.tone === "error" && drafts.length === 0)} onClick={saveRecord} type="button">
+            {isSaving ? "保存中..." : "確定"}
           </button>
         </div>
       </section>
@@ -310,70 +404,116 @@ export function CookingRecordEditModal({ inventoryItems, item, onClose, onSaved,
 function ConsumptionEditList({
   drafts,
   inventoryItems,
-  onChange
+  onChange,
+  onSelectVisible,
+  onTabChange,
+  tab
 }: {
   drafts: ConsumptionEditDraft[];
   inventoryItems: StockItem[];
   onChange: (index: number, values: Partial<ConsumptionEditDraft>) => void;
+  onSelectVisible: (selected: boolean) => void;
+  onTabChange: (tab: ConsumptionTab) => void;
+  tab: ConsumptionTab;
 }) {
   if (drafts.length === 0) {
     return <p className="empty-list">消費量の明細はありません。写真・評価・コメントだけ編集できます。</p>;
   }
 
+  const rows = drafts
+    .map((draft, index) => {
+      const stockItem = inventoryItems.find((item) => item.id === draft.stockItemId);
+      const category = stockItem?.category ?? "食材";
+      const amount = Number(draft.amount);
+      return {
+        category,
+        draft,
+        index,
+        isShortage: Boolean(draft.selected && stockItem && Number.isFinite(amount) && amount > Number(stockItem.quantity || 0)),
+        stockItem
+      };
+    })
+    .filter((row) => tab === "all" || row.category === tab);
+  const shortageNames = rows.filter((row) => row.isShortage).map((row) => row.draft.ingredientName);
+
   return (
-    <section className="consumption-editor" aria-label="消費量編集">
+    <section className="consumption-editor" aria-label="消費量確認">
       <div className="panel-title compact-title">
         <div>
           <span>消費確認</span>
-          <h4>在庫から減らした量</h4>
+          <h4>在庫から減らす量</h4>
         </div>
       </div>
-      <div className="consumption-list">
-        {drafts.map((draft, index) => {
-          const stockItem = inventoryItems.find((item) => item.id === draft.stockItemId);
-          const amount = Number(draft.amount);
-          const isShortage = Boolean(draft.selected && stockItem && Number.isFinite(amount) && amount > Number(stockItem.quantity || 0));
-
-          return (
-            <article className="consumption-item" data-selected={draft.selected} key={draft.id}>
-              <div className="item-main">
-                <label className="consumption-check">
-                  <input checked={draft.selected} onChange={(event) => onChange(index, { selected: event.target.checked })} type="checkbox" />
-                  <span>
-                    <small>
-                      元の消費 {draft.originalConsumedAmount}{draft.consumedUnit || draft.requestedUnit} / 必要 {draft.requestedAmount}{draft.requestedUnit}
-                    </small>
-                    <strong>{draft.ingredientName}</strong>
-                  </span>
-                </label>
-              </div>
-              <label>
-                減らす在庫
-                <select value={draft.stockItemId} onChange={(event) => onChange(index, { stockItemId: event.target.value })}>
-                  <option value="">減算しない</option>
-                  {inventoryItems.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.name} / {item.quantity}{item.unit} / {item.storage_location}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                消費量
-                <input min="0" step="0.1" type="number" value={draft.amount} onChange={(event) => onChange(index, { amount: event.target.value })} />
-              </label>
-              <button className="consumption-remove-button" onClick={() => onChange(index, { selected: !draft.selected })} type="button">
-                {draft.selected ? "行を削除" : "削除を取り消す"}
-              </button>
-              {isShortage && stockItem ? (
-                <p className="consumption-item-warning">
-                  現在の在庫 {stockItem.quantity}{stockItem.unit} より多いです。保存時は在庫が0で止まります。
-                </p>
-              ) : null}
-            </article>
-          );
-        })}
+      <div className="consumption-toolbar">
+        <div className="consumption-tabs" role="tablist" aria-label="材料カテゴリ">
+          {(["all", "食材", "調味料"] as ConsumptionTab[]).map((value) => (
+            <button
+              aria-selected={tab === value}
+              data-active={tab === value}
+              key={value}
+              onClick={() => onTabChange(value)}
+              role="tab"
+              type="button"
+            >
+              {value === "all" ? "全" : value}
+            </button>
+          ))}
+        </div>
+        <div className="consumption-bulk-actions">
+          <button className="secondary-button compact-button" type="button" onClick={() => onSelectVisible(true)}>
+            全選択
+          </button>
+          <button className="secondary-button compact-button" type="button" onClick={() => onSelectVisible(false)}>
+            全解除
+          </button>
+        </div>
       </div>
+      {shortageNames.length ? (
+        <p className="consumption-shortage">
+          在庫不足: {shortageNames.join("、")} は確定すると在庫が0で止まります。
+        </p>
+      ) : null}
+      {rows.length === 0 ? (
+        <p className="empty-list">このカテゴリの材料はありません。</p>
+      ) : (
+        <div className="consumption-list">
+          {rows.map(({ category, draft, index, isShortage, stockItem }) => (
+              <article className="consumption-item" data-selected={draft.selected} key={draft.id}>
+                <div className="item-main">
+                  <label className="consumption-check">
+                    <input checked={draft.selected} onChange={(event) => onChange(index, { selected: event.target.checked })} type="checkbox" />
+                    <span>
+                      <small>
+                        前回 {draft.originalConsumedAmount}{draft.consumedUnit || draft.requestedUnit} / 必要 {draft.requestedAmount}{draft.requestedUnit} / {category}
+                      </small>
+                      <strong>{draft.ingredientName}</strong>
+                    </span>
+                  </label>
+                </div>
+                <label>
+                  減らす在庫
+                  <select value={draft.stockItemId} onChange={(event) => onChange(index, { stockItemId: event.target.value })}>
+                    <option value="">減算しない</option>
+                    {inventoryItems.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.name} / 現在 {item.quantity}{item.unit} / {item.storage_location}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  消費量
+                  <input min="0" step="0.1" type="number" value={draft.amount} onChange={(event) => onChange(index, { amount: event.target.value })} />
+                </label>
+                {isShortage && stockItem ? (
+                  <p className="consumption-item-warning">
+                    在庫 {stockItem.quantity}{stockItem.unit} に対して消費量が多いです。
+                  </p>
+                ) : null}
+              </article>
+          ))}
+        </div>
+      )}
     </section>
   );
 }

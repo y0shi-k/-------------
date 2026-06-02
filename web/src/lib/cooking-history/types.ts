@@ -47,6 +47,7 @@ export type CookingConsumptionEvent = {
 
 export type ConsumptionEditDraft = {
   id: string;
+  isNew: boolean;
   ingredientName: string;
   requestedAmount: number;
   requestedUnit: string;

@@ -1,7 +1,7 @@
 {
   "ticket_id": "TKT-0152-cooking-history-record-edit",
   "scope": "web",
-  "generated_at": "2026-06-02T19:28:23+09:00",
+  "generated_at": "2026-06-02T20:03:19+09:00",
   "status": "pass",
   "checks": {
     "lint": "pass",

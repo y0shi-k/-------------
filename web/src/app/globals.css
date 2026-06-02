@@ -3101,6 +3101,14 @@ h1 {
   color: #047857;
 }
 
+.consumption-edit-note {
+  margin: -4px 0 0;
+  color: #64748b;
+  font-size: 0.82rem;
+  font-weight: 800;
+  line-height: 1.5;
+}
+
 /* Canvas版（AppSheet風）ジャンルタグピッカー */
 .genre-field-label .genre-picker {
   font-weight: 400;

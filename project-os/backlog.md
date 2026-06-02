@@ -6,6 +6,7 @@
 
 ## 現在のフォーカス
 - 公開前セキュリティ整備（TKT-0149/0150/0151）が一段落。次は本番Supabase/Vercelへの適用・手動確認。
+- (TKT-0154) 数量・単位入力のUX改善（単位ピッカー／単位換算の上単位連動／数量スピン1刻み／数値欄IMEオフ）。spec_ready・実装はCodexで実施予定。
 
 ## 次にやる候補（優先度つき・要ユーザー確認）
 1. (P1) 公開前の本番適用ゲート — Supabase Dashboard Auth設定（TKT-0149）、`ai_usage_events` migration適用（TKT-0151 `supabase db push`）、実DB/実機での手動スモーク。

@@ -1,5 +1,6 @@
 import type { ConsumptionEditDraft, CookingConsumptionEvent } from "@/lib/cooking-history/types";
 import type { StockItem } from "@/lib/inventory/types";
+import type { RecipeIngredient } from "@/lib/recipes/types";
 
 export type InventoryAdjustment = {
   deltaQuantity: number;
@@ -20,6 +21,7 @@ export function buildEditDrafts(events: CookingConsumptionEvent[]): ConsumptionE
 
     return {
       id: event.id,
+      isNew: false,
       ingredientName: event.ingredient_name,
       requestedAmount: Number(event.requested_amount || 0),
       requestedUnit: event.requested_unit,
@@ -31,6 +33,31 @@ export function buildEditDrafts(events: CookingConsumptionEvent[]): ConsumptionE
       substituteFor: event.substitute_for,
       amount: String(Number.isFinite(consumedAmount) ? consumedAmount : 0),
       selected: true
+    };
+  });
+}
+
+export function buildDraftsFromRecipeIngredients(ingredients: RecipeIngredient[], inventoryItems: StockItem[]): ConsumptionEditDraft[] {
+  return ingredients.map((ingredient, index) => {
+    const exactStock = inventoryItems.find(
+      (item) => item.category === ingredient.item_type && item.unit === ingredient.unit && item.quantity > 0 && item.name === ingredient.name
+    );
+    const amount = exactStock ? Math.min(Number(ingredient.amount || 0), Number(exactStock.quantity || 0)) : 0;
+
+    return {
+      id: `new-${ingredient.id || index}`,
+      isNew: true,
+      ingredientName: ingredient.name,
+      requestedAmount: Number(ingredient.amount || 0),
+      requestedUnit: ingredient.unit,
+      originalConsumedAmount: 0,
+      consumedUnit: ingredient.unit,
+      originalStockItemId: "",
+      stockItemId: exactStock?.id ?? "",
+      stockItemName: exactStock?.name ?? "",
+      substituteFor: "",
+      amount: String(Number.isFinite(amount) ? amount : 0),
+      selected: Boolean(exactStock) && Number(ingredient.amount) > 0
     };
   });
 }
