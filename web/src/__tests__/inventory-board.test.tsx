@@ -168,11 +168,11 @@ describe("InventoryBoard", () => {
 
     fireEvent.change(screen.getByLabelText("品名"), { target: { value: "豆腐" } });
     fireEvent.change(screen.getByLabelText("数量"), { target: { value: "2" } });
-    fireEvent.change(screen.getByLabelText("単位"), { target: { value: "丁" } });
-    fireEvent.change(screen.getByLabelText("換算元数量"), { target: { value: "1" } });
-    fireEvent.change(screen.getByLabelText("換算元単位"), { target: { value: "丁" } });
+    fireEvent.change(screen.getByLabelText("単位を検索・追加"), { target: { value: "丁" } });
+    fireEvent.keyDown(screen.getByLabelText("単位を検索・追加"), { key: "Enter" });
     fireEvent.change(screen.getByLabelText("換算先数量"), { target: { value: "300" } });
-    fireEvent.change(screen.getByLabelText("換算先単位"), { target: { value: "g" } });
+    fireEvent.change(screen.getByLabelText("換算先単位を検索・追加"), { target: { value: "g" } });
+    fireEvent.keyDown(screen.getByLabelText("換算先単位を検索・追加"), { key: "Enter" });
     fireEvent.click(screen.getByRole("button", { name: "在庫に追加" }));
 
     await waitFor(() => {
@@ -255,11 +255,10 @@ describe("InventoryBoard", () => {
     openManualAdd();
 
     fireEvent.change(screen.getByLabelText("品名"), { target: { value: "ひき肉" } });
-    fireEvent.change(screen.getByLabelText("換算元数量"), { target: { value: "1" } });
-    fireEvent.change(screen.getByLabelText("換算元単位"), { target: { value: "パック" } });
+    fireEvent.change(screen.getByLabelText("換算先数量"), { target: { value: "150" } });
     fireEvent.click(screen.getByRole("button", { name: "在庫に追加" }));
 
-    expect(await screen.findByText("単位換算は「1 パック = 150 g」のように数量と単位をすべて入力してください。")).toBeTruthy();
+    expect(await screen.findByText("単位換算は「1 本 = 1000 ml」のように換算先の数量と単位を入力してください。")).toBeTruthy();
     expect(from).not.toHaveBeenCalledWith("inventory_items");
   });
 
@@ -530,7 +529,8 @@ describe("InventoryBoard", () => {
 
     fireEvent.change(screen.getByLabelText("買い物の品名"), { target: { value: "牛乳" } });
     fireEvent.change(screen.getByLabelText("買い物の数量"), { target: { value: "2" } });
-    fireEvent.change(screen.getByLabelText("買い物の単位"), { target: { value: "本" } });
+    fireEvent.change(screen.getByLabelText("買い物の単位を検索・追加"), { target: { value: "本" } });
+    fireEvent.keyDown(screen.getByLabelText("買い物の単位を検索・追加"), { key: "Enter" });
     fireEvent.click(screen.getByRole("button", { name: "手動追加" }));
 
     await waitFor(() => {

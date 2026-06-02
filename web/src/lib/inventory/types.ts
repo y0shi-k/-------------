@@ -65,15 +65,22 @@ export const emptyStockItemFormValues: StockItemFormValues = {
   status_note: ""
 };
 
+function formatConversionRatio(conversion: UnitConversion | null) {
+  if (!conversion || conversion.fromQty <= 0) return "";
+  const ratio = conversion.toQty / conversion.fromQty;
+  if (!Number.isFinite(ratio)) return "";
+  return Number.isInteger(ratio) ? String(ratio) : String(Number(ratio.toFixed(3)));
+}
+
 export function toFormValues(item: StockItem): StockItemFormValues {
   return {
     category: item.category,
     name: item.name,
     quantity: String(item.quantity),
     unit: item.unit,
-    conversion_from_qty: item.unit_conversion ? String(item.unit_conversion.fromQty) : "",
-    conversion_from_unit: item.unit_conversion?.fromUnit ?? "",
-    conversion_to_qty: item.unit_conversion ? String(item.unit_conversion.toQty) : "",
+    conversion_from_qty: "",
+    conversion_from_unit: "",
+    conversion_to_qty: formatConversionRatio(item.unit_conversion),
     conversion_to_unit: item.unit_conversion?.toUnit ?? "",
     display_expires_on: item.display_expires_on ?? "",
     effective_expires_on: item.effective_expires_on ?? "",

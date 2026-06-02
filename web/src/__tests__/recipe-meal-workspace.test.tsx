@@ -232,7 +232,8 @@ describe("RecipeMealWorkspace", () => {
     const ingredientEditor = screen.getByLabelText("材料入力");
     fireEvent.change(within(ingredientEditor).getByLabelText("品名"), { target: { value: "卵" } });
     fireEvent.change(within(ingredientEditor).getByLabelText("数量"), { target: { value: "3" } });
-    fireEvent.change(within(ingredientEditor).getByLabelText("単位"), { target: { value: "個" } });
+    fireEvent.change(within(ingredientEditor).getByLabelText("単位を検索・追加"), { target: { value: "個" } });
+    fireEvent.keyDown(within(ingredientEditor).getByLabelText("単位を検索・追加"), { key: "Enter" });
     fireEvent.change(screen.getByLabelText("下準備"), { target: { value: "卵を溶く" } });
     fireEvent.change(screen.getByLabelText("調理手順"), { target: { value: "煮る\n卵でとじる" } });
     fireEvent.click(screen.getByRole("button", { name: "レシピを保存" }));

@@ -6,6 +6,7 @@ import { AiUsageMeter } from "@/components/ai-usage-meter";
 import { DeleteConfirmPanel } from "@/components/delete-confirm-panel";
 import { GeminiApiKeyPanel } from "@/components/gemini-api-key-panel";
 import { ShoppingListSection } from "@/components/shopping-list-section";
+import { UnitPicker } from "@/components/unit-picker";
 import { useShellAiUsage } from "@/components/web-mode-shell";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import {
@@ -81,20 +82,19 @@ type NormalizedForm =
   | { error: string };
 
 function normalizeUnitConversion(values: StockItemFormValues): UnitConversion | null | { error: string } {
-  const hasAnyConversionValue =
-    values.conversion_from_qty || values.conversion_from_unit || values.conversion_to_qty || values.conversion_to_unit;
+  const hasAnyConversionValue = values.conversion_to_qty || values.conversion_to_unit;
 
   if (!hasAnyConversionValue) {
     return null;
   }
 
-  const fromQty = Number(values.conversion_from_qty);
+  const fromQty = 1;
   const toQty = Number(values.conversion_to_qty);
-  const fromUnit = values.conversion_from_unit.trim();
+  const fromUnit = values.unit.trim();
   const toUnit = values.conversion_to_unit.trim();
 
-  if (!Number.isFinite(fromQty) || fromQty <= 0 || !Number.isFinite(toQty) || toQty <= 0 || !fromUnit || !toUnit) {
-    return { error: "単位換算は「1 パック = 150 g」のように数量と単位をすべて入力してください。" };
+  if (!fromUnit || !Number.isFinite(toQty) || toQty <= 0 || !toUnit) {
+    return { error: "単位換算は「1 本 = 1000 ml」のように換算先の数量と単位を入力してください。" };
   }
 
   return { fromQty, fromUnit, toQty, toUnit };
@@ -847,19 +847,14 @@ export function InventoryBoard({
                 <div className="qty-unit-wrap">
                   <input
                     aria-label="数量"
+                    inputMode="decimal"
                     min="0"
-                    step="0.1"
+                    step="any"
                     type="number"
                     value={values.quantity}
                     onChange={(event) => updateValue("quantity", event.target.value)}
                   />
-                  <input
-                    aria-label="単位"
-                    type="text"
-                    value={values.unit}
-                    onChange={(event) => updateValue("unit", event.target.value)}
-                    placeholder="個"
-                  />
+                  <UnitPicker value={values.unit} onSelect={(unit) => updateValue("unit", unit)} />
                 </div>
               </label>
               <label>
@@ -870,41 +865,21 @@ export function InventoryBoard({
             <div className="unit-conversion-fields">
               <span className="unit-conversion-label">単位換算</span>
               <div className="conversion-row">
-                <input
-                  aria-label="換算元数量"
-                  inputMode="decimal"
-                  min="0"
-                  step="0.1"
-                  type="number"
-                  value={values.conversion_from_qty}
-                  onChange={(event) => updateValue("conversion_from_qty", event.target.value)}
-                  placeholder="1"
-                />
-                <input
-                  aria-label="換算元単位"
-                  value={values.conversion_from_unit}
-                  onChange={(event) => updateValue("conversion_from_unit", event.target.value)}
-                  placeholder="パック"
-                />
-                <span>=</span>
+                <span className="conversion-from-label">1{values.unit || "—"}</span>
+                <span className="conversion-equals">=</span>
                 <input
                   aria-label="換算先数量"
                   inputMode="decimal"
                   min="0"
-                  step="0.1"
+                  step="any"
                   type="number"
                   value={values.conversion_to_qty}
                   onChange={(event) => updateValue("conversion_to_qty", event.target.value)}
-                  placeholder="150"
+                  placeholder="1000"
                 />
-                <input
-                  aria-label="換算先単位"
-                  value={values.conversion_to_unit}
-                  onChange={(event) => updateValue("conversion_to_unit", event.target.value)}
-                  placeholder="g"
-                />
+                <UnitPicker value={values.conversion_to_unit} onSelect={(unit) => updateValue("conversion_to_unit", unit)} ariaLabel="換算先単位" />
               </div>
-              <p>例: 1パック = 150g。料理完了時に双方向で換算します。</p>
+              <p>例: 1本 = 1000ml。料理完了時に双方向で換算します。</p>
             </div>
             <div className="form-row two-columns">
               <label>
@@ -1063,19 +1038,15 @@ export function InventoryBoard({
             />
             <input
               aria-label="買い物の数量"
+              inputMode="decimal"
               min="0"
-              step="0.1"
+              step="any"
               type="number"
               value={shoppingValues.required_quantity}
               onChange={(event) => updateShoppingValue("required_quantity", event.target.value)}
               placeholder="1"
             />
-            <input
-              aria-label="買い物の単位"
-              value={shoppingValues.unit}
-              onChange={(event) => updateShoppingValue("unit", event.target.value)}
-              placeholder="個"
-            />
+            <UnitPicker value={shoppingValues.unit} onSelect={(unit) => updateShoppingValue("unit", unit)} ariaLabel="買い物の単位" />
             <button className="primary-button compact-button" type="submit" disabled={isSaving}>
               手動追加
             </button>

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { AiUsageMeter } from "@/components/ai-usage-meter";
 import { DeleteConfirmPanel } from "@/components/delete-confirm-panel";
 import { GeminiApiKeyPanel } from "@/components/gemini-api-key-panel";
+import { UnitPicker } from "@/components/unit-picker";
 import { useShellAiUsage, useShellNavigation, useShellStatusMessage } from "@/components/web-mode-shell";
 import type { StockItem } from "@/lib/inventory/types";
 import {
@@ -1573,14 +1574,15 @@ export function RecipeMealWorkspace({
                     <input aria-label="品名" value={ingredient.name} onChange={(event) => updateIngredient(index, { name: event.target.value, item_type: "食材" })} placeholder="品名" />
                     <input
                       aria-label="数量"
+                      inputMode="decimal"
                       min="0"
-                      step="0.1"
+                      step="any"
                       type="number"
                       value={ingredient.amount}
                       onChange={(event) => updateIngredient(index, { amount: event.target.value, item_type: "食材" })}
                       placeholder="数量"
                     />
-                    <input aria-label="単位" value={ingredient.unit} onChange={(event) => updateIngredient(index, { unit: event.target.value, item_type: "食材" })} placeholder="単位" />
+                    <UnitPicker value={ingredient.unit} onSelect={(unit) => updateIngredient(index, { unit, item_type: "食材" })} />
                     <button className="danger-button compact-button" type="button" onClick={() => removeIngredientRow(index)} aria-label="材料を削除">
                       ×
                     </button>
@@ -1601,14 +1603,15 @@ export function RecipeMealWorkspace({
                     <input aria-label="品名" value={ingredient.name} onChange={(event) => updateIngredient(index, { name: event.target.value, item_type: "調味料" })} placeholder="調味料名" />
                     <input
                       aria-label="数量"
+                      inputMode="decimal"
                       min="0"
-                      step="0.1"
+                      step="any"
                       type="number"
                       value={ingredient.amount}
                       onChange={(event) => updateIngredient(index, { amount: event.target.value, item_type: "調味料" })}
                       placeholder="数量"
                     />
-                    <input aria-label="単位" value={ingredient.unit} onChange={(event) => updateIngredient(index, { unit: event.target.value, item_type: "調味料" })} placeholder="単位" />
+                    <UnitPicker value={ingredient.unit} onSelect={(unit) => updateIngredient(index, { unit, item_type: "調味料" })} />
                     <button className="danger-button compact-button" type="button" onClick={() => removeIngredientRow(index)} aria-label="調味料を削除">
                       ×
                     </button>
