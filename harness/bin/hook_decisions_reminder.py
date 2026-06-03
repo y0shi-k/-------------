@@ -2,8 +2,12 @@
 """Stop Hook: 実装変更があるのに decisions.md を更新していない場合だけ、更新を促す。
 
 毎ターン煩くならないよう、git の未コミット変更に web/ または supabase/ が含まれ、かつ
-decisions.md が変更されていないときのみ additionalContext を出す（非ブロック）。
+decisions.md が変更されていないときのみ systemMessage を出す（非ブロック）。
 それ以外は何も出さず exit 0。
+
+注: Stop イベントは hookSpecificOutput.additionalContext を受け付けない
+（additionalContext は UserPromptSubmit / PostToolUse 用）。Stop で非ブロックの
+お知らせを出す正しいフィールドは top-level の systemMessage。
 """
 import json
 import subprocess
@@ -35,12 +39,7 @@ def main() -> int:
             "project-os/knowledge/decisions.md と project-os/backlog.md の更新を検討してください"
             "（/finalize でも追記できます）。"
         )
-        print(json.dumps({
-            "hookSpecificOutput": {
-                "hookEventName": "Stop",
-                "additionalContext": msg,
-            }
-        }, ensure_ascii=False))
+        print(json.dumps({"systemMessage": msg}, ensure_ascii=False))
 
     return 0
 
