@@ -5642,6 +5642,42 @@ h1 {
     display: none;
   }
 
+  /*
+   * TKT-0160: 料理・記録のPC多カラム化。
+   * PCではサイドバー葉（カレンダー/タイムライン/インサイト）が historyView を駆動するため、
+   * コンテンツ内のビュータブは隠す（スマホは内部タブ維持）。
+   */
+  .cooking-view-tabs {
+    display: none;
+  }
+
+  /* サマリーは4列のまま、広幅で間隔・余白を活かす。 */
+  .cooking-history-workspace .cooking-summary-grid {
+    gap: 16px;
+  }
+
+  /* タイムラインの履歴カードを広画面で複数カラム自動配置。 */
+  .cooking-history-workspace .cooking-timeline-view .history-list {
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    align-items: start;
+    gap: 16px;
+  }
+
+  /* カレンダーはセルと写真サムネを広画面向けに拡大（7列構造・凡例・選択状態は維持）。 */
+  .cooking-history-workspace .calendar-cell {
+    min-height: 110px;
+  }
+
+  .cooking-history-workspace .calendar-cell img {
+    height: 60px;
+  }
+
+  /* インサイトは広幅で2〜3列に自動拡張。 */
+  .cooking-history-workspace .insight-grid {
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+  }
+
   .canvas-recipe-collection {
     min-width: 0;
   }

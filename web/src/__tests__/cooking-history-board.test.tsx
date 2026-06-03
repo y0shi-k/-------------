@@ -4,7 +4,13 @@ import { CookingHistoryBoard } from "@/components/cooking-history-board";
 import type { CookingHistoryItem } from "@/lib/cooking-history/types";
 
 const shellMocks = vi.hoisted(() => ({
-  requestViewRecipe: vi.fn()
+  requestViewRecipe: vi.fn(),
+  selectedSubViews: {
+    ingredients: "inventory" as "inventory" | "shopping",
+    recipes: "recipes" as "recipes" | "schedule",
+    cooking: "timeline" as "calendar" | "timeline" | "insights"
+  },
+  selectShellLeaf: vi.fn()
 }));
 
 vi.mock("@/components/web-mode-shell", () => ({
@@ -14,6 +20,11 @@ vi.mock("@/components/web-mode-shell", () => ({
     pendingRecipeOrigin: "recipes",
     returnToMode: vi.fn(),
     requestViewRecipe: shellMocks.requestViewRecipe
+  }),
+  useShellSubView: () => ({
+    activeDesktopTarget: { group: "cooking", kind: "mode", leaf: shellMocks.selectedSubViews.cooking },
+    selectedSubViews: shellMocks.selectedSubViews,
+    selectShellLeaf: shellMocks.selectShellLeaf
   })
 }));
 
@@ -59,6 +70,12 @@ function renderBoard(props?: Partial<React.ComponentProps<typeof CookingHistoryB
 describe("CookingHistoryBoard", () => {
   beforeEach(() => {
     shellMocks.requestViewRecipe.mockReset();
+    shellMocks.selectShellLeaf.mockReset();
+    shellMocks.selectedSubViews = {
+      ingredients: "inventory",
+      recipes: "recipes",
+      cooking: "timeline"
+    };
   });
 
   it("shows cooking history with and without photos", () => {
@@ -160,5 +177,28 @@ describe("CookingHistoryBoard", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "レシピを見る" }));
     expect(shellMocks.requestViewRecipe).toHaveBeenCalledWith("recipe-1", "cooking");
+  });
+
+  it("syncs the view tab selection to the shell sidebar leaf", () => {
+    renderBoard({ initialHistory: [baseHistory] });
+
+    fireEvent.click(screen.getByRole("tab", { name: "カレンダー" }));
+    expect(shellMocks.selectShellLeaf).toHaveBeenCalledWith("cooking", "calendar");
+
+    fireEvent.click(screen.getByRole("tab", { name: "振り返り" }));
+    expect(shellMocks.selectShellLeaf).toHaveBeenCalledWith("cooking", "insights");
+  });
+
+  it("renders the view driven by the shell sub-view selection", () => {
+    shellMocks.selectedSubViews = {
+      ingredients: "inventory",
+      recipes: "recipes",
+      cooking: "insights"
+    };
+
+    renderBoard({ initialHistory: [baseHistory] });
+
+    expect(screen.getByLabelText("料理履歴振り返り")).toBeTruthy();
+    expect(screen.queryByLabelText("料理履歴カレンダー")).toBeNull();
   });
 });

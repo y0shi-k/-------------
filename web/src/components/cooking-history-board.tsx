@@ -1,9 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CookingRecordEditModal } from "@/components/cooking-record-edit-modal";
-import { useShellNavigation } from "@/components/web-mode-shell";
+import { useShellNavigation, useShellSubView } from "@/components/web-mode-shell";
 import { CookingHistoryItem, CookingHistoryPhoto } from "@/lib/cooking-history/types";
 import type { StockItem } from "@/lib/inventory/types";
 
@@ -104,6 +104,17 @@ export function CookingHistoryBoard({ initialHistory, initialInventoryItems, use
   const [selectedDate, setSelectedDate] = useState(localDateKey(today));
   const [editingItem, setEditingItem] = useState<CookingHistoryItem | null>(null);
   const { requestViewRecipe } = useShellNavigation();
+  const { selectedSubViews, selectShellLeaf } = useShellSubView();
+
+  useEffect(() => {
+    setHistoryView(selectedSubViews.cooking);
+  }, [selectedSubViews.cooking]);
+
+  function switchHistoryView(view: HistoryView) {
+    setHistoryView(view);
+    selectShellLeaf("cooking", view);
+  }
+
   const visibleHistory = history.filter((item) => {
     const query = historySearch.trim().toLowerCase();
     const cookedDate = toLocalDate(dateKey(item.cooked_at));
@@ -195,13 +206,13 @@ export function CookingHistoryBoard({ initialHistory, initialInventoryItems, use
       </div>
 
       <div className="cooking-view-tabs" role="tablist" aria-label="料理履歴表示">
-        <button aria-selected={historyView === "calendar"} data-active={historyView === "calendar"} onClick={() => setHistoryView("calendar")} role="tab" type="button">
+        <button aria-selected={historyView === "calendar"} data-active={historyView === "calendar"} onClick={() => switchHistoryView("calendar")} role="tab" type="button">
           カレンダー
         </button>
-        <button aria-selected={historyView === "timeline"} data-active={historyView === "timeline"} onClick={() => setHistoryView("timeline")} role="tab" type="button">
+        <button aria-selected={historyView === "timeline"} data-active={historyView === "timeline"} onClick={() => switchHistoryView("timeline")} role="tab" type="button">
           タイムライン
         </button>
-        <button aria-selected={historyView === "insights"} data-active={historyView === "insights"} onClick={() => setHistoryView("insights")} role="tab" type="button">
+        <button aria-selected={historyView === "insights"} data-active={historyView === "insights"} onClick={() => switchHistoryView("insights")} role="tab" type="button">
           振り返り
         </button>
       </div>

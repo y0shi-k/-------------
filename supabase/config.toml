@@ -215,12 +215,16 @@ web3 = 30
 
 [auth.email]
 # Allow/disallow new user signups via email to your project.
-enable_signup = false
+# NOTE: ローカル(練習場)専用。true でメール認証プロバイダ自体が有効になり、
+# 管理者作成アカウントでもメール/パスワードでログインできる。
+# 本番は Supabase ダッシュボードで別管理のため、この値は本番に影響しない。
+enable_signup = true
 # If enabled, a user will be required to confirm any email change on both the old, and new email
 # addresses. If disabled, only the new email is required to confirm.
 double_confirm_changes = true
 # If enabled, users need to confirm their email address before signing in.
-enable_confirmations = true
+# ローカルはメール送信が Mailpit 止まりなので、確認不要にして検証をスムーズにする。
+enable_confirmations = false
 # If enabled, users will need to reauthenticate or have logged in recently to change their password.
 secure_password_change = true
 # Controls the minimum amount of time that must pass before sending another signup confirmation or password reset email.

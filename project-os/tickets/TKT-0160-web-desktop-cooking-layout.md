@@ -1,7 +1,7 @@
 ---
 id: TKT-0160-web-desktop-cooking-layout
 title: 料理・記録のPC多カラム化（タイムライン/カレンダー/インサイトの広幅化）
-status: draft
+status: completed
 goal: PC幅で料理・記録を広画面向けに多カラム化し、サマリー・タイムライン・カレンダー・インサイトを余白を活かして配置する（スマホは温存）
 acceptance:
   - 【IA: グループ化ツリー】PCではサイドバー「料理・記録」グループ配下の葉「カレンダー」「タイムライン」「インサイト」を選ぶと該当ビューに切り替わる。コンテンツ内のビュータブ（`.cooking-view-tabs`）はPCではサイドバーに一本化し隠す（スマホは内部タブのまま）
@@ -26,6 +26,8 @@ required_gates:
   - spec_ready
   - implementation_ready
   - verify_passed
+  - manual_smokes_done
+  - review_ready
   - report_ready
 related_specs:
   - SPEC-0160-web-desktop-cooking-layout

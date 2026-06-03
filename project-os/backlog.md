@@ -13,6 +13,7 @@
 - (TKT-0165) 完了。PC幅の献立スケジュールを TKT-0159 の7列横並びから「1日=1行」の縦アジェンダ表示へ戻した（各日カードが盤面全高まで伸びてスロット下に死に余白が出る問題を解消）。CSSのみ（globals.css 1024pxブロック）、`.schedule-board` を max760px中央寄せに制限。verify pass・危険evalなし。実機目視と最大幅の好みは残課題。
 - (デザイン正本) `docs/design/pc-design-language.md` を新設。PC幅のトーンを Image #3（indigo+白基調・余白広め）に統一する設計正本。デザイントークン（--accent-soft/--favorite/--shadow-card）＋コンポーネント規定。今後のPC各画面はこれに収束させる。
 - (TKT-0166) 完了。PCレシピカードを縦型へ刷新（上部プレースホルダ＋名前2行クランプ＋操作ボタンをホバー退避＋タグ折り返し）。トークン土台を :root に追加。CSS+1行JSXのみ、スマホ温存。verify pass・全gate閉（check-gatesの🔴危険は散文由来の過剰マッチと記録）。実機目視は残課題。
+- (TKT-0160) 完了。料理・記録のPC多カラム化。`useShellSubView` で `selectedSubViews.cooking→historyView` を同期しPCで内部タブ（`.cooking-view-tabs`）を非表示、タブonClickを `selectShellLeaf("cooking",view)` 経由に（recipe/inventory と同形）。CSSはタイムライン複数カラム（auto-fill minmax320）・カレンダーセル/サムネ拡大（72→110/34→60px）・インサイト広幅化を1024pxブロックに追加。スマホ温存。verify pass・全gate閉（🔴 photo/schema eval は写真語彙とテストfixtureによる過剰マッチと記録、実ロジック無変更）。実機目視は残課題。
 - (TKT-0167) 完了。レシピお気に入り `recipes.is_favorite`（boolean not null default false）を新設（危険変更=schema+RLS）。縦型カードにハート（楽観的更新＋失敗ロールバック・トグル専用更新で saveRecipe と分離）、絞り込みに「お気に入り」チップ追加。既存行ポリシー（auth.uid()=user_id）で充足し新規RLSなし。Docker未導入でローカルSupabase不可のため、ユーザー承認のうえ hosted（wwtompvneobysieofxkl）へ `supabase db push` 適用し schema/RLS/後方互換を hosted で実検証。verify pass・全gate閉。**UI happy-path（保存・絞り込み・モバイル・ハート見た目）のブラウザ確認はユーザー残課題**。ハートSVGは非対称崩れを対称パスへ修正済み。
 
 ## 次にやる候補（優先度つき・要ユーザー確認）
