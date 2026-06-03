@@ -90,6 +90,34 @@ button:disabled {
   display: none;
 }
 
+/* スマホ: ステータスバーのアカウント表示を設定への入口にする */
+.canvas-status-account {
+  flex-shrink: 0;
+  max-width: 38vw;
+  overflow: hidden;
+  padding: 2px 8px;
+  border: 1px solid #e3e8f0;
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.canvas-status-account:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.canvas-status-account[data-active="true"] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
 .canvas-status-text {
   overflow: hidden;
   max-width: min(72vw, 520px);
@@ -259,6 +287,74 @@ h1 {
 
 .mode-panel {
   padding-top: 0;
+}
+
+/* 設定・連携画面 */
+.settings-panel {
+  display: grid;
+  gap: 16px;
+  width: min(720px, 100%);
+  margin: 0 auto;
+}
+
+.settings-panel-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.settings-panel-header h2 {
+  margin: 4px 0 2px;
+  color: var(--ink);
+  font-size: 1.2rem;
+}
+
+.settings-panel-header p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.settings-close-button {
+  flex-shrink: 0;
+}
+
+.settings-section {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid #e3e8f0;
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+}
+
+.settings-section-heading h3 {
+  margin: 0 0 2px;
+  color: var(--ink);
+  font-size: 1rem;
+}
+
+.settings-section-heading p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.settings-account {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.settings-account-email {
+  color: var(--ink);
+  font-size: 0.9rem;
+  font-weight: 600;
+  word-break: break-all;
 }
 
 .desktop-app-frame,

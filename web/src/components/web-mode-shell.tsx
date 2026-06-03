@@ -3,6 +3,7 @@
 import { createContext, type ReactNode, useCallback, useEffect, useMemo, useRef, useState, useContext } from "react";
 import { AiUsageMeter } from "@/components/ai-usage-meter";
 import { LogoutButton } from "@/components/logout-button";
+import { SettingsPanel } from "@/components/settings-panel";
 import { getAiUsageSummary, type AiUsageSummary } from "@/lib/ai/usage";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 
@@ -198,6 +199,7 @@ export function WebModeShell({
   );
   const active = modes.find((mode) => mode.id === activeMode) ?? modes[0];
   const activeChildren = childrenByMode[active.id];
+  const isSettingsActive = activeDesktopTarget.kind === "settings";
   const selectShellLeaf = useCallback((group: ModeId, leaf: ShellLeafId) => {
     setActiveMode(group);
     setActiveDesktopTarget({ group, kind: "mode", leaf });
@@ -358,8 +360,8 @@ export function WebModeShell({
           <div className="desktop-workspace">
             <header className="desktop-topbar">
               <div className="desktop-topbar-title">
-                <span className="eyebrow">{active.eyebrow}</span>
-                <strong>{active.label}</strong>
+                <span className="eyebrow">{isSettingsActive ? "SETTINGS" : active.eyebrow}</span>
+                <strong>{isSettingsActive ? "設定" : active.label}</strong>
               </div>
               <div className="desktop-status-pill" data-tone={statusMessage?.tone ?? "idle"} role="status" aria-live="polite">
                 <strong>{statusLabel}</strong>
@@ -380,26 +382,40 @@ export function WebModeShell({
               <span>|</span>
               <span className="canvas-status-text">{statusText}</span>
               <AiUsageMeter variant="statusbar" summary={aiUsageSummary} />
-              <small>{userEmail}</small>
+              <button
+                aria-current={isSettingsActive ? "page" : undefined}
+                className="canvas-status-account"
+                data-active={isSettingsActive}
+                onClick={() => setActiveDesktopTarget({ kind: "settings" })}
+                type="button"
+              >
+                {userEmail}
+              </button>
             </div>
             <h1 className="sr-only">料理レシピ・食材管理</h1>
             <p className="sr-only">{active.status}</p>
 
-            <section className="mode-panel" aria-labelledby={`mode-title-${active.id}`}>
-              {active.id === "ingredients" ? (
-                <h2 className="sr-only" id={`mode-title-${active.id}`}>
-                  {active.label}
-                </h2>
-              ) : (
-                <div className="mode-heading">
-                  <div>
-                    <h2 id={`mode-title-${active.id}`}>{active.label}</h2>
-                    <p className="eyebrow">{active.eyebrow}</p>
+            {isSettingsActive ? (
+              <section className="mode-panel" aria-label="設定">
+                <SettingsPanel userEmail={userEmail} onClose={() => returnToMode(activeMode)} />
+              </section>
+            ) : (
+              <section className="mode-panel" aria-labelledby={`mode-title-${active.id}`}>
+                {active.id === "ingredients" ? (
+                  <h2 className="sr-only" id={`mode-title-${active.id}`}>
+                    {active.label}
+                  </h2>
+                ) : (
+                  <div className="mode-heading">
+                    <div>
+                      <h2 id={`mode-title-${active.id}`}>{active.label}</h2>
+                      <p className="eyebrow">{active.eyebrow}</p>
+                    </div>
                   </div>
-                </div>
-              )}
-              {activeChildren}
-            </section>
+                )}
+                {activeChildren}
+              </section>
+            )}
           </div>
         </div>
 

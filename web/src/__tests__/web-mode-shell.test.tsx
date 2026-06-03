@@ -120,6 +120,33 @@ describe("WebModeShell", () => {
     expect(screen.getByLabelText("shell-subview").textContent).toBe("ingredients:inventory|inventory|schedule|timeline");
   });
 
+  it("opens the settings screen from the desktop gear with all three sections", async () => {
+    await act(async () => {
+      renderShell();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /設定/ }));
+
+    expect(screen.getByRole("region", { name: "Gemini APIキー設定" })).toBeTruthy();
+    expect(screen.getByRole("region", { name: "本日のAI残り回数" })).toBeTruthy();
+    expect(screen.getByRole("region", { name: "アカウント" })).toBeTruthy();
+    expect(screen.getByLabelText("ユーザー自身のAPIキー")).toBeTruthy();
+    expect(screen.getAllByRole("button", { name: "ログアウト" }).length).toBeGreaterThan(0);
+    // ボードはアンマウントされ設定だけが描画される
+    expect(screen.queryByText("食材管理の中身")).toBeNull();
+  });
+
+  it("opens settings from the mobile status-bar account entry", async () => {
+    await act(async () => {
+      renderShell();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "user@example.com" }));
+
+    expect(screen.getByRole("region", { name: "Gemini APIキー設定" })).toBeTruthy();
+    expect(screen.getByRole("region", { name: "アカウント" })).toBeTruthy();
+  });
+
   it("fetches AI usage summary on mount and renders statusbar meter when ok", async () => {
     rpc.mockResolvedValue({
       data: {

@@ -369,15 +369,15 @@ describe("InventoryBoard", () => {
     renderBoard();
     openPhotoScan();
 
-    expect(await screen.findByText("写真 0/10")).toBeTruthy();
     fireEvent.change(screen.getByLabelText("写真を撮る"), {
       target: { files: [new File(["photo"], "ingredient.jpg", { type: "image/jpeg" })] }
     });
 
+    // 残量メーターは設定画面へ集約済み（ボード内には表示しない）。
+    // ボードでは上限到達時にAI解析ボタンが無効化されることのみを保証する。
     await waitFor(() => {
       expect((screen.getByRole("button", { name: "AI解析する" }) as HTMLButtonElement).disabled).toBe(true);
     });
-    expect(screen.getByText(/食材写真解析の上限に達しました/)).toBeTruthy();
   });
 
   it("requires a user-owned Gemini API key before scanning a photo", async () => {

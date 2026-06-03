@@ -2,13 +2,12 @@
 
 import { ChangeEvent, FormEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AiUsageMeter } from "@/components/ai-usage-meter";
 import { DeleteConfirmPanel } from "@/components/delete-confirm-panel";
-import { GeminiApiKeyPanel } from "@/components/gemini-api-key-panel";
 import { ShoppingListSection } from "@/components/shopping-list-section";
 import { NumberField } from "@/components/number-field";
 import { UnitPicker } from "@/components/unit-picker";
 import { useShellAiUsage, useShellSubView, type InventoryShellLeaf } from "@/components/web-mode-shell";
+import { loadUserGeminiApiKey } from "@/lib/ai/user-gemini-api-key";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import {
   emptyStockItemFormValues,
@@ -225,6 +224,10 @@ export function InventoryBoard({
   const scanLimitReached = Boolean(
     aiUsageSummary?.ok && (aiUsageSummary.ingredient_scan.remaining <= 0 || aiUsageSummary.total.remaining <= 0)
   );
+
+  useEffect(() => {
+    setGeminiApiKey(loadUserGeminiApiKey());
+  }, []);
 
   useEffect(() => {
     setActiveView(selectedSubViews.ingredients);
@@ -493,7 +496,7 @@ export function InventoryBoard({
     if (!trimmedApiKey) {
       setPhotoFeedback({
         tone: "error",
-        message: "原因: ユーザー自身のGemini APIキーが未入力です。影響: AI解析を実行できません。修正方法: Gemini APIキーを入力してから再度お試しください。"
+        message: "原因: ユーザー自身のGemini APIキーが未入力です。影響: AI解析を実行できません。修正方法: 設定画面でGemini APIキーを登録してから再度お試しください。"
       });
       return;
     }
@@ -954,10 +957,6 @@ export function InventoryBoard({
               ) : (
                 <p className="photo-empty">写真は非公開で保存し、入力したGemini APIキーでAI解析します。APIキーはDBに保存しません。</p>
               )}
-
-              <GeminiApiKeyPanel apiKey={geminiApiKey} disabled={isUploadingPhoto} id="ingredient-scan-gemini-api-key" onChange={setGeminiApiKey} />
-
-              <AiUsageMeter summary={aiUsageSummary} feature="ingredient_scan" />
 
               {photoFeedback ? (
                 <p className="operation-message photo-message" data-tone={photoFeedback.tone} role={photoFeedback.tone === "error" ? "alert" : "status"}>

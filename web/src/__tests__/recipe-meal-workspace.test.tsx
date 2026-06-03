@@ -468,13 +468,13 @@ describe("RecipeMealWorkspace", () => {
     };
     renderWorkspace();
 
-    expect(await screen.findByText("レシピ 0/20")).toBeTruthy();
+    // 残量メーターは設定画面へ集約済み（ボード内には表示しない）。
+    // ボードでは上限到達時にAIレシピボタンが無効化されることのみを保証する。
     await waitFor(() => {
       expect(
         (screen.getByRole("button", { name: "AIレシピを編集モーダルで開く" }) as HTMLButtonElement).disabled
       ).toBe(true);
     });
-    expect(screen.getAllByText(/AIレシピ生成の上限に達しました/).length).toBeGreaterThan(0);
     expect(fetch).not.toHaveBeenCalled();
   });
 

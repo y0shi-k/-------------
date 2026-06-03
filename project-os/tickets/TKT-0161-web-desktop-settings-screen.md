@@ -1,7 +1,7 @@
 ---
 id: TKT-0161-web-desktop-settings-screen
 title: 設定・連携のPC画面（散在する設定の集約・新規ナビ項目）
-status: draft
+status: completed
 goal: 各ボードに散在する設定（Gemini APIキー／AI残り回数／アカウント・ログアウト等）を、添付モック「設定・連携」に沿ったPCの設定画面へ集約し、設定の所在を一本化する
 acceptance:
   - 【確定: 案A】PCは左サイドバー下部に「設定」ギアを固定配置し、そこから全画面の設定へ遷移できる（主ナビ3項目は据え置き、設定を主ナビに昇格させない）

@@ -14,6 +14,7 @@
 - (デザイン正本) `docs/design/pc-design-language.md` を新設。PC幅のトーンを Image #3（indigo+白基調・余白広め）に統一する設計正本。デザイントークン（--accent-soft/--favorite/--shadow-card）＋コンポーネント規定。今後のPC各画面はこれに収束させる。
 - (TKT-0166) 完了。PCレシピカードを縦型へ刷新（上部プレースホルダ＋名前2行クランプ＋操作ボタンをホバー退避＋タグ折り返し）。トークン土台を :root に追加。CSS+1行JSXのみ、スマホ温存。verify pass・全gate閉（check-gatesの🔴危険は散文由来の過剰マッチと記録）。実機目視は残課題。
 - (TKT-0160) 完了。料理・記録のPC多カラム化。`useShellSubView` で `selectedSubViews.cooking→historyView` を同期しPCで内部タブ（`.cooking-view-tabs`）を非表示、タブonClickを `selectShellLeaf("cooking",view)` 経由に（recipe/inventory と同形）。CSSはタイムライン複数カラム（auto-fill minmax320）・カレンダーセル/サムネ拡大（72→110/34→60px）・インサイト広幅化を1024pxブロックに追加。スマホ温存。verify pass・全gate閉（🔴 photo/schema eval は写真語彙とテストfixtureによる過剰マッチと記録、実ロジック無変更）。実機目視は残課題。
+- (TKT-0161) 完了。散在設定（Gemini APIキー入力・AI残り回数・アカウント/ログアウト）をPC=サイドバー下部ギア／スマホ=ステータスバーのアカウントタップから開く設定画面（`settings-panel.tsx` 新設）へ集約。TKT-0157配線済みの `activeDesktopTarget.kind==="settings"` の描画先を実装。APIキー入力は設定へ移設しボード内4箇所撤去、ボードはマウント時 `loadUserGeminiApiKey()` でキー読込を代替（旧パネルのuseEffect依存を補完）、未入力エラー文を「設定画面で登録」に更新。AI残量メーターは上部バー＋設定に集約しボード内4箇所撤去。ログアウトは設定に新設＋PC上部バー据え置き。認証・キー保存ロジック不変。verify pass・全gate閉（🔴 schema/photo eval は changed_paths 過剰マッチ、実ロジック無変更）。**実機ブラウザの目視スモーク（設定遷移・APIキー保存→AI実行・ログアウト・スマホ全画面化）はユーザー残課題**。`.photo-empty` 旧文言は据え置き（軽微）。
 - (TKT-0167) 完了。レシピお気に入り `recipes.is_favorite`（boolean not null default false）を新設（危険変更=schema+RLS）。縦型カードにハート（楽観的更新＋失敗ロールバック・トグル専用更新で saveRecipe と分離）、絞り込みに「お気に入り」チップ追加。既存行ポリシー（auth.uid()=user_id）で充足し新規RLSなし。Docker未導入でローカルSupabase不可のため、ユーザー承認のうえ hosted（wwtompvneobysieofxkl）へ `supabase db push` 適用し schema/RLS/後方互換を hosted で実検証。verify pass・全gate閉。**UI happy-path（保存・絞り込み・モバイル・ハート見た目）のブラウザ確認はユーザー残課題**。ハートSVGは非対称崩れを対称パスへ修正済み。
 
 ## 次にやる候補（優先度つき・要ユーザー確認）
@@ -22,7 +23,7 @@
    - サイドバーIA=案A グループ化ツリー: 🏠ホーム / [食材管理: 在庫一覧・買い物リスト] / [献立・レシピ: レシピ・献立スケジュール] / [料理・記録: カレンダー・タイムライン・インサイト] / ⚙設定。スマホ=「3モード＋内部タブ」と同一論理ツリーの別レンダリング。目的地のみ葉、アクションは葉にしない。
    - 土台: TKT-0157（デスクトップシェル＝グループ化ツリーナビ＋(group,leaf)状態＋サブビュー受け渡し口）← これが完了しないと TKT-0158〜0162 に着手しない（依存）。当初のガワ差し替えより範囲広め。
    - 各モード多カラム化＋サブビュー持ち上げ: TKT-0158（食材管理）/ TKT-0159（献立・レシピ。※スケジュールのPC7列ウィークグリッドは下部余白が無駄だったため TKT-0165 で縦アジェンダ表示へ差し戻し済み）/ TKT-0160（料理・記録: カレンダーは月グリッドのまま拡大）。各ボードの内部タブ state を持ち上げ、PCでコンテンツ内タブを隠す。
-   - 拡張: TKT-0161（設定: 案A=サイドバー下部ギア＋スマホ導線、主ナビ非昇格）/ TKT-0162（ホーム: 案A=新設・PCのみ初期表示、今日の献立をホームに集約）。
+   - 拡張: TKT-0161（設定: 案A=サイドバー下部ギア＋スマホ導線、主ナビ非昇格）=完了。/ TKT-0162（ホーム: 案A=新設・PCのみ初期表示、今日の献立をホームに集約）=次の候補。
    - 任意（P低）: TKT-0163（上部バー横断検索の機能化）。
    - 注意: 先行の TKT-0138「PCに広げない」方針は、≥1024px のデスクトップ表示について見直し済み（モバイル温存）。
 1. (P1) 公開前の本番適用ゲート — Supabase Dashboard Auth設定（TKT-0149）、`ai_usage_events` migration適用（TKT-0151 `supabase db push`）、実DB/実機での手動スモーク。
