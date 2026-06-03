@@ -1,0 +1,23 @@
+{
+  "ticket_id": "TKT-0159-web-desktop-recipe-meal-layout",
+  "scope": "web",
+  "generated_at": "2026-06-03T22:55:26+09:00",
+  "status": "pass",
+  "checks": {
+    "lint": "pass",
+    "typecheck": "pass",
+    "test": "pass",
+    "build": "pass"
+  },
+  "policy": {
+    "no_gas_dependency": "pass",
+    "no_hardcoded_secret": "pass",
+    "supabase_rls_present": "pass"
+  },
+  "details": {
+    "gas_hits": [],
+    "secret_hits": [],
+    "rls_note": ""
+  },
+  "note": "Canvas版 app.html は凍結・参照専用のため verify 対象外。"
+}

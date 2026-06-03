@@ -7,7 +7,7 @@ import { DeleteConfirmPanel } from "@/components/delete-confirm-panel";
 import { GeminiApiKeyPanel } from "@/components/gemini-api-key-panel";
 import { NumberField } from "@/components/number-field";
 import { UnitPicker } from "@/components/unit-picker";
-import { useShellAiUsage, useShellNavigation, useShellStatusMessage } from "@/components/web-mode-shell";
+import { useShellAiUsage, useShellNavigation, useShellStatusMessage, useShellSubView, type RecipeShellLeaf } from "@/components/web-mode-shell";
 import type { StockItem } from "@/lib/inventory/types";
 import {
   CookCandidate,
@@ -80,6 +80,7 @@ type CookingViewerOrigin = "recipes" | "cooking";
 type ConsumptionTab = "all" | "食材" | "調味料";
 
 const mealTypes: MealType[] = ["朝", "昼", "晩", "その他"];
+const scheduleMealTypes: MealType[] = ["朝", "昼", "晩"];
 const mealTypeOrder: Record<MealType, number> = { 朝: 0, 昼: 1, 晩: 2, その他: 3 };
 
 type NormalizedRecipeForm =
@@ -296,6 +297,7 @@ export function RecipeMealWorkspace({
   const router = useRouter();
   const { clearPendingRecipe, pendingRecipeId, pendingRecipeOrigin, returnToMode } = useShellNavigation();
   const { showStatusMessage } = useShellStatusMessage();
+  const { selectedSubViews, selectShellLeaf } = useShellSubView();
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
   const { aiUsageSummary, refreshAiUsage } = useShellAiUsage();
   const recipeLimitReached = Boolean(
@@ -325,6 +327,15 @@ export function RecipeMealWorkspace({
   });
   const selectedShortageSelectionCount = shortageSelectionItems.filter((item) => item.selected).length;
   const allVisibleShortagesSelected = filteredShortageSelectionItems.length > 0 && filteredShortageSelectionItems.every((item) => item.selected);
+
+  useEffect(() => {
+    setActiveView(selectedSubViews.recipes);
+  }, [selectedSubViews.recipes]);
+
+  function switchRecipeView(view: RecipeShellLeaf) {
+    setActiveView(view);
+    selectShellLeaf("recipes", view);
+  }
 
   function resetRecipeForm() {
     setRecipeValues(emptyRecipeFormValues);
@@ -1451,10 +1462,10 @@ export function RecipeMealWorkspace({
       </div>
 
       <div className="canvas-mode-control recipe-subnav" aria-label="献立とレシピの表示切替">
-        <button className="secondary-button compact-button" data-tab="recipes" data-active={activeView === "recipes"} type="button" onClick={() => setActiveView("recipes")}>
+        <button className="secondary-button compact-button" data-tab="recipes" data-active={activeView === "recipes"} type="button" onClick={() => switchRecipeView("recipes")}>
           レシピ集
         </button>
-        <button className="secondary-button compact-button" data-tab="schedule" data-active={activeView === "schedule"} type="button" onClick={() => setActiveView("schedule")}>
+        <button className="secondary-button compact-button" data-tab="schedule" data-active={activeView === "schedule"} type="button" onClick={() => switchRecipeView("schedule")}>
           スケジュール
         </button>
       </div>
@@ -2041,93 +2052,95 @@ export function RecipeMealWorkspace({
             >
               ↑
             </button>
-            {scheduleDays.map((day) => {
-              const daySchedules = visibleMealSchedules.filter((schedule) => schedule.scheduled_on === day);
-              const tone = scheduleDateTone(day);
-              return (
-                <section className="schedule-day" data-tone={tone} key={day}>
-                  <div className="schedule-day-badge">
-                    <span>{formatScheduleDayLabel(day)}</span>
-                    {tone === "today" ? <em>今日</em> : null}
-                  </div>
-                  <div className="schedule-day-slots">
-                    {(["朝", "昼", "晩"] as MealType[]).map((mealType) => {
-                      const schedule = daySchedules.find((item) => item.meal_type === mealType);
-                      const isSelected = Boolean(schedule) && selectedSchedule?.id === schedule?.id;
-                      return (
-                        <div
-                          className="schedule-slot"
-                          data-empty={!schedule}
-                          key={`${day}-${mealType}`}
-                          onDragOver={(event) => {
-                            event.preventDefault();
-                            event.dataTransfer.dropEffect = "move";
-                            event.currentTarget.classList.add("is-dragover");
-                          }}
-                          onDragLeave={(event) => {
-                            if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+            <div className="schedule-days-grid">
+              {scheduleDays.map((day) => {
+                const daySchedules = visibleMealSchedules.filter((schedule) => schedule.scheduled_on === day);
+                const tone = scheduleDateTone(day);
+                return (
+                  <section className="schedule-day" data-tone={tone} key={day}>
+                    <div className="schedule-day-badge">
+                      <span>{formatScheduleDayLabel(day)}</span>
+                      {tone === "today" ? <em>今日</em> : null}
+                    </div>
+                    <div className="schedule-day-slots">
+                      {scheduleMealTypes.map((mealType) => {
+                        const schedule = daySchedules.find((item) => item.meal_type === mealType);
+                        const isSelected = Boolean(schedule) && selectedSchedule?.id === schedule?.id;
+                        return (
+                          <div
+                            className="schedule-slot"
+                            data-empty={!schedule}
+                            key={`${day}-${mealType}`}
+                            onDragOver={(event) => {
+                              event.preventDefault();
+                              event.dataTransfer.dropEffect = "move";
+                              event.currentTarget.classList.add("is-dragover");
+                            }}
+                            onDragLeave={(event) => {
+                              if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                                event.currentTarget.classList.remove("is-dragover");
+                              }
+                            }}
+                            onDrop={(event) => {
+                              event.preventDefault();
                               event.currentTarget.classList.remove("is-dragover");
-                            }
-                          }}
-                          onDrop={(event) => {
-                            event.preventDefault();
-                            event.currentTarget.classList.remove("is-dragover");
-                            const id = event.dataTransfer.getData("text/plain");
-                            if (!id) return;
-                            const dragged = mealSchedules.find((item) => item.id === id);
-                            if (dragged) moveScheduleToSlot(dragged, day, mealType);
-                          }}
-                        >
-                          <div className="schedule-slot-head">
-                            <span>{mealType}</span>
-                            <button
-                              className="schedule-add-button"
-                              type="button"
-                              onClick={() => setPickerSlot({ date: day, meal: mealType })}
-                              aria-label={`${formatScheduleDayLabel(day)} ${mealType}に追加`}
-                            >
-                              ＋
-                            </button>
-                          </div>
-                          {schedule ? (
-                            <article
-                              className="schedule-meal-card"
-                              data-active={isSelected}
-                              data-done={schedule.status === "完了"}
-                              draggable
-                              onDragStart={(event) => {
-                                event.dataTransfer.effectAllowed = "move";
-                                event.dataTransfer.setData("text/plain", schedule.id);
-                                event.currentTarget.classList.add("is-dragging");
-                              }}
-                              onDragEnd={(event) => {
-                                event.currentTarget.classList.remove("is-dragging");
-                              }}
-                            >
+                              const id = event.dataTransfer.getData("text/plain");
+                              if (!id) return;
+                              const dragged = mealSchedules.find((item) => item.id === id);
+                              if (dragged) moveScheduleToSlot(dragged, day, mealType);
+                            }}
+                          >
+                            <div className="schedule-slot-head">
+                              <span>{mealType}</span>
                               <button
-                                className="schedule-meal-select"
+                                className="schedule-add-button"
                                 type="button"
-                                onClick={() => {
-                                  setSelectedScheduleId(schedule.id);
-                                  setSlotMenuId(schedule.id);
-                                }}
-                                aria-label={`${schedule.recipe_name || "レシピ名なし"} の操作`}
+                                onClick={() => setPickerSlot({ date: day, meal: mealType })}
+                                aria-label={`${formatScheduleDayLabel(day)} ${mealType}に追加`}
                               >
-                                <span className="schedule-meal-handle" aria-hidden="true">≡</span>
-                                <span className="schedule-meal-body">
-                                  <strong>{schedule.recipe_name || "レシピ名なし"}</strong>
-                                  {schedule.status === "完了" ? <em>完了</em> : null}
-                                </span>
+                                ＋
                               </button>
-                            </article>
-                          ) : null}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </section>
-              );
-            })}
+                            </div>
+                            {schedule ? (
+                              <article
+                                className="schedule-meal-card"
+                                data-active={isSelected}
+                                data-done={schedule.status === "完了"}
+                                draggable
+                                onDragStart={(event) => {
+                                  event.dataTransfer.effectAllowed = "move";
+                                  event.dataTransfer.setData("text/plain", schedule.id);
+                                  event.currentTarget.classList.add("is-dragging");
+                                }}
+                                onDragEnd={(event) => {
+                                  event.currentTarget.classList.remove("is-dragging");
+                                }}
+                              >
+                                <button
+                                  className="schedule-meal-select"
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedScheduleId(schedule.id);
+                                    setSlotMenuId(schedule.id);
+                                  }}
+                                  aria-label={`${schedule.recipe_name || "レシピ名なし"} の操作`}
+                                >
+                                  <span className="schedule-meal-handle" aria-hidden="true">≡</span>
+                                  <span className="schedule-meal-body">
+                                    <strong>{schedule.recipe_name || "レシピ名なし"}</strong>
+                                    {schedule.status === "完了" ? <em>完了</em> : null}
+                                  </span>
+                                </button>
+                              </article>
+                            ) : null}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </section>
+                );
+              })}
+            </div>
             <button
               className="schedule-shift"
               type="button"
@@ -2883,12 +2896,27 @@ function RecipeDetail({ recipe }: { recipe: Recipe | null }) {
 
   return (
     <div className="recipe-detail">
-      <h4>{recipe.name}</h4>
-      {recipe.source ? <p className="item-note">参考元: {recipe.source}</p> : null}
-      <IngredientSummary title="食材" ingredients={foodIngredients} />
-      <IngredientSummary title="調味料" ingredients={seasoningIngredients} />
-      <StepSummary title="下準備" steps={recipe.prep_steps} />
-      <StepSummary title="調理手順" steps={recipe.steps} />
+      <section className="recipe-detail-hero" aria-label="レシピ概要">
+        <div className="recipe-detail-photo" aria-hidden="true">
+          <span>{recipe.name.slice(0, 1) || "R"}</span>
+        </div>
+        <div className="recipe-detail-hero-body">
+          <h4>{recipe.name}</h4>
+          {recipe.genre.length > 0 ? <div className="recipe-detail-genres">{recipe.genre.map((genre) => <span key={genre}>#{genre}</span>)}</div> : null}
+          <p className="item-note">材料 {recipe.ingredients.length} 品目 / 調理回数 {recipe.cook_count} 回</p>
+          {recipe.source ? <p className="item-note">参考元: {recipe.source}</p> : null}
+        </div>
+      </section>
+      <div className="recipe-detail-columns">
+        <div className="recipe-detail-column">
+          <IngredientSummary title="食材" ingredients={foodIngredients} />
+          <IngredientSummary title="調味料" ingredients={seasoningIngredients} />
+        </div>
+        <div className="recipe-detail-column">
+          <StepSummary title="下準備" steps={recipe.prep_steps} />
+          <StepSummary title="調理手順" steps={recipe.steps} />
+        </div>
+      </div>
     </div>
   );
 }

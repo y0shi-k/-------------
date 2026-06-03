@@ -14,7 +14,13 @@ const shellMocks = vi.hoisted(() => ({
   returnToMode: vi.fn(),
   showStatusMessage: vi.fn(),
   aiUsageSummary: null as AiUsageSummary | null,
-  refreshAiUsage: vi.fn(async () => {})
+  refreshAiUsage: vi.fn(async () => {}),
+  selectedSubViews: {
+    ingredients: "inventory" as "inventory" | "shopping",
+    recipes: "recipes" as "recipes" | "schedule",
+    cooking: "timeline" as "calendar" | "timeline" | "insights"
+  },
+  selectShellLeaf: vi.fn()
 }));
 
 vi.mock("@/lib/supabase/browser", () => ({
@@ -43,6 +49,11 @@ vi.mock("@/components/web-mode-shell", () => ({
   useShellAiUsage: () => ({
     aiUsageSummary: shellMocks.aiUsageSummary,
     refreshAiUsage: shellMocks.refreshAiUsage
+  }),
+  useShellSubView: () => ({
+    activeDesktopTarget: { group: "recipes", kind: "mode", leaf: shellMocks.selectedSubViews.recipes },
+    selectedSubViews: shellMocks.selectedSubViews,
+    selectShellLeaf: shellMocks.selectShellLeaf
   })
 }));
 
@@ -188,6 +199,12 @@ describe("RecipeMealWorkspace", () => {
     shellMocks.aiUsageSummary = null;
     shellMocks.refreshAiUsage.mockReset();
     shellMocks.refreshAiUsage.mockResolvedValue(undefined);
+    shellMocks.selectedSubViews = {
+      ingredients: "inventory",
+      recipes: "recipes",
+      cooking: "timeline"
+    };
+    shellMocks.selectShellLeaf.mockReset();
     global.fetch = vi.fn();
     localStorage.clear();
   });
@@ -204,6 +221,29 @@ describe("RecipeMealWorkspace", () => {
     expect(screen.getByText("玉ねぎ 2個")).toBeTruthy();
     expect(screen.getByText("切る")).toBeTruthy();
     expect(screen.getByText("煮る")).toBeTruthy();
+  });
+
+  it("opens the schedule view from the shell subview selection", async () => {
+    shellMocks.selectedSubViews = {
+      ingredients: "inventory",
+      recipes: "schedule",
+      cooking: "timeline"
+    };
+
+    renderWorkspace({ initialMealSchedules: [baseSchedule] });
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("7日献立")).toBeTruthy();
+    });
+    expect(screen.getByText("カレー")).toBeTruthy();
+  });
+
+  it("reports internal recipe view changes back to the shell", () => {
+    renderWorkspace();
+
+    openScheduleView();
+
+    expect(shellMocks.selectShellLeaf).toHaveBeenCalledWith("recipes", "schedule");
   });
 
   it("creates a recipe with ingredients for the authenticated user", async () => {
