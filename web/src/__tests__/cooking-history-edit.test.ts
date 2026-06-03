@@ -130,4 +130,39 @@ describe("cooking history edit helpers", () => {
     );
     expect(computeInventoryAdjustments([draft])).toEqual([{ stockItemId: "stock-a", deltaQuantity: -150 }]);
   });
+
+  it("classifies drafts as 調味料 by matching recipe ingredients name and unit", () => {
+    const seasoningEvent: CookingConsumptionEvent = {
+      ...baseEvent,
+      id: "event-2",
+      ingredient_name: "醤油",
+      requested_unit: "ml",
+      consumed_unit: "ml",
+      stock_item_id: null,
+      stock_item_name: ""
+    };
+    const seasoningIngredient: RecipeIngredient = {
+      ...baseIngredient,
+      id: "ingredient-2",
+      item_type: "調味料",
+      name: "醤油",
+      unit: "ml"
+    };
+
+    const [draft] = buildEditDrafts([seasoningEvent], [seasoningIngredient]);
+
+    expect(draft.item_type).toBe("調味料");
+  });
+
+  it("falls back to 食材 when no matching recipe ingredient is provided", () => {
+    expect(buildEditDrafts([baseEvent])[0].item_type).toBe("食材");
+    expect(buildEditDrafts([baseEvent], [])[0].item_type).toBe("食材");
+  });
+
+  it("carries item_type from recipe ingredients when rebuilding drafts", () => {
+    const seasoning: RecipeIngredient = { ...baseIngredient, item_type: "調味料", name: "砂糖", unit: "g" };
+    const [draft] = buildDraftsFromRecipeIngredients([seasoning], []);
+
+    expect(draft.item_type).toBe("調味料");
+  });
 });

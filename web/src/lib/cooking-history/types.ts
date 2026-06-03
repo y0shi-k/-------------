@@ -1,3 +1,5 @@
+import type { RecipeIngredientType } from "@/lib/recipes/types";
+
 export type CookingHistoryPhoto = {
   id: string;
   user_id: string;
@@ -48,6 +50,7 @@ export type CookingConsumptionEvent = {
 export type ConsumptionEditDraft = {
   id: string;
   isNew: boolean;
+  item_type: RecipeIngredientType;
   ingredientName: string;
   requestedAmount: number;
   requestedUnit: string;

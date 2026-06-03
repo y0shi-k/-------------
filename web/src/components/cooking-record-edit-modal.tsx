@@ -61,32 +61,39 @@ export function CookingRecordEditModal({ inventoryItems, item, onClose, onSaved,
       }
 
       const events = (data ?? []) as CookingConsumptionEvent[];
-      if (events.length > 0 || !item.recipe_id) {
-        setIsRebuiltFromRecipe(false);
-        setDrafts(buildEditDrafts(events));
-        return;
+
+      // レシピ材料は分類（食材/調味料）の正本。イベント有無に関わらず取得して item_type を引く。
+      let recipeIngredients: RecipeIngredient[] = [];
+      if (item.recipe_id) {
+        const { data: ingredients, error: ingredientsError } = await supabase
+          .from("recipe_ingredients")
+          .select("*")
+          .eq("user_id", userId)
+          .eq("recipe_id", item.recipe_id)
+          .order("sort_order", { ascending: true });
+
+        if (!mounted) return;
+
+        if (ingredientsError) {
+          setFeedback({
+            tone: "error",
+            message: "原因: レシピ材料を読み込めませんでした。影響: 消費量の入力欄を復元できません。修正方法: ログイン状態とレシピデータを確認してください。"
+          });
+          setDrafts([]);
+          return;
+        }
+
+        recipeIngredients = (ingredients ?? []) as RecipeIngredient[];
       }
 
-      const { data: ingredients, error: ingredientsError } = await supabase
-        .from("recipe_ingredients")
-        .select("*")
-        .eq("user_id", userId)
-        .eq("recipe_id", item.recipe_id)
-        .order("sort_order", { ascending: true });
-
-      if (!mounted) return;
-
-      if (ingredientsError) {
-        setFeedback({
-          tone: "error",
-          message: "原因: レシピ材料を読み込めませんでした。影響: 消費量の入力欄を復元できません。修正方法: ログイン状態とレシピデータを確認してください。"
-        });
-        setDrafts([]);
+      if (events.length > 0 || !item.recipe_id) {
+        setIsRebuiltFromRecipe(false);
+        setDrafts(buildEditDrafts(events, recipeIngredients));
         return;
       }
 
       setIsRebuiltFromRecipe(true);
-      setDrafts(buildDraftsFromRecipeIngredients((ingredients ?? []) as RecipeIngredient[], inventoryItems));
+      setDrafts(buildDraftsFromRecipeIngredients(recipeIngredients, inventoryItems));
     }
 
     loadConsumptionEvents();
@@ -102,11 +109,9 @@ export function CookingRecordEditModal({ inventoryItems, item, onClose, onSaved,
 
   function setVisibleConsumptionSelected(selected: boolean) {
     setDrafts((current) =>
-      current.map((draft) => {
-        const stockItem = inventoryItems.find((item) => item.id === draft.stockItemId);
-        const category = stockItem?.category ?? "食材";
-        return consumptionTab === "all" || consumptionTab === category ? { ...draft, selected } : draft;
-      })
+      current.map((draft) =>
+        consumptionTab === "all" || consumptionTab === draft.item_type ? { ...draft, selected } : draft
+      )
     );
   }
 
@@ -423,7 +428,7 @@ function ConsumptionEditList({
   const rows = drafts
     .map((draft, index) => {
       const stockItem = inventoryItems.find((item) => item.id === draft.stockItemId);
-      const category = stockItem?.category ?? "食材";
+      const category = draft.item_type;
       const amount = Number(draft.amount);
       return {
         category,

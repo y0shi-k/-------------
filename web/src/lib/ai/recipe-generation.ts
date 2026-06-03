@@ -43,6 +43,7 @@ export function buildGeminiRecipeRequest(input: { mode: "generate" | "structure"
       ? [
           "次のレシピ本文をWebアプリに保存しやすいJSONへ構造化してください。",
           "説明文やMarkdownは不要です。JSONだけを返してください。",
+          ingredientTypeRule(),
           recipeJsonSchema(),
           `本文:\n${input.sourceText}`
         ].join("\n\n")
@@ -50,6 +51,7 @@ export function buildGeminiRecipeRequest(input: { mode: "generate" | "structure"
           "次の条件から家庭料理のレシピ案を1つ作ってください。",
           "必須食材は必ず使い、任意食材は合う場合だけ使ってください。",
           "説明文やMarkdownは不要です。JSONだけを返してください。",
+          ingredientTypeRule(),
           recipeJsonSchema(),
           `必須食材:\n${input.required || "指定なし"}`,
           `任意食材:\n${input.optional || "指定なし"}`,
@@ -85,8 +87,12 @@ export function parseGeminiRecipeResponse(response: GeminiResponse): AiRecipeRes
   return { ok: true, recipe };
 }
 
+function ingredientTypeRule() {
+  return '材料の item_type は、醤油・味噌・塩・砂糖・酢・油・みりん・酒・だし・コンソメ・スパイス等の調味料は "調味料"、それ以外の具材は "食材" にしてください。';
+}
+
 function recipeJsonSchema() {
-  return '形式: {"name":"レシピ名","genre":["和食"],"source":"AI提案","ingredients":[{"item_type":"食材","name":"玉ねぎ","amount":1,"unit":"個"}],"prep_steps":["切る"],"steps":["炒める"]}';
+  return '形式: {"name":"レシピ名","genre":["和食"],"source":"AI提案","ingredients":[{"item_type":"食材","name":"玉ねぎ","amount":1,"unit":"個"},{"item_type":"調味料","name":"醤油","amount":15,"unit":"ml"}],"prep_steps":["切る"],"steps":["炒める"]}';
 }
 
 function extractGeminiText(response: GeminiResponse): string {

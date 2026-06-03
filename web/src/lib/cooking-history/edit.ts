@@ -1,6 +1,10 @@
 import type { ConsumptionEditDraft, CookingConsumptionEvent } from "@/lib/cooking-history/types";
 import type { StockItem } from "@/lib/inventory/types";
-import type { RecipeIngredient } from "@/lib/recipes/types";
+import type { RecipeIngredient, RecipeIngredientType } from "@/lib/recipes/types";
+
+function ingredientTypeKey(name: string, unit: string) {
+  return `${name}|${unit}`;
+}
 
 export type InventoryAdjustment = {
   deltaQuantity: number;
@@ -14,7 +18,11 @@ export type QuantityUpdate = {
   previousQuantity: number;
 };
 
-export function buildEditDrafts(events: CookingConsumptionEvent[]): ConsumptionEditDraft[] {
+export function buildEditDrafts(events: CookingConsumptionEvent[], ingredients: RecipeIngredient[] = []): ConsumptionEditDraft[] {
+  const itemTypeByKey = new Map<string, RecipeIngredientType>(
+    ingredients.map((ingredient) => [ingredientTypeKey(ingredient.name, ingredient.unit), ingredient.item_type])
+  );
+
   return events.map((event) => {
     const consumedAmount = Number(event.consumed_amount || 0);
     const stockItemId = event.stock_item_id ?? "";
@@ -22,6 +30,7 @@ export function buildEditDrafts(events: CookingConsumptionEvent[]): ConsumptionE
     return {
       id: event.id,
       isNew: false,
+      item_type: itemTypeByKey.get(ingredientTypeKey(event.ingredient_name, event.requested_unit)) ?? "食材",
       ingredientName: event.ingredient_name,
       requestedAmount: Number(event.requested_amount || 0),
       requestedUnit: event.requested_unit,
@@ -47,6 +56,7 @@ export function buildDraftsFromRecipeIngredients(ingredients: RecipeIngredient[]
     return {
       id: `new-${ingredient.id || index}`,
       isNew: true,
+      item_type: ingredient.item_type,
       ingredientName: ingredient.name,
       requestedAmount: Number(ingredient.amount || 0),
       requestedUnit: ingredient.unit,
