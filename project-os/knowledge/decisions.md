@@ -5,6 +5,38 @@
 
 ---
 
+## 2026-06-04
+
+### 決定
+レシピのお気に入りを `recipes.is_favorite`（boolean not null default false）で新設（TKT-0167）。
+新規 RLS ポリシーは追加せず、既存行ポリシー（`auth.uid() = user_id`）で参照・更新を自分の行に限定する。
+切替は専用更新（楽観的更新＋失敗ロールバック）にし、既存の `saveRecipe` payload には含めない。
+カテゴリ絞り込みは今回「お気に入り」チップのみ追加（「よく作る」は cook_count 由来で導出可だが今回スコープ外）。
+ローカルに Docker が無く真のローカル Supabase が使えないため、ユーザー明示承認のうえ migration を
+hosted プロジェクト（`wwtompvneobysieofxkl`）へ `supabase db push` で適用し、schema/RLS/後方互換を
+hosted で実検証した。
+
+### 理由
+列追加＋default false は加算的で後方互換。RLS は行ポリシーが列にも効くため新規不要。トグルを保存処理から
+分離することで既存保存の回帰を避けられる。ローカル隔離環境が無い以上、危険変更の本体（schema/RLS）は
+実 DB で確認するのが最も確実で、追加列は低リスク。
+
+### 却下した案
+- お気に入り用に新規 RLS ポリシーを追加 → 既存行ポリシーで充足のため不要。
+- is_favorite を `saveRecipe` の payload に混ぜる → 保存処理の回帰リスク。トグル専用更新に分離。
+- 「よく作る」チップも同時追加 → スコープを最小に保つため見送り（cook_count 由来でいつでも追加可）。
+- DB 適用を保留しコードのみ確定 → ローカル DB が無く UI happy-path も確認できないため、ユーザー承認のうえ hosted 適用を選択。
+
+### 付随修正
+- Stop hook `hook_decisions_reminder.py` が Stop 非対応の `hookSpecificOutput.additionalContext` を出して
+  スキーマエラーになっていたため、`systemMessage` に修正。
+
+### 次に確認すること
+- UI happy-path（ハート保存・リロード保持・絞り込み・オフライン時ロールバック・スマホ・ハートの見た目）の
+  ブラウザ確認（ユーザー）。崩れ・サイズの微調整要否。
+
+---
+
 ## 2026-06-03
 
 ### 決定（PCデザイン言語の正本を新設し Image #3 トーンに統一）

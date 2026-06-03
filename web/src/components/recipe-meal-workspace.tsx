@@ -258,6 +258,7 @@ export function RecipeMealWorkspace({
   const [recipeSearchLogic, setRecipeSearchLogic] = useState<RecipeSearchLogic>("and");
   const [recipeSearchMode, setRecipeSearchMode] = useState<RecipeSearchMode>("name");
   const [recipeSort, setRecipeSort] = useState<RecipeSort>("created_desc");
+  const [recipeFavoriteOnly, setRecipeFavoriteOnly] = useState(false);
   const [pendingDeleteRecipeId, setPendingDeleteRecipeId] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
   const [pendingConsumptionScheduleId, setPendingConsumptionScheduleId] = useState<string | null>(null);
@@ -306,7 +307,8 @@ export function RecipeMealWorkspace({
 
   const selectedRecipe = recipes.find((recipe) => recipe.id === selectedRecipeId) ?? recipes[0] ?? null;
   const activeCookingRecipe = recipes.find((recipe) => recipe.id === activeCookingRecipeId) ?? null;
-  const visibleRecipes = filterAndSortRecipes(recipes, recipeSearch, recipeSort, recipeSearchMode, recipeSearchLogic);
+  const favoriteFilteredRecipes = recipeFavoriteOnly ? recipes.filter((recipe) => recipe.is_favorite) : recipes;
+  const visibleRecipes = filterAndSortRecipes(favoriteFilteredRecipes, recipeSearch, recipeSort, recipeSearchMode, recipeSearchLogic);
   const selectedSchedule = mealSchedules.find((schedule) => schedule.id === selectedScheduleId) ?? mealSchedules[0] ?? null;
   const slotMenuSchedule = slotMenuId ? mealSchedules.find((schedule) => schedule.id === slotMenuId) ?? null : null;
   const cookingSchedule = cookingScheduleId ? mealSchedules.find((schedule) => schedule.id === cookingScheduleId) ?? null : null;
@@ -982,6 +984,26 @@ export function RecipeMealWorkspace({
     }
 
     setMealSchedules((items) => items.map((item) => (item.id === schedule.id ? (data as MealSchedule) : item)));
+  }
+
+  // お気に入りの切替（TKT-0167）。moveScheduleToSlot 同様、まず画面を即時反転（楽観的更新）し、
+  // 保存はバックグラウンド。失敗時は前状態へロールバックし、レイアウトを動かさないトーストで通知する。
+  // is_favorite はトグル専用更新にして、既存の saveRecipe payload には含めない（責務分離）。
+  async function toggleRecipeFavorite(recipe: Recipe) {
+    const previousRecipes = recipes;
+    const nextFavorite = !recipe.is_favorite;
+    setRecipes((items) => items.map((item) => (item.id === recipe.id ? { ...item, is_favorite: nextFavorite } : item)));
+
+    const { error } = await supabase
+      .from("recipes")
+      .update({ is_favorite: nextFavorite })
+      .eq("id", recipe.id)
+      .eq("user_id", userId);
+
+    if (error) {
+      setRecipes(previousRecipes);
+      showToast("お気に入りを更新できませんでした。ログイン状態を確認してください。", "error");
+    }
   }
 
   // Canvas版 startScheduleSlotCooking 相当: 調理ビューアを開く。完了（消費）はビューア側で行う。
@@ -1904,6 +1926,9 @@ export function RecipeMealWorkspace({
             onEdit={startEditRecipe}
             onDelete={(recipe) => requestDelete(recipe.name, "このレシピを削除します。献立に紐づくレシピ参照も外れます。", () => deleteRecipe(recipe))}
             onSelect={setSelectedRecipeId}
+            onToggleFavorite={toggleRecipeFavorite}
+            favoriteOnly={recipeFavoriteOnly}
+            onFavoriteFilterChange={setRecipeFavoriteOnly}
             pendingDeleteRecipeId={pendingDeleteRecipeId}
             recipes={visibleRecipes}
             search={recipeSearch}
@@ -2741,6 +2766,9 @@ function RecipeList({
   onDelete,
   onEdit,
   onSelect,
+  onToggleFavorite,
+  favoriteOnly,
+  onFavoriteFilterChange,
   onSearchChange,
   onSearchLogicChange,
   onSearchModeChange,
@@ -2759,6 +2787,9 @@ function RecipeList({
   onDelete: (recipe: Recipe) => void;
   onEdit: (recipe: Recipe) => void;
   onSelect: (id: string) => void;
+  onToggleFavorite: (recipe: Recipe) => void;
+  favoriteOnly: boolean;
+  onFavoriteFilterChange: (value: boolean) => void;
   onSearchChange: (value: string) => void;
   onSearchLogicChange: (value: RecipeSearchLogic) => void;
   onSearchModeChange: (value: RecipeSearchMode) => void;
@@ -2819,6 +2850,14 @@ function RecipeList({
           </button>
         ))}
       </div>
+      <div className="recipe-filter-chips" aria-label="レシピの絞り込み">
+        <button className="recipe-filter-chip" data-active={!favoriteOnly} type="button" onClick={() => onFavoriteFilterChange(false)}>
+          すべて
+        </button>
+        <button className="recipe-filter-chip" data-active={favoriteOnly} type="button" onClick={() => onFavoriteFilterChange(true)}>
+          お気に入り
+        </button>
+      </div>
       <div className="recipe-count-row">
         <span>{totalCount} レシピ</span>
         <small>同期は上部の同期ボタンで一括反映</small>
@@ -2855,6 +2894,20 @@ function RecipeList({
                 <div className="recipe-card-meta-row">
                   <p className="recipe-card-meta">材料 {recipe.ingredients.length} 品目 | 調理回数 {recipe.cook_count} | 登録 {formatRecipeDate(recipe.created_at)}</p>
                   <RecipeListGenreSummary genres={recipe.genre} />
+                </div>
+                <div className="recipe-card-footer">
+                  <button
+                    className="recipe-favorite-button"
+                    data-on={recipe.is_favorite}
+                    type="button"
+                    aria-pressed={recipe.is_favorite}
+                    aria-label={recipe.is_favorite ? "お気に入りを解除" : "お気に入りに追加"}
+                    onClick={(event) => { event.stopPropagation(); onToggleFavorite(recipe); }}
+                  >
+                    <svg aria-hidden="true" viewBox="0 0 24 24">
+                      <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+                    </svg>
+                  </button>
                 </div>
               </div>
             </article>

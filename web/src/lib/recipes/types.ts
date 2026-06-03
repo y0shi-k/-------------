@@ -25,6 +25,7 @@ export type Recipe = {
   prep_steps: string[];
   cook_count: number;
   cooked_on_history: string[];
+  is_favorite: boolean;
   created_at: string;
   updated_at: string;
   ingredients: RecipeIngredient[];

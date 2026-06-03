@@ -80,6 +80,7 @@ export default async function Home() {
     prep_steps: Array.isArray(recipe.prep_steps) ? recipe.prep_steps : [],
     steps: Array.isArray(recipe.steps) ? recipe.steps : [],
     cooked_on_history: Array.isArray(recipe.cooked_on_history) ? recipe.cooked_on_history : [],
+    is_favorite: Boolean(recipe.is_favorite),
     ingredients: ingredientRows.filter((ingredient) => ingredient.recipe_id === recipe.id)
   }));
   const cookingHistoryRows = (cookingHistory ?? []) as Omit<CookingHistoryItem, "photos">[];

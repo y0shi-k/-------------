@@ -80,6 +80,7 @@ const baseRecipe: Recipe = {
   prep_steps: ["切る"],
   cook_count: 0,
   cooked_on_history: [],
+  is_favorite: false,
   created_at: "2026-05-24T00:00:00.000Z",
   updated_at: "2026-05-24T00:00:00.000Z",
   ingredients: [baseIngredient]

@@ -3643,6 +3643,32 @@ h1 {
   color: #4f46e5;
 }
 
+/* お気に入り絞り込みチップ（TKT-0167 / 設計 §3.3）。非active=白地+枠、active=accent寄り。 */
+.recipe-filter-chips {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 4px 10px;
+}
+
+.recipe-filter-chip {
+  flex: 0 0 auto;
+  min-height: 28px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--muted);
+  padding: 4px 14px;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.recipe-filter-chip[data-active="true"] {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+
 .recipe-count-row {
   display: flex;
   align-items: center;
@@ -3875,6 +3901,41 @@ h1 {
   align-items: center;
   gap: 6px;
   margin-left: auto;
+}
+
+/* お気に入りハート（TKT-0167 / 設計 §3.5）。未選択=rose アウトライン、選択=--favorite 塗り。 */
+.recipe-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  margin-top: 6px;
+}
+
+.recipe-favorite-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  min-height: 36px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--favorite);
+  padding: 0;
+  cursor: pointer;
+}
+
+.recipe-favorite-button svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: var(--favorite);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+
+.recipe-favorite-button[data-on="true"] svg {
+  fill: var(--favorite);
 }
 
 .meal-actions {
@@ -5701,6 +5762,26 @@ h1 {
   .recipe-card .recipe-list-genre-summary {
     flex-wrap: wrap;
     white-space: normal;
+  }
+
+  /* お気に入りフッタはカード下端に常時表示（操作ボタンと違いホバー退避しない）。main を縦に伸ばし footer を底へ。 */
+  .recipe-card .recipe-card-main {
+    flex: 1 1 auto;
+  }
+
+  .recipe-card .recipe-card-footer {
+    margin-top: auto;
+    padding-top: 8px;
+  }
+
+  .recipe-card .recipe-favorite-button {
+    width: 32px;
+    min-height: 32px;
+  }
+
+  .recipe-card .recipe-favorite-button svg {
+    width: 20px;
+    height: 20px;
   }
 
   .recipe-detail-panel {
