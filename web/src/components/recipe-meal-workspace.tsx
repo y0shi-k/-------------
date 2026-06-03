@@ -2830,7 +2830,7 @@ function RecipeList({
         <div className="recipe-list">
           {recipes.map((recipe) => (
             <article className="recipe-card" data-active={selectedRecipeId === recipe.id} key={recipe.id} onClick={() => onSelect(recipe.id)}>
-              <div className="recipe-card-icon" aria-hidden="true">III</div>
+              <div className="recipe-card-icon" aria-hidden="true"><span>{recipe.name.slice(0, 1) || "R"}</span></div>
               <div className="recipe-card-main">
                 <div className="recipe-card-heading">
                   <button className="recipe-select-button" type="button" onClick={(event) => { event.stopPropagation(); onSelect(recipe.id); }}>

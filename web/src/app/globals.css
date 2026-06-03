@@ -11,6 +11,10 @@
   --green: #009f73;
   --cream: #fff9e8;
   --cream-line: #fde3a4;
+  /* PCデザイン言語トークン（docs/design/pc-design-language.md §2）。後続画面で再利用する。 */
+  --accent-soft: #eef0ff;
+  --favorite: #f43f5e;
+  --shadow-card: 0 8px 24px rgb(15 23 42 / 6%);
 }
 
 * {
@@ -3712,6 +3716,11 @@ h1 {
   font-weight: 900;
 }
 
+.recipe-card-icon span {
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+
 .recipe-icon-button {
   display: grid;
   width: 40px;
@@ -5576,9 +5585,122 @@ h1 {
     min-width: 0;
   }
 
+  /*
+   * TKT-0166: PCレシピ一覧を縦型カードへ（docs/design/pc-design-language.md §3.5）。
+   * カード自身で見せるため一覧パネルの色面・枠は外し、白基調にする。
+   */
   .recipe-list {
-    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
     align-items: stretch;
+    gap: 16px;
+    border-color: transparent;
+    background: transparent;
+    padding: 4px;
+  }
+
+  .recipe-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+    min-height: 0;
+    border-color: #e8ecf5;
+    border-radius: 16px;
+    background: var(--surface);
+    padding: 0;
+    overflow: hidden;
+    box-shadow: var(--shadow-card);
+    transition: box-shadow 0.18s ease, transform 0.18s ease, border-color 0.18s ease;
+  }
+
+  .recipe-card:hover {
+    border-color: #dbe1f0;
+    box-shadow: 0 14px 32px rgb(15 23 42 / 10%);
+    transform: translateY(-2px);
+  }
+
+  .recipe-card[data-active="true"] {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent), var(--shadow-card);
+  }
+
+  /* 上部ビジュアル・プレースホルダ（将来の写真差し込み口）。当面は頭文字。 */
+  .recipe-card .recipe-card-icon {
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    min-height: 0;
+    border-radius: 0;
+    background: linear-gradient(135deg, var(--accent-soft), #f5f3ff);
+    color: var(--accent);
+  }
+
+  .recipe-card .recipe-card-icon span {
+    font-size: 2rem;
+    font-weight: 800;
+  }
+
+  .recipe-card-main {
+    gap: 8px;
+    padding: 14px;
+  }
+
+  .recipe-card-heading {
+    min-height: 0;
+    align-items: flex-start;
+  }
+
+  /* レシピ名は2行クランプ。1文字省略を禁止。 */
+  .recipe-card .recipe-select-button strong {
+    display: -webkit-box;
+    overflow: hidden;
+    font-size: 0.98rem;
+    line-height: 1.35;
+    white-space: normal;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  /* 操作ボタンは名前行に入れず、ホバー/フォーカス時にサムネ右上へオーバーレイ。 */
+  .recipe-card .recipe-card-actions {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    gap: 6px;
+    margin-left: 0;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s ease;
+  }
+
+  .recipe-card:hover .recipe-card-actions,
+  .recipe-card:focus-within .recipe-card-actions {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .recipe-card .recipe-icon-button {
+    width: 32px;
+    min-height: 32px;
+    border: 1px solid #e8ecf5;
+    background: rgb(255 255 255 / 92%);
+    box-shadow: 0 2px 6px rgb(15 23 42 / 12%);
+  }
+
+  /* メタ行・ジャンルタグは折り返し可にして溢れさせない。 */
+  .recipe-card .recipe-card-meta-row {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .recipe-card .recipe-card-meta {
+    max-width: 100%;
+    white-space: normal;
+  }
+
+  .recipe-card .recipe-list-genre-summary {
+    flex-wrap: wrap;
+    white-space: normal;
   }
 
   .recipe-detail-panel {
@@ -5605,42 +5727,19 @@ h1 {
     min-width: 0;
   }
 
+  /*
+   * TKT-0165: PC幅でも、スマホ版と同じ「1日=1行」の縦アジェンダ表示を維持する。
+   * 横7列グリッド（TKT-0159）は各日カードが盤面の全高まで引き伸ばされ、
+   * スロット下に大きな縦余白が出て無駄だったため採用しない。
+   * ベース（スマホ）の縦積みレイアウトへフォールバックし、読みやすい幅に制限して中央寄せにする。
+   */
   .schedule-board {
-    grid-template-columns: 40px minmax(0, 1fr) 40px;
-    align-items: stretch;
-  }
-
-  .schedule-shift {
-    height: auto;
-    min-height: 100%;
+    width: min(760px, 100%);
+    margin: 0 auto;
   }
 
   .schedule-days-grid {
-    grid-template-columns: repeat(7, minmax(118px, 1fr));
-    align-items: stretch;
-    overflow-x: auto;
-  }
-
-  .schedule-day {
-    flex-direction: column;
-    gap: 10px;
-    min-width: 118px;
-    padding: 10px;
-  }
-
-  .schedule-day-badge {
-    width: 100%;
-    min-height: 54px;
-  }
-
-  .schedule-day-slots {
-    grid-template-columns: 1fr;
-    grid-template-rows: repeat(3, minmax(92px, 1fr));
-    flex: 1;
-  }
-
-  .schedule-slot {
-    min-height: 92px;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
