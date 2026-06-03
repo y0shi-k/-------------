@@ -61,9 +61,11 @@ type ConsumptionDraft = {
   ingredientName: string;
   requestedAmount: number;
   requestedUnit: string;
-  selected: boolean;
   stockItemId: string;
 };
+
+// 完了モーダルの一括操作。default=在庫がある行に既定量、zero=表示中の行を0にする。
+type ConsumptionBulkMode = "default" | "zero";
 
 type AiRecipeMode = "generate" | "structure";
 type RecipeWorkspaceView = "recipes" | "schedule";
@@ -590,13 +592,20 @@ export function RecipeMealWorkspace({
     setCookingPhotoPreviewUrl(URL.createObjectURL(file));
   }
 
-  function setVisibleConsumptionSelected(selected: boolean) {
+  function setVisibleConsumptionAmount(mode: ConsumptionBulkMode) {
     if (!activeCookingRecipe) return;
     setConsumptionDrafts((items) =>
       items.map((draft) => {
         const ingredient = activeCookingRecipe.ingredients.find((item) => item.name === draft.ingredientName && item.unit === draft.requestedUnit);
         const visible = consumptionTab === "all" || ingredient?.item_type === consumptionTab;
-        return visible ? { ...draft, selected } : draft;
+        if (!visible) return draft;
+        if (mode === "zero") {
+          return { ...draft, amount: "0" };
+        }
+        // default: 在庫を選んでいる行だけ既定量（min(必要量, 在庫量)）を入れる。在庫未選択の行は0のまま。
+        const stockItem = inventoryItemsForMeals.find((item) => item.id === draft.stockItemId);
+        if (!stockItem) return draft;
+        return { ...draft, amount: String(Math.min(draft.requestedAmount, Number(stockItem.quantity || 0))) };
       })
     );
   }
@@ -656,7 +665,6 @@ export function RecipeMealWorkspace({
         requestedAmount: ingredient.amount,
         requestedUnit: ingredient.unit,
         amount: exactStock ? String(Math.min(ingredient.amount, exactStock.quantity)) : "0",
-        selected: Boolean(exactStock) && Number(ingredient.amount) > 0,
         stockItemId: exactStock?.id ?? ""
       };
     });
@@ -1123,7 +1131,7 @@ export function RecipeMealWorkspace({
       ...draft,
       consumedAmount: Number(draft.amount)
     }));
-    const invalidDraft = normalizedDrafts.find((draft) => draft.selected && (!Number.isFinite(draft.consumedAmount) || draft.consumedAmount < 0));
+    const invalidDraft = normalizedDrafts.find((draft) => draft.stockItemId && (!Number.isFinite(draft.consumedAmount) || draft.consumedAmount < 0));
     if (invalidDraft) {
       setFeedback({ tone: "error", message: "原因: 消費量に不備があります。影響: 在庫を減算できません。修正方法: 0以上の数値に直してください。" });
       return;
@@ -1143,7 +1151,7 @@ export function RecipeMealWorkspace({
       stockItem: StockItem;
     }> = [];
     for (const draft of normalizedDrafts) {
-      if (!draft.selected || !draft.stockItemId || draft.consumedAmount === 0) continue;
+      if (!draft.stockItemId || draft.consumedAmount === 0) continue;
       const stockItem = inventoryItemsForMeals.find((item) => item.id === draft.stockItemId);
       if (!stockItem) continue;
       consumedRows.push({
@@ -1361,7 +1369,7 @@ export function RecipeMealWorkspace({
               drafts={consumptionDrafts}
               inventoryItems={inventoryItemsForMeals}
               onChange={updateConsumptionDraft}
-              onSelectVisible={setVisibleConsumptionSelected}
+              onBulkSet={setVisibleConsumptionAmount}
               onTabChange={setConsumptionTab}
               recipe={activeCookingRecipe}
               tab={consumptionTab}
@@ -2350,7 +2358,7 @@ function ConsumptionEditor({
   drafts,
   inventoryItems,
   onChange,
-  onSelectVisible,
+  onBulkSet,
   onTabChange,
   recipe,
   tab
@@ -2358,7 +2366,7 @@ function ConsumptionEditor({
   drafts: ConsumptionDraft[];
   inventoryItems: StockItem[];
   onChange: (index: number, values: Partial<ConsumptionDraft>) => void;
-  onSelectVisible: (selected: boolean) => void;
+  onBulkSet: (mode: ConsumptionBulkMode) => void;
   onTabChange: (tab: ConsumptionTab) => void;
   recipe: Recipe | null;
   tab: ConsumptionTab;
@@ -2372,14 +2380,19 @@ function ConsumptionEditor({
       const ingredient = recipe.ingredients.find((item) => item.name === draft.ingredientName && item.unit === draft.requestedUnit);
       const stockItem = inventoryItems.find((item) => item.id === draft.stockItemId);
       const amount = Number(draft.amount);
+      // おすすめ = 同分類・同単位・在庫あり。それ以外は代替材料として選べるよう「その他の在庫」に出す。
+      const options = ingredient
+        ? inventoryItems.filter((item) => item.category === ingredient.item_type && item.unit === ingredient.unit && item.quantity > 0)
+        : [];
+      const recommendedIds = new Set(options.map((item) => item.id));
+      const otherOptions = inventoryItems.filter((item) => item.quantity > 0 && !recommendedIds.has(item.id));
       return {
         draft,
         index,
         ingredient,
-        isShortage: Boolean(draft.selected && stockItem && Number.isFinite(amount) && amount > Number(stockItem.quantity || 0)),
-        options: ingredient
-          ? inventoryItems.filter((item) => item.category === ingredient.item_type && item.unit === ingredient.unit && item.quantity > 0)
-          : [],
+        isShortage: Boolean(stockItem && Number.isFinite(amount) && amount > 0 && amount > Number(stockItem.quantity || 0)),
+        options,
+        otherOptions,
         stockItem
       };
     })
@@ -2410,11 +2423,11 @@ function ConsumptionEditor({
           ))}
         </div>
         <div className="consumption-bulk-actions">
-          <button className="secondary-button compact-button" type="button" onClick={() => onSelectVisible(true)}>
-            全選択
+          <button className="secondary-button compact-button" type="button" onClick={() => onBulkSet("default")}>
+            全部 既定量
           </button>
-          <button className="secondary-button compact-button" type="button" onClick={() => onSelectVisible(false)}>
-            全解除
+          <button className="secondary-button compact-button" type="button" onClick={() => onBulkSet("zero")}>
+            全部 0
           </button>
         </div>
       </div>
@@ -2429,37 +2442,51 @@ function ConsumptionEditor({
         <p className="empty-list">このカテゴリの材料はありません。</p>
       ) : (
         <div className="consumption-list">
-          {rows.map(({ draft, index, ingredient, isShortage, options, stockItem }) => {
+          {rows.map(({ draft, index, ingredient, isShortage, options, otherOptions, stockItem }) => {
+            const hasAnyStock = options.length > 0 || otherOptions.length > 0;
             return (
-              <article className="consumption-item" data-selected={draft.selected} key={`${draft.ingredientName}-${draft.requestedUnit}-${index}`}>
-                <div className="item-main">
-                  <label className="consumption-check">
-                    <input
-                      checked={draft.selected}
-                      onChange={(event) => onChange(index, { selected: event.target.checked })}
-                      type="checkbox"
-                    />
-                    <span>
-                      <small>必要 {draft.requestedAmount}{draft.requestedUnit} / {ingredient?.item_type ?? "未分類"}</small>
-                      <strong>{draft.ingredientName}</strong>
+              <article className="consumption-row" data-active={Number(draft.amount) > 0} key={`${draft.ingredientName}-${draft.requestedUnit}-${index}`}>
+                <div className="consumption-row-top">
+                  <div className="consumption-row-label">
+                    <strong>{draft.ingredientName}</strong>
+                    <small>必要 {draft.requestedAmount}{draft.requestedUnit}・{ingredient?.item_type ?? "未分類"}</small>
+                  </div>
+                  <div className="consumption-row-controls">
+                    <select
+                      aria-label="減らす在庫"
+                      value={draft.stockItemId}
+                      onChange={(event) => onChange(index, { stockItemId: event.target.value })}
+                    >
+                      <option value="">{hasAnyStock ? "在庫を選ぶ" : "在庫がありません"}</option>
+                      {options.length > 0 ? (
+                        <optgroup label="おすすめ（同分類・同単位）">
+                          {options.map((item) => (
+                            <option key={item.id} value={item.id}>
+                              {item.name} / {item.quantity}{item.unit} / {item.storage_location}
+                            </option>
+                          ))}
+                        </optgroup>
+                      ) : null}
+                      {otherOptions.length > 0 ? (
+                        <optgroup label="その他の在庫（代替材料）">
+                          {otherOptions.map((item) => (
+                            <option key={item.id} value={item.id}>
+                              {item.name} / {item.quantity}{item.unit} / {item.storage_location}
+                            </option>
+                          ))}
+                        </optgroup>
+                      ) : null}
+                    </select>
+                    <span className="consumption-amount">
+                      <NumberField
+                        ariaLabel="消費量"
+                        value={draft.amount}
+                        onChange={(next) => onChange(index, { amount: next })}
+                      />
+                      <span className="consumption-unit">{draft.requestedUnit}</span>
                     </span>
-                  </label>
+                  </div>
                 </div>
-                <label>
-                  減らす在庫
-                  <select value={draft.stockItemId} onChange={(event) => onChange(index, { stockItemId: event.target.value })}>
-                    <option value="">減算しない</option>
-                    {options.map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.name} / {item.quantity}{item.unit} / {item.storage_location}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  消費量
-                  <input min="0" step="0.1" type="number" value={draft.amount} onChange={(event) => onChange(index, { amount: event.target.value })} />
-                </label>
                 {isShortage && stockItem ? (
                   <p className="consumption-item-warning">
                     在庫 {stockItem.quantity}{stockItem.unit} に対して消費量が多いです。

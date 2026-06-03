@@ -774,7 +774,7 @@ describe("RecipeMealWorkspace", () => {
     expect(await screen.findByText("カレー を調理完了にしました。料理履歴にも記録済みです。")).toBeTruthy();
   });
 
-  it("lets users choose consumption rows and save rating/comment with cooking history", async () => {
+  it("excludes a row by setting consumption to 0 and saves rating/comment with cooking history", async () => {
     const completed = { ...baseSchedule, status: "完了", completed_at: "2026-05-24T10:00:00.000Z" };
     const scheduleUpdate = updateSingleQuery(completed);
     const inventoryUpdate = updateEqQuery();
@@ -799,12 +799,13 @@ describe("RecipeMealWorkspace", () => {
 
     const consumptionModal = await screen.findByRole("dialog", { name: "実際の消費量を調整" });
     expect(within(consumptionModal).getByRole("tab", { name: "全" })).toBeTruthy();
-    expect(within(consumptionModal).getByRole("button", { name: "全選択" })).toBeTruthy();
-    expect(within(consumptionModal).getByRole("button", { name: "全解除" })).toBeTruthy();
+    expect(within(consumptionModal).getByRole("button", { name: "全部 既定量" })).toBeTruthy();
+    expect(within(consumptionModal).getByRole("button", { name: "全部 0" })).toBeTruthy();
     fireEvent.change(within(consumptionModal).getByLabelText("消費量"), { target: { value: "2" } });
     expect(within(consumptionModal).getByText(/在庫不足: 玉ねぎ/)).toBeTruthy();
 
-    fireEvent.click(within(consumptionModal).getByRole("checkbox", { name: /玉ねぎ/ }));
+    // チェックボックスは廃止。消費量を0にすることで在庫減算から除外する。
+    fireEvent.change(within(consumptionModal).getByLabelText("消費量"), { target: { value: "0" } });
     fireEvent.click(within(consumptionModal).getAllByRole("button", { name: "★" })[3]);
     fireEvent.change(within(consumptionModal).getByLabelText("一言コメント"), { target: { value: "家族に好評" } });
     fireEvent.click(within(consumptionModal).getByRole("button", { name: "確定" }));

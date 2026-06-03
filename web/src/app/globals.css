@@ -4049,6 +4049,87 @@ h1 {
   font-weight: 900;
 }
 
+/* 完了モーダル（ConsumptionEditor）専用の1行高密度レイアウト。
+   編集モーダルが使う .consumption-item には影響させない。 */
+.consumption-row {
+  display: grid;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  padding: 10px 12px;
+}
+
+.consumption-row[data-active="false"] {
+  opacity: 0.6;
+}
+
+.consumption-row-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+}
+
+.consumption-row-label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 120px;
+}
+
+.consumption-row-label strong {
+  color: var(--ink);
+  font-size: 0.96rem;
+  font-weight: 800;
+}
+
+.consumption-row-label small {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.consumption-row-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 260px;
+  min-width: 220px;
+  justify-content: flex-end;
+}
+
+.consumption-row-controls select {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink);
+  padding: 10px 12px;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.consumption-amount {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+
+.consumption-amount .number-field {
+  width: 108px;
+}
+
+.consumption-unit {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
 .cooking-record-panel {
   display: grid;
   gap: 12px;
