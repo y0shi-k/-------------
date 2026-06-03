@@ -257,6 +257,15 @@ h1 {
   padding-top: 0;
 }
 
+.desktop-app-frame,
+.desktop-workspace {
+  display: contents;
+}
+
+.desktop-topbar {
+  display: none;
+}
+
 .mode-heading {
   display: grid;
   gap: 10px;
@@ -302,6 +311,13 @@ h1 {
 
 .desktop-mode-nav {
   display: none;
+}
+
+.desktop-nav-brand,
+.desktop-nav-groups,
+.desktop-nav-group,
+.desktop-nav-leaves {
+  min-width: 0;
 }
 
 .bottom-mode-nav button {
@@ -5024,6 +5040,319 @@ h1 {
 
   .meal-actions {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (min-width: 1024px) {
+  .web-app-shell {
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .desktop-app-frame {
+    display: grid;
+    grid-template-columns: 248px minmax(0, 1fr);
+    min-height: 100vh;
+    background:
+      linear-gradient(180deg, rgb(255 255 255 / 72%), rgb(248 250 252 / 92%)),
+      var(--background);
+  }
+
+  .desktop-mode-nav {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    display: flex;
+    height: 100vh;
+    flex-direction: column;
+    gap: 18px;
+    border-right: 1px solid #edf1f7;
+    background: rgb(255 255 255 / 92%);
+    padding: 24px 18px;
+    box-shadow: 16px 0 40px rgb(15 23 42 / 4%);
+  }
+
+  .desktop-nav-brand {
+    display: grid;
+    grid-template-columns: 38px minmax(0, 1fr);
+    gap: 10px;
+    align-items: center;
+    padding: 0 4px 12px;
+  }
+
+  .desktop-nav-logo {
+    display: grid;
+    width: 38px;
+    height: 38px;
+    place-items: center;
+    border: 1px solid #dfe6f2;
+    border-radius: 8px;
+    color: #4f46e5;
+    font-size: 0.74rem;
+    font-weight: 900;
+  }
+
+  .desktop-nav-brand strong,
+  .desktop-nav-home strong,
+  .desktop-nav-settings strong,
+  .desktop-nav-group-button strong {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .desktop-nav-brand strong {
+    display: block;
+    color: #172033;
+    font-size: 0.92rem;
+  }
+
+  .desktop-nav-brand small {
+    display: block;
+    margin-top: 3px;
+    color: var(--muted);
+    font-size: 0.72rem;
+    font-weight: 700;
+    line-height: 1.35;
+  }
+
+  .desktop-nav-home,
+  .desktop-nav-settings,
+  .desktop-nav-group-button,
+  .desktop-nav-leaves button {
+    width: 100%;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    background: transparent;
+    color: #64748b;
+    text-align: left;
+  }
+
+  .desktop-nav-home,
+  .desktop-nav-settings,
+  .desktop-nav-group-button {
+    display: grid;
+    grid-template-columns: 34px minmax(0, 1fr);
+    gap: 8px;
+    align-items: center;
+    min-height: 42px;
+    padding: 8px 10px;
+    font-size: 0.82rem;
+    font-weight: 800;
+  }
+
+  .desktop-nav-home span,
+  .desktop-nav-settings span,
+  .desktop-nav-group-button span {
+    color: #94a3b8;
+    font-size: 0.68rem;
+    font-weight: 900;
+  }
+
+  .desktop-nav-groups {
+    display: grid;
+    gap: 12px;
+    overflow-y: auto;
+    padding-right: 2px;
+  }
+
+  .desktop-nav-group {
+    display: grid;
+    gap: 5px;
+  }
+
+  .desktop-nav-leaves {
+    display: grid;
+    gap: 4px;
+    padding-left: 32px;
+  }
+
+  .desktop-nav-leaves button {
+    display: grid;
+    gap: 2px;
+    min-height: 42px;
+    padding: 7px 10px;
+  }
+
+  .desktop-nav-leaves span {
+    overflow: hidden;
+    color: #334155;
+    font-size: 0.78rem;
+    font-weight: 800;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .desktop-nav-leaves small {
+    overflow: hidden;
+    color: #94a3b8;
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .desktop-nav-home[data-active="true"],
+  .desktop-nav-settings[data-active="true"],
+  .desktop-nav-group-button[data-active="true"],
+  .desktop-nav-leaves button[data-active="true"] {
+    border-color: #e5e7ff;
+    background: #eef0ff;
+    color: #4f46e5;
+  }
+
+  .desktop-nav-leaves button[data-active="true"] span,
+  .desktop-nav-home[data-active="true"] span,
+  .desktop-nav-settings[data-active="true"] span,
+  .desktop-nav-group-button[data-active="true"] span {
+    color: #4f46e5;
+  }
+
+  .desktop-nav-settings {
+    margin-top: auto;
+  }
+
+  .desktop-workspace {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    min-width: 0;
+    padding: 18px 28px 40px;
+  }
+
+  .desktop-topbar {
+    position: sticky;
+    top: 0;
+    z-index: 35;
+    display: grid;
+    grid-template-columns: minmax(150px, 0.6fr) minmax(160px, 0.65fr) minmax(240px, 1.1fr) auto minmax(180px, auto);
+    gap: 14px;
+    align-items: center;
+    margin: 0 auto 22px;
+    width: min(1280px, 100%);
+    border: 1px solid #edf1f7;
+    border-radius: 8px;
+    background: rgb(255 255 255 / 94%);
+    padding: 12px 14px;
+    box-shadow: 0 18px 45px rgb(15 23 42 / 5%);
+  }
+
+  .desktop-topbar-title {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .desktop-topbar-title .eyebrow {
+    margin: 0;
+    font-size: 0.66rem;
+  }
+
+  .desktop-topbar-title strong {
+    overflow: hidden;
+    color: #172033;
+    font-size: 1rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .desktop-status-pill {
+    display: grid;
+    min-width: 0;
+    gap: 2px;
+    border: 1px solid #edf1f7;
+    border-radius: 8px;
+    background: #f8fafc;
+    padding: 7px 10px;
+  }
+
+  .desktop-status-pill strong {
+    color: #94a3b8;
+    font-size: 0.66rem;
+    font-weight: 900;
+  }
+
+  .desktop-status-pill span {
+    overflow: hidden;
+    color: #64748b;
+    font-size: 0.73rem;
+    font-weight: 800;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .desktop-status-pill[data-tone="success"] strong,
+  .desktop-status-pill[data-tone="success"] span {
+    color: #059669;
+  }
+
+  .desktop-status-pill[data-tone="error"] strong,
+  .desktop-status-pill[data-tone="error"] span {
+    color: #e11d48;
+  }
+
+  .desktop-status-pill[data-tone="info"] strong,
+  .desktop-status-pill[data-tone="info"] span {
+    color: #4f46e5;
+  }
+
+  .desktop-search-slot input {
+    width: 100%;
+    min-height: 40px;
+    border: 1px solid #edf1f7;
+    border-radius: 999px;
+    background: #f8fafc;
+    color: #64748b;
+    padding: 0 16px;
+    font-weight: 700;
+  }
+
+  .desktop-topbar .ai-usage-meter[data-variant="statusbar"] {
+    justify-content: end;
+  }
+
+  .desktop-account {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+  }
+
+  .desktop-account small {
+    overflow: hidden;
+    max-width: 180px;
+    color: #64748b;
+    font-size: 0.74rem;
+    font-weight: 800;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .desktop-account .account-actions {
+    display: flex;
+    align-items: center;
+  }
+
+  .desktop-account .form-error {
+    display: none;
+  }
+
+  .desktop-account .secondary-button {
+    min-height: 36px;
+    padding: 0 12px;
+    white-space: nowrap;
+  }
+
+  .desktop-workspace > .canvas-status-bar,
+  .bottom-mode-nav {
+    display: none;
+  }
+
+  .mode-panel {
+    width: min(1280px, 100%);
+    margin: 0 auto;
   }
 }
 

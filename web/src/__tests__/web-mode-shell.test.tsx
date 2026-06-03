@@ -1,18 +1,44 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { WebModeShell, useShellAiUsage } from "@/components/web-mode-shell";
+import { WebModeShell, useShellAiUsage, useShellSubView } from "@/components/web-mode-shell";
 
 const rpc = vi.fn();
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({
+    refresh: vi.fn(),
+    replace: vi.fn()
+  })
+}));
 
 vi.mock("@/lib/supabase/browser", () => ({
   createBrowserSupabaseClient: () => ({ rpc })
 }));
 
-function renderShell() {
+function SubViewProbe() {
+  const { activeDesktopTarget, selectedSubViews } = useShellSubView();
+  const target =
+    activeDesktopTarget.kind === "mode"
+      ? `${activeDesktopTarget.group}:${activeDesktopTarget.leaf}`
+      : activeDesktopTarget.kind;
+
+  return (
+    <output aria-label="shell-subview">
+      {target}|{selectedSubViews.ingredients}|{selectedSubViews.recipes}|{selectedSubViews.cooking}
+    </output>
+  );
+}
+
+function renderShell(options?: { withSubViewProbe?: boolean }) {
   return render(
     <WebModeShell
       childrenByMode={{
-        ingredients: <div>食材管理の中身</div>,
+        ingredients: (
+          <div>
+            食材管理の中身
+            {options?.withSubViewProbe ? <SubViewProbe /> : null}
+          </div>
+        ),
         recipes: <div>献立レシピの中身</div>,
         cooking: <div>料理記録の中身</div>
       }}
@@ -37,7 +63,7 @@ describe("WebModeShell", () => {
     });
 
     expect(screen.getByRole("heading", { name: "料理レシピ・食材管理" })).toBeTruthy();
-    expect(screen.getByRole("status").textContent).toContain("食材管理");
+    expect(screen.getAllByRole("status")[0].textContent).toContain("食材管理");
     expect(screen.getAllByText("在庫 5件").length).toBeGreaterThan(0);
     expect(screen.getByText("食材管理の中身")).toBeTruthy();
     expect(screen.queryByText("献立レシピの中身")).toBeNull();
@@ -49,12 +75,49 @@ describe("WebModeShell", () => {
     });
 
     fireEvent.click(screen.getAllByRole("button", { name: /献立/ })[0]);
-    expect(screen.getByRole("status").textContent).toContain("献立・レシピ");
+    expect(screen.getAllByRole("status")[0].textContent).toContain("献立・レシピ");
     expect(screen.getByText("献立レシピの中身")).toBeTruthy();
 
     fireEvent.click(screen.getAllByRole("button", { name: /記録/ })[0]);
-    expect(screen.getByRole("status").textContent).toContain("料理・記録");
+    expect(screen.getAllByRole("status")[0].textContent).toContain("料理・記録");
     expect(screen.getByText("料理記録の中身")).toBeTruthy();
+  });
+
+  it("renders the desktop sidebar tree and topbar frame", async () => {
+    await act(async () => {
+      renderShell();
+    });
+
+    expect(screen.getByRole("complementary", { name: "PC主ナビ" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /ホーム/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /設定/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /在庫一覧/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /買い物リスト/ })).toBeTruthy();
+    expect(screen.getAllByRole("button", { name: /レシピ/ }).length).toBeGreaterThan(0);
+    expect(screen.getByRole("button", { name: /献立スケジュール/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /カレンダー/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /タイムライン/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /インサイト/ })).toBeTruthy();
+    expect(screen.getByRole("searchbox", { name: "検索スロット" })).toBeTruthy();
+    expect(screen.getAllByText("user@example.com").length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("button", { name: "ログアウト" }).length).toBeGreaterThan(0);
+  });
+
+  it("keeps selected group and leaf state for future subview wiring", async () => {
+    await act(async () => {
+      renderShell({ withSubViewProbe: true });
+    });
+
+    expect(screen.getByLabelText("shell-subview").textContent).toBe("ingredients:inventory|inventory|recipes|timeline");
+
+    fireEvent.click(screen.getByRole("button", { name: /買い物リスト/ }));
+    expect(screen.getByLabelText("shell-subview").textContent).toBe("ingredients:shopping|shopping|recipes|timeline");
+
+    fireEvent.click(screen.getByRole("button", { name: /献立スケジュール/ }));
+    expect(screen.getByText("献立レシピの中身")).toBeTruthy();
+
+    fireEvent.click(screen.getAllByRole("button", { name: /^食材管理$/ })[0]);
+    expect(screen.getByLabelText("shell-subview").textContent).toBe("ingredients:inventory|inventory|schedule|timeline");
   });
 
   it("fetches AI usage summary on mount and renders statusbar meter when ok", async () => {
@@ -73,9 +136,10 @@ describe("WebModeShell", () => {
     await waitFor(() => {
       expect(rpc).toHaveBeenCalledWith("get_ai_usage_summary");
     });
-    expect(await screen.findByText("合計 27/30")).toBeTruthy();
-    expect(await screen.findByText("レシピ 18/20")).toBeTruthy();
-    expect(await screen.findByText("写真 9/10")).toBeTruthy();
+    await screen.findAllByText("合計 27/30");
+    expect(screen.getAllByText("合計 27/30").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("レシピ 18/20").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("写真 9/10").length).toBeGreaterThan(0);
   });
 
   it("renders nothing in statusbar meter when summary fetch fails", async () => {

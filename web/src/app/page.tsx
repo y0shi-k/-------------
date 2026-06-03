@@ -106,7 +106,7 @@ export default async function Home() {
   }));
 
   return (
-    <main className="app-shell">
+    <main className="app-shell web-app-shell">
       <WebModeShell
         childrenByMode={{
           ingredients: (

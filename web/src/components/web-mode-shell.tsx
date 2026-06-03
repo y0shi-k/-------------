@@ -2,10 +2,19 @@
 
 import { createContext, type ReactNode, useCallback, useEffect, useMemo, useRef, useState, useContext } from "react";
 import { AiUsageMeter } from "@/components/ai-usage-meter";
+import { LogoutButton } from "@/components/logout-button";
 import { getAiUsageSummary, type AiUsageSummary } from "@/lib/ai/usage";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 
-type ModeId = "ingredients" | "recipes" | "cooking";
+export type ModeId = "ingredients" | "recipes" | "cooking";
+export type InventoryShellLeaf = "inventory" | "shopping";
+export type RecipeShellLeaf = "recipes" | "schedule";
+export type CookingShellLeaf = "calendar" | "timeline" | "insights";
+export type ShellLeafId = InventoryShellLeaf | RecipeShellLeaf | CookingShellLeaf;
+export type ShellDesktopTarget =
+  | { kind: "home" }
+  | { kind: "settings" }
+  | { group: ModeId; kind: "mode"; leaf: ShellLeafId };
 
 type Mode = {
   id: ModeId;
@@ -47,6 +56,16 @@ type ShellStatusContextValue = {
   showStatusMessage: (message: ShellStatusMessage) => void;
 };
 
+type ShellSubViewContextValue = {
+  activeDesktopTarget: ShellDesktopTarget;
+  selectedSubViews: {
+    ingredients: InventoryShellLeaf;
+    recipes: RecipeShellLeaf;
+    cooking: CookingShellLeaf;
+  };
+  selectShellLeaf: (group: ModeId, leaf: ShellLeafId) => void;
+};
+
 const ShellStatusContext = createContext<ShellStatusContextValue>({
   aiUsageSummary: null,
   clearPendingRecipe: () => {},
@@ -57,6 +76,52 @@ const ShellStatusContext = createContext<ShellStatusContextValue>({
   returnToMode: () => {},
   showStatusMessage: () => {}
 });
+
+const ShellSubViewContext = createContext<ShellSubViewContextValue>({
+  activeDesktopTarget: { group: "ingredients", kind: "mode", leaf: "inventory" },
+  selectedSubViews: {
+    ingredients: "inventory",
+    recipes: "recipes",
+    cooking: "timeline"
+  },
+  selectShellLeaf: () => {}
+});
+
+const shellLeafGroups = [
+  {
+    id: "ingredients",
+    defaultLeaf: "inventory",
+    leaves: [
+      { id: "inventory", label: "在庫一覧", status: "食材の残量と期限" },
+      { id: "shopping", label: "買い物リスト", status: "不足分の確認" }
+    ]
+  },
+  {
+    id: "recipes",
+    defaultLeaf: "recipes",
+    leaves: [
+      { id: "recipes", label: "レシピ", status: "保存済みレシピ" },
+      { id: "schedule", label: "献立スケジュール", status: "予定の確認" }
+    ]
+  },
+  {
+    id: "cooking",
+    defaultLeaf: "timeline",
+    leaves: [
+      { id: "calendar", label: "カレンダー", status: "月ごとの記録" },
+      { id: "timeline", label: "タイムライン", status: "最近の料理履歴" },
+      { id: "insights", label: "インサイト", status: "振り返り" }
+    ]
+  }
+] satisfies {
+  id: ModeId;
+  defaultLeaf: ShellLeafId;
+  leaves: { id: ShellLeafId; label: string; status: string }[];
+}[];
+
+function defaultLeafForMode(modeId: ModeId): ShellLeafId {
+  return shellLeafGroups.find((group) => group.id === modeId)?.defaultLeaf ?? "inventory";
+}
 
 export function useShellStatusMessage() {
   return useContext(ShellStatusContext);
@@ -73,6 +138,10 @@ export function useShellAiUsage() {
   return { aiUsageSummary, refreshAiUsage };
 }
 
+export function useShellSubView() {
+  return useContext(ShellSubViewContext);
+}
+
 export function WebModeShell({
   userEmail,
   inventoryCount,
@@ -82,6 +151,16 @@ export function WebModeShell({
   childrenByMode
 }: WebModeShellProps) {
   const [activeMode, setActiveMode] = useState<ModeId>("ingredients");
+  const [activeDesktopTarget, setActiveDesktopTarget] = useState<ShellDesktopTarget>({
+    group: "ingredients",
+    kind: "mode",
+    leaf: "inventory"
+  });
+  const [selectedSubViews, setSelectedSubViews] = useState<ShellSubViewContextValue["selectedSubViews"]>({
+    ingredients: "inventory",
+    recipes: "recipes",
+    cooking: "timeline"
+  });
   const [pendingRecipeId, setPendingRecipeId] = useState<string | null>(null);
   const [pendingRecipeOrigin, setPendingRecipeOrigin] = useState<RecipeViewerOrigin>("recipes");
   const [statusMessage, setStatusMessage] = useState<ShellStatusMessage | null>(null);
@@ -119,23 +198,31 @@ export function WebModeShell({
   );
   const active = modes.find((mode) => mode.id === activeMode) ?? modes[0];
   const activeChildren = childrenByMode[active.id];
+  const selectShellLeaf = useCallback((group: ModeId, leaf: ShellLeafId) => {
+    setActiveMode(group);
+    setActiveDesktopTarget({ group, kind: "mode", leaf });
+    setSelectedSubViews((current) => ({
+      ...current,
+      [group]: leaf
+    }));
+  }, []);
   const showStatusMessage = useCallback((message: ShellStatusMessage) => {
     if (statusTimer.current) clearTimeout(statusTimer.current);
     setStatusMessage(message);
     statusTimer.current = setTimeout(() => setStatusMessage(null), 3000);
   }, []);
   const requestViewRecipe = useCallback((recipeId: string, origin: RecipeViewerOrigin = "recipes") => {
-    setActiveMode("recipes");
+    selectShellLeaf("recipes", "recipes");
     setPendingRecipeId(recipeId);
     setPendingRecipeOrigin(origin);
-  }, []);
+  }, [selectShellLeaf]);
   const clearPendingRecipe = useCallback(() => {
     setPendingRecipeId(null);
     setPendingRecipeOrigin("recipes");
   }, []);
   const returnToMode = useCallback((modeId: ModeId) => {
-    setActiveMode(modeId);
-  }, []);
+    selectShellLeaf(modeId, selectedSubViews[modeId] ?? defaultLeafForMode(modeId));
+  }, [selectShellLeaf, selectedSubViews]);
   const refreshAiUsage = useCallback(async () => {
     setAiUsageSummary(await getAiUsageSummary(supabase));
   }, [supabase]);
@@ -170,6 +257,14 @@ export function WebModeShell({
         : "通知"
     : "待機中";
   const statusText = statusMessage?.message ?? `${active.label}: ${active.status}`;
+  const shellSubViewContextValue = useMemo(
+    () => ({
+      activeDesktopTarget,
+      selectedSubViews,
+      selectShellLeaf
+    }),
+    [activeDesktopTarget, selectedSubViews, selectShellLeaf]
+  );
 
   useEffect(() => {
     void refreshAiUsage();
@@ -181,46 +276,148 @@ export function WebModeShell({
 
   return (
     <ShellStatusContext.Provider value={shellContextValue}>
-      <div className="canvas-status-bar" data-tone={statusMessage?.tone ?? "idle"} role="status" aria-live="polite">
-        <strong>{statusLabel}</strong>
-        <span>|</span>
-        <span className="canvas-status-text">{statusText}</span>
-        <AiUsageMeter variant="statusbar" summary={aiUsageSummary} />
-        <small>{userEmail}</small>
-      </div>
-      <h1 className="sr-only">料理レシピ・食材管理</h1>
-      <p className="sr-only">{active.status}</p>
-
-      <section className="mode-panel" aria-labelledby={`mode-title-${active.id}`}>
-        {active.id === "ingredients" ? (
-          <h2 className="sr-only" id={`mode-title-${active.id}`}>
-            {active.label}
-          </h2>
-        ) : (
-          <div className="mode-heading">
-            <div>
-              <h2 id={`mode-title-${active.id}`}>{active.label}</h2>
-              <p className="eyebrow">{active.eyebrow}</p>
+      <ShellSubViewContext.Provider value={shellSubViewContextValue}>
+        <div className="desktop-app-frame">
+          <aside className="desktop-mode-nav" aria-label="PC主ナビ">
+            <div className="desktop-nav-brand">
+              <span aria-hidden="true" className="desktop-nav-logo">
+                SM
+              </span>
+              <div>
+                <strong>Stock Master</strong>
+                <small>今日のごはん、なに作る?</small>
+              </div>
             </div>
-          </div>
-        )}
-        {activeChildren}
-      </section>
 
-      <nav className="bottom-mode-nav" aria-label="スマホ主モード">
-        {modes.map((mode) => (
+            <button
+              aria-current={activeDesktopTarget.kind === "home" ? "page" : undefined}
+              className="desktop-nav-home"
+              data-active={activeDesktopTarget.kind === "home"}
+              onClick={() => setActiveDesktopTarget({ kind: "home" })}
+              type="button"
+            >
+              <span aria-hidden="true">HOME</span>
+              <strong>ホーム</strong>
+            </button>
+
+            <div className="desktop-nav-groups">
+              {modes.map((mode) => {
+                const group = shellLeafGroups.find((item) => item.id === mode.id);
+                const isGroupActive = activeDesktopTarget.kind === "mode" && activeDesktopTarget.group === mode.id;
+
+                return (
+                  <section className="desktop-nav-group" key={mode.id}>
+                    <button
+                      aria-current={isGroupActive ? "page" : undefined}
+                      className="desktop-nav-group-button"
+                      data-active={isGroupActive}
+                      onClick={() => selectShellLeaf(mode.id, group?.defaultLeaf ?? defaultLeafForMode(mode.id))}
+                      type="button"
+                    >
+                      <span aria-hidden="true">{mode.icon}</span>
+                      <strong>{mode.label}</strong>
+                    </button>
+                    <div className="desktop-nav-leaves">
+                      {group?.leaves.map((leaf) => {
+                        const isLeafActive =
+                          activeDesktopTarget.kind === "mode" &&
+                          activeDesktopTarget.group === mode.id &&
+                          activeDesktopTarget.leaf === leaf.id;
+
+                        return (
+                          <button
+                            aria-current={isLeafActive ? "page" : undefined}
+                            data-active={isLeafActive}
+                            key={leaf.id}
+                            onClick={() => selectShellLeaf(mode.id, leaf.id)}
+                            type="button"
+                          >
+                            <span>{leaf.label}</span>
+                            <small>{leaf.status}</small>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </section>
+                );
+              })}
+            </div>
+
+            <button
+              aria-current={activeDesktopTarget.kind === "settings" ? "page" : undefined}
+              className="desktop-nav-settings"
+              data-active={activeDesktopTarget.kind === "settings"}
+              onClick={() => setActiveDesktopTarget({ kind: "settings" })}
+              type="button"
+            >
+              <span aria-hidden="true">SET</span>
+              <strong>設定</strong>
+            </button>
+          </aside>
+
+          <div className="desktop-workspace">
+            <header className="desktop-topbar">
+              <div className="desktop-topbar-title">
+                <span className="eyebrow">{active.eyebrow}</span>
+                <strong>{active.label}</strong>
+              </div>
+              <div className="desktop-status-pill" data-tone={statusMessage?.tone ?? "idle"} role="status" aria-live="polite">
+                <strong>{statusLabel}</strong>
+                <span>{statusText}</span>
+              </div>
+              <div className="desktop-search-slot" role="search">
+                <input aria-label="検索スロット" disabled placeholder="食材・レシピを検索" type="search" />
+              </div>
+              <AiUsageMeter variant="statusbar" summary={aiUsageSummary} />
+              <div className="desktop-account">
+                <small>{userEmail}</small>
+                <LogoutButton />
+              </div>
+            </header>
+
+            <div className="canvas-status-bar" data-tone={statusMessage?.tone ?? "idle"} role="status" aria-live="polite">
+              <strong>{statusLabel}</strong>
+              <span>|</span>
+              <span className="canvas-status-text">{statusText}</span>
+              <AiUsageMeter variant="statusbar" summary={aiUsageSummary} />
+              <small>{userEmail}</small>
+            </div>
+            <h1 className="sr-only">料理レシピ・食材管理</h1>
+            <p className="sr-only">{active.status}</p>
+
+            <section className="mode-panel" aria-labelledby={`mode-title-${active.id}`}>
+              {active.id === "ingredients" ? (
+                <h2 className="sr-only" id={`mode-title-${active.id}`}>
+                  {active.label}
+                </h2>
+              ) : (
+                <div className="mode-heading">
+                  <div>
+                    <h2 id={`mode-title-${active.id}`}>{active.label}</h2>
+                    <p className="eyebrow">{active.eyebrow}</p>
+                  </div>
+                </div>
+              )}
+              {activeChildren}
+            </section>
+          </div>
+        </div>
+
+        <nav className="bottom-mode-nav" aria-label="スマホ主モード">
+          {modes.map((mode) => (
           <button
             aria-current={mode.id === activeMode ? "page" : undefined}
             data-active={mode.id === activeMode}
             key={mode.id}
-            onClick={() => setActiveMode(mode.id)}
+            onClick={() => selectShellLeaf(mode.id, selectedSubViews[mode.id] ?? defaultLeafForMode(mode.id))}
             type="button"
           >
             <span aria-hidden="true">{mode.icon}</span>
             <strong>{mode.label}</strong>
           </button>
-        ))}
-      </nav>
+          ))}
+        </nav>
+      </ShellSubViewContext.Provider>
     </ShellStatusContext.Provider>
   );
 }
