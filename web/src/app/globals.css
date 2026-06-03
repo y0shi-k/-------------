@@ -4702,6 +4702,10 @@ h1 {
   box-shadow: 0 8px 18px rgb(15 23 42 / 5%);
 }
 
+.stock-item-icon {
+  display: none;
+}
+
 .stock-item:has(.expiry-chip[data-tone="expired"]) {
   border-color: #fecdd3;
   background: #fff1f2;
@@ -5353,6 +5357,149 @@ h1 {
   .mode-panel {
     width: min(1280px, 100%);
     margin: 0 auto;
+  }
+
+  .inventory-workspace {
+    display: grid;
+    gap: 16px;
+  }
+
+  .inventory-workspace .inventory-canvas-header {
+    align-items: center;
+  }
+
+  .inventory-view-control {
+    border-color: transparent;
+    background: transparent;
+    padding: 0;
+    box-shadow: none;
+  }
+
+  .inventory-view-control .inventory-view-tab {
+    display: none;
+  }
+
+  .inventory-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .canvas-inventory-list {
+    gap: 8px;
+  }
+
+  .canvas-inventory-list .stock-list {
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    align-items: stretch;
+    border-color: transparent;
+    background: transparent;
+    padding: 0;
+  }
+
+  .canvas-inventory-list .stock-list .bulk-toolbar {
+    grid-column: 1 / -1;
+  }
+
+  .canvas-inventory-list .stock-item {
+    grid-template-columns: 44px minmax(0, 1fr) auto;
+    grid-template-areas:
+      "icon select actions"
+      "icon main main"
+      "icon note note"
+      "icon qty qty";
+    align-content: start;
+    gap: 10px 12px;
+    min-height: 172px;
+    border-color: #e5edf7;
+    background: #fff;
+    padding: 14px;
+  }
+
+  .canvas-inventory-list .stock-item-icon {
+    display: grid;
+    grid-area: icon;
+    width: 44px;
+    height: 44px;
+    place-items: center;
+    border: 1px solid #dbeafe;
+    border-radius: 12px;
+    background: #eff6ff;
+    color: #2563eb;
+    font-size: 0.72rem;
+    font-weight: 900;
+  }
+
+  .canvas-inventory-list .stock-item:has(.conversion-chip) .stock-item-icon {
+    border-color: #ddd6fe;
+    background: #f5f3ff;
+    color: #6d28d9;
+  }
+
+  .canvas-inventory-list .stock-item > .select-row {
+    grid-area: select;
+    align-self: start;
+  }
+
+  .canvas-inventory-list .stock-item > .item-main {
+    grid-area: main;
+  }
+
+  .canvas-inventory-list .item-title-row {
+    flex-wrap: wrap;
+  }
+
+  .canvas-inventory-list .item-main h4 {
+    font-size: 1rem;
+    white-space: normal;
+  }
+
+  .canvas-inventory-list .stock-item > .item-note {
+    grid-area: note;
+    white-space: normal;
+  }
+
+  .canvas-inventory-list .stock-item > .quantity-stepper {
+    grid-area: qty;
+    justify-content: space-between;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    background: #f8fafc;
+    padding: 6px;
+  }
+
+  .canvas-inventory-list .stock-item > .item-actions {
+    grid-area: actions;
+    justify-self: end;
+  }
+
+  .photo-scan-modal {
+    width: min(1040px, 100%);
+  }
+
+  .photo-scan-modal:has(.scan-candidate-panel) {
+    display: grid;
+    grid-template-columns: minmax(320px, 0.92fr) minmax(0, 1.08fr);
+    gap: 18px;
+    align-items: start;
+  }
+
+  .photo-scan-modal:has(.scan-candidate-panel) .modal-close-button {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+  }
+
+  .photo-scan-modal:has(.scan-candidate-panel) .scan-candidate-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .photo-scan-modal:has(.scan-candidate-panel) .scan-candidate-card {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-content: start;
+    gap: 10px;
+  }
+
+  .photo-scan-modal:has(.scan-candidate-panel) .scan-candidate-card .select-row {
+    grid-column: 1 / -1;
   }
 }
 

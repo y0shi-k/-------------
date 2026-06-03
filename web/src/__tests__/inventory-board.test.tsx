@@ -14,6 +14,14 @@ const shellAiMocks = vi.hoisted(() => ({
   aiUsageSummary: null as AiUsageSummary | null,
   refreshAiUsage: vi.fn(async () => {})
 }));
+const shellSubViewMocks = vi.hoisted(() => ({
+  selectedSubViews: {
+    ingredients: "inventory" as "inventory" | "shopping",
+    recipes: "recipes",
+    cooking: "timeline"
+  },
+  selectShellLeaf: vi.fn()
+}));
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({
@@ -34,6 +42,11 @@ vi.mock("@/components/web-mode-shell", () => ({
   useShellAiUsage: () => ({
     aiUsageSummary: shellAiMocks.aiUsageSummary,
     refreshAiUsage: shellAiMocks.refreshAiUsage
+  }),
+  useShellSubView: () => ({
+    activeDesktopTarget: { group: "ingredients", kind: "mode", leaf: shellSubViewMocks.selectedSubViews.ingredients },
+    selectedSubViews: shellSubViewMocks.selectedSubViews,
+    selectShellLeaf: shellSubViewMocks.selectShellLeaf
   })
 }));
 
@@ -132,6 +145,12 @@ describe("InventoryBoard", () => {
     shellAiMocks.aiUsageSummary = null;
     shellAiMocks.refreshAiUsage.mockReset();
     shellAiMocks.refreshAiUsage.mockResolvedValue(undefined);
+    shellSubViewMocks.selectedSubViews = {
+      ingredients: "inventory",
+      recipes: "recipes",
+      cooking: "timeline"
+    };
+    shellSubViewMocks.selectShellLeaf.mockReset();
     compressImageFile.mockReset();
     buildPhotoStoragePath.mockReset();
     buildPhotoStoragePath.mockReturnValue("user-1/ingredient-scan/photo-1.jpg");
@@ -153,6 +172,29 @@ describe("InventoryBoard", () => {
     expect(screen.getByRole("heading", { name: "食材を追加" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "画像スキャン" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "手動で追加" })).toBeTruthy();
+  });
+
+  it("opens the shopping list from the shell subview selection", async () => {
+    shellSubViewMocks.selectedSubViews = {
+      ingredients: "shopping",
+      recipes: "recipes",
+      cooking: "timeline"
+    };
+
+    renderBoard({ initialShoppingItems: [baseShoppingItem] });
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "買い物リスト" })).toBeTruthy();
+    });
+    expect(screen.getByText("玉ねぎ")).toBeTruthy();
+  });
+
+  it("reports internal inventory view changes back to the shell", () => {
+    renderBoard();
+
+    openShoppingView();
+
+    expect(shellSubViewMocks.selectShellLeaf).toHaveBeenCalledWith("ingredients", "shopping");
   });
 
   it("adds a manual inventory item with the authenticated user id", async () => {

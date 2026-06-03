@@ -8,7 +8,7 @@ import { GeminiApiKeyPanel } from "@/components/gemini-api-key-panel";
 import { ShoppingListSection } from "@/components/shopping-list-section";
 import { NumberField } from "@/components/number-field";
 import { UnitPicker } from "@/components/unit-picker";
-import { useShellAiUsage } from "@/components/web-mode-shell";
+import { useShellAiUsage, useShellSubView, type InventoryShellLeaf } from "@/components/web-mode-shell";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import {
   emptyStockItemFormValues,
@@ -163,6 +163,12 @@ function unitConversionLabel(item: StockItem) {
   return `${conversion.fromQty}${conversion.fromUnit} = ${conversion.toQty}${conversion.toUnit}`;
 }
 
+function stockItemIcon(item: StockItem) {
+  if (item.category === "調味料") return "SP";
+  if (item.source === "photo") return "AI";
+  return "FD";
+}
+
 function sortItems(items: StockItem[], sort: InventoryFilters["sort"]) {
   return [...items].sort((a, b) => {
     if (sort === "expiry_asc") {
@@ -215,9 +221,14 @@ export function InventoryBoard({
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
   const router = useRouter();
   const { aiUsageSummary, refreshAiUsage } = useShellAiUsage();
+  const { selectedSubViews, selectShellLeaf } = useShellSubView();
   const scanLimitReached = Boolean(
     aiUsageSummary?.ok && (aiUsageSummary.ingredient_scan.remaining <= 0 || aiUsageSummary.total.remaining <= 0)
   );
+
+  useEffect(() => {
+    setActiveView(selectedSubViews.ingredients);
+  }, [selectedSubViews.ingredients]);
 
   function requestDelete(target: string, message: string, confirm: () => void) {
     setPendingDelete({ target, message, confirm });
@@ -226,6 +237,11 @@ export function InventoryBoard({
 
   function updateShoppingValue<K extends keyof ShoppingFormValues>(key: K, value: ShoppingFormValues[K]) {
     setShoppingValues((current) => ({ ...current, [key]: value }));
+  }
+
+  function switchInventoryView(view: InventoryShellLeaf) {
+    setActiveView(view);
+    selectShellLeaf("ingredients", view);
   }
 
   function toggleShoppingSelected(itemId: string) {
@@ -746,11 +762,11 @@ export function InventoryBoard({
           <h2 className="sr-only">在庫</h2>
         </div>
 
-        <div className="canvas-mode-control" aria-label="食材管理の表示切替">
-          <button className="secondary-button compact-button" data-active={activeView === "inventory"} type="button" onClick={() => setActiveView("inventory")}>
+        <div className="canvas-mode-control inventory-view-control" aria-label="食材管理の表示切替">
+          <button className="secondary-button compact-button inventory-view-tab" data-active={activeView === "inventory"} type="button" onClick={() => switchInventoryView("inventory")}>
             食材管理
           </button>
-          <button className="secondary-button compact-button" data-active={activeView === "shopping"} type="button" onClick={() => setActiveView("shopping")}>
+          <button className="secondary-button compact-button inventory-view-tab" data-active={activeView === "shopping"} type="button" onClick={() => switchInventoryView("shopping")}>
             買い物リスト
           </button>
           <button className="primary-button compact-button icon-action" type="button" onClick={openAddChoice} aria-label="食材を追加">
@@ -1140,6 +1156,7 @@ function ItemList({ disabled, emptyText, items, list, onDelete, onEdit, onQuanti
       {toolbar}
       {items.map((item) => (
         <article className="stock-item" key={item.id}>
+          <span className="stock-item-icon" aria-hidden="true">{stockItemIcon(item)}</span>
           <label className="select-row">
             <input
               checked={selectedIds.includes(item.id)}
