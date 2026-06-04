@@ -3947,6 +3947,13 @@ h1 {
   cursor: pointer;
 }
 
+.recipe-card > .recipe-thumb {
+  width: 48px;
+  min-height: 48px;
+  aspect-ratio: 1;
+  border-radius: 12px;
+}
+
 .recipe-card-main {
   display: grid;
   min-width: 0;
@@ -4252,6 +4259,7 @@ h1 {
 .recipe-detail-photo {
   display: grid;
   min-height: 132px;
+  overflow: hidden;
   place-items: center;
   border-radius: 10px;
   background:
@@ -4787,10 +4795,20 @@ h1 {
 }
 
 .candidate-item {
+  grid-template-columns: 72px minmax(0, 1fr);
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #fbfcfa;
   padding: 10px;
+}
+
+.candidate-thumb {
+  align-self: start;
+  border-radius: 8px;
+}
+
+.candidate-actions {
+  grid-column: 1 / -1;
 }
 
 .reason-chip-row {
@@ -5953,8 +5971,9 @@ h1 {
     box-shadow: 0 0 0 1px var(--accent), var(--shadow-card);
   }
 
-  /* 上部ビジュアル・プレースホルダ（将来の写真差し込み口）。当面は頭文字。 */
-  .recipe-card .recipe-card-icon {
+  /* 上部ビジュアル。画像が無い場合は RecipeThumb 側で頭文字プレースホルダへ戻す。 */
+  .recipe-card .recipe-card-icon,
+  .recipe-card > .recipe-thumb {
     width: 100%;
     aspect-ratio: 4 / 3;
     min-height: 0;
@@ -6125,6 +6144,7 @@ h1 {
   }
 
   .recipe-card-icon,
+  .recipe-card > .recipe-thumb,
   .recipe-icon-button {
     width: 36px;
     min-height: 36px;

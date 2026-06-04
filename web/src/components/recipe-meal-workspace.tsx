@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { DeleteConfirmPanel } from "@/components/delete-confirm-panel";
 import { NumberField } from "@/components/number-field";
 import { UnitPicker } from "@/components/unit-picker";
+import { RecipeThumb } from "@/components/ui/recipe-thumb";
 import { useShellAiUsage, useShellNavigation, useShellStatusMessage, useShellSubView, type RecipeShellLeaf } from "@/components/web-mode-shell";
 import type { StockItem } from "@/lib/inventory/types";
 import {
@@ -229,6 +230,10 @@ function compareRecipeWithInventory(recipe: Recipe, inventoryItems: StockItem[])
       };
     })
     .filter((item) => item.name && item.shortageQuantity > 0);
+}
+
+function recipeForCandidate(candidate: CookCandidate, recipes: Recipe[]) {
+  return recipes.find((recipe) => recipe.id === candidate.recipe_id) ?? recipes.find((recipe) => recipe.name === candidate.recipe_name) ?? null;
 }
 
 export function RecipeMealWorkspace({
@@ -2011,6 +2016,10 @@ export function RecipeMealWorkspace({
               <div className="candidate-list">
                 {activeCookCandidates.map((candidate) => (
                   <article className="candidate-item" key={candidate.id}>
+                    <RecipeThumb
+                      className="candidate-thumb"
+                      recipe={recipeForCandidate(candidate, recipes) ?? { name: candidate.recipe_name || "レシピ名なし" }}
+                    />
                     <div className="item-main">
                       <span>作りたい</span>
                       <h4>{candidate.recipe_name || "レシピ名なし"}</h4>
@@ -2866,7 +2875,7 @@ function RecipeList({
         <div className="recipe-list">
           {recipes.map((recipe) => (
             <article className="recipe-card" data-active={selectedRecipeId === recipe.id} key={recipe.id} onClick={() => onSelect(recipe.id)}>
-              <div className="recipe-card-icon" aria-hidden="true"><span>{recipe.name.slice(0, 1) || "R"}</span></div>
+              <RecipeThumb recipe={recipe} />
               <div className="recipe-card-main">
                 <div className="recipe-card-heading">
                   <button className="recipe-select-button" type="button" onClick={(event) => { event.stopPropagation(); onSelect(recipe.id); }}>
@@ -2947,9 +2956,7 @@ function RecipeDetail({ recipe }: { recipe: Recipe | null }) {
   return (
     <div className="recipe-detail">
       <section className="recipe-detail-hero" aria-label="レシピ概要">
-        <div className="recipe-detail-photo" aria-hidden="true">
-          <span>{recipe.name.slice(0, 1) || "R"}</span>
-        </div>
+        <RecipeThumb className="recipe-detail-photo" recipe={recipe} size="hero" />
         <div className="recipe-detail-hero-body">
           <h4>{recipe.name}</h4>
           {recipe.genre.length > 0 ? <div className="recipe-detail-genres">{recipe.genre.map((genre) => <span key={genre}>#{genre}</span>)}</div> : null}

@@ -1,7 +1,7 @@
 ---
 id: SPEC-0171-web-recipe-photos
 title: レシピの写真化（一覧カード＋レシピ詳細ヒーロー＋レシピ提案サムネ）
-status: draft
+status: spec_ready
 scope:
   - web/src/components/recipe-meal-workspace.tsx
   - web/src/app/globals.css

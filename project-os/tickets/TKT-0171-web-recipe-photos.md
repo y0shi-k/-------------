@@ -1,7 +1,7 @@
 ---
 id: TKT-0171-web-recipe-photos
 title: レシピの写真化（一覧カード＋レシピ詳細ヒーロー＋レシピ提案サムネ）
-status: draft
+status: completed
 goal: TKT-0166の縦型カードのプレースホルダに実写真の差し込み口を通し、レシピ一覧・詳細・提案を参考モックのような写真主体の見た目にする
 acceptance:
   - レシピ一覧カード（`recipe-meal-workspace` 内の縦型カード）が `<RecipeThumb>` で写真表示になり、画像が無いものはプレースホルダ（TKT-0166既存）にフォールバックする

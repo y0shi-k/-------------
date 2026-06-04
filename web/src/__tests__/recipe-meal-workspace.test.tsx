@@ -219,9 +219,24 @@ describe("RecipeMealWorkspace", () => {
 
     expect(screen.getByRole("heading", { name: "レシピ・献立・買い物" })).toBeTruthy();
     expect(screen.getAllByText("カレー").length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("img", { name: "カレー" }).some((image) => image.tagName === "IMG")).toBe(true);
     expect(screen.getByText("玉ねぎ 2個")).toBeTruthy();
     expect(screen.getByText("切る")).toBeTruthy();
     expect(screen.getByText("煮る")).toBeTruthy();
+  });
+
+  it("keeps recipe photo placeholders when no static image matches", () => {
+    renderWorkspace({ initialRecipes: [{ ...baseRecipe, name: "謎の創作料理" }] });
+
+    const placeholders = screen.getAllByRole("img", { name: "謎の創作料理" });
+    expect(placeholders.some((image) => image.tagName === "DIV" && image.className.includes("recipe-thumb--placeholder"))).toBe(true);
+  });
+
+  it("shows thumbnails on cook candidates", () => {
+    renderWorkspace({ initialCookCandidates: [baseCandidate] });
+
+    expect(screen.getByRole("heading", { name: "作りたい候補" })).toBeTruthy();
+    expect(screen.getAllByRole("img", { name: "カレー" }).some((image) => image.className.includes("candidate-thumb"))).toBe(true);
   });
 
   it("opens the schedule view from the shell subview selection", async () => {
