@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { CookingHistoryBoard } from "@/components/cooking-history-board";
+import { HomeDashboard } from "@/components/home-dashboard";
 import { InventoryBoard } from "@/components/inventory-board";
 import { RecipeMealWorkspace } from "@/components/recipe-meal-workspace";
 import { WebModeShell } from "@/components/web-mode-shell";
@@ -140,6 +141,18 @@ export default async function Home() {
           )
         }}
         historyCount={cookingHistoryWithPhotos.length}
+        home={
+          <HomeDashboard
+            cookCandidates={(cookCandidates ?? []) as CookCandidate[]}
+            historyCount={cookingHistoryWithPhotos.length}
+            inventoryCount={(inventoryItems ?? []).length}
+            inventoryItems={(inventoryItems ?? []) as StockItem[]}
+            mealCount={(mealSchedules ?? []).length}
+            mealSchedules={(mealSchedules ?? []) as MealSchedule[]}
+            recipeCount={recipesWithIngredients.length}
+            shoppingItems={(shoppingItems ?? []) as ShoppingItem[]}
+          />
+        }
         inventoryCount={(inventoryItems ?? []).length}
         mealCount={(mealSchedules ?? []).length}
         recipeCount={recipesWithIngredients.length}

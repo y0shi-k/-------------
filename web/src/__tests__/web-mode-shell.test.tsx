@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import type { ReactNode } from "react";
+import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { WebModeShell, useShellAiUsage, useShellSubView } from "@/components/web-mode-shell";
 
 const rpc = vi.fn();
@@ -29,9 +30,10 @@ function SubViewProbe() {
   );
 }
 
-function renderShell(options?: { withSubViewProbe?: boolean }) {
+function renderShell(options?: { withSubViewProbe?: boolean; home?: ReactNode }) {
   return render(
     <WebModeShell
+      home={options?.home}
       childrenByMode={{
         ingredients: (
           <div>
@@ -55,6 +57,10 @@ describe("WebModeShell", () => {
   beforeEach(() => {
     rpc.mockReset();
     rpc.mockResolvedValue({ data: { ok: false }, error: null });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it("starts from the ingredient mode and shows a persistent status", async () => {
@@ -133,6 +139,46 @@ describe("WebModeShell", () => {
     expect(screen.getByLabelText("ユーザー自身のAPIキー")).toBeTruthy();
     expect(screen.getAllByRole("button", { name: "ログアウト" }).length).toBeGreaterThan(0);
     // ボードはアンマウントされ設定だけが描画される
+    expect(screen.queryByText("食材管理の中身")).toBeNull();
+  });
+
+  it("lands on the home dashboard on desktop width (>=1024px)", async () => {
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn().mockImplementation((query: string) => ({
+        matches: query.includes("min-width: 1024px"),
+        media: query,
+        onchange: null,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        dispatchEvent: vi.fn()
+      }))
+    );
+
+    await act(async () => {
+      renderShell({ home: <div>ホームの中身</div> });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("ホームの中身")).toBeTruthy();
+    });
+    expect(screen.getAllByRole("status")[0].textContent).toContain("ホーム");
+    // ホーム表示中はモードボードを描画しない
+    expect(screen.queryByText("食材管理の中身")).toBeNull();
+  });
+
+  it("shows the home content when the home nav button is clicked", async () => {
+    await act(async () => {
+      renderShell({ home: <div>ホームの中身</div> });
+    });
+
+    // matchMedia 未定義（スマホ相当）なので初期は食材管理
+    expect(screen.getByText("食材管理の中身")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: /ホーム/ }));
+    expect(screen.getByText("ホームの中身")).toBeTruthy();
     expect(screen.queryByText("食材管理の中身")).toBeNull();
   });
 

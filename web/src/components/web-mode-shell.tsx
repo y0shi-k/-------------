@@ -37,6 +37,7 @@ type WebModeShellProps = {
     recipes: ReactNode;
     cooking: ReactNode;
   };
+  home?: ReactNode;
 };
 
 type ShellStatusMessage = {
@@ -149,7 +150,8 @@ export function WebModeShell({
   recipeCount,
   mealCount,
   historyCount,
-  childrenByMode
+  childrenByMode,
+  home
 }: WebModeShellProps) {
   const [activeMode, setActiveMode] = useState<ModeId>("ingredients");
   const [activeDesktopTarget, setActiveDesktopTarget] = useState<ShellDesktopTarget>({
@@ -200,6 +202,7 @@ export function WebModeShell({
   const active = modes.find((mode) => mode.id === activeMode) ?? modes[0];
   const activeChildren = childrenByMode[active.id];
   const isSettingsActive = activeDesktopTarget.kind === "settings";
+  const isHomeActive = activeDesktopTarget.kind === "home" && Boolean(home);
   const selectShellLeaf = useCallback((group: ModeId, leaf: ShellLeafId) => {
     setActiveMode(group);
     setActiveDesktopTarget({ group, kind: "mode", leaf });
@@ -258,7 +261,8 @@ export function WebModeShell({
         ? "エラー"
         : "通知"
     : "待機中";
-  const statusText = statusMessage?.message ?? `${active.label}: ${active.status}`;
+  const statusText =
+    statusMessage?.message ?? (isHomeActive ? "ホーム: 今日の確認" : `${active.label}: ${active.status}`);
   const shellSubViewContextValue = useMemo(
     () => ({
       activeDesktopTarget,
@@ -271,6 +275,15 @@ export function WebModeShell({
   useEffect(() => {
     void refreshAiUsage();
   }, [refreshAiUsage]);
+
+  // PC（≥1024px）の初回はホームを初期表示にする。スマホ（<1024px）は食材管理起点のまま。
+  // 初期 state は ingredients に据え置き、マウント後に PC のみ昇格する（SSR/ハイドレーション不整合とスマホ初期表示を回避）。
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
+    if (window.matchMedia("(min-width: 1024px)").matches) {
+      setActiveDesktopTarget({ kind: "home" });
+    }
+  }, []);
 
   useEffect(() => () => {
     if (statusTimer.current) clearTimeout(statusTimer.current);
@@ -360,8 +373,8 @@ export function WebModeShell({
           <div className="desktop-workspace">
             <header className="desktop-topbar">
               <div className="desktop-topbar-title">
-                <span className="eyebrow">{isSettingsActive ? "SETTINGS" : active.eyebrow}</span>
-                <strong>{isSettingsActive ? "設定" : active.label}</strong>
+                <span className="eyebrow">{isHomeActive ? "WELCOME" : isSettingsActive ? "SETTINGS" : active.eyebrow}</span>
+                <strong>{isHomeActive ? "ホーム" : isSettingsActive ? "設定" : active.label}</strong>
               </div>
               <div className="desktop-status-pill" data-tone={statusMessage?.tone ?? "idle"} role="status" aria-live="polite">
                 <strong>{statusLabel}</strong>
@@ -395,7 +408,11 @@ export function WebModeShell({
             <h1 className="sr-only">料理レシピ・食材管理</h1>
             <p className="sr-only">{active.status}</p>
 
-            {isSettingsActive ? (
+            {isHomeActive ? (
+              <section className="mode-panel" aria-label="ホーム">
+                {home}
+              </section>
+            ) : isSettingsActive ? (
               <section className="mode-panel" aria-label="設定">
                 <SettingsPanel userEmail={userEmail} onClose={() => returnToMode(activeMode)} />
               </section>
