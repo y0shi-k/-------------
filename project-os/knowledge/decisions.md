@@ -292,3 +292,25 @@ Claude Code のネイティブ機能で「動く」形にするため。
 
 ### 次に確認すること
 - 実チケットで `/implement`（危険度ルーティング）の委譲挙動を確認する。
+
+---
+
+## 2026-06-05
+
+### 決定
+ユーザー登録画像（TKT-0174 レシピ画像）の Storage 後始末順序を確定:
+- **差し替え**: 新規upload → DB(`image_storage_path`)更新 → 成功後に旧object削除。DB更新失敗時は今uploadした孤児objectを即時削除。
+- **削除**: DB列をnullに更新 → 成功後にStorage object削除（DBを正とし、表示は確実にフォールバックへ戻す）。
+- 旧object削除のみ失敗した場合は処理成功扱いとし、`staleRemovalFailed` でユーザー通知（表示影響なし）。
+- DBには公開URLを保存せず Storage path のみ。表示は短命の署名付きURL。path規約 `<user_id>/recipe-images/<recipe_id>/<uuid>.webp`。
+
+### 理由
+「表示が壊れない」ことを最優先にするため、表示が依存するDBを常に先に正しい状態へ更新し、Storage削除は後始末扱い（失敗してもデータ漏洩なし・本人領域限定のまま）。孤児objectの即時掃除でゴミ蓄積を防ぐ。公開URL保存禁止・本人領域限定は TKT-0173 のpolicy/DB制約と二重防御。
+
+### 却下した案
+- Storage削除を先に実行 → 削除成功・DB更新失敗時に「DBはpathを指すが実体なし」の壊れ表示になりうるため却下。
+- `upsert:true` での同一path上書き → uuid付与で毎回別pathにし、差し替え中の競合・キャッシュ汚染を避けるため `upsert:false`＋旧object明示削除を採用。
+
+### 次に確認すること
+- 実機スモークでクロスユーザー read/write 拒否（Supabase storage policy / RLS の実動作）と、ブラウザでのWebP圧縮品質・スマホUI重なりを確認する。
+- 同方式を食材画像（TKT-0176）へ展開する際、`recipe-image-upload.ts` の共通化余地を検討する。

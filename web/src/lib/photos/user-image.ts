@@ -13,7 +13,7 @@ export const PHOTOS_BUCKET = "photos";
 export const USER_IMAGE_SIGNED_URL_TTL_SECONDS = 60 * 30;
 
 /** createSignedUrl だけに依存する最小インターフェース（テスト容易・クライアント実装に非依存）。 */
-type SignedUrlCapableClient = {
+export type SignedUrlCapableClient = {
   storage: {
     from: (bucket: string) => {
       createSignedUrl: (path: string, expiresIn: number) => Promise<{ data: { signedUrl: string } | null }>;

@@ -9,6 +9,17 @@ vi.mock("@/components/web-mode-shell", () => ({
   useShellSubView: () => ({ selectShellLeaf })
 }));
 
+// 署名付きURL発行に使う Storage クライアントだけスタブ化する（環境変数なしでも動かす）。
+vi.mock("@/lib/supabase/browser", () => ({
+  createBrowserSupabaseClient: () => ({
+    storage: {
+      from: () => ({
+        createSignedUrl: vi.fn(async () => ({ data: null }))
+      })
+    }
+  })
+}));
+
 const baseProps = {
   inventoryCount: 5,
   recipeCount: 4,

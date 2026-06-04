@@ -10,6 +10,13 @@ const DEFAULT_MAX_EDGE = 1024;
 const OUTPUT_CONTENT_TYPE = "image/jpeg";
 const OUTPUT_QUALITY = 0.82;
 
+/** レシピ画像（4:3 カード）向けの圧縮パラメータ。元画像を巨大なまま保存しない。 */
+const RECIPE_IMAGE_MAX_EDGE = 1280;
+const RECIPE_IMAGE_ASPECT = 4 / 3;
+const RECIPE_IMAGE_WEBP_QUALITY = 0.82;
+const RECIPE_IMAGE_WEBP_CONTENT_TYPE = "image/webp";
+const RECIPE_IMAGE_JPEG_CONTENT_TYPE = "image/jpeg";
+
 function loadImage(file: File): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const objectUrl = URL.createObjectURL(file);
@@ -82,6 +89,75 @@ export async function compressImageFile(file: File, maxEdge = DEFAULT_MAX_EDGE):
     height: size.height,
     width: size.width
   };
+}
+
+function canvasToBlobTyped(canvas: HTMLCanvasElement, contentType: string, quality: number): Promise<Blob | null> {
+  return new Promise((resolve) => {
+    canvas.toBlob((blob) => resolve(blob), contentType, quality);
+  });
+}
+
+/**
+ * 中央クロップ後の描画矩形を求める。元画像の縦横比を目標比に合わせて中央でクロップする。
+ * 切り抜き位置の偏りを避けるため常に中央基準。
+ */
+function getCenterCropRect(width: number, height: number, targetAspect: number) {
+  const sourceAspect = width / height;
+  if (sourceAspect > targetAspect) {
+    // 横長すぎる: 幅を削る。
+    const cropWidth = Math.round(height * targetAspect);
+    return { sx: Math.round((width - cropWidth) / 2), sy: 0, sWidth: cropWidth, sHeight: height };
+  }
+  // 縦長すぎる: 高さを削る。
+  const cropHeight = Math.round(width / targetAspect);
+  return { sx: 0, sy: Math.round((height - cropHeight) / 2), sWidth: width, sHeight: cropHeight };
+}
+
+/**
+ * レシピ画像をカード向けに圧縮・リサイズする。
+ * - 4:3 に中央クロップし、最長辺を最大 1280px へ縮小する（元画像を巨大なまま保存しない）。
+ * - 既定で WebP 出力。toBlob が WebP 非対応の環境では JPEG へフォールバックする。
+ * 拡張子は呼び出し側が `contentType` を見て決める。
+ */
+export async function compressRecipeImageFile(file: File): Promise<CompressedPhoto> {
+  if (!file.type.startsWith("image/")) {
+    throw new Error("画像ファイルを選んでください。");
+  }
+
+  const image = await loadImage(file);
+  const naturalWidth = image.naturalWidth || image.width;
+  const naturalHeight = image.naturalHeight || image.height;
+  if (!naturalWidth || !naturalHeight) {
+    throw new Error("画像のサイズを取得できませんでした。");
+  }
+
+  const crop = getCenterCropRect(naturalWidth, naturalHeight, RECIPE_IMAGE_ASPECT);
+  const scaled = getScaledSize(crop.sWidth, crop.sHeight, RECIPE_IMAGE_MAX_EDGE);
+
+  const canvas = document.createElement("canvas");
+  canvas.width = scaled.width;
+  canvas.height = scaled.height;
+  const context = canvas.getContext("2d");
+  if (!context) {
+    throw new Error("画像処理を開始できませんでした。");
+  }
+  context.drawImage(image, crop.sx, crop.sy, crop.sWidth, crop.sHeight, 0, 0, scaled.width, scaled.height);
+
+  const webpBlob = await canvasToBlobTyped(canvas, RECIPE_IMAGE_WEBP_CONTENT_TYPE, RECIPE_IMAGE_WEBP_QUALITY);
+  if (webpBlob && webpBlob.type === RECIPE_IMAGE_WEBP_CONTENT_TYPE) {
+    return { blob: webpBlob, byteSize: webpBlob.size, contentType: RECIPE_IMAGE_WEBP_CONTENT_TYPE, height: scaled.height, width: scaled.width };
+  }
+
+  const jpegBlob = await canvasToBlobTyped(canvas, RECIPE_IMAGE_JPEG_CONTENT_TYPE, RECIPE_IMAGE_WEBP_QUALITY);
+  if (!jpegBlob) {
+    throw new Error("画像を圧縮できませんでした。");
+  }
+  return { blob: jpegBlob, byteSize: jpegBlob.size, contentType: RECIPE_IMAGE_JPEG_CONTENT_TYPE, height: scaled.height, width: scaled.width };
+}
+
+/** contentType から Storage path の拡張子を決める（WebP / JPEG）。 */
+export function imageExtensionFromContentType(contentType: string): string {
+  return contentType === RECIPE_IMAGE_WEBP_CONTENT_TYPE ? "webp" : "jpg";
 }
 
 export function buildPhotoStoragePath(userId: string) {

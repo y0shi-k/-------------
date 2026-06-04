@@ -25,7 +25,9 @@ import {
 } from "@/lib/recipes/types";
 import { loadUserGeminiApiKey } from "@/lib/ai/user-gemini-api-key";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
-import { buildCookingHistoryPhotoStoragePath, compressImageFile } from "@/lib/photos/compress";
+import { buildCookingHistoryPhotoStoragePath, compressImageFile, compressRecipeImageFile } from "@/lib/photos/compress";
+import { deleteRecipeImage, uploadRecipeImage } from "@/lib/photos/recipe-image-upload";
+import { useRecipeImageUrls } from "@/lib/photos/use-recipe-image-urls";
 
 type RecipeMealWorkspaceProps = {
   initialCookCandidates: CookCandidate[];
@@ -249,6 +251,16 @@ export function RecipeMealWorkspace({
   const [mealSchedules, setMealSchedules] = useState(initialMealSchedules);
   const [recipeValues, setRecipeValues] = useState<RecipeFormValues>(emptyRecipeFormValues);
   const [editingRecipeId, setEditingRecipeId] = useState<string | null>(null);
+  // 編集中レシピの「保存済み画像 path」。差し替え時の旧 object 削除や、表示の起点に使う。
+  const [editingRecipeImagePath, setEditingRecipeImagePath] = useState<string | null>(null);
+  // 編集中レシピの保存済み画像の署名付きURL（プレビュー表示用）。
+  const [editingRecipeImageUrl, setEditingRecipeImageUrl] = useState<string | null>(null);
+  // 新規選択した画像ファイル（保存時にアップロードする。未保存の状態）。
+  const [recipeImageFile, setRecipeImageFile] = useState<File | null>(null);
+  // 新規選択画像のプレビュー（object URL）。
+  const [recipeImagePreviewUrl, setRecipeImagePreviewUrl] = useState<string | null>(null);
+  // 既存画像を削除する操作を選んだか（保存時に Storage/DB から消す）。
+  const [recipeImageRemoved, setRecipeImageRemoved] = useState(false);
   const [selectedRecipeId, setSelectedRecipeId] = useState(initialRecipes[0]?.id ?? "");
   const [activeCookingRecipeId, setActiveCookingRecipeId] = useState("");
   // Canvas版同様、7日ウィンドウは常に今日を中央（today-3〜today+3）に置く。
@@ -299,11 +311,14 @@ export function RecipeMealWorkspace({
   const [toast, setToast] = useState<{ message: string; tone: "info" | "success" | "error" } | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cookingPhotoInputRef = useRef<HTMLInputElement>(null);
+  const recipeImageInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
   const { clearPendingRecipe, pendingRecipeId, pendingRecipeOrigin, returnToMode } = useShellNavigation();
   const { showStatusMessage } = useShellStatusMessage();
   const { selectedSubViews, selectShellLeaf } = useShellSubView();
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
+  // 一覧・詳細・候補で使うユーザー登録画像の署名付きURL（recipe.id -> url）。
+  const recipeImageUrls = useRecipeImageUrls(recipes, supabase);
   const { aiUsageSummary, refreshAiUsage } = useShellAiUsage();
   const recipeLimitReached = Boolean(
     aiUsageSummary?.ok && (aiUsageSummary.recipe_generation.remaining <= 0 || aiUsageSummary.total.remaining <= 0)
@@ -347,9 +362,64 @@ export function RecipeMealWorkspace({
     selectShellLeaf("recipes", view);
   }
 
+  // プレビュー用の object URL をメモリリークさせないよう、アンマウント/差し替え時に解放する。
+  useEffect(() => {
+    return () => {
+      if (recipeImagePreviewUrl) {
+        URL.revokeObjectURL(recipeImagePreviewUrl);
+      }
+    };
+  }, [recipeImagePreviewUrl]);
+
+  function clearRecipeImageDraft() {
+    setRecipeImagePreviewUrl((current) => {
+      if (current) URL.revokeObjectURL(current);
+      return null;
+    });
+    setRecipeImageFile(null);
+    setRecipeImageRemoved(false);
+    if (recipeImageInputRef.current) {
+      recipeImageInputRef.current.value = "";
+    }
+  }
+
   function resetRecipeForm() {
     setRecipeValues(emptyRecipeFormValues);
     setEditingRecipeId(null);
+    setEditingRecipeImagePath(null);
+    setEditingRecipeImageUrl(null);
+    clearRecipeImageDraft();
+  }
+
+  function selectRecipeImage(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0] ?? null;
+    event.target.value = "";
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setFeedback({
+        tone: "error",
+        message: "原因: 画像以外のファイルが選ばれました。影響: 画像を登録できません。修正方法: 画像ファイル（JPEG/PNG/WebPなど）を選び直してください。"
+      });
+      return;
+    }
+    setRecipeImagePreviewUrl((current) => {
+      if (current) URL.revokeObjectURL(current);
+      return URL.createObjectURL(file);
+    });
+    setRecipeImageFile(file);
+    setRecipeImageRemoved(false);
+  }
+
+  function removeRecipeImage() {
+    // 新規選択中ならその下書きだけ取り消す。保存済み画像があれば「削除」を予約する。
+    clearRecipeImageDraft();
+    if (editingRecipeImagePath) {
+      setRecipeImageRemoved(true);
+    }
+  }
+
+  function cancelRecipeImageChange() {
+    clearRecipeImageDraft();
   }
 
   function updateRecipeValue<K extends keyof RecipeFormValues>(key: K, value: RecipeFormValues[K]) {
@@ -499,6 +569,9 @@ export function RecipeMealWorkspace({
   function applyRecipeToEditor(recipe: RecipeFormValues) {
     setRecipeValues(recipe);
     setEditingRecipeId(null);
+    setEditingRecipeImagePath(null);
+    setEditingRecipeImageUrl(null);
+    clearRecipeImageDraft();
     setIsTextImportOpen(false);
     setIsAiMenuOpen(false);
     setAiSourceText("");
@@ -511,6 +584,10 @@ export function RecipeMealWorkspace({
     setEditingRecipeId(recipe.id);
     setSelectedRecipeId(recipe.id);
     setPendingDeleteRecipeId(null);
+    clearRecipeImageDraft();
+    setEditingRecipeImagePath(recipe.image_storage_path);
+    // 既存の保存済み画像はカード一覧用の署名付きURLを使い回す（無ければプレビューはプレースホルダ）。
+    setEditingRecipeImageUrl(recipeImageUrls.get(recipe.id) ?? null);
     setIsRecipeEditorOpen(true);
     setFeedback({ tone: "info", message: `${recipe.name} を編集中です。` });
   }
@@ -701,12 +778,19 @@ export function RecipeMealWorkspace({
 
     const { error } = await supabase.from("recipes").delete().eq("id", recipe.id).eq("user_id", userId);
 
-    setIsSaving(false);
-
     if (error) {
+      setIsSaving(false);
       setFeedback({ tone: "error", message: "原因: レシピを削除できませんでした。影響: レシピ一覧に残ります。修正方法: ログイン状態を確認してください。" });
       return;
     }
+
+    // レシピ本体の削除に成功したら、紐づく画像 object も後始末する（孤児ファイルを残さない）。
+    // 失敗しても表示に影響はないため、削除自体は成功扱いとする。
+    if (recipe.image_storage_path) {
+      await supabase.storage.from("photos").remove([recipe.image_storage_path]);
+    }
+
+    setIsSaving(false);
 
     setRecipes((items) => items.filter((item) => item.id !== recipe.id));
     setMealSchedules((items) => items.map((item) => (item.recipe_id === recipe.id ? { ...item, recipe_id: null } : item)));
@@ -791,9 +875,8 @@ export function RecipeMealWorkspace({
       .insert(ingredientPayload)
       .select();
 
-    setIsSaving(false);
-
     if (ingredientError || !savedIngredients) {
+      setIsSaving(false);
       setFeedback({
         tone: "error",
         message: "原因: 材料をDBへ保存できませんでした。影響: レシピ本文だけ保存済みの可能性があります。修正方法: レシピを開き直して材料を再保存してください。"
@@ -801,8 +884,20 @@ export function RecipeMealWorkspace({
       return;
     }
 
+    // 画像（任意）の保存。本文・材料の保存後に行う。失敗してもレシピ本文は保存済みなので、
+    // 画像だけ未反映であることを明示してフィードバックする。
+    const imageResult = await persistRecipeImageChange(recipeId, (savedRecipe as { image_storage_path: string | null }).image_storage_path ?? null);
+    if (!imageResult.ok) {
+      setIsSaving(false);
+      setFeedback({ tone: "error", message: imageResult.error });
+      return;
+    }
+
+    setIsSaving(false);
+
     const mergedRecipe = {
       ...(savedRecipe as Omit<Recipe, "ingredients">),
+      image_storage_path: imageResult.imagePath,
       ingredients: savedIngredients as RecipeIngredient[]
     } as Recipe;
     setRecipes((items) => {
@@ -815,7 +910,55 @@ export function RecipeMealWorkspace({
     setScheduleRecipeId((current) => current || mergedRecipe.id);
     resetRecipeForm();
     setIsRecipeEditorOpen(false);
-    setFeedback({ tone: "success", message: editingRecipeId ? "レシピを更新しました。" : "レシピを追加しました。" });
+    const successMessage = editingRecipeId ? "レシピを更新しました。" : "レシピを追加しました。";
+    setFeedback({
+      tone: "success",
+      message: imageResult.staleRemovalFailed
+        ? `${successMessage} ただし古い画像ファイルの削除に失敗しました。表示には影響しませんが、不要ファイルが残る場合があります。`
+        : successMessage
+    });
+  }
+
+  /**
+   * レシピ画像の差分（新規アップロード／削除）を Storage と DB に反映する。
+   * 戻り値の `imagePath` は反映後の最終 path（変更なしなら現状維持）。
+   */
+  async function persistRecipeImageChange(
+    recipeId: string,
+    currentImagePath: string | null
+  ): Promise<{ ok: true; imagePath: string | null; staleRemovalFailed: boolean } | { ok: false; error: string }> {
+    // 新規画像を選んでいる場合: 圧縮 → アップロード → DB 更新（差し替え時は旧 object を削除）。
+    if (recipeImageFile) {
+      let compressed;
+      try {
+        compressed = await compressRecipeImageFile(recipeImageFile);
+      } catch {
+        return { ok: false, error: "原因: 選んだ画像を処理できませんでした。影響: 画像は登録されません（レシピ本文は保存済み）。修正方法: 別の画像ファイルを選び直してください。" };
+      }
+
+      const result = await uploadRecipeImage(supabase, {
+        userId,
+        recipeId,
+        compressed,
+        previousPath: currentImagePath
+      });
+      if (!result.ok) {
+        return { ok: false, error: `${result.error}（レシピ本文は保存済みです）` };
+      }
+      return { ok: true, imagePath: result.storagePath, staleRemovalFailed: result.staleRemovalFailed };
+    }
+
+    // 既存画像の削除を予約していた場合: DB を null に戻し、Storage object を削除する。
+    if (recipeImageRemoved && currentImagePath) {
+      const result = await deleteRecipeImage(supabase, { userId, recipeId, storagePath: currentImagePath });
+      if (!result.ok) {
+        return { ok: false, error: `${result.error}（レシピ本文は保存済みです）` };
+      }
+      return { ok: true, imagePath: null, staleRemovalFailed: result.staleRemovalFailed };
+    }
+
+    // 画像に変更なし。
+    return { ok: true, imagePath: currentImagePath, staleRemovalFailed: false };
   }
 
   async function addScheduleEntry(date: string, meal: MealType, recipeId: string) {
@@ -1356,11 +1499,7 @@ export function RecipeMealWorkspace({
             <button className="cooking-overlay-back" type="button" onClick={closeCookingViewer} aria-label="戻る">←</button>
             <div className="cooking-overlay-title">
               <h2>{activeCookingRecipe.name}</h2>
-              {/^https?:\/\//.test(activeCookingRecipe.source) ? (
-                <a href={activeCookingRecipe.source} target="_blank" rel="noreferrer">
-                  {activeCookingRecipe.source}
-                </a>
-              ) : null}
+              <RecipeSourceLinks source={activeCookingRecipe.source} />
             </div>
           </header>
 
@@ -1606,6 +1745,26 @@ export function RecipeMealWorkspace({
                   placeholder="例: https://... または本の名前"
                 />
               </label>
+
+              <RecipeImagePicker
+                disabled={isSaving}
+                inputRef={recipeImageInputRef}
+                previewUrl={
+                  recipeImagePreviewUrl
+                    ? recipeImagePreviewUrl
+                    : !recipeImageRemoved
+                      ? // 署名付きURLは非同期に揃うため、最新の Map を優先しつつ開始時スナップショットへフォールバック。
+                        (editingRecipeId ? recipeImageUrls.get(editingRecipeId) ?? null : null) ?? editingRecipeImageUrl
+                      : null
+                }
+                recipeName={recipeValues.name}
+                removalPending={recipeImageRemoved && Boolean(editingRecipeImagePath)}
+                selectedFileName={recipeImageFile?.name ?? null}
+                showCancel={Boolean(recipeImageFile || recipeImageRemoved)}
+                onCancel={cancelRecipeImageChange}
+                onRemove={removeRecipeImage}
+                onSelect={selectRecipeImage}
+              />
 
               <div className="ingredient-editor" aria-label="材料入力">
                 <div className="ingredient-editor-heading">
@@ -1924,6 +2083,7 @@ export function RecipeMealWorkspace({
 
           <RecipeList
             disabled={isSaving}
+            imageUrls={recipeImageUrls}
             onCook={openCookingViewer}
             onEdit={startEditRecipe}
             onDelete={(recipe) => requestDelete(recipe.name, "このレシピを削除します。献立に紐づくレシピ参照も外れます。", () => deleteRecipe(recipe))}
@@ -1955,7 +2115,7 @@ export function RecipeMealWorkspace({
               <h3 id="recipe-detail-heading">レシピ詳細</h3>
             </div>
           </div>
-          <RecipeDetail recipe={selectedRecipe} />
+          <RecipeDetail imageUrl={recipeImageUrls.get(selectedRecipe.id) ?? null} recipe={selectedRecipe} />
           <button className="primary-button" type="button" disabled={!selectedRecipe} onClick={() => selectedRecipe && openCookingViewer(selectedRecipe)}>
             調理ビューを開く
           </button>
@@ -2014,11 +2174,14 @@ export function RecipeMealWorkspace({
               <p className="empty-list">作りたい候補はありません。</p>
             ) : (
               <div className="candidate-list">
-                {activeCookCandidates.map((candidate) => (
+                {activeCookCandidates.map((candidate) => {
+                  const candidateRecipe = recipeForCandidate(candidate, recipes);
+                  return (
                   <article className="candidate-item" key={candidate.id}>
                     <RecipeThumb
                       className="candidate-thumb"
-                      recipe={recipeForCandidate(candidate, recipes) ?? { name: candidate.recipe_name || "レシピ名なし" }}
+                      imageUrl={candidateRecipe ? recipeImageUrls.get(candidateRecipe.id) ?? null : null}
+                      recipe={candidateRecipe ?? { name: candidate.recipe_name || "レシピ名なし" }}
                     />
                     <div className="item-main">
                       <span>作りたい</span>
@@ -2045,7 +2208,8 @@ export function RecipeMealWorkspace({
                       </button>
                     </div>
                   </article>
-                ))}
+                  );
+                })}
               </div>
             )}
           </section>
@@ -2768,6 +2932,7 @@ function CookingViewer({
 
 function RecipeList({
   disabled,
+  imageUrls,
   onCook,
   onDelete,
   onEdit,
@@ -2789,6 +2954,7 @@ function RecipeList({
   totalCount
 }: {
   disabled: boolean;
+  imageUrls: Map<string, string>;
   onCook: (recipe: Recipe) => void;
   onDelete: (recipe: Recipe) => void;
   onEdit: (recipe: Recipe) => void;
@@ -2875,7 +3041,7 @@ function RecipeList({
         <div className="recipe-list">
           {recipes.map((recipe) => (
             <article className="recipe-card" data-active={selectedRecipeId === recipe.id} key={recipe.id} onClick={() => onSelect(recipe.id)}>
-              <RecipeThumb recipe={recipe} />
+              <RecipeThumb imageUrl={imageUrls.get(recipe.id) ?? null} recipe={recipe} />
               <div className="recipe-card-main">
                 <div className="recipe-card-heading">
                   <button className="recipe-select-button" type="button" onClick={(event) => { event.stopPropagation(); onSelect(recipe.id); }}>
@@ -2945,7 +3111,75 @@ function RecipeListGenreSummary({ genres }: { genres: string[] }) {
   );
 }
 
-function RecipeDetail({ recipe }: { recipe: Recipe | null }) {
+/**
+ * レシピ編集フォーム内の画像 UI。プレビュー枠＋操作ボタン（選択／差し替え／削除／取り消し）。
+ * 圧縮・アップロードは親の保存フローで行い、ここでは選択と表示・取り消しだけを扱う。
+ */
+function RecipeImagePicker({
+  disabled,
+  inputRef,
+  previewUrl,
+  recipeName,
+  removalPending,
+  selectedFileName,
+  showCancel,
+  onCancel,
+  onRemove,
+  onSelect
+}: {
+  disabled: boolean;
+  inputRef: React.RefObject<HTMLInputElement | null>;
+  previewUrl: string | null;
+  recipeName: string;
+  removalPending: boolean;
+  selectedFileName: string | null;
+  showCancel: boolean;
+  onCancel: () => void;
+  onRemove: () => void;
+  onSelect: (event: ChangeEvent<HTMLInputElement>) => void;
+}) {
+  const hasPreview = Boolean(previewUrl);
+  const selectLabel = hasPreview ? "画像を差し替える" : "画像を選ぶ";
+
+  return (
+    <div className="recipe-image-field" aria-label="レシピ画像">
+      <div className="recipe-image-field-heading">
+        <span>レシピ画像</span>
+        <small>カードや詳細に表示されます（任意）</small>
+      </div>
+      <div className="recipe-image-preview">
+        {hasPreview && previewUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element -- 署名付きURL/プレビュー。next/image は使わない。
+          <img alt={recipeName ? `${recipeName} の画像プレビュー` : "レシピ画像プレビュー"} src={previewUrl} />
+        ) : (
+          <span className="recipe-image-preview-empty" aria-hidden="true">
+            画像なし
+          </span>
+        )}
+      </div>
+      <div className="recipe-image-actions">
+        <label className="photo-file-button recipe-image-select" data-disabled={disabled}>
+          {selectLabel}
+          <input accept="image/*" disabled={disabled} onChange={onSelect} ref={inputRef} type="file" />
+        </label>
+        {hasPreview ? (
+          <button className="danger-button compact-button" disabled={disabled} onClick={onRemove} type="button">
+            画像を削除
+          </button>
+        ) : null}
+        {showCancel ? (
+          <button className="secondary-button compact-button" disabled={disabled} onClick={onCancel} type="button">
+            変更を取り消す
+          </button>
+        ) : null}
+      </div>
+      {selectedFileName ? <p className="recipe-image-hint">選択中: {selectedFileName}（保存時に圧縮して登録します）</p> : null}
+      {removalPending ? <p className="recipe-image-hint">現在の画像を削除します。保存すると反映されます。</p> : null}
+    </div>
+  );
+}
+
+function RecipeDetail({ imageUrl, recipe }: { imageUrl?: string | null; recipe: Recipe | null }) {
   if (!recipe) {
     return <p className="empty-list">レシピを選ぶと材料と手順を確認できます。</p>;
   }
@@ -2956,12 +3190,14 @@ function RecipeDetail({ recipe }: { recipe: Recipe | null }) {
   return (
     <div className="recipe-detail">
       <section className="recipe-detail-hero" aria-label="レシピ概要">
-        <RecipeThumb className="recipe-detail-photo" recipe={recipe} size="hero" />
+        <RecipeThumb className="recipe-detail-photo" imageUrl={imageUrl} recipe={recipe} size="hero" />
         <div className="recipe-detail-hero-body">
           <h4>{recipe.name}</h4>
           {recipe.genre.length > 0 ? <div className="recipe-detail-genres">{recipe.genre.map((genre) => <span key={genre}>#{genre}</span>)}</div> : null}
           <p className="item-note">材料 {recipe.ingredients.length} 品目 / 調理回数 {recipe.cook_count} 回</p>
-          {recipe.source ? <p className="item-note">参考元: {recipe.source}</p> : null}
+          {recipe.source ? (
+            <p className="item-note">参考元: <RecipeSourceLinks source={recipe.source} inline /></p>
+          ) : null}
         </div>
       </section>
       <div className="recipe-detail-columns">
@@ -2994,6 +3230,33 @@ function IngredientSummary({ ingredients, title }: { ingredients: RecipeIngredie
         </ul>
       )}
     </section>
+  );
+}
+
+// Canvas版に合わせ、sourceを改行区切りで分割し、各行がURLならリンク、
+// それ以外（本の名前など）はテキストで表示する。XSSはReactのエスケープで担保。
+function RecipeSourceLinks({ source, inline = false }: { source: string; inline?: boolean }) {
+  const entries = source
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  if (entries.length === 0) return null;
+
+  return (
+    <span className={inline ? "recipe-source-links recipe-source-links-inline" : "recipe-source-links"}>
+      {entries.map((entry, index) =>
+        /^https?:\/\//.test(entry) ? (
+          <a key={`${entry}-${index}`} href={entry} target="_blank" rel="noreferrer">
+            {entry}
+          </a>
+        ) : (
+          <span key={`${entry}-${index}`} className="recipe-source-text">
+            {entry}
+          </span>
+        )
+      )}
+    </span>
   );
 }
 

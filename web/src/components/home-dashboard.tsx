@@ -1,11 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { TodayDashboard } from "@/components/today-dashboard";
 import { RecipeThumb } from "@/components/ui/recipe-thumb";
 import { useShellSubView, type ModeId, type ShellLeafId } from "@/components/web-mode-shell";
 import type { StockItem } from "@/lib/inventory/types";
 import type { CookCandidate, MealSchedule, Recipe, ShoppingItem } from "@/lib/recipes/types";
+import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
+import { useRecipeImageUrls } from "@/lib/photos/use-recipe-image-urls";
 
 const HOME_HERO_IMAGE = "/images/hero/home-hero.webp";
 
@@ -85,6 +87,8 @@ export function HomeDashboard({
   recipes = []
 }: HomeDashboardProps) {
   const { selectShellLeaf } = useShellSubView();
+  const supabase = useMemo(() => createBrowserSupabaseClient(), []);
+  const recipeImageUrls = useRecipeImageUrls(recipes, supabase);
 
   const summaryCards: SummaryCard[] = [
     { key: "inventory", label: "在庫", count: inventoryCount, hint: "食材の残量と期限", group: "ingredients", leaf: "inventory" },
@@ -113,7 +117,7 @@ export function HomeDashboard({
                 onClick={() => selectShellLeaf("recipes", "recipes")}
                 type="button"
               >
-                <RecipeThumb recipe={recipe} size="card" />
+                <RecipeThumb imageUrl={recipeImageUrls.get(recipe.id) ?? null} recipe={recipe} size="card" />
                 <div className="home-feature-meta">
                   <strong className="home-feature-name">{recipe.name}</strong>
                   <small className="home-feature-hint">{featuredHint(recipe)}</small>
