@@ -150,6 +150,7 @@ export default async function Home() {
             mealCount={(mealSchedules ?? []).length}
             mealSchedules={(mealSchedules ?? []) as MealSchedule[]}
             recipeCount={recipesWithIngredients.length}
+            recipes={recipesWithIngredients as Recipe[]}
             shoppingItems={(shoppingItems ?? []) as ShoppingItem[]}
           />
         }
