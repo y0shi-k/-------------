@@ -4,6 +4,7 @@ import { ChangeEvent, FormEvent, type ReactNode, useEffect, useMemo, useRef, use
 import { useRouter } from "next/navigation";
 import { DeleteConfirmPanel } from "@/components/delete-confirm-panel";
 import { ShoppingListSection } from "@/components/shopping-list-section";
+import { IngredientIcon } from "@/components/ui/ingredient-icon";
 import { NumberField } from "@/components/number-field";
 import { UnitPicker } from "@/components/unit-picker";
 import { useShellAiUsage, useShellSubView, type InventoryShellLeaf } from "@/components/web-mode-shell";
@@ -160,12 +161,6 @@ function unitConversionLabel(item: StockItem) {
   const conversion = item.unit_conversion;
   if (!conversion) return "";
   return `${conversion.fromQty}${conversion.fromUnit} = ${conversion.toQty}${conversion.toUnit}`;
-}
-
-function stockItemIcon(item: StockItem) {
-  if (item.category === "調味料") return "SP";
-  if (item.source === "photo") return "AI";
-  return "FD";
 }
 
 function sortItems(items: StockItem[], sort: InventoryFilters["sort"]) {
@@ -995,7 +990,8 @@ export function InventoryBoard({
                       />
                       選択
                     </label>
-                    <div>
+                    <IngredientIcon className="scan-candidate-icon" name={candidate.item.name} size="sm" />
+                    <div className="scan-candidate-main">
                       <h4>{candidate.item.name}</h4>
                       <p>{candidate.item.quantity}{candidate.item.unit} · {candidate.item.storage_location}</p>
                       {candidate.item.display_expires_on || candidate.item.effective_expires_on ? (
@@ -1155,7 +1151,7 @@ function ItemList({ disabled, emptyText, items, list, onDelete, onEdit, onQuanti
       {toolbar}
       {items.map((item) => (
         <article className="stock-item" key={item.id}>
-          <span className="stock-item-icon" aria-hidden="true">{stockItemIcon(item)}</span>
+          <IngredientIcon className="stock-item-icon" name={item.name} size="md" />
           <label className="select-row">
             <input
               checked={selectedIds.includes(item.id)}

@@ -167,6 +167,7 @@ describe("InventoryBoard", () => {
 
     expect(screen.getByRole("heading", { name: "在庫" })).toBeTruthy();
     expect(screen.getByText("卵")).toBeTruthy();
+    expect(screen.getByRole("img", { name: "卵" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "期限順 ▲" })).toBeTruthy();
     openIngredientModal();
     expect(screen.getByRole("heading", { name: "食材を追加" })).toBeTruthy();
@@ -485,6 +486,7 @@ describe("InventoryBoard", () => {
       expect(shellAiMocks.refreshAiUsage).toHaveBeenCalled();
     });
     expect(screen.getByText("ヨーグルト")).toBeTruthy();
+    expect(screen.getByRole("img", { name: "ヨーグルト" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "選択した候補を在庫に追加" }));
 
     await waitFor(() => {
