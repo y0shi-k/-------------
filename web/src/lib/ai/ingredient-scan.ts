@@ -146,7 +146,7 @@ export function parseGeminiIngredientResponse(response: GeminiResponse): GeminiS
   return { ok: true, items: items.slice(0, MAX_CANDIDATES) };
 }
 
-export function toStagingInsert(candidate: IngredientScanCandidate, userId: string): Omit<StockItem, "id" | "created_at" | "updated_at"> & {
+export function toStagingInsert(candidate: IngredientScanCandidate, userId: string): Omit<StockItem, "id" | "created_at" | "updated_at" | "image_storage_path"> & {
   raw_text: string;
 } {
   return {
@@ -165,7 +165,7 @@ export function toStagingInsert(candidate: IngredientScanCandidate, userId: stri
   };
 }
 
-export function toInventoryInsert(candidate: IngredientScanCandidate, userId: string): Omit<StockItem, "id" | "created_at" | "updated_at"> {
+export function toInventoryInsert(candidate: IngredientScanCandidate, userId: string): Omit<StockItem, "id" | "created_at" | "updated_at" | "image_storage_path"> {
   return {
     user_id: userId,
     category: candidate.category,

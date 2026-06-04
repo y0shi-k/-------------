@@ -1,7 +1,7 @@
 ---
 id: SPEC-0172-web-demo-seed-and-images
 title: デモ用シードデータ＋Codex生成画像の配置（実画像で最終見栄え確認）
-status: draft
+status: spec_ready
 scope:
   - web/public/images/
   - scripts/

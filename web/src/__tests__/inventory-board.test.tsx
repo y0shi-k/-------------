@@ -68,6 +68,7 @@ const baseItem: StockItem = {
   storage_location: "冷蔵庫",
   status_note: "朝食用",
   source: "manual",
+  image_storage_path: null,
   created_at: "2026-05-24T00:00:00Z",
   updated_at: "2026-05-24T00:00:00Z"
 };

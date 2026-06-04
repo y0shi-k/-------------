@@ -20,6 +20,7 @@ export type StockItem = {
   storage_location: string;
   status_note: string;
   source: string;
+  image_storage_path: string | null;
   created_at: string;
   updated_at: string;
 };

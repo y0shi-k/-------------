@@ -71,7 +71,7 @@ type ShoppingFormValues = {
 
 type AddFlow = "choice" | "manual" | "photo" | null;
 
-type InventoryInsert = Omit<StockItem, "id" | "created_at" | "updated_at">;
+type InventoryInsert = Omit<StockItem, "id" | "created_at" | "updated_at" | "image_storage_path">;
 
 type ScanCandidate = {
   clientId: string;

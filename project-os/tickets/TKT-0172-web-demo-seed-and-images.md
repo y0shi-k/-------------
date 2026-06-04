@@ -1,7 +1,7 @@
 ---
 id: TKT-0172-web-demo-seed-and-images
 title: デモ用シードデータ＋Codex生成画像の配置（実画像で最終見栄え確認）
-status: draft
+status: implementation_ready
 goal: Codexで生成したレシピ写真・ヒーローを `web/public/` に配置し、画像と一致するデモレシピ/食材のシードを用意して、参考モックに近い実画面を確認できるようにする
 acceptance:
   - `docs/design/demo-image-assets.md` の規約どおりに生成画像が `web/public/images/recipes/recipe-<slug>.webp`（最低6枚）と `web/public/images/hero/home-hero.webp` に配置される

@@ -93,3 +93,24 @@ export function buildCookingHistoryPhotoStoragePath(userId: string) {
   const randomPart = globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2);
   return `${userId}/cooking-history/${Date.now()}-${randomPart}.jpg`;
 }
+
+function randomFileStem() {
+  return globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+/**
+ * ユーザー登録レシピ画像の Storage path。
+ * 既存 `photos` バケット内に `<user_id>/recipe-images/<recipe_id>/<uuid>.<ext>` で置く。
+ * 先頭フォルダが user_id のため、既存の本人限定 storage policy でそのまま保護される。
+ */
+export function buildRecipeImageStoragePath(userId: string, recipeId: string, extension = "webp") {
+  return `${userId}/recipe-images/${recipeId}/${randomFileStem()}.${extension}`;
+}
+
+/**
+ * ユーザー登録食材（在庫アイテム）画像の Storage path。
+ * 既存 `photos` バケット内に `<user_id>/inventory-images/<item_id>/<uuid>.<ext>` で置く。
+ */
+export function buildInventoryImageStoragePath(userId: string, itemId: string, extension = "webp") {
+  return `${userId}/inventory-images/${itemId}/${randomFileStem()}.${extension}`;
+}

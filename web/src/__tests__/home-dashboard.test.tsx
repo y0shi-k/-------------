@@ -32,6 +32,7 @@ function makeRecipe(overrides: Partial<Recipe>): Recipe {
     cook_count: 0,
     cooked_on_history: [],
     is_favorite: false,
+    image_storage_path: null,
     created_at: "2026-01-01",
     updated_at: "2026-01-01",
     ingredients: [],

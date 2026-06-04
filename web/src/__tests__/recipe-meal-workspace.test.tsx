@@ -81,6 +81,7 @@ const baseRecipe: Recipe = {
   cook_count: 0,
   cooked_on_history: [],
   is_favorite: false,
+  image_storage_path: null,
   created_at: "2026-05-24T00:00:00.000Z",
   updated_at: "2026-05-24T00:00:00.000Z",
   ingredients: [baseIngredient]
@@ -99,6 +100,7 @@ const baseInventory: StockItem = {
   storage_location: "冷蔵庫",
   status_note: "",
   source: "manual",
+  image_storage_path: null,
   created_at: "2026-05-24T00:00:00.000Z",
   updated_at: "2026-05-24T00:00:00.000Z"
 };
