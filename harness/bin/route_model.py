@@ -50,7 +50,8 @@ def parse_front_matter(text: str) -> dict:
 def find_ticket(tkt: str) -> Path | None:
     if not TICKETS.is_dir() or not tkt:
         return None
-    hits = sorted(TICKETS.glob(f"{tkt}*.md"))
+    # completed/ サブフォルダへ移動済みの ticket も拾うため再帰探索する。
+    hits = sorted(TICKETS.rglob(f"{tkt}*.md"))
     return hits[0] if hits else None
 
 

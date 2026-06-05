@@ -147,7 +147,8 @@ def match_evals(evals: list[dict], paths: list[str], blob: str) -> list[dict]:
 def find_one(directory: Path, prefix: str) -> Path | None:
     if not directory.is_dir() or not prefix:
         return None
-    hits = sorted(directory.glob(f"{prefix}*.md"))
+    # completed/ サブフォルダへ移動済みの ticket / spec も拾うため再帰探索する。
+    hits = sorted(directory.rglob(f"{prefix}*.md"))
     return hits[0] if hits else None
 
 

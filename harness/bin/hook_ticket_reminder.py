@@ -83,7 +83,8 @@ def has_uncommitted_ticket(cwd: str) -> bool:
         return True  # git が使えなければ介入しない（誤ブロック回避）
     for line in out.splitlines():
         name = line[3:].strip() if len(line) > 3 else ""
-        if "project-os/tickets/TKT-" in name and name.endswith(".md"):
+        # 完了 ticket は project-os/tickets/completed/ へ移動するため、その階層も許容する。
+        if re.search(r"project-os/tickets/(?:completed/)?TKT-", name) and name.endswith(".md"):
             return True
     return False
 
@@ -96,7 +97,8 @@ def has_recent_open_ticket(cwd: str) -> bool:
     paths = {
         line.strip()
         for line in out.splitlines()
-        if line.strip().startswith("project-os/tickets/TKT-") and line.strip().endswith(".md")
+        if re.match(r"project-os/tickets/(?:completed/)?TKT-", line.strip())
+        and line.strip().endswith(".md")
     }
     return any(_ticket_status(cwd, rel) in OPEN_STATUSES for rel in paths)
 

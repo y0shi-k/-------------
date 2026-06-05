@@ -20,7 +20,13 @@ description: チケットの完了成果物（report.md、危険変更時はrevi
    - `project-os/knowledge/decisions.md` に今回の決定（決定/理由/却下案/次に確認）を追記（重要な判断があった場合）。
    - 踏んだ地雷・再発防止があれば `project-os/knowledge/learnings.md` に追記。
    - `project-os/backlog.md` の「現在のフォーカス」「次にやる候補」を更新（完了項目を外し、次を繰り上げ）。
-7. ticket の `status` を `completed` に更新する。
+7. ticket を完了状態にする。**直接 front-matter を書き換えず、ヘルパーを使う**:
+   ```bash
+   harness/bin/ticket_status.py <TKT> completed
+   ```
+   これで ticket の `status` が `completed` に更新され、ticket は `project-os/tickets/completed/` へ、
+   related_specs に挙がる SPEC は `project-os/specs/completed/` へ自動で移動する（ファイル名・`id` は不変）。
+   移動後は `git status` に rename として現れる。
 
 ## 注意
 - 成果物は会話の要約ではなく、後から `project-os/` だけを読んで判定できる内容にする。
