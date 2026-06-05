@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-labelledby="title">
+  <title id="title">Tea ingredient icon</title>
+  <circle cx="48" cy="48" r="46" fill="#f0fdf4"/>
+  <path d="M34 13h28l5 12v55c0 5-4 9-9 9H38c-5 0-9-4-9-9V25l5-12Z" fill="#dcfce7" stroke="#22c55e" stroke-width="4" stroke-linejoin="round"/>
+  <path d="M33 13h30v13H29l4-13Z" fill="#86efac" stroke="#22c55e" stroke-width="4" stroke-linejoin="round"/>
+  <path d="M36 43h28v28H36z" fill="#16a34a"/>
+  <path d="M49 63c-10-9-10-19 2-27 10 9 10 18-2 27Z" fill="#bbf7d0"/>
+  <path d="M50 61c3-9 8-15 16-18" stroke="#dcfce7" stroke-width="3" stroke-linecap="round"/>
+</svg>

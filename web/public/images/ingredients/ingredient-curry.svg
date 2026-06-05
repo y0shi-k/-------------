@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-labelledby="title">
+  <title id="title">Curry ingredient icon</title>
+  <circle cx="48" cy="48" r="46" fill="#fffbeb"/>
+  <path d="M20 45h56l-6 28c-1 6-6 10-12 10H38c-6 0-11-4-12-10l-6-28Z" fill="#f59e0b"/>
+  <path d="M28 39c8-14 32-14 40 0H28Z" fill="#92400e"/>
+  <circle cx="39" cy="57" r="5" fill="#fef3c7"/>
+  <circle cx="56" cy="63" r="5" fill="#fef3c7"/>
+</svg>

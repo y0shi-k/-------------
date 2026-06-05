@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-labelledby="title">
+  <title id="title">Dairy ingredient icon</title>
+  <circle cx="48" cy="48" r="46" fill="#eff6ff"/>
+  <path d="M32 15h33l7 18v48c0 5-4 9-9 9H36c-5 0-9-4-9-9V33l5-18Z" fill="#ffffff" stroke="#60a5fa" stroke-width="4" stroke-linejoin="round"/>
+  <path d="M32 15h33l7 18H27l5-18Z" fill="#bfdbfe" stroke="#60a5fa" stroke-width="4" stroke-linejoin="round"/>
+  <path d="M36 44h28v27H36z" fill="#2563eb"/>
+  <path d="M44 36h17" stroke="#1d4ed8" stroke-width="4" stroke-linecap="round"/>
+  <path d="M50 53c5 6 9 11 9 16 0 5-4 9-9 9s-9-4-9-9c0-5 4-10 9-16Z" fill="#ffffff"/>
+</svg>

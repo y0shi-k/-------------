@@ -1,0 +1,23 @@
+{
+  "ticket_id": "TKT-0175-ingredient-standard-image-catalog",
+  "scope": "web",
+  "generated_at": "2026-06-05T18:55:47+09:00",
+  "status": "pass",
+  "checks": {
+    "lint": "pass",
+    "typecheck": "pass",
+    "test": "pass",
+    "build": "pass"
+  },
+  "policy": {
+    "no_gas_dependency": "pass",
+    "no_hardcoded_secret": "pass",
+    "supabase_rls_present": "pass"
+  },
+  "details": {
+    "gas_hits": [],
+    "secret_hits": [],
+    "rls_note": ""
+  },
+  "note": "Canvas版 app.html は凍結・参照専用のため verify 対象外。"
+}

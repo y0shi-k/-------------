@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-labelledby="title">
+  <title id="title">Carrot ingredient icon</title>
+  <circle cx="48" cy="48" r="46" fill="#fff7ed"/>
+  <path d="M56 27c-4 21-14 39-28 52-2 2-6 0-5-4 5-19 14-37 27-52 2-2 7 0 6 4Z" fill="#f97316"/>
+  <path d="M56 26c-5-9-3-16 5-20 2 8 0 15-5 20Zm-2 1c3-9 9-14 18-13-3 9-9 13-18 13Z" fill="#22c55e"/>
+  <path d="M38 56h12M33 67h10M44 43h9" stroke="#fed7aa" stroke-width="4" stroke-linecap="round"/>
+</svg>

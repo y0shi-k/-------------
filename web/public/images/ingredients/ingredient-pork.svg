@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-labelledby="title">
+  <title id="title">Pork ingredient icon</title>
+  <circle cx="48" cy="48" r="46" fill="#fff1f2"/>
+  <path d="M22 50c0-17 13-29 30-29s28 12 28 27-12 27-29 27S22 66 22 50Z" fill="#fb7185"/>
+  <path d="M23 32 12 22c11-2 17 2 19 10M71 31l12-9c-1 10-5 16-13 18" fill="#fda4af"/>
+  <ellipse cx="51" cy="54" rx="15" ry="11" fill="#ffe4e6"/>
+  <circle cx="45" cy="54" r="3" fill="#be123c"/>
+  <circle cx="57" cy="54" r="3" fill="#be123c"/>
+</svg>

@@ -2925,6 +2925,33 @@ h1 {
   white-space: nowrap;
 }
 
+.cooking-overlay-title .recipe-source-links {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: center;
+}
+
+.recipe-source-links {
+  display: inline;
+}
+
+.recipe-source-links a {
+  color: #2563eb;
+  font-weight: 700;
+  word-break: break-all;
+}
+
+.recipe-source-links-inline a + a,
+.recipe-source-links-inline a + .recipe-source-text,
+.recipe-source-links-inline .recipe-source-text + a {
+  margin-left: 6px;
+}
+
+.recipe-source-text {
+  color: inherit;
+}
+
 .cooking-overlay-body {
   flex: 1;
   overflow-y: auto;
@@ -7213,6 +7240,18 @@ h1 {
   font-size: calc(var(--ingredient-icon-size, 40px) * 0.55);
   line-height: 1;
   user-select: none;
+}
+
+.ingredient-icon[data-has-standard-image="true"] {
+  background: #fff;
+}
+
+.ingredient-icon img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
 }
 
 .ingredient-icon--sm {

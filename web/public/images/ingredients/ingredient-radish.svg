@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-labelledby="title">
+  <title id="title">Radish ingredient icon</title>
+  <circle cx="48" cy="48" r="46" fill="#f8fafc"/>
+  <path d="M51 30c13 8 20 21 17 35-2 11-10 17-20 17S31 76 28 65c-3-14 4-27 17-35h6Z" fill="#ffffff" stroke="#cbd5e1" stroke-width="3"/>
+  <path d="M48 32c-7-9-7-17 0-24 5 8 5 16 0 24Zm1 1c4-10 12-15 23-14-4 10-11 15-23 14Z" fill="#16a34a"/>
+</svg>

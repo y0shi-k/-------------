@@ -3,6 +3,7 @@
 ## 目的別の参照先
 - 通常運用を見るとき: `runbook/導入手順.md`
 - Supabase登録手順を見るとき: `runbook/Supabase登録の詳細手順.md`
+- Supabaseへの変更反映と日常運用（非エンジニア向け完全版）を見るとき: `runbook/Supabaseの反映と運用ガイド.md`
 - PC版のデザイントーン（Image #3準拠）の正本を見るとき: `design/pc-design-language.md`
 - 調査資料を置くとき: `research/`
 - 長期計画を見るとき: `plans/`

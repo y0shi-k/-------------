@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-labelledby="title">
+  <title id="title">Leafy greens ingredient icon</title>
+  <circle cx="48" cy="48" r="46" fill="#f0fdf4"/>
+  <path d="M49 80c-18-8-28-21-26-36 13-1 24 6 30 19 1-17 10-29 24-35 7 18 0 38-28 52Z" fill="#22c55e"/>
+  <path d="M49 80c-1-17 4-30 17-42M48 79c-5-14-9-22-18-30" stroke="#dcfce7" stroke-width="5" stroke-linecap="round"/>
+</svg>

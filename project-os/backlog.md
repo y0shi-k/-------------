@@ -5,6 +5,7 @@
 > 着手時にここの「次」を見て `/new-ticket` する。完了時に `/finalize` がここを更新する。
 
 ## 現在のフォーカス
+- (TKT-0177) 完了。「テキストからレシピを追加」→「AIで構造化」でURL込み本文を貼ってもリンクが消える不具合を Canvas版に合わせて解消。サーバ側 `recipe-generation.ts` に「AIのsource優先＋structureモードで空なら本文から `https?://...` 正規表現抽出（複数=改行区切り・ユニーク化）」のフォールバックを追加し、`parseGeminiRecipeResponse(res,{mode,sourceText})` へ拡張。source は string 改行区切り・1000字保持（160字制限回避）・"AI提案"除外。表示は共通部品 `RecipeSourceLinks`（URLはリンク/他はテキスト・Reactエスケープ）を調理ビューア上部とレシピ詳細「参考元」に適用。編集画面「出典」欄は既存で手動URL入力対応済み（任意）。テスト8件追加・verify pass。`/check-gates` の🔴 `supabase_schema_change` は `recipes` テーブル名トークン＋他チケット未コミットmigrationの過剰マッチ＝実schema/Storage/auth無変更（軽量プロセスで完了・report記録）。**実機での貼付→構造化→保存→リンク表示の目視はユーザー残課題**。
 - (ユーザー登録画像イニシアチブ TKT-0173〜0176) デモ固定画像（TKT-0168〜0172）の次段＝ユーザー自身が画像を登録できる実運用層。TKT-0173（DB列`image_storage_path`＋非公開`photos`バケット流用・本人領域限定policy）完了→**TKT-0174（レシピ画像の登録・差し替え・削除UI）完了**。次は TKT-0175（食材標準画像カタログ）/ TKT-0176（在庫食材画像の登録UI）。
 - (TKT-0174) 完了。レシピ編集UIに画像ピッカー（選択/プレビュー/差し替え/削除・二重送信防止）を追加し、一覧/詳細/候補/ホームfeaturedで「ユーザー登録画像(署名付きURL)→固定デモ画像→プレースホルダ」に表示優先順位を統一。非公開Storageへ4:3/1280px/WebP圧縮保存・DBはpathのみ・後始末（差し替え/削除/孤児/レシピ削除）実装。危険変更（photo_upload_storage/supabase_schema_change）。verify pass・全gate閉。**実機スモーク（圧縮品質・スマホUI重なり・クロスユーザー拒否）はユーザー残課題**。
 - 公開前セキュリティ整備（TKT-0149/0150/0151）が一段落。次は本番Supabase/Vercelへの適用・手動確認。

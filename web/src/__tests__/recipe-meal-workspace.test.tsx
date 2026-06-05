@@ -759,6 +759,26 @@ describe("RecipeMealWorkspace", () => {
     expect(shellMocks.returnToMode).not.toHaveBeenCalled();
   });
 
+  it("renders multiple source URLs as separate links in the cooking overlay", () => {
+    const sourcedRecipe: Recipe = {
+      ...baseRecipe,
+      source: "https://a.example.com/recipe/1\nhttps://b.example.com/recipe/2\n料理本のメモ"
+    };
+
+    renderWorkspace({ initialRecipes: [sourcedRecipe] });
+
+    fireEvent.click(screen.getByRole("button", { name: "調理ビューを開く" }));
+
+    const overlay = screen.getByRole("dialog", { name: "調理ビューア全画面" });
+    const firstLink = within(overlay).getByRole("link", { name: "https://a.example.com/recipe/1" });
+    const secondLink = within(overlay).getByRole("link", { name: "https://b.example.com/recipe/2" });
+    expect(firstLink.getAttribute("href")).toBe("https://a.example.com/recipe/1");
+    expect(secondLink.getAttribute("href")).toBe("https://b.example.com/recipe/2");
+    // URLでない出典（本の名前）はリンク化せずテキスト表示する。
+    expect(within(overlay).getByText("料理本のメモ")).toBeTruthy();
+    expect(within(overlay).queryByRole("link", { name: "料理本のメモ" })).toBeNull();
+  });
+
   it("returns to cooking records when the viewer was opened from history", async () => {
     shellMocks.pendingRecipeId = "recipe-1";
     shellMocks.pendingRecipeOrigin = "cooking";

@@ -81,7 +81,7 @@ export async function POST(request: Request) {
   }
 
   // ok応答後のparse失敗はGoogle quotaを実際に消費しているため消費したままにする。
-  const parsed = parseGeminiRecipeResponse(await geminiResponse.json());
+  const parsed = parseGeminiRecipeResponse(await geminiResponse.json(), { mode, sourceText });
   if (!parsed.ok) {
     return errorResponse(parsed.error, 422);
   }

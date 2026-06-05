@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-labelledby="title">
+  <title id="title">Rice ingredient icon</title>
+  <circle cx="48" cy="48" r="46" fill="#f8fafc"/>
+  <path d="M18 46h60l-7 27c-1 6-6 10-12 10H37c-6 0-11-4-12-10l-7-27Z" fill="#e0f2fe"/>
+  <path d="M27 39c6-15 35-15 42 0H27Z" fill="#ffffff"/>
+  <path d="M24 48h48" stroke="#0ea5e9" stroke-width="4" stroke-linecap="round"/>
+</svg>

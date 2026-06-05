@@ -43,6 +43,7 @@ export function buildGeminiRecipeRequest(input: { mode: "generate" | "structure"
       ? [
           "次のレシピ本文をWebアプリに保存しやすいJSONへ構造化してください。",
           "説明文やMarkdownは不要です。JSONだけを返してください。",
+          sourceExtractionRule(),
           ingredientTypeRule(),
           recipeJsonSchema(),
           `本文:\n${input.sourceText}`
@@ -66,7 +67,10 @@ export function buildGeminiRecipeRequest(input: { mode: "generate" | "structure"
   };
 }
 
-export function parseGeminiRecipeResponse(response: GeminiResponse): AiRecipeResult {
+export function parseGeminiRecipeResponse(
+  response: GeminiResponse,
+  opts: { mode?: "generate" | "structure"; sourceText?: string } = {}
+): AiRecipeResult {
   const text = extractGeminiText(response);
   if (!text) {
     return { ok: false, error: "原因: AIの返答が空でした。影響: レシピ案を表示できません。修正方法: 条件を変えて再度お試しください。" };
@@ -79,7 +83,7 @@ export function parseGeminiRecipeResponse(response: GeminiResponse): AiRecipeRes
     return { ok: false, error: "原因: AIの返答をJSONとして読めませんでした。影響: レシピ案を表示できません。修正方法: もう一度実行してください。" };
   }
 
-  const recipe = normalizeRecipe(parsed);
+  const recipe = normalizeRecipe(parsed, { mode: opts.mode ?? "generate", sourceText: opts.sourceText ?? "" });
   if (!recipe) {
     return { ok: false, error: "原因: AIの返答にレシピ名や材料が不足しています。影響: レシピ案を表示できません。修正方法: 条件を少し具体的にしてください。" };
   }
@@ -89,6 +93,10 @@ export function parseGeminiRecipeResponse(response: GeminiResponse): AiRecipeRes
 
 function ingredientTypeRule() {
   return '材料の item_type は、醤油・味噌・塩・砂糖・酢・油・みりん・酒・だし・コンソメ・スパイス等の調味料は "調味料"、それ以外の具材は "食材" にしてください。';
+}
+
+function sourceExtractionRule() {
+  return "source には本文中の参照元URL（出典のURL）をそのまま入れてください。複数あれば改行で区切ります。URLが見つからない場合は空文字にし、本文を要約した文言や独自の文言は入れないでください。";
 }
 
 function recipeJsonSchema() {
@@ -111,7 +119,7 @@ function unwrapJsonText(text: string) {
   return fenceMatch ? fenceMatch[1].trim() : trimmed;
 }
 
-function normalizeRecipe(value: unknown): RecipeFormValues | null {
+function normalizeRecipe(value: unknown, opts: { mode: "generate" | "structure"; sourceText: string }): RecipeFormValues | null {
   if (!value || typeof value !== "object") return null;
   const raw = value as RawRecipe;
   const name = cleanText(raw.name);
@@ -124,11 +132,57 @@ function normalizeRecipe(value: unknown): RecipeFormValues | null {
   return {
     name,
     genre: normalizeStringList(raw.genre).join(", "),
-    source: cleanText(raw.source) || "AI提案",
+    source: resolveSource(raw.source, opts),
     prep_steps: normalizeStringList(raw.prep_steps).join("\n"),
     steps: normalizeStringList(raw.steps).join("\n"),
     ingredients
   };
+}
+
+// Canvas版に合わせ、AIが返したsourceを優先しつつ、structureモードで
+// sourceが取れない場合は入力本文からURLを正規表現で抽出して補完する。
+function resolveSource(rawSource: unknown, opts: { mode: "generate" | "structure"; sourceText: string }) {
+  const aiSource = sanitizeSource(rawSource);
+  if (aiSource) return aiSource;
+
+  if (opts.mode === "structure") {
+    const extracted = extractUrls(opts.sourceText);
+    return extracted.length > 0 ? extracted.join("\n").slice(0, SOURCE_MAX_LENGTH) : "";
+  }
+
+  return "AI提案";
+}
+
+const SOURCE_MAX_LENGTH = 1000;
+
+// URLや本の名前を切らないよう、cleanText(160字)より長めに保持し改行も残す。
+// "AI提案" など本文要約でない無意味なAI既定値はsourceとして扱わない。
+function sanitizeSource(value: unknown) {
+  if (typeof value !== "string") return "";
+  const trimmed = value.trim();
+  if (!trimmed || trimmed === "AI提案") return "";
+  return trimmed.slice(0, SOURCE_MAX_LENGTH);
+}
+
+function extractUrls(text: string) {
+  if (typeof text !== "string") return [];
+  const matches = text.match(/https?:\/\/[^\s]+/g) ?? [];
+  return Array.from(new Set(matches.map(trimUrlTrailingPunctuation)));
+}
+
+// 文末の句読点や、URLを囲む閉じ括弧を取り除く。
+// ただし `(dish)` のようにURL内で対になっている半角括弧は残す。
+function trimUrlTrailingPunctuation(url: string) {
+  let result = url.replace(/[.,!?、。，．！？」』]+$/u, "");
+  while (/[)）]$/.test(result)) {
+    const tail = result.slice(-1);
+    const open = tail === ")" ? "(" : "（";
+    const openCount = result.split(open).length - 1;
+    const closeCount = result.split(tail).length - 1;
+    if (closeCount <= openCount) break;
+    result = result.slice(0, -1).replace(/[.,!?、。，．！？」』]+$/u, "");
+  }
+  return result;
 }
 
 function normalizeIngredient(value: unknown): RecipeIngredientFormValues | null {

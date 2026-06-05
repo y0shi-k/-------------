@@ -1151,7 +1151,7 @@ function ItemList({ disabled, emptyText, items, list, onDelete, onEdit, onQuanti
       {toolbar}
       {items.map((item) => (
         <article className="stock-item" key={item.id}>
-          <IngredientIcon className="stock-item-icon" name={item.name} size="md" />
+          <IngredientIcon category={item.category} className="stock-item-icon" name={item.name} size="md" />
           <label className="select-row">
             <input
               checked={selectedIds.includes(item.id)}

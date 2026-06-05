@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-labelledby="title">
+  <title id="title">Bread ingredient icon</title>
+  <circle cx="48" cy="48" r="46" fill="#fffbeb"/>
+  <path d="M22 40c0-16 12-27 26-27s26 11 26 27v33c0 6-5 10-11 10H33c-6 0-11-4-11-10V40Z" fill="#d97706"/>
+  <path d="M31 43c0-11 8-19 17-19s17 8 17 19v28H31V43Z" fill="#fbbf24"/>
+</svg>

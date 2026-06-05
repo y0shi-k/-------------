@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-labelledby="title">
+  <title id="title">Seasoning ingredient icon</title>
+  <circle cx="48" cy="48" r="46" fill="#f8fafc"/>
+  <path d="M36 17h24l4 14v44c0 6-5 10-10 10H42c-6 0-10-4-10-10V31l4-14Z" fill="#ffffff" stroke="#94a3b8" stroke-width="4"/>
+  <path d="M34 46h28v22H34z" fill="#64748b"/>
+  <path d="M39 18h18" stroke="#334155" stroke-width="5" stroke-linecap="round"/>
+</svg>
