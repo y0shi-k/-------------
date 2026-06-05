@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolveIngredientImage } from "@/lib/ui/ingredient-image";
+import { normalizeIngredientImageName, resolveIngredientImage, resolveUserIngredientImage } from "@/lib/ui/ingredient-image";
 
 describe("resolveIngredientImage", () => {
   it("assigns standard images to the initial catalog ingredients", () => {
@@ -62,5 +62,14 @@ describe("resolveIngredientImage", () => {
 
   it("returns null for unknown non-seasoning ingredients so emoji fallback can render", () => {
     expect(resolveIngredientImage("謎の食材")).toBeNull();
+  });
+
+  it("uses the same normalization key for remembered user ingredient images", () => {
+    expect(normalizeIngredientImageName("　Milk  牛乳　")).toBe("milk牛乳");
+    expect(
+      resolveUserIngredientImage("  MILK 牛乳 ", [
+        { normalized_name: "milk牛乳", image_storage_path: "user-1/ingredient-images/milk/image.webp" }
+      ])?.image_storage_path
+    ).toBe("user-1/ingredient-images/milk/image.webp");
   });
 });

@@ -8,6 +8,7 @@ import type { CookingHistoryItem, CookingHistoryPhoto } from "@/lib/cooking-hist
 import type { StockItem, StorageLocation } from "@/lib/inventory/types";
 import type { CookCandidate, MealSchedule, Recipe, RecipeIngredient, ShoppingItem } from "@/lib/recipes/types";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import type { UserIngredientImage } from "@/lib/ui/ingredient-image";
 
 export default async function Home() {
   const supabase = await createServerSupabaseClient();
@@ -27,7 +28,8 @@ export default async function Home() {
     { data: mealSchedules },
     { data: shoppingItems },
     { data: cookCandidates },
-    { data: storageLocations }
+    { data: storageLocations },
+    { data: userIngredientImages }
   ] = await Promise.all([
     supabase
       .from("inventory_items")
@@ -71,7 +73,12 @@ export default async function Home() {
       .select("*")
       .eq("user_id", user.id)
       .order("sort_order", { ascending: true })
-      .order("name", { ascending: true })
+      .order("name", { ascending: true }),
+    supabase
+      .from("user_ingredient_images")
+      .select("normalized_name,image_storage_path")
+      .eq("user_id", user.id)
+      .order("normalized_name", { ascending: true })
   ]);
   const recipeRows = (recipes ?? []) as Omit<Recipe, "ingredients">[];
   const ingredientRows = (recipeIngredients ?? []) as RecipeIngredient[];
@@ -116,6 +123,7 @@ export default async function Home() {
               initialInventoryItems={(inventoryItems ?? []) as StockItem[]}
               initialShoppingItems={(shoppingItems ?? []) as ShoppingItem[]}
               initialStorageLocations={(storageLocations ?? []) as StorageLocation[]}
+              initialUserIngredientImages={(userIngredientImages ?? []) as UserIngredientImage[]}
               key="ingredients"
               userId={user.id}
             />

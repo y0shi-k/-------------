@@ -19,13 +19,23 @@ import {
   toFormValues
 } from "@/lib/inventory/types";
 import type { ShoppingItem } from "@/lib/recipes/types";
-import { buildPhotoStoragePath, compressImageFile } from "@/lib/photos/compress";
+import {
+  buildInventoryImageStoragePath,
+  buildPhotoStoragePath,
+  buildUserIngredientImageStoragePath,
+  compressImageFile,
+  compressIngredientImageFile,
+  imageExtensionFromContentType
+} from "@/lib/photos/compress";
+import { createUserImageSignedUrl, PHOTOS_BUCKET } from "@/lib/photos/user-image";
+import { normalizeIngredientImageName, resolveUserIngredientImage, type UserIngredientImage } from "@/lib/ui/ingredient-image";
 
 type InventoryBoardProps = {
   userId: string;
   initialInventoryItems: StockItem[];
   initialShoppingItems?: ShoppingItem[];
   initialStorageLocations?: StorageLocation[];
+  initialUserIngredientImages?: UserIngredientImage[];
 };
 
 type Feedback = {
@@ -35,6 +45,8 @@ type Feedback = {
 
 const inventorySaveErrorMessage =
   "原因: 在庫をDBへ保存できませんでした。影響: 入力した食材は在庫一覧に追加されません。修正方法: ログイン状態と入力内容を確認してください。";
+const ingredientImageSaveErrorMessage =
+  "原因: 食材画像を保存できませんでした。影響: 在庫情報は保存されましたが、画像は反映されません。修正方法: 別の画像を選び、通信状態とログイン状態を確認してください。";
 
 function logInventorySaveError(action: "insert" | "update", error: unknown) {
   if (!error) return;
@@ -183,13 +195,16 @@ export function InventoryBoard({
   userId,
   initialInventoryItems,
   initialShoppingItems = [],
-  initialStorageLocations = []
+  initialStorageLocations = [],
+  initialUserIngredientImages = []
 }: InventoryBoardProps) {
   const [inventoryItems, setInventoryItems] = useState(initialInventoryItems);
   const [shoppingItems, setShoppingItems] = useState(initialShoppingItems);
   const [selectedShoppingIds, setSelectedShoppingIds] = useState<string[]>([]);
   const [shoppingValues, setShoppingValues] = useState<ShoppingFormValues>({ name: "", required_quantity: "1", unit: "個" });
   const [storageLocations, setStorageLocations] = useState(initialStorageLocations);
+  const [userIngredientImages, setUserIngredientImages] = useState(initialUserIngredientImages);
+  const [ingredientImageUrls, setIngredientImageUrls] = useState<Map<string, string>>(() => new Map());
   const [values, setValues] = useState<StockItemFormValues>(emptyStockItemFormValues);
   const [editing, setEditing] = useState<EditingTarget>(null);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
@@ -199,6 +214,11 @@ export function InventoryBoard({
   const [geminiApiKey, setGeminiApiKey] = useState("");
   const [selectedPhoto, setSelectedPhoto] = useState<File | null>(null);
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
+  const [selectedIngredientImage, setSelectedIngredientImage] = useState<File | null>(null);
+  const [ingredientImagePreviewUrl, setIngredientImagePreviewUrl] = useState<string | null>(null);
+  const [applyImageToSameName, setApplyImageToSameName] = useState(true);
+  const [removeInventoryImageOnSave, setRemoveInventoryImageOnSave] = useState(false);
+  const [removeUserNameImageOnSave, setRemoveUserNameImageOnSave] = useState(false);
   const [scanCandidates, setScanCandidates] = useState<ScanCandidate[]>([]);
   const [selectedScanCandidateIds, setSelectedScanCandidateIds] = useState<string[]>([]);
   const [inventoryFilters, setInventoryFilters] = useState<InventoryFilters>({
@@ -212,6 +232,7 @@ export function InventoryBoard({
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const photoInputRef = useRef<HTMLInputElement | null>(null);
+  const ingredientImageInputRef = useRef<HTMLInputElement | null>(null);
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
   const router = useRouter();
   const { aiUsageSummary, refreshAiUsage } = useShellAiUsage();
@@ -394,6 +415,45 @@ export function InventoryBoard({
     };
   }, [photoPreviewUrl]);
 
+  useEffect(() => {
+    return () => {
+      if (ingredientImagePreviewUrl) URL.revokeObjectURL(ingredientImagePreviewUrl);
+    };
+  }, [ingredientImagePreviewUrl]);
+
+  const imageSignatureKey = useMemo(() => {
+    const inventoryPaths = inventoryItems.map((item) => item.image_storage_path).filter(Boolean) as string[];
+    const userPaths = userIngredientImages.map((image) => image.image_storage_path).filter(Boolean);
+    return [...new Set([...inventoryPaths, ...userPaths])].sort().join(",");
+  }, [inventoryItems, userIngredientImages]);
+
+  useEffect(() => {
+    let active = true;
+    const paths = imageSignatureKey ? imageSignatureKey.split(",").filter(Boolean) : [];
+    if (paths.length === 0) {
+      setIngredientImageUrls(new Map());
+      return () => {
+        active = false;
+      };
+    }
+
+    async function resolveUrls() {
+      const entries = await Promise.all(
+        paths.map(async (path) => {
+          const url = await createUserImageSignedUrl(supabase, path);
+          return url ? ([path, url] as const) : null;
+        })
+      );
+      if (!active) return;
+      setIngredientImageUrls(new Map(entries.filter((entry): entry is readonly [string, string] => entry !== null)));
+    }
+
+    resolveUrls();
+    return () => {
+      active = false;
+    };
+  }, [imageSignatureKey, supabase]);
+
   function updateValue<K extends keyof StockItemFormValues>(key: K, value: StockItemFormValues[K]) {
     setValues((current) => ({ ...current, [key]: value }));
   }
@@ -401,6 +461,7 @@ export function InventoryBoard({
   function resetForm() {
     setValues(emptyStockItemFormValues);
     setEditing(null);
+    resetIngredientImageSelection();
   }
 
   function openAddChoice() {
@@ -459,6 +520,18 @@ export function InventoryBoard({
     }
   }
 
+  function resetIngredientImageSelection() {
+    if (ingredientImagePreviewUrl) URL.revokeObjectURL(ingredientImagePreviewUrl);
+    setSelectedIngredientImage(null);
+    setIngredientImagePreviewUrl(null);
+    setApplyImageToSameName(true);
+    setRemoveInventoryImageOnSave(false);
+    setRemoveUserNameImageOnSave(false);
+    if (ingredientImageInputRef.current) {
+      ingredientImageInputRef.current.value = "";
+    }
+  }
+
   function selectPhoto(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0] ?? null;
     if (!file) return;
@@ -476,6 +549,37 @@ export function InventoryBoard({
     setSelectedPhoto(file);
     setPhotoPreviewUrl(URL.createObjectURL(file));
     setPhotoFeedback({ tone: "info", message: "写真を選びました。内容を確認してから保存してください。" });
+  }
+
+  function selectIngredientImage(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0] ?? null;
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      resetIngredientImageSelection();
+      setFeedback({
+        tone: "error",
+        message: "原因: 画像ではないファイルです。影響: 食材画像を保存できません。修正方法: 画像ファイルを選んでください。"
+      });
+      return;
+    }
+
+    if (ingredientImagePreviewUrl) URL.revokeObjectURL(ingredientImagePreviewUrl);
+    setSelectedIngredientImage(file);
+    setIngredientImagePreviewUrl(URL.createObjectURL(file));
+    setRemoveInventoryImageOnSave(false);
+    setRemoveUserNameImageOnSave(false);
+    setFeedback({ tone: "info", message: "画像を選びました。保存するとこの食材に反映します。" });
+  }
+
+  function imageUrlForItem(item: StockItem) {
+    if (item.image_storage_path) return ingredientImageUrls.get(item.image_storage_path) ?? null;
+    const userImage = resolveUserIngredientImage(item.name, userIngredientImages);
+    return userImage ? ingredientImageUrls.get(userImage.image_storage_path) ?? null : null;
+  }
+
+  function currentUserNameImage() {
+    return resolveUserIngredientImage(values.name, userIngredientImages);
   }
 
   async function scanPhoto() {
@@ -592,6 +696,7 @@ export function InventoryBoard({
   function startEdit(_list: "inventory", item: StockItem) {
     setValues(toFormValues(item));
     setEditing({ item });
+    resetIngredientImageSelection();
     setAddFlow("manual");
     setFeedback({ tone: "info", message: `${item.name} を編集中です。` });
   }
@@ -650,10 +755,18 @@ export function InventoryBoard({
         return;
       }
 
-      setInventoryItems((items) => items.map((item) => (item.id === data.id ? (data as StockItem) : item)));
+      const imageResult = await persistIngredientImageChange(data as StockItem);
+      if (!imageResult.ok) {
+        setFeedback({ tone: "error", message: imageResult.error });
+      }
+      const savedItem = { ...(data as StockItem), image_storage_path: imageResult.ok ? imageResult.imageStoragePath : (data as StockItem).image_storage_path };
+      setInventoryItems((items) => items.map((item) => (item.id === data.id ? savedItem : item)));
       resetForm();
       setAddFlow(null);
-      setFeedback({ tone: "success", message: "内容を更新しました。" });
+      setFeedback({
+        tone: imageResult.ok ? (imageResult.warning ? "info" : "success") : "error",
+        message: imageResult.ok ? imageResult.warning ?? "内容を更新しました。" : imageResult.error
+      });
       return;
     }
 
@@ -666,10 +779,116 @@ export function InventoryBoard({
       return;
     }
 
-    setInventoryItems((items) => [data as StockItem, ...items]);
+    const imageResult = await persistIngredientImageChange(data as StockItem);
+    const savedItem = { ...(data as StockItem), image_storage_path: imageResult.ok ? imageResult.imageStoragePath : (data as StockItem).image_storage_path };
+    setInventoryItems((items) => [savedItem, ...items]);
     resetForm();
     setAddFlow(null);
-    setFeedback({ tone: "success", message: "在庫に追加しました。" });
+    setFeedback({
+      tone: imageResult.ok ? (imageResult.warning ? "info" : "success") : "error",
+      message: imageResult.ok ? imageResult.warning ?? "在庫に追加しました。" : imageResult.error
+    });
+  }
+
+  async function persistIngredientImageChange(
+    item: StockItem
+  ): Promise<{ ok: true; imageStoragePath: string | null; warning?: string } | { ok: false; error: string }> {
+    const previousItemPath = editing?.item.id === item.id ? editing.item.image_storage_path : item.image_storage_path;
+    const normalizedName = normalizeIngredientImageName(item.name);
+    const previousUserImage = normalizedName ? userIngredientImages.find((image) => image.normalized_name === normalizedName) ?? null : null;
+
+    if (!selectedIngredientImage && !removeInventoryImageOnSave && !removeUserNameImageOnSave) {
+      return { ok: true, imageStoragePath: item.image_storage_path };
+    }
+
+    try {
+      if (selectedIngredientImage) {
+        const compressed = await compressIngredientImageFile(selectedIngredientImage);
+        const extension = imageExtensionFromContentType(compressed.contentType);
+        const inventoryPath = buildInventoryImageStoragePath(userId, item.id, extension);
+
+        const { error: uploadError } = await supabase.storage.from(PHOTOS_BUCKET).upload(inventoryPath, compressed.blob, {
+          contentType: compressed.contentType,
+          upsert: false
+        });
+        if (uploadError) return { ok: false, error: ingredientImageSaveErrorMessage };
+
+        const { error: updateError } = await supabase
+          .from("inventory_items")
+          .update({ image_storage_path: inventoryPath })
+          .eq("id", item.id)
+          .eq("user_id", userId);
+        if (updateError) {
+          await supabase.storage.from(PHOTOS_BUCKET).remove([inventoryPath]);
+          return { ok: false, error: ingredientImageSaveErrorMessage };
+        }
+
+        if (applyImageToSameName && normalizedName) {
+          const userPath = buildUserIngredientImageStoragePath(userId, normalizedName, extension);
+          const { error: userUploadError } = await supabase.storage.from(PHOTOS_BUCKET).upload(userPath, compressed.blob, {
+            contentType: compressed.contentType,
+            upsert: false
+          });
+          if (userUploadError) {
+            return { ok: true, imageStoragePath: inventoryPath, warning: "個別画像を保存しました。同じ食材名への記憶は失敗しました。" };
+          }
+
+          const nextUserImage = {
+            user_id: userId,
+            normalized_name: normalizedName,
+            display_name: item.name,
+            image_storage_path: userPath
+          };
+          const { error: upsertError } = await supabase.from("user_ingredient_images").upsert(nextUserImage, {
+            onConflict: "user_id,normalized_name"
+          });
+          if (upsertError) {
+            await supabase.storage.from(PHOTOS_BUCKET).remove([userPath]);
+            return { ok: true, imageStoragePath: inventoryPath, warning: "個別画像を保存しました。同じ食材名への記憶は失敗しました。" };
+          }
+
+          setUserIngredientImages((images) => [
+            ...images.filter((image) => image.normalized_name !== normalizedName),
+            { normalized_name: normalizedName, image_storage_path: userPath }
+          ]);
+          if (previousUserImage?.image_storage_path && previousUserImage.image_storage_path !== userPath) {
+            await supabase.storage.from(PHOTOS_BUCKET).remove([previousUserImage.image_storage_path]);
+          }
+        }
+
+        if (previousItemPath && previousItemPath !== inventoryPath) {
+          await supabase.storage.from(PHOTOS_BUCKET).remove([previousItemPath]);
+        }
+        return { ok: true, imageStoragePath: inventoryPath };
+      }
+
+      let imageStoragePath = item.image_storage_path;
+      if (removeInventoryImageOnSave && previousItemPath) {
+        const { error: updateError } = await supabase
+          .from("inventory_items")
+          .update({ image_storage_path: null })
+          .eq("id", item.id)
+          .eq("user_id", userId);
+        if (updateError) return { ok: false, error: ingredientImageSaveErrorMessage };
+        await supabase.storage.from(PHOTOS_BUCKET).remove([previousItemPath]);
+        imageStoragePath = null;
+      }
+
+      if (removeUserNameImageOnSave && previousUserImage) {
+        const { error: deleteError } = await supabase
+          .from("user_ingredient_images")
+          .delete()
+          .eq("user_id", userId)
+          .eq("normalized_name", previousUserImage.normalized_name);
+        if (deleteError) return { ok: false, error: ingredientImageSaveErrorMessage };
+        await supabase.storage.from(PHOTOS_BUCKET).remove([previousUserImage.image_storage_path]);
+        setUserIngredientImages((images) => images.filter((image) => image.normalized_name !== previousUserImage.normalized_name));
+      }
+
+      return { ok: true, imageStoragePath };
+    } catch {
+      return { ok: false, error: ingredientImageSaveErrorMessage };
+    }
   }
 
   function toggleScanCandidate(candidateId: string) {
@@ -838,6 +1057,88 @@ export function InventoryBoard({
               品名
               <input value={values.name} onChange={(event) => updateValue("name", event.target.value)} placeholder="例: 牛乳" />
             </label>
+            <section className="ingredient-image-editor" aria-label="食材画像">
+              <div className="ingredient-image-preview">
+                {ingredientImagePreviewUrl ? (
+                  <>
+                    {/* Blob URL previews are local-only, so Next Image optimization is not useful here. */}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={ingredientImagePreviewUrl} alt="選択した食材画像のプレビュー" />
+                  </>
+                ) : editing && imageUrlForItem(editing.item) && !removeInventoryImageOnSave ? (
+                  <>
+                    {/* Supabase signed URLs are already scoped and short lived. */}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={imageUrlForItem(editing.item) ?? ""} alt="現在の食材画像" />
+                  </>
+                ) : (
+                  <IngredientIcon category={values.category} name={values.name || "食材"} size="lg" />
+                )}
+              </div>
+              <div className="ingredient-image-controls">
+                <label className="photo-file-button ingredient-image-file-button">
+                  画像を選ぶ
+                  <input
+                    ref={ingredientImageInputRef}
+                    accept="image/*"
+                    capture="environment"
+                    type="file"
+                    onChange={selectIngredientImage}
+                    disabled={isSaving}
+                  />
+                </label>
+                <label className="image-memory-toggle">
+                  <input
+                    checked={applyImageToSameName}
+                    disabled={isSaving}
+                    onChange={(event) => setApplyImageToSameName(event.currentTarget.checked)}
+                    type="checkbox"
+                  />
+                  同じ食材名にも使う
+                </label>
+                <div className="ingredient-image-remove-row">
+                  <button
+                    className="secondary-button compact-button"
+                    type="button"
+                    disabled={isSaving || (!selectedIngredientImage && !ingredientImagePreviewUrl)}
+                    onClick={resetIngredientImageSelection}
+                  >
+                    選択を取り消す
+                  </button>
+                  {editing?.item.image_storage_path ? (
+                    <button
+                      className="danger-button compact-button"
+                      type="button"
+                      disabled={isSaving}
+                      onClick={() => {
+                        resetIngredientImageSelection();
+                        setRemoveInventoryImageOnSave(true);
+                      }}
+                    >
+                      個別画像を削除
+                    </button>
+                  ) : null}
+                  {currentUserNameImage() ? (
+                    <button
+                      className="danger-button compact-button"
+                      type="button"
+                      disabled={isSaving}
+                      onClick={() => {
+                        resetIngredientImageSelection();
+                        setRemoveUserNameImageOnSave(true);
+                      }}
+                    >
+                      同名画像を削除
+                    </button>
+                  ) : null}
+                </div>
+                {removeInventoryImageOnSave || removeUserNameImageOnSave ? (
+                  <p className="ingredient-image-note">保存すると画像を削除し、標準画像または絵文字へ戻します。</p>
+                ) : (
+                  <p className="ingredient-image-note">画像は非公開Storageへ保存します。公開URLは保存しません。</p>
+                )}
+              </div>
+            </section>
             <div className="form-row two-columns">
               <label>
                 分類
@@ -1055,6 +1356,8 @@ export function InventoryBoard({
             onSelect={toggleShoppingSelected}
             selectedIds={selectedShoppingIds}
             title="未購入"
+            userImageUrls={ingredientImageUrls}
+            userIngredientImages={userIngredientImages}
           />
           <ShoppingListSection
             emptyText="購入済みの買い物はありません。"
@@ -1062,6 +1365,8 @@ export function InventoryBoard({
             onSelect={toggleShoppingSelected}
             selectedIds={selectedShoppingIds}
             title="購入済み"
+            userImageUrls={ingredientImageUrls}
+            userIngredientImages={userIngredientImages}
           />
         </section>
         ) : null}
@@ -1104,6 +1409,7 @@ export function InventoryBoard({
           <ItemList
             emptyText="在庫はありません。右上の＋から追加してください。"
             items={filteredInventoryItems}
+            imageUrls={ingredientImageUrls}
             list="inventory"
             onDelete={(list, item) => requestDelete(item.name, "この在庫を削除します。元には戻せません。", () => deleteItem(list, item))}
             onEdit={startEdit}
@@ -1120,6 +1426,7 @@ export function InventoryBoard({
               />
             }
             disabled={isSaving}
+            userIngredientImages={userIngredientImages}
           />
         </section>
         ) : null}
@@ -1131,6 +1438,7 @@ export function InventoryBoard({
 type ItemListProps = {
   disabled: boolean;
   emptyText: string;
+  imageUrls: Map<string, string>;
   items: StockItem[];
   list: "inventory";
   onDelete: (list: "inventory", item: StockItem) => void;
@@ -1139,9 +1447,10 @@ type ItemListProps = {
   onSelect: (list: "inventory", itemId: string) => void;
   selectedIds: string[];
   toolbar: ReactNode;
+  userIngredientImages: UserIngredientImage[];
 };
 
-function ItemList({ disabled, emptyText, items, list, onDelete, onEdit, onQuantityChange, onSelect, selectedIds, toolbar }: ItemListProps) {
+function ItemList({ disabled, emptyText, imageUrls, items, list, onDelete, onEdit, onQuantityChange, onSelect, selectedIds, toolbar, userIngredientImages }: ItemListProps) {
   if (items.length === 0) {
     return <p className="empty-list">{emptyText}</p>;
   }
@@ -1151,7 +1460,7 @@ function ItemList({ disabled, emptyText, items, list, onDelete, onEdit, onQuanti
       {toolbar}
       {items.map((item) => (
         <article className="stock-item" key={item.id}>
-          <IngredientIcon category={item.category} className="stock-item-icon" name={item.name} size="md" />
+          <IngredientIcon category={item.category} className="stock-item-icon" imageUrl={resolveItemImageUrl(item, userIngredientImages, imageUrls)} name={item.name} size="md" />
           <label className="select-row">
             <input
               checked={selectedIds.includes(item.id)}
@@ -1200,6 +1509,12 @@ function ItemList({ disabled, emptyText, items, list, onDelete, onEdit, onQuanti
       ))}
     </div>
   );
+}
+
+function resolveItemImageUrl(item: StockItem, userIngredientImages: UserIngredientImage[], imageUrls: Map<string, string>) {
+  if (item.image_storage_path) return imageUrls.get(item.image_storage_path) ?? null;
+  const userImage = resolveUserIngredientImage(item.name, userIngredientImages);
+  return userImage ? imageUrls.get(userImage.image_storage_path) ?? null : null;
 }
 
 type ListToolbarProps = {

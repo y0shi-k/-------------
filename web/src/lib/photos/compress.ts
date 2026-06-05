@@ -16,6 +16,8 @@ const RECIPE_IMAGE_ASPECT = 4 / 3;
 const RECIPE_IMAGE_WEBP_QUALITY = 0.82;
 const RECIPE_IMAGE_WEBP_CONTENT_TYPE = "image/webp";
 const RECIPE_IMAGE_JPEG_CONTENT_TYPE = "image/jpeg";
+const INGREDIENT_IMAGE_MAX_EDGE = 1024;
+const INGREDIENT_IMAGE_WEBP_QUALITY = 0.82;
 
 function loadImage(file: File): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -155,6 +157,45 @@ export async function compressRecipeImageFile(file: File): Promise<CompressedPho
   return { blob: jpegBlob, byteSize: jpegBlob.size, contentType: RECIPE_IMAGE_JPEG_CONTENT_TYPE, height: scaled.height, width: scaled.width };
 }
 
+/**
+ * 食材画像を表示用に圧縮・リサイズする。
+ * 元の縦横比は保ち、最長辺を最大 1024px にする。WebP 非対応環境では JPEG に戻す。
+ */
+export async function compressIngredientImageFile(file: File): Promise<CompressedPhoto> {
+  if (!file.type.startsWith("image/")) {
+    throw new Error("画像ファイルを選んでください。");
+  }
+
+  const image = await loadImage(file);
+  const naturalWidth = image.naturalWidth || image.width;
+  const naturalHeight = image.naturalHeight || image.height;
+  if (!naturalWidth || !naturalHeight) {
+    throw new Error("画像のサイズを取得できませんでした。");
+  }
+
+  const scaled = getScaledSize(naturalWidth, naturalHeight, INGREDIENT_IMAGE_MAX_EDGE);
+  const canvas = document.createElement("canvas");
+  canvas.width = scaled.width;
+  canvas.height = scaled.height;
+
+  const context = canvas.getContext("2d");
+  if (!context) {
+    throw new Error("画像処理を開始できませんでした。");
+  }
+  context.drawImage(image, 0, 0, scaled.width, scaled.height);
+
+  const webpBlob = await canvasToBlobTyped(canvas, RECIPE_IMAGE_WEBP_CONTENT_TYPE, INGREDIENT_IMAGE_WEBP_QUALITY);
+  if (webpBlob && webpBlob.type === RECIPE_IMAGE_WEBP_CONTENT_TYPE) {
+    return { blob: webpBlob, byteSize: webpBlob.size, contentType: RECIPE_IMAGE_WEBP_CONTENT_TYPE, height: scaled.height, width: scaled.width };
+  }
+
+  const jpegBlob = await canvasToBlobTyped(canvas, RECIPE_IMAGE_JPEG_CONTENT_TYPE, INGREDIENT_IMAGE_WEBP_QUALITY);
+  if (!jpegBlob) {
+    throw new Error("画像を圧縮できませんでした。");
+  }
+  return { blob: jpegBlob, byteSize: jpegBlob.size, contentType: RECIPE_IMAGE_JPEG_CONTENT_TYPE, height: scaled.height, width: scaled.width };
+}
+
 /** contentType から Storage path の拡張子を決める（WebP / JPEG）。 */
 export function imageExtensionFromContentType(contentType: string): string {
   return contentType === RECIPE_IMAGE_WEBP_CONTENT_TYPE ? "webp" : "jpg";
@@ -189,4 +230,12 @@ export function buildRecipeImageStoragePath(userId: string, recipeId: string, ex
  */
 export function buildInventoryImageStoragePath(userId: string, itemId: string, extension = "webp") {
   return `${userId}/inventory-images/${itemId}/${randomFileStem()}.${extension}`;
+}
+
+/**
+ * 同名食材で再利用するユーザー画像の Storage path。
+ * normalizedName はUI側で NFKC / 小文字 / 空白除去済みにする。
+ */
+export function buildUserIngredientImageStoragePath(userId: string, normalizedName: string, extension = "webp") {
+  return `${userId}/ingredient-images/${encodeURIComponent(normalizedName)}/${randomFileStem()}.${extension}`;
 }

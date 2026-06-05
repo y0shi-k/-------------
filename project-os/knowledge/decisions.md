@@ -297,6 +297,22 @@ Claude Code のネイティブ機能で「動く」形にするため。
 
 ## 2026-06-05
 
+### 決定（TKT-0177 / AI構造化のsource URL保持）
+「テキストからレシピを追加」→「AIで構造化」で、レシピの参照元URLを Canvas版同様に保持・表示する方式を確定:
+- 抽出は**サーバ側**（`recipe-generation.ts`）に置く。`parseGeminiRecipeResponse(response, { mode, sourceText })` でモードと元本文を受け、`resolveSource` が「AIの source 優先 → structureモードで空なら本文から `https?://...` を正規表現抽出（複数は改行区切り・ユニーク化）」を実行。
+- source は string のまま改行区切りで複数URLを保持（スキーマ分割はしない）。保持上限は 1000 字（`cleanText` の160字制限はURL用に使わない）。`"AI提案"` は無意味な既定値として source から除外。
+- 表示は共通部品 `RecipeSourceLinks`（改行分割→URLはリンク/他はテキスト、Reactエスケープで XSS 担保）。調理ビューア上部とレシピ詳細「参考元」に適用。編集画面の「出典」textarea は既存で手動入力（URL/本名・改行可・任意）に対応済み。
+
+### 理由
+入力本文・Gemini呼び出しはサーバ側に集約されており、URL抽出フォールバックもサーバ側が自然で安全（クライアントへロジック露出しない）。Canvas版（`app.html` 6677-6682 / 8064-8076）の実績挙動に合わせ、UX差異を解消するため。
+
+### 却下した案
+- クライアント側でURL抽出 → 入力本文・mode がサーバにしか無く二重実装になるため却下。
+- source を別列に分割 → スキーマ変更（危険変更）を伴い過剰。string 改行区切りで十分。
+
+### 次に確認すること（運用課題）
+- `check_gates.py` は作業ツリー全体の diff を見るため、`supabase_schema_change` 等の danger eval が「テーブル名トークン（`recipes` 等）」や「他チケットの未コミット migration」で過剰マッチする既知の制約。チケット単位コミットで切り分けるのが望ましい。
+
 ### 決定
 ユーザー登録画像（TKT-0174 レシピ画像）の Storage 後始末順序を確定:
 - **差し替え**: 新規upload → DB(`image_storage_path`)更新 → 成功後に旧object削除。DB更新失敗時は今uploadした孤児objectを即時削除。

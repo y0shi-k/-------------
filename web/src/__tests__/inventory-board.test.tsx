@@ -8,7 +8,10 @@ import type { AiUsageSummary } from "@/lib/ai/usage";
 const from = vi.fn();
 const storageFrom = vi.fn();
 const compressImageFile = vi.fn();
+const compressIngredientImageFile = vi.fn();
 const buildPhotoStoragePath = vi.fn();
+const buildInventoryImageStoragePath = vi.fn();
+const buildUserIngredientImageStoragePath = vi.fn();
 const refresh = vi.fn();
 const shellAiMocks = vi.hoisted(() => ({
   aiUsageSummary: null as AiUsageSummary | null,
@@ -51,8 +54,12 @@ vi.mock("@/components/web-mode-shell", () => ({
 }));
 
 vi.mock("@/lib/photos/compress", () => ({
+  buildInventoryImageStoragePath: (userId: string, itemId: string, extension: string) => buildInventoryImageStoragePath(userId, itemId, extension),
   buildPhotoStoragePath: () => buildPhotoStoragePath(),
-  compressImageFile: (file: File) => compressImageFile(file)
+  buildUserIngredientImageStoragePath: (userId: string, normalizedName: string, extension: string) => buildUserIngredientImageStoragePath(userId, normalizedName, extension),
+  compressImageFile: (file: File) => compressImageFile(file),
+  compressIngredientImageFile: (file: File) => compressIngredientImageFile(file),
+  imageExtensionFromContentType: (contentType: string) => (contentType === "image/webp" ? "webp" : "jpg")
 }));
 
 const baseItem: StockItem = {
@@ -153,8 +160,13 @@ describe("InventoryBoard", () => {
     };
     shellSubViewMocks.selectShellLeaf.mockReset();
     compressImageFile.mockReset();
+    compressIngredientImageFile.mockReset();
     buildPhotoStoragePath.mockReset();
+    buildInventoryImageStoragePath.mockReset();
+    buildUserIngredientImageStoragePath.mockReset();
     buildPhotoStoragePath.mockReturnValue("user-1/ingredient-scan/photo-1.jpg");
+    buildInventoryImageStoragePath.mockReturnValue("user-1/inventory-images/item-1/image.webp");
+    buildUserIngredientImageStoragePath.mockReturnValue("user-1/ingredient-images/milk/image.webp");
     global.fetch = vi.fn();
     localStorage.clear();
     URL.createObjectURL = vi.fn(() => "blob:preview");
@@ -234,6 +246,63 @@ describe("InventoryBoard", () => {
     expect(await screen.findByText("在庫に追加しました。")).toBeTruthy();
     expect(screen.getByText("豆腐")).toBeTruthy();
     expect(screen.getByText("1丁 = 300g")).toBeTruthy();
+  });
+
+  it("uploads an inventory image and remembers it for the same ingredient name", async () => {
+    const inserted = { ...baseItem, id: "item-1", name: "牛乳", image_storage_path: null };
+    const single = vi.fn().mockResolvedValue({ data: inserted, error: null });
+    const select = vi.fn(() => ({ single }));
+    const insert = vi.fn(() => ({ select }));
+    const eqUser = vi.fn().mockResolvedValue({ error: null });
+    const eqId = vi.fn(() => ({ eq: eqUser }));
+    const update = vi.fn(() => ({ eq: eqId }));
+    const upsert = vi.fn().mockResolvedValue({ error: null });
+    const upload = vi.fn().mockResolvedValue({ error: null });
+    const remove = vi.fn().mockResolvedValue({ error: null });
+    const createSignedUrl = vi.fn(async (path: string) => ({ data: { signedUrl: `https://signed/${path}` } }));
+    const compressedBlob = new Blob(["ingredient"], { type: "image/webp" });
+
+    storageFrom.mockReturnValue({ createSignedUrl, remove, upload });
+    from.mockImplementation((table: string) => {
+      if (table === "inventory_items") return { insert, update };
+      if (table === "user_ingredient_images") return { upsert };
+      return {};
+    });
+    compressIngredientImageFile.mockResolvedValue({
+      blob: compressedBlob,
+      byteSize: compressedBlob.size,
+      contentType: "image/webp",
+      width: 800,
+      height: 600
+    });
+
+    renderBoard();
+    openManualAdd();
+
+    fireEvent.change(screen.getByLabelText("品名"), { target: { value: "牛乳" } });
+    fireEvent.change(screen.getByLabelText("画像を選ぶ"), {
+      target: { files: [new File(["photo"], "milk.jpg", { type: "image/jpeg" })] }
+    });
+    expect(screen.getByAltText("選択した食材画像のプレビュー")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "在庫に追加" }));
+
+    await waitFor(() => {
+      expect(upload).toHaveBeenCalledWith("user-1/inventory-images/item-1/image.webp", compressedBlob, {
+        contentType: "image/webp",
+        upsert: false
+      });
+      expect(update).toHaveBeenCalledWith({ image_storage_path: "user-1/inventory-images/item-1/image.webp" });
+      expect(upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          user_id: "user-1",
+          normalized_name: "牛乳",
+          display_name: "牛乳",
+          image_storage_path: "user-1/ingredient-images/milk/image.webp"
+        }),
+        { onConflict: "user_id,normalized_name" }
+      );
+    });
+    expect(await screen.findByText("在庫に追加しました。")).toBeTruthy();
   });
 
   it("shows inventory insert errors inside the modal and logs details for debugging", async () => {

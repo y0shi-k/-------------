@@ -6,6 +6,17 @@ export type StandardIngredientImage = {
   alt: string;
 };
 
+export type UserIngredientImage = {
+  image_storage_path: string;
+  normalized_name: string;
+};
+
+export type IngredientDisplayImage =
+  | { kind: "inventory"; src: string; alt: string }
+  | { kind: "user"; src: string; alt: string }
+  | ({ kind: "standard" } & StandardIngredientImage)
+  | { kind: "emoji"; emoji: string; alt: string };
+
 type IngredientImageRule = StandardIngredientImage & {
   keywords: readonly string[];
 };
@@ -152,6 +163,19 @@ export function resolveIngredientImage(name: string, category?: ItemCategory): S
   }
 
   return category === "調味料" ? imageForKey("seasoning") : null;
+}
+
+export function normalizeIngredientImageName(name: string) {
+  return normalizeIngredientName(name);
+}
+
+export function resolveUserIngredientImage(
+  name: string,
+  userImages: readonly UserIngredientImage[]
+): UserIngredientImage | null {
+  const normalized = normalizeIngredientName(name);
+  if (!normalized) return null;
+  return userImages.find((image) => image.normalized_name === normalized && Boolean(image.image_storage_path)) ?? null;
 }
 
 function findBestRule(normalizedName: string, rules: readonly IngredientImageRule[]) {

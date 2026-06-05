@@ -4930,7 +4930,19 @@ h1 {
 }
 
 .shopping-item {
-  grid-template-columns: 1fr;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+}
+
+@media (max-width: 640px) {
+  .shopping-item {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .shopping-item .select-row,
+  .shopping-item .item-main,
+  .shopping-item .compact-button {
+    grid-column: 2;
+  }
 }
 
 .compact-title {
@@ -6376,6 +6388,79 @@ h1 {
   resize: none;
 }
 
+.ingredient-image-editor {
+  display: grid;
+  grid-template-columns: 116px minmax(0, 1fr);
+  gap: 14px;
+  align-items: center;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #f8fafc;
+  padding: 14px;
+}
+
+.ingredient-image-preview {
+  display: grid;
+  width: 104px;
+  height: 104px;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.ingredient-image-preview img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.ingredient-image-controls {
+  display: grid;
+  min-width: 0;
+  gap: 10px;
+}
+
+.ingredient-image-file-button {
+  width: fit-content;
+  min-height: 42px;
+}
+
+.image-memory-toggle {
+  display: inline-flex !important;
+  width: fit-content;
+  align-items: center;
+  gap: 8px;
+  margin: 0 !important;
+  color: #475569 !important;
+  font-size: 0.78rem !important;
+  font-weight: 800 !important;
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+}
+
+.image-memory-toggle input {
+  width: 18px !important;
+  min-height: 18px !important;
+  padding: 0 !important;
+}
+
+.ingredient-image-remove-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ingredient-image-note {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
 /* 5. 2列レイアウトを常に適用 */
 .inventory-editor-modal .form-row.two-columns {
   display: grid;
@@ -6518,6 +6603,20 @@ h1 {
 
   .inventory-editor-modal .form-row.two-columns {
     grid-template-columns: 1fr;
+  }
+
+  .ingredient-image-editor {
+    grid-template-columns: 88px minmax(0, 1fr);
+    gap: 12px;
+  }
+
+  .ingredient-image-preview {
+    width: 80px;
+    height: 80px;
+  }
+
+  .ingredient-image-remove-row .compact-button {
+    min-width: 0;
   }
 
   .inventory-editor-modal .conversion-row {
@@ -7246,12 +7345,21 @@ h1 {
   background: #fff;
 }
 
+.ingredient-icon[data-has-user-image="true"] {
+  overflow: hidden;
+  background: #fff;
+}
+
 .ingredient-icon img {
   display: block;
   width: 100%;
   height: 100%;
   object-fit: contain;
   pointer-events: none;
+}
+
+.ingredient-icon[data-has-user-image="true"] img {
+  object-fit: cover;
 }
 
 .ingredient-icon--sm {

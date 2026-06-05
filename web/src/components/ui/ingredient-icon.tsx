@@ -10,18 +10,29 @@ type IngredientIconProps = {
   category?: ItemCategory;
   size?: IngredientIconSize;
   className?: string;
+  imageUrl?: string | null;
 };
 
 /**
  * 食材の標準画像を優先し、見つからない場合は絵文字へ戻す。
  * 各画面は表示を直書きせず必ず本コンポーネントを経由する（正本 §8.6）。
  */
-export function IngredientIcon({ name, category, size = "md", className }: IngredientIconProps) {
+export function IngredientIcon({ name, category, size = "md", className, imageUrl }: IngredientIconProps) {
   const image = resolveIngredientImage(name, category);
   const emoji = ingredientEmoji(name);
   const classNames = ["ingredient-icon", `ingredient-icon--${size}`, className]
     .filter(Boolean)
     .join(" ");
+
+  if (imageUrl) {
+    return (
+      <span className={classNames} data-has-user-image="true" role="img" aria-label={name || "食材"}>
+        {/* Supabase signed URLs are already scoped and short lived, so Next Image optimization is not needed here. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={imageUrl} alt="" aria-hidden="true" />
+      </span>
+    );
+  }
 
   return (
     <span className={classNames} data-has-standard-image={Boolean(image)} role="img" aria-label={name || "食材"}>

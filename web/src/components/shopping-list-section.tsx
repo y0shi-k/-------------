@@ -1,4 +1,6 @@
 import type { ShoppingItem } from "@/lib/recipes/types";
+import { IngredientIcon } from "@/components/ui/ingredient-icon";
+import { resolveUserIngredientImage, type UserIngredientImage } from "@/lib/ui/ingredient-image";
 
 export function shoppingSourceLabel(item: ShoppingItem) {
   if (item.source_type === "meal_schedule") return item.linked_recipe_name ? `献立: ${item.linked_recipe_name}` : "献立由来";
@@ -12,7 +14,9 @@ export function ShoppingListSection({
   onMarkPurchased,
   onSelect,
   selectedIds,
-  title
+  title,
+  userIngredientImages = [],
+  userImageUrls = new Map()
 }: {
   emptyText: string;
   items: ShoppingItem[];
@@ -20,6 +24,8 @@ export function ShoppingListSection({
   onSelect: (id: string) => void;
   selectedIds: string[];
   title: string;
+  userIngredientImages?: UserIngredientImage[];
+  userImageUrls?: Map<string, string>;
 }) {
   return (
     <section className="shopping-list-section" aria-label={title}>
@@ -33,6 +39,7 @@ export function ShoppingListSection({
         <div className="stock-list">
           {items.map((item) => (
             <article className="stock-item compact-stock-item shopping-item" key={item.id}>
+              <IngredientIcon className="stock-item-icon" imageUrl={shoppingItemImageUrl(item, userIngredientImages, userImageUrls)} name={item.name} size="sm" />
               <label className="select-row">
                 <input checked={selectedIds.includes(item.id)} onChange={() => onSelect(item.id)} type="checkbox" />
                 選択
@@ -53,4 +60,9 @@ export function ShoppingListSection({
       )}
     </section>
   );
+}
+
+function shoppingItemImageUrl(item: ShoppingItem, userIngredientImages: UserIngredientImage[], userImageUrls: Map<string, string>) {
+  const userImage = resolveUserIngredientImage(item.name, userIngredientImages);
+  return userImage ? userImageUrls.get(userImage.image_storage_path) ?? null : null;
 }
