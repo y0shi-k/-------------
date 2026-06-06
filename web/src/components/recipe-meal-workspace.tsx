@@ -29,7 +29,7 @@ import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import { buildCookingHistoryPhotoStoragePath, compressImageFile, compressRecipeImageFile } from "@/lib/photos/compress";
 import { computeRollbackQuantityUpdates, type RollbackConsumptionEvent } from "@/lib/cooking-history/rollback";
 import { copyPhotoStorageObject, deleteRecipeImage, setRecipeImageFromCandidate, uploadRecipeImage } from "@/lib/photos/recipe-image-upload";
-import { useCookingPhotoCandidates, type CookingPhotoCandidate } from "@/lib/photos/use-cooking-photo-candidates";
+import { useCookingPhotoCandidates, type CookingPhotoCandidate, type CookingPhotoCandidateClient } from "@/lib/photos/use-cooking-photo-candidates";
 import { useRecipeImageUrls } from "@/lib/photos/use-recipe-image-urls";
 import { PHOTOS_BUCKET } from "@/lib/photos/user-image";
 
@@ -335,13 +335,14 @@ export function RecipeMealWorkspace({
   const { showStatusMessage } = useShellStatusMessage();
   const { selectedSubViews, selectShellLeaf } = useShellSubView();
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
+  const photoCandidateClient = supabase as unknown as CookingPhotoCandidateClient;
   // 一覧・詳細・候補で使うユーザー登録画像の署名付きURL（recipe.id -> url）。
   const recipeImageUrls = useRecipeImageUrls(recipes, supabase);
   const {
     candidates: cookingPhotoCandidates,
     error: cookingPhotoCandidatesError,
     loading: cookingPhotoCandidatesLoading
-  } = useCookingPhotoCandidates(supabase, userId);
+  } = useCookingPhotoCandidates(photoCandidateClient, userId, Boolean(photoCandidatePickerTarget));
   const { aiUsageSummary, refreshAiUsage } = useShellAiUsage();
   const recipeLimitReached = Boolean(
     aiUsageSummary?.ok && (aiUsageSummary.recipe_generation.remaining <= 0 || aiUsageSummary.total.remaining <= 0)

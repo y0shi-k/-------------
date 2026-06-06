@@ -28,3 +28,4 @@
 
 - Supabaseへ反映するにはmigration pushが必要。
 - 実Storageアップロードの手動smokeは、本番/共有DBへの副作用を避けるため未実施。
+続けて

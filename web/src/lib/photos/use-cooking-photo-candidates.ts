@@ -54,13 +54,21 @@ export async function fetchCookingPhotoCandidateRows(client: CookingPhotoCandida
   return { ok: true as const, rows: data ?? [] };
 }
 
-export function useCookingPhotoCandidates(client: CookingPhotoCandidateClient, userId: string) {
+export function useCookingPhotoCandidates(client: CookingPhotoCandidateClient, userId: string, enabled = true) {
   const [candidates, setCandidates] = useState<CookingPhotoCandidate[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     let active = true;
+    if (!enabled) {
+      setLoading(false);
+      setError(null);
+      return () => {
+        active = false;
+      };
+    }
+
     setLoading(true);
     setError(null);
 
@@ -95,7 +103,7 @@ export function useCookingPhotoCandidates(client: CookingPhotoCandidateClient, u
     return () => {
       active = false;
     };
-  }, [client, userId]);
+  }, [client, enabled, userId]);
 
   return { candidates, error, loading };
 }

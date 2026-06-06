@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { deleteRecipeImage, uploadRecipeImage, type RecipeImageClient } from "@/lib/photos/recipe-image-upload";
+import { deleteRecipeImage, setRecipeImageFromCandidate, uploadRecipeImage, type RecipeImageClient } from "@/lib/photos/recipe-image-upload";
 import type { CompressedPhoto } from "@/lib/photos/compress";
 
 const USER_ID = "11111111-1111-1111-1111-111111111111";
@@ -17,9 +17,16 @@ type StorageError = { message: string } | null;
 
 function makeClient(options?: {
   uploadError?: StorageError;
+  copyError?: StorageError;
+  downloadError?: StorageError;
   removeError?: StorageError;
   updateError?: StorageError;
 }) {
+  const copy = vi.fn<(fromPath: string, toPath: string) => Promise<{ error: StorageError }>>(async () => ({ error: options?.copyError ?? null }));
+  const download = vi.fn<(path: string) => Promise<{ data: Blob | null; error: StorageError }>>(async () => ({
+    data: options?.downloadError ? null : new Blob(["candidate"], { type: "image/jpeg" }),
+    error: options?.downloadError ?? null
+  }));
   const upload = vi.fn<(path: string, body: Blob, opts?: { contentType?: string; upsert?: boolean }) => Promise<{ error: StorageError }>>(
     async () => ({ error: options?.uploadError ?? null })
   );
@@ -29,12 +36,12 @@ function makeClient(options?: {
       eq: async () => ({ error: options?.updateError ?? null })
     })
   }));
-  const storageFrom = vi.fn(() => ({ upload, remove }));
+  const storageFrom = vi.fn(() => ({ copy, download, upload, remove }));
   const client = {
     storage: { from: storageFrom },
     from: vi.fn(() => ({ update }))
   } as unknown as RecipeImageClient;
-  return { client, upload, remove, update, storageFrom };
+  return { client, copy, download, upload, remove, update, storageFrom };
 }
 
 describe("uploadRecipeImage", () => {
@@ -88,6 +95,71 @@ describe("uploadRecipeImage", () => {
     expect(result.ok).toBe(false);
     // いま upload した path の削除が呼ばれる（孤児を残さない）。
     expect(remove).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("setRecipeImageFromCandidate", () => {
+  it("候補写真を新しい recipe-images path へコピーして DB を更新する", async () => {
+    const { client, copy, update } = makeClient();
+    const candidatePath = `${USER_ID}/cooking-history/old.jpg`;
+    const result = await setRecipeImageFromCandidate(client, {
+      userId: USER_ID,
+      recipeId: RECIPE_ID,
+      candidatePath,
+      candidateContentType: "image/jpeg"
+    });
+
+    expect(result.ok).toBe(true);
+    const copiedPath = copy.mock.calls[0][1] as string;
+    expect(copy).toHaveBeenCalledWith(candidatePath, copiedPath);
+    expect(copiedPath.startsWith(`${USER_ID}/recipe-images/${RECIPE_ID}/`)).toBe(true);
+    expect(copiedPath.endsWith(".jpg")).toBe(true);
+    expect(update).toHaveBeenCalledWith({ image_storage_path: copiedPath });
+  });
+
+  it("候補設定でも差し替え後に古いレシピ画像 object を削除する", async () => {
+    const { client, remove } = makeClient();
+    const previousPath = `${USER_ID}/recipe-images/${RECIPE_ID}/old.webp`;
+    const result = await setRecipeImageFromCandidate(client, {
+      userId: USER_ID,
+      recipeId: RECIPE_ID,
+      candidatePath: `${USER_ID}/cooking-history/source.jpg`,
+      candidateContentType: "image/jpeg",
+      previousPath
+    });
+
+    expect(result.ok).toBe(true);
+    expect(remove).toHaveBeenCalledWith([previousPath]);
+  });
+
+  it("Storage copy が使えない場合は download から再 upload する", async () => {
+    const { client, copy, download, upload } = makeClient({ copyError: { message: "copy failed" } });
+    const result = await setRecipeImageFromCandidate(client, {
+      userId: USER_ID,
+      recipeId: RECIPE_ID,
+      candidatePath: `${USER_ID}/cooking-history/source.jpg`,
+      candidateContentType: "image/jpeg"
+    });
+
+    expect(result.ok).toBe(true);
+    expect(copy).toHaveBeenCalled();
+    expect(download).toHaveBeenCalledWith(`${USER_ID}/cooking-history/source.jpg`);
+    expect(upload).toHaveBeenCalledWith(expect.stringContaining(`${USER_ID}/recipe-images/${RECIPE_ID}/`), expect.any(Blob), {
+      contentType: "image/jpeg",
+      upsert: false
+    });
+  });
+
+  it("DB 更新に失敗したらコピー済み object を片付けてエラーにする", async () => {
+    const { client, copy, remove } = makeClient({ updateError: { message: "boom" } });
+    const result = await setRecipeImageFromCandidate(client, {
+      userId: USER_ID,
+      recipeId: RECIPE_ID,
+      candidatePath: `${USER_ID}/cooking-history/source.jpg`
+    });
+
+    expect(result.ok).toBe(false);
+    expect(remove).toHaveBeenCalledWith([copy.mock.calls[0][1]]);
   });
 });
 

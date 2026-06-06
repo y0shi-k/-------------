@@ -4609,6 +4609,10 @@ h1 {
   gap: 10px;
 }
 
+.cooking-photo-picker .secondary-button {
+  width: fit-content;
+}
+
 .cooking-record-panel .photo-preview img {
   max-height: 240px;
 }
@@ -6802,6 +6806,68 @@ h1 {
   font-size: 11px;
   line-height: 1.5;
   overflow-wrap: anywhere;
+}
+
+.photo-candidate-modal {
+  width: min(720px, 100%);
+}
+
+.photo-candidate-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+  gap: 10px;
+}
+
+.photo-candidate-item {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff;
+  padding: 8px;
+  color: #475569;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-align: left;
+}
+
+.photo-candidate-item img,
+.photo-candidate-item span {
+  display: grid;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 6px;
+  background: #eef3ef;
+  color: #94a3b8;
+  object-fit: cover;
+}
+
+.photo-candidate-item small {
+  overflow: hidden;
+  color: #64748b;
+  font-size: 0.72rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.photo-candidate-empty,
+.photo-candidate-error {
+  margin: 0;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #64748b;
+  padding: 14px;
+  line-height: 1.6;
+}
+
+.photo-candidate-error {
+  border-color: #fecaca;
+  background: #fff5f5;
+  color: #b91c1c;
 }
 
 .recipe-editor-form input,
