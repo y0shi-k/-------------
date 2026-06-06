@@ -179,6 +179,13 @@ function deleteQuery(error: unknown = null) {
   return { deleteRows, eqRecipe, eqUser };
 }
 
+function selectEqQuery(data: unknown[], error: unknown = null) {
+  const eqUser = vi.fn().mockResolvedValue({ data, error });
+  const eqSchedule = vi.fn(() => ({ eq: eqUser }));
+  const select = vi.fn(() => ({ eq: eqSchedule }));
+  return { eqSchedule, eqUser, select };
+}
+
 function insertListQuery(data: unknown[], error: unknown = null) {
   const select = vi.fn().mockResolvedValue({ data, error });
   const insert = vi.fn(() => ({ select }));
@@ -654,6 +661,91 @@ describe("RecipeMealWorkspace", () => {
       expect(scheduleDelete.deleteRows).toHaveBeenCalled();
     });
     expect(await screen.findByText("カレー を献立から削除しました。")).toBeTruthy();
+  });
+
+  it("uncompletes a meal schedule and rolls inventory/history back", async () => {
+    const completedSchedule: MealSchedule = {
+      ...baseSchedule,
+      status: "完了",
+      completed_at: "2026-05-24T10:00:00.000Z"
+    };
+    const uncompletedSchedule: MealSchedule = {
+      ...completedSchedule,
+      status: "未完了",
+      completed_at: null
+    };
+    const eventsSelect = selectEqQuery([{ stock_item_id: "stock-1", consumed_amount: 1 }]);
+    const consumptionDelete = deleteQuery();
+    const historyDelete = deleteQuery();
+    const inventoryUpdate = updateEqQuery();
+    const scheduleUpdate = updateSingleQuery(uncompletedSchedule);
+
+    from.mockImplementation((table: string) => {
+      if (table === "cooking_consumption_events") return { select: eventsSelect.select, delete: consumptionDelete.deleteRows };
+      if (table === "inventory_items") return { update: inventoryUpdate.update };
+      if (table === "cooking_history") return { delete: historyDelete.deleteRows };
+      if (table === "meal_schedules") return { update: scheduleUpdate.update };
+      return {};
+    });
+
+    renderWorkspace({ initialInventoryItems: [{ ...baseInventory, quantity: 0 }], initialMealSchedules: [completedSchedule] });
+    openScheduleView();
+
+    fireEvent.click(within(screen.getByLabelText("7日献立")).getByRole("button", { name: "カレー の操作" }));
+    fireEvent.click(screen.getByRole("button", { name: "完了を外す" }));
+    expect(await screen.findByLabelText("完了解除確認")).toBeTruthy();
+    fireEvent.click(within(screen.getByLabelText("完了解除確認")).getByRole("button", { name: "完了を外す" }));
+
+    await waitFor(() => {
+      expect(eventsSelect.select).toHaveBeenCalledWith("stock_item_id, consumed_amount");
+      expect(inventoryUpdate.update).toHaveBeenCalledWith({ quantity: 1 });
+      expect(consumptionDelete.deleteRows).toHaveBeenCalled();
+      expect(historyDelete.deleteRows).toHaveBeenCalled();
+      expect(scheduleUpdate.update).toHaveBeenCalledWith({ status: "未完了", completed_at: null });
+      expect(refresh).toHaveBeenCalled();
+    });
+    expect(await screen.findByText("カレー の完了を取り消し、在庫を戻しました。")).toBeTruthy();
+  });
+
+  it("deletes a completed meal schedule after rolling inventory/history back", async () => {
+    const completedSchedule: MealSchedule = {
+      ...baseSchedule,
+      status: "完了",
+      completed_at: "2026-05-24T10:00:00.000Z"
+    };
+    const eventsSelect = selectEqQuery([
+      { stock_item_id: "stock-1", consumed_amount: 1 },
+      { stock_item_id: null, consumed_amount: 10 }
+    ]);
+    const consumptionDelete = deleteQuery();
+    const historyDelete = deleteQuery();
+    const inventoryUpdate = updateEqQuery();
+    const scheduleDelete = deleteQuery();
+
+    from.mockImplementation((table: string) => {
+      if (table === "cooking_consumption_events") return { select: eventsSelect.select, delete: consumptionDelete.deleteRows };
+      if (table === "inventory_items") return { update: inventoryUpdate.update };
+      if (table === "cooking_history") return { delete: historyDelete.deleteRows };
+      if (table === "meal_schedules") return { delete: scheduleDelete.deleteRows };
+      return {};
+    });
+
+    renderWorkspace({ initialInventoryItems: [{ ...baseInventory, quantity: 0 }], initialMealSchedules: [completedSchedule] });
+    openScheduleView();
+
+    fireEvent.click(within(screen.getByLabelText("7日献立")).getByRole("button", { name: "カレー を削除" }));
+    expect(await screen.findByText("在庫を戻して献立を削除します。料理履歴と消費記録も削除されます。完成写真は残ります。")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "削除する" }));
+
+    await waitFor(() => {
+      expect(inventoryUpdate.update).toHaveBeenCalledTimes(1);
+      expect(inventoryUpdate.update).toHaveBeenCalledWith({ quantity: 1 });
+      expect(consumptionDelete.deleteRows).toHaveBeenCalled();
+      expect(historyDelete.deleteRows).toHaveBeenCalled();
+      expect(scheduleDelete.deleteRows).toHaveBeenCalled();
+    });
+    expect(await screen.findByText("カレー を献立から削除しました。")).toBeTruthy();
+    expect(within(screen.getByLabelText("7日献立")).queryByText("カレー")).toBeNull();
   });
 
   it("adds, assigns, and removes cook candidates", async () => {

@@ -26,6 +26,7 @@ import {
 import { loadUserGeminiApiKey } from "@/lib/ai/user-gemini-api-key";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import { buildCookingHistoryPhotoStoragePath, compressImageFile, compressRecipeImageFile } from "@/lib/photos/compress";
+import { computeRollbackQuantityUpdates, type RollbackConsumptionEvent } from "@/lib/cooking-history/rollback";
 import { deleteRecipeImage, uploadRecipeImage } from "@/lib/photos/recipe-image-upload";
 import { useRecipeImageUrls } from "@/lib/photos/use-recipe-image-urls";
 
@@ -43,9 +44,12 @@ type Feedback = {
 };
 
 type PendingDelete = {
+  confirmLabel?: string;
   confirm: () => void;
   message: string;
   target: string;
+  title?: string;
+  tone?: "danger" | "default";
 };
 
 type RecipeShoppingShortage = {
@@ -178,6 +182,13 @@ function scheduleDateTone(value: string): "today" | "sun" | "sat" | "weekday" {
   if (weekday === 0) return "sun";
   if (weekday === 6) return "sat";
   return "weekday";
+}
+
+function scheduleDeleteMessage(schedule: MealSchedule) {
+  if (schedule.status === "完了") {
+    return "在庫を戻して献立を削除します。料理履歴と消費記録も削除されます。完成写真は残ります。";
+  }
+  return "この献立予定を削除します。料理履歴は削除されません。";
 }
 
 function inventoryAmountByNameAndUnit(items: StockItem[], name: string, unit: string) {
@@ -708,8 +719,8 @@ export function RecipeMealWorkspace({
     );
   }
 
-  function requestDelete(target: string, message: string, confirm: () => void) {
-    setPendingDelete({ target, message, confirm });
+  function requestDelete(target: string, message: string, confirm: () => void, options?: Pick<PendingDelete, "confirmLabel" | "title" | "tone">) {
+    setPendingDelete({ target, message, confirm, ...options });
     setFeedback(null);
   }
 
@@ -1208,6 +1219,17 @@ export function RecipeMealWorkspace({
     setIsSaving(true);
     setFeedback(null);
 
+    let rollbackUpdates: ReturnType<typeof computeRollbackQuantityUpdates> = [];
+    if (schedule.status === "完了") {
+      const rollbackResult = await rollbackCompletedSchedule(schedule);
+      if (!rollbackResult.ok) {
+        setIsSaving(false);
+        setFeedback({ tone: "error", message: rollbackResult.message });
+        return;
+      }
+      rollbackUpdates = rollbackResult.updates;
+    }
+
     const { error } = await supabase.from("meal_schedules").delete().eq("id", schedule.id).eq("user_id", userId);
 
     setIsSaving(false);
@@ -1218,11 +1240,115 @@ export function RecipeMealWorkspace({
     }
 
     setMealSchedules((items) => items.filter((item) => item.id !== schedule.id));
+    setInventoryItemsForMeals((items) =>
+      items.map((item) => {
+        const update = rollbackUpdates.find((entry) => entry.id === item.id);
+        return update ? { ...item, quantity: update.nextQuantity } : item;
+      })
+    );
     if (selectedScheduleId === schedule.id) {
       const nextSchedule = mealSchedules.find((item) => item.id !== schedule.id);
       setSelectedScheduleId(nextSchedule?.id ?? "");
     }
     setFeedback({ tone: "info", message: `${schedule.recipe_name || "献立"} を献立から削除しました。` });
+  }
+
+  async function rollbackCompletedSchedule(schedule: MealSchedule): Promise<{ message: string; ok: false } | { ok: true; updates: ReturnType<typeof computeRollbackQuantityUpdates> }> {
+    const { data: events, error: eventsError } = await supabase
+      .from("cooking_consumption_events")
+      .select("stock_item_id, consumed_amount")
+      .eq("meal_schedule_id", schedule.id)
+      .eq("user_id", userId);
+
+    if (eventsError || !events) {
+      return {
+        ok: false,
+        message: "原因: 消費記録を確認できませんでした。影響: 在庫を戻せないため処理を中止しました。修正方法: ログイン状態を確認し、再読込してからもう一度お試しください。"
+      };
+    }
+
+    const updates = computeRollbackQuantityUpdates(events as RollbackConsumptionEvent[], inventoryItemsForMeals).filter((update) => !update.missing);
+    for (const update of updates) {
+      const { error: inventoryError } = await supabase
+        .from("inventory_items")
+        .update({ quantity: update.nextQuantity })
+        .eq("id", update.id)
+        .eq("user_id", userId);
+
+      if (inventoryError) {
+        return {
+          ok: false,
+          message: "原因: 在庫を戻せませんでした。影響: 完了解除または削除を中止しました。修正方法: 再読込して在庫状態を確認してからもう一度お試しください。"
+        };
+      }
+    }
+
+    const { error: consumptionDeleteError } = await supabase
+      .from("cooking_consumption_events")
+      .delete()
+      .eq("meal_schedule_id", schedule.id)
+      .eq("user_id", userId);
+    if (consumptionDeleteError) {
+      return {
+        ok: false,
+        message: "原因: 消費記録を削除できませんでした。影響: 在庫を戻した後の整理が止まりました。修正方法: 再読込して料理履歴を確認してください。"
+      };
+    }
+
+    const { error: historyDeleteError } = await supabase.from("cooking_history").delete().eq("meal_schedule_id", schedule.id).eq("user_id", userId);
+    if (historyDeleteError) {
+      return {
+        ok: false,
+        message: "原因: 料理履歴を削除できませんでした。影響: 献立の完了状態はまだ変更していません。修正方法: 再読込して料理履歴を確認してください。"
+      };
+    }
+
+    return { ok: true, updates };
+  }
+
+  async function uncompleteSchedule(schedule: MealSchedule) {
+    if (schedule.status !== "完了") {
+      setFeedback({ tone: "info", message: "この献立は未完了です。" });
+      return;
+    }
+
+    setIsSaving(true);
+    setFeedback(null);
+
+    const rollbackResult = await rollbackCompletedSchedule(schedule);
+    if (!rollbackResult.ok) {
+      setIsSaving(false);
+      setFeedback({ tone: "error", message: rollbackResult.message });
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("meal_schedules")
+      .update({ status: "未完了", completed_at: null })
+      .eq("id", schedule.id)
+      .eq("user_id", userId)
+      .select()
+      .single();
+
+    setIsSaving(false);
+
+    if (error || !data) {
+      setFeedback({
+        tone: "error",
+        message: "原因: 献立を未完了に戻せませんでした。影響: 在庫と履歴の巻き戻し後に表示状態だけが残る可能性があります。修正方法: 再読込して状態を確認してください。"
+      });
+      return;
+    }
+
+    setMealSchedules((items) => items.map((item) => (item.id === schedule.id ? (data as MealSchedule) : item)));
+    setInventoryItemsForMeals((items) =>
+      items.map((item) => {
+        const update = rollbackResult.updates.find((entry) => entry.id === item.id);
+        return update ? { ...item, quantity: update.nextQuantity } : item;
+      })
+    );
+    router.refresh();
+    showToast(`${schedule.recipe_name || "献立"} の完了を取り消し、在庫を戻しました。`, "success");
   }
 
   async function addCurrentRecipeToShopping() {
@@ -1658,6 +1784,7 @@ export function RecipeMealWorkspace({
 
       {pendingDelete ? (
         <DeleteConfirmPanel
+          confirmLabel={pendingDelete.confirmLabel}
           disabled={isSaving}
           message={pendingDelete.message}
           onCancel={() => setPendingDelete(null)}
@@ -1667,6 +1794,8 @@ export function RecipeMealWorkspace({
             action();
           }}
           target={pendingDelete.target}
+          title={pendingDelete.title}
+          tone={pendingDelete.tone}
         />
       ) : null}
 
@@ -2029,6 +2158,25 @@ export function RecipeMealWorkspace({
               >
                 別のレシピに変更
               </button>
+              {slotMenuSchedule.status === "完了" ? (
+                <button
+                  className="slot-menu-button slot-menu-change"
+                  type="button"
+                  disabled={isSaving}
+                  onClick={() => {
+                    const target = slotMenuSchedule;
+                    setSlotMenuId(null);
+                    requestDelete(
+                      target.recipe_name || "献立",
+                      "在庫を戻し、料理履歴と消費記録を削除して、この献立を未完了に戻します。完成写真は残ります。",
+                      () => uncompleteSchedule(target),
+                      { confirmLabel: "完了を外す", title: "完了解除確認", tone: "default" }
+                    );
+                  }}
+                >
+                  完了を外す
+                </button>
+              ) : null}
               <button
                 className="slot-menu-button slot-menu-delete"
                 type="button"
@@ -2036,7 +2184,7 @@ export function RecipeMealWorkspace({
                 onClick={() => {
                   const target = slotMenuSchedule;
                   setSlotMenuId(null);
-                  requestDelete(target.recipe_name || "献立", "この献立予定を削除します。料理履歴は削除されません。", () => deleteSchedule(target));
+                  requestDelete(target.recipe_name || "献立", scheduleDeleteMessage(target), () => deleteSchedule(target));
                 }}
               >
                 削除する
@@ -2310,7 +2458,20 @@ export function RecipeMealWorkspace({
                                 onDragEnd={(event) => {
                                   event.currentTarget.classList.remove("is-dragging");
                                 }}
-                              >
+                                >
+                                <button
+                                  className="schedule-meal-delete-button"
+                                  type="button"
+                                  disabled={isSaving}
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    requestDelete(schedule.recipe_name || "献立", scheduleDeleteMessage(schedule), () => deleteSchedule(schedule));
+                                  }}
+                                  aria-label={`${schedule.recipe_name || "献立"} を削除`}
+                                  title="削除"
+                                >
+                                  ×
+                                </button>
                                 <button
                                   className="schedule-meal-select"
                                   type="button"
