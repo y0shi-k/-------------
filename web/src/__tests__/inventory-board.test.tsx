@@ -121,6 +121,7 @@ function renderBoard(props?: Partial<React.ComponentProps<typeof InventoryBoard>
   return render(
     <InventoryBoard
       initialInventoryItems={props?.initialInventoryItems ?? []}
+      initialArchivedInventoryItems={props?.initialArchivedInventoryItems ?? []}
       initialShoppingItems={props?.initialShoppingItems ?? []}
       initialStorageLocations={props?.initialStorageLocations ?? []}
       userId={props?.userId ?? "user-1"}
@@ -186,6 +187,42 @@ describe("InventoryBoard", () => {
     expect(screen.getByRole("heading", { name: "食材を追加" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "画像スキャン" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "手動で追加" })).toBeTruthy();
+  });
+
+  it("filters inventory cards by category together with storage location", () => {
+    renderBoard({
+      initialInventoryItems: [
+        { ...baseItem, id: "food-1", category: "食材", name: "牛乳", storage_location: "冷蔵庫" },
+        { ...baseItem, id: "food-2", category: "食材", name: "トマト", storage_location: "常温" },
+        { ...baseItem, id: "seasoning-1", category: "調味料", name: "醤油", storage_location: "常温" }
+      ],
+      initialStorageLocations: [
+        { id: "loc-1", user_id: "user-1", name: "冷蔵庫", sort_order: 1, created_at: "2026-05-24T00:00:00Z", updated_at: "2026-05-24T00:00:00Z" },
+        { id: "loc-2", user_id: "user-1", name: "常温", sort_order: 2, created_at: "2026-05-24T00:00:00Z", updated_at: "2026-05-24T00:00:00Z" }
+      ]
+    });
+
+    expect(screen.getByRole("button", { name: /^All\s+3$/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /^材料\s+2$/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /^調味料\s+1$/ })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: /^調味料\s+1$/ }));
+
+    expect(screen.queryByText("牛乳")).toBeNull();
+    expect(screen.queryByText("トマト")).toBeNull();
+    expect(screen.getByText("醤油")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: /^All\s+3$/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^常温\s+2$/ }));
+
+    expect(screen.queryByText("牛乳")).toBeNull();
+    expect(screen.getByText("トマト")).toBeTruthy();
+    expect(screen.getByText("醤油")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: /^材料\s+2$/ }));
+
+    expect(screen.getByText("トマト")).toBeTruthy();
+    expect(screen.queryByText("醤油")).toBeNull();
   });
 
   it("opens the shopping list from the shell subview selection", async () => {
@@ -435,10 +472,48 @@ describe("InventoryBoard", () => {
 
     await waitFor(() => {
       expect(from).toHaveBeenCalledWith("inventory_items");
-      expect(update).toHaveBeenCalledWith({ quantity: 0 });
+      expect(update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          quantity: 0,
+          archived_reason: "manual_zero"
+        })
+      );
     });
     await waitFor(() => {
-      expect(screen.getByLabelText("牛乳の数量").textContent).toContain("0本");
+      expect(screen.queryByLabelText("牛乳の数量")).toBeNull();
+      expect(screen.getByRole("heading", { name: "復元履歴" })).toBeTruthy();
+      expect(screen.getByText("牛乳")).toBeTruthy();
+    });
+  });
+
+  it("restores a zero-inventory item with a user-entered quantity", async () => {
+    const archivedItem = {
+      ...baseItem,
+      id: "archived-1",
+      quantity: 0,
+      archived_at: "2026-06-06T00:00:00.000Z",
+      archived_reason: "manual_zero"
+    };
+    const restoredItem = { ...archivedItem, quantity: 2, archived_at: null, archived_reason: null };
+    const single = vi.fn().mockResolvedValue({ data: restoredItem, error: null });
+    const select = vi.fn(() => ({ single }));
+    const eqUser = vi.fn(() => ({ select }));
+    const eqId = vi.fn(() => ({ eq: eqUser }));
+    const update = vi.fn(() => ({ eq: eqId }));
+    from.mockReturnValue({ update });
+
+    renderBoard({ initialArchivedInventoryItems: [archivedItem] });
+
+    fireEvent.change(screen.getByLabelText("牛乳の復元数量"), { target: { value: "2" } });
+    fireEvent.click(screen.getByRole("button", { name: "戻す" }));
+
+    await waitFor(() => {
+      expect(update).toHaveBeenCalledWith({
+        quantity: 2,
+        archived_at: null,
+        archived_reason: null
+      });
+      expect(screen.getByLabelText("牛乳の数量").textContent).toContain("2本");
     });
   });
 
@@ -452,12 +527,12 @@ describe("InventoryBoard", () => {
       }
     });
 
-    expect(screen.getByAltText("選択した食材写真のプレビュー")).toBeTruthy();
+    expect(screen.getByAltText("選択した食材写真のプレビュー 1")).toBeTruthy();
     expect(screen.getByRole("button", { name: "AI解析する" })).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "別の写真にする" }));
 
-    expect(screen.queryByAltText("選択した食材写真のプレビュー")).toBeNull();
+    expect(screen.queryByAltText("選択した食材写真のプレビュー 1")).toBeNull();
     expect(screen.getByText("写真は非公開で保存し、入力したGemini APIキーでAI解析します。APIキーはDBに保存しません。")).toBeTruthy();
   });
 
@@ -578,7 +653,7 @@ describe("InventoryBoard", () => {
         headers: {
           "Content-Type": "application/json"
         },
-        body: JSON.stringify({ photoId: "photo-1", geminiApiKey: "user-owned-test-key" })
+        body: JSON.stringify({ photoIds: ["photo-1"], geminiApiKey: "user-owned-test-key" })
       });
     });
     expect(await screen.findByText("1件の候補を見つけました。確認してから在庫に追加してください。")).toBeTruthy();
@@ -595,6 +670,190 @@ describe("InventoryBoard", () => {
       expect(inventoryInsert).toHaveBeenCalledWith([aiItem]);
     });
     expect(await screen.findByText("1件を在庫に追加しました。")).toBeTruthy();
+  });
+
+  it("uploads multiple selected photos and merges AI candidates", async () => {
+    localStorage.setItem("stock-master:user-gemini-api-key", "user-owned-test-key");
+    buildPhotoStoragePath.mockReturnValueOnce("user-1/ingredient-scan/photo-1.jpg").mockReturnValueOnce("user-1/ingredient-scan/photo-2.jpg");
+    const upload = vi.fn().mockResolvedValue({ error: null });
+    const remove = vi.fn().mockResolvedValue({ error: null });
+    const photoSingle = vi
+      .fn()
+      .mockResolvedValueOnce({ data: { id: "photo-1" }, error: null })
+      .mockResolvedValueOnce({ data: { id: "photo-2" }, error: null });
+    const photoSelect = vi.fn(() => ({ single: photoSingle }));
+    const photoInsert = vi.fn(() => ({ select: photoSelect }));
+    const compressedBlob = new Blob(["compressed"], { type: "image/jpeg" });
+    const aiItems = [
+      { user_id: "user-1", category: "食材", name: "牛乳", quantity: 1, unit: "本", unit_conversion: null, display_expires_on: null, effective_expires_on: null, storage_location: "冷蔵庫", status_note: "AI解析候補", source: "ai_photo" },
+      { user_id: "user-1", category: "調味料", name: "醤油", quantity: 1, unit: "本", unit_conversion: null, display_expires_on: null, effective_expires_on: null, storage_location: "常温", status_note: "AI解析候補", source: "ai_photo" }
+    ];
+
+    storageFrom.mockReturnValue({ upload, remove });
+    from.mockImplementation((table: string) => {
+      if (table === "photos") return { insert: photoInsert };
+      return {};
+    });
+    compressImageFile.mockResolvedValue({
+      blob: compressedBlob,
+      byteSize: compressedBlob.size,
+      contentType: "image/jpeg",
+      width: 1024,
+      height: 768
+    });
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      json: async () => ({ items: aiItems })
+    } as Response);
+
+    renderBoard();
+    openPhotoScan();
+
+    fireEvent.change(screen.getByLabelText("写真を撮る"), {
+      target: {
+        files: [
+          new File(["photo-1"], "ingredient-1.jpg", { type: "image/jpeg" }),
+          new File(["photo-2"], "ingredient-2.jpg", { type: "image/jpeg" })
+        ]
+      }
+    });
+    expect(screen.getByAltText("選択した食材写真のプレビュー 1")).toBeTruthy();
+    expect(screen.getByAltText("選択した食材写真のプレビュー 2")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "AI解析する" }));
+
+    await waitFor(() => {
+      expect(upload).toHaveBeenCalledTimes(2);
+      expect(photoInsert).toHaveBeenCalledTimes(2);
+      expect(fetch).toHaveBeenCalledWith("/api/ai/scan-ingredients", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ photoIds: ["photo-1", "photo-2"], geminiApiKey: "user-owned-test-key" })
+      });
+    });
+    expect(await screen.findByText("2件の候補を見つけました。確認してから在庫に追加してください。")).toBeTruthy();
+    expect(screen.getByText("牛乳")).toBeTruthy();
+    expect(screen.getByText("醤油")).toBeTruthy();
+  });
+
+  it("edits one AI scan candidate without losing the remaining selected candidates", async () => {
+    localStorage.setItem("stock-master:user-gemini-api-key", "user-owned-test-key");
+    const upload = vi.fn().mockResolvedValue({ error: null });
+    const remove = vi.fn().mockResolvedValue({ error: null });
+    const photoSingle = vi.fn().mockResolvedValue({ data: { id: "photo-1" }, error: null });
+    const photoSelect = vi.fn(() => ({ single: photoSingle }));
+    const photoInsert = vi.fn(() => ({ select: photoSelect }));
+    const inventoryOrder = vi.fn().mockResolvedValue({
+      data: [
+        { ...baseItem, id: "ai-1", name: "牛乳", source: "ai_photo" },
+        { ...baseItem, id: "ai-2", name: "卵パック", source: "ai_photo" },
+        { ...baseItem, id: "ai-3", name: "トマト", source: "ai_photo" }
+      ],
+      error: null
+    });
+    const inventorySelect = vi.fn(() => ({ order: inventoryOrder }));
+    const inventoryInsert = vi.fn(() => ({ select: inventorySelect }));
+    const compressedBlob = new Blob(["compressed"], { type: "image/jpeg" });
+    const aiItems = [
+      {
+        user_id: "user-1",
+        category: "食材",
+        name: "牛乳",
+        quantity: 1,
+        unit: "本",
+        unit_conversion: null,
+        display_expires_on: null,
+        effective_expires_on: null,
+        storage_location: "冷蔵庫",
+        status_note: "AI解析候補",
+        source: "ai_photo"
+      },
+      {
+        user_id: "user-1",
+        category: "食材",
+        name: "卵",
+        quantity: 10,
+        unit: "個",
+        unit_conversion: null,
+        display_expires_on: null,
+        effective_expires_on: null,
+        storage_location: "冷蔵庫",
+        status_note: "AI解析候補",
+        source: "ai_photo"
+      },
+      {
+        user_id: "user-1",
+        category: "食材",
+        name: "トマト",
+        quantity: 3,
+        unit: "個",
+        unit_conversion: null,
+        display_expires_on: null,
+        effective_expires_on: null,
+        storage_location: "野菜室",
+        status_note: "AI解析候補",
+        source: "ai_photo"
+      }
+    ];
+
+    storageFrom.mockReturnValue({ upload, remove });
+    from.mockImplementation((table: string) => {
+      if (table === "photos") return { insert: photoInsert };
+      if (table === "inventory_items") return { insert: inventoryInsert };
+      return {};
+    });
+    compressImageFile.mockResolvedValue({
+      blob: compressedBlob,
+      byteSize: compressedBlob.size,
+      contentType: "image/jpeg",
+      width: 1024,
+      height: 768
+    });
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      json: async () => ({ items: aiItems })
+    } as Response);
+
+    renderBoard();
+    openPhotoScan();
+
+    fireEvent.change(screen.getByLabelText("写真を撮る"), {
+      target: {
+        files: [new File(["photo"], "ingredient.jpg", { type: "image/jpeg" })]
+      }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "AI解析する" }));
+
+    expect(await screen.findByText("3件の候補を見つけました。確認してから在庫に追加してください。")).toBeTruthy();
+    expect(screen.getByText("3件選択中")).toBeTruthy();
+
+    fireEvent.click(screen.getAllByRole("button", { name: "編集" })[1]);
+    expect(screen.getByRole("heading", { name: "AI候補を編集" })).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("品名"), { target: { value: "卵パック" } });
+    fireEvent.click(screen.getByRole("button", { name: "候補を更新" }));
+
+    expect(await screen.findByText("卵パックの候補を更新しました。確認してから在庫に追加してください。")).toBeTruthy();
+    expect(screen.getByText("牛乳")).toBeTruthy();
+    expect(screen.getByText("卵パック")).toBeTruthy();
+    expect(screen.getByText("トマト")).toBeTruthy();
+    expect(screen.getByText("3件選択中")).toBeTruthy();
+    expect(inventoryInsert).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "選択した候補を在庫に追加" }));
+
+    await waitFor(() => {
+      expect(inventoryInsert).toHaveBeenCalledWith([
+        aiItems[0],
+        {
+          ...aiItems[1],
+          name: "卵パック"
+        },
+        aiItems[2]
+      ]);
+    });
+    expect(await screen.findByText("3件を在庫に追加しました。")).toBeTruthy();
   });
 
   it("shows a clear error when photo upload fails", async () => {
@@ -619,7 +878,7 @@ describe("InventoryBoard", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "AI解析する" }));
 
-    expect(await screen.findByText(/原因: 写真をStorageへ保存できませんでした。/)).toBeTruthy();
+    expect(await screen.findByText(/原因: 選択した写真をStorageまたはDBへ保存できませんでした。/)).toBeTruthy();
     expect(from).not.toHaveBeenCalledWith("photos");
   });
 

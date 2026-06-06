@@ -11,6 +11,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 type ScanRequest = {
   geminiApiKey?: unknown;
   photoId?: unknown;
+  photoIds?: unknown;
 };
 
 type PhotoMetadata = {
@@ -47,10 +48,10 @@ function limitErrorMessage(reason: string | undefined) {
 
 export async function POST(request: Request) {
   const body = (await request.json().catch(() => null)) as ScanRequest | null;
-  const photoId = typeof body?.photoId === "string" ? body.photoId.trim() : "";
+  const photoIds = normalizePhotoIds(body);
   const apiKey = typeof body?.geminiApiKey === "string" ? body.geminiApiKey.trim().slice(0, 300) : "";
 
-  if (!photoId) {
+  if (photoIds.length === 0) {
     return errorResponse(ERROR_MESSAGES.invalidRequest, 400);
   }
 
@@ -67,22 +68,72 @@ export async function POST(request: Request) {
     return errorResponse(ERROR_MESSAGES.unauthorized, 401);
   }
 
+  const items: Array<ReturnType<typeof toInventoryInsert>> = [];
+  const errors: string[] = [];
+
+  for (const photoId of photoIds) {
+    const result = await scanOnePhoto({ apiKey, photoId, supabase, userId: user.id });
+    if (result.ok) {
+      items.push(...result.items.map((item) => toInventoryInsert(item, user.id)));
+    } else {
+      errors.push(result.error);
+    }
+  }
+
+  if (items.length === 0) {
+    const firstError = errors[0] ?? ERROR_MESSAGES.geminiFailed;
+    const status = statusFromError(firstError);
+    return errorResponse(firstError, status);
+  }
+
+  if (errors.length === 0) {
+    return NextResponse.json({ items });
+  }
+
+  return NextResponse.json({ items, failedCount: errors.length, errors: errors.slice(0, 3) });
+}
+
+function errorResponse(error: string, status: number) {
+  return NextResponse.json({ error }, { status });
+}
+
+function normalizePhotoIds(body: ScanRequest | null) {
+  const ids = Array.isArray(body?.photoIds)
+    ? body.photoIds
+    : typeof body?.photoId === "string"
+      ? [body.photoId]
+      : [];
+
+  return [...new Set(ids.map((id) => (typeof id === "string" ? id.trim() : "")).filter(Boolean))].slice(0, 8);
+}
+
+async function scanOnePhoto({
+  apiKey,
+  photoId,
+  supabase,
+  userId
+}: {
+  apiKey: string;
+  photoId: string;
+  supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>;
+  userId: string;
+}) {
   const { data: photo, error: photoError } = await supabase
     .from("photos")
     .select("id,user_id,bucket_id,storage_path,usage_type,content_type")
     .eq("id", photoId)
-    .eq("user_id", user.id)
+    .eq("user_id", userId)
     .eq("usage_type", "ingredient_scan")
     .single();
 
   if (photoError || !photo) {
-    return errorResponse(ERROR_MESSAGES.photoNotFound, 404);
+    return { ok: false as const, error: ERROR_MESSAGES.photoNotFound };
   }
 
   // Gemini送信前（写真ダウンロード前）に原子的に1回分を予約する。超過時はStorage I/Oを行わない。
   const reservation = await consumeAiUsage(supabase, "ingredient_scan");
   if (!reservation.ok || !reservation.event_id) {
-    return errorResponse(limitErrorMessage(reservation.reason), 429);
+    return { ok: false as const, error: limitErrorMessage(reservation.reason) };
   }
 
   const eventId = reservation.event_id;
@@ -94,7 +145,7 @@ export async function POST(request: Request) {
   // 写真取得失敗時は予約を返金して当日枠を消費しない。
   if (downloadError || !file) {
     await refundAiUsage(supabase, eventId);
-    return errorResponse(ERROR_MESSAGES.downloadFailed, 500);
+    return { ok: false as const, error: ERROR_MESSAGES.downloadFailed };
   }
 
   const mimeType = metadata.content_type || file.type || "image/jpeg";
@@ -114,18 +165,22 @@ export async function POST(request: Request) {
   // 通信失敗（Geminiが処理する前）は予約を返金して当日枠を消費しない。
   if (!geminiResponse.ok) {
     await refundAiUsage(supabase, eventId);
-    return errorResponse(ERROR_MESSAGES.geminiFailed, 502);
+    return { ok: false as const, error: ERROR_MESSAGES.geminiFailed };
   }
 
   // ok応答後のparse失敗はGoogle quotaを実際に消費しているため消費したままにする。
   const parsed = parseGeminiIngredientResponse(await geminiResponse.json());
   if (!parsed.ok) {
-    return errorResponse(parsed.error, 422);
+    return { ok: false as const, error: parsed.error };
   }
 
-  return NextResponse.json({ items: parsed.items.map((item) => toInventoryInsert(item, user.id)) });
+  return { ok: true as const, items: parsed.items };
 }
 
-function errorResponse(error: string, status: number) {
-  return NextResponse.json({ error }, { status });
+function statusFromError(error: string) {
+  if (error === ERROR_MESSAGES.photoNotFound) return 404;
+  if (error === ERROR_MESSAGES.downloadFailed) return 500;
+  if (error === ERROR_MESSAGES.geminiFailed) return 502;
+  if (error === ERROR_MESSAGES.featureLimit || error === ERROR_MESSAGES.totalLimit) return 429;
+  return 422;
 }

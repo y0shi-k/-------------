@@ -1,3 +1,5 @@
+import { formatQuantityForInput, isFractionalUnit, type QuantityNotation } from "@/lib/format/numeric";
+
 export type ItemCategory = "食材" | "調味料";
 
 export type UnitConversion = {
@@ -21,6 +23,8 @@ export type StockItem = {
   status_note: string;
   source: string;
   image_storage_path: string | null;
+  archived_at?: string | null;
+  archived_reason?: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -73,11 +77,11 @@ function formatConversionRatio(conversion: UnitConversion | null) {
   return Number.isInteger(ratio) ? String(ratio) : String(Number(ratio.toFixed(3)));
 }
 
-export function toFormValues(item: StockItem): StockItemFormValues {
+export function toFormValues(item: StockItem, notation?: QuantityNotation): StockItemFormValues {
   return {
     category: item.category,
     name: item.name,
-    quantity: String(item.quantity),
+    quantity: formatQuantityForInput(item.quantity, { allowFraction: isFractionalUnit(item.unit), notation }),
     unit: item.unit,
     conversion_from_qty: "",
     conversion_from_unit: "",

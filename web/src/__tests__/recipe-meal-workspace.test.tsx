@@ -718,7 +718,11 @@ describe("RecipeMealWorkspace", () => {
 
     await waitFor(() => {
       expect(eventsSelect.select).toHaveBeenCalledWith("stock_item_id, consumed_amount");
-      expect(inventoryUpdate.update).toHaveBeenCalledWith({ quantity: 1 });
+      expect(inventoryUpdate.update).toHaveBeenCalledWith({
+        quantity: 1,
+        archived_at: null,
+        archived_reason: null
+      });
       expect(consumptionDelete.deleteRows).toHaveBeenCalled();
       expect(historyDelete.deleteRows).toHaveBeenCalled();
       expect(scheduleUpdate.update).toHaveBeenCalledWith({ status: "未完了", completed_at: null });
@@ -759,7 +763,11 @@ describe("RecipeMealWorkspace", () => {
 
     await waitFor(() => {
       expect(inventoryUpdate.update).toHaveBeenCalledTimes(1);
-      expect(inventoryUpdate.update).toHaveBeenCalledWith({ quantity: 1 });
+      expect(inventoryUpdate.update).toHaveBeenCalledWith({
+        quantity: 1,
+        archived_at: null,
+        archived_reason: null
+      });
       expect(consumptionDelete.deleteRows).toHaveBeenCalled();
       expect(historyDelete.deleteRows).toHaveBeenCalled();
       expect(scheduleDelete.deleteRows).toHaveBeenCalled();
@@ -933,7 +941,12 @@ describe("RecipeMealWorkspace", () => {
     fireEvent.click(within(consumptionModal).getByRole("button", { name: "確定" }));
 
     await waitFor(() => {
-      expect(inventoryUpdate.update).toHaveBeenCalledWith({ quantity: 0 });
+      expect(inventoryUpdate.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          quantity: 0,
+          archived_reason: "cooking_zero"
+        })
+      );
       expect(scheduleUpdate.update).toHaveBeenCalledWith(
         expect.objectContaining({
           status: "完了",

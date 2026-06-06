@@ -22,6 +22,7 @@ export default async function Home() {
 
   const [
     { data: inventoryItems },
+    { data: archivedInventoryItems },
     { data: cookingHistory },
     { data: recipes },
     { data: recipeIngredients },
@@ -35,7 +36,16 @@ export default async function Home() {
       .from("inventory_items")
       .select("*")
       .eq("user_id", user.id)
+      .is("archived_at", null)
+      .gt("quantity", 0)
       .order("created_at", { ascending: false }),
+    supabase
+      .from("inventory_items")
+      .select("*")
+      .eq("user_id", user.id)
+      .not("archived_at", "is", null)
+      .order("archived_at", { ascending: false })
+      .limit(50),
     supabase
       .from("cooking_history")
       .select("*")
@@ -121,6 +131,7 @@ export default async function Home() {
           ingredients: (
             <InventoryBoard
               initialInventoryItems={(inventoryItems ?? []) as StockItem[]}
+              initialArchivedInventoryItems={(archivedInventoryItems ?? []) as StockItem[]}
               initialShoppingItems={(shoppingItems ?? []) as ShoppingItem[]}
               initialStorageLocations={(storageLocations ?? []) as StorageLocation[]}
               initialUserIngredientImages={(userIngredientImages ?? []) as UserIngredientImage[]}

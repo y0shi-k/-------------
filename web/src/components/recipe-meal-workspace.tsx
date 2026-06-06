@@ -4,6 +4,17 @@ import { type ChangeEvent, FormEvent, type ReactNode, useCallback, useEffect, us
 import { useRouter } from "next/navigation";
 import { DeleteConfirmPanel } from "@/components/delete-confirm-panel";
 import { NumberField } from "@/components/number-field";
+import {
+  detectNotation,
+  displayQuantity,
+  formatQuantity,
+  formatQuantityForInput,
+  isFractionalUnit,
+  quantityToNumber,
+  roundQuantity
+} from "@/lib/format/numeric";
+import { getQuantityNotation, setQuantityNotation } from "@/lib/format/quantity-notation";
+import { getCustomFractions } from "@/lib/format/fraction-candidates";
 import { PhotoCandidatePicker } from "@/components/photo-candidate-picker";
 import { UnitPicker } from "@/components/unit-picker";
 import { RecipeThumb } from "@/components/ui/recipe-thumb";
@@ -90,6 +101,13 @@ type CookingViewerOrigin = "recipes" | "cooking";
 type ConsumptionTab = "all" | "食材" | "調味料";
 type PhotoCandidatePickerTarget = "recipe-image" | "cooking-photo";
 
+function archiveFieldsForCookingQuantity(quantity: number) {
+  if (quantity > 0) {
+    return { archived_at: null, archived_reason: null };
+  }
+  return { archived_at: new Date().toISOString(), archived_reason: "cooking_zero" };
+}
+
 const mealTypes: MealType[] = ["朝", "昼", "晩", "その他"];
 const scheduleMealTypes: MealType[] = ["朝", "昼", "晩"];
 const mealTypeOrder: Record<MealType, number> = { 朝: 0, 昼: 1, 晩: 2, その他: 3 };
@@ -127,6 +145,15 @@ function addDays(value: string, days: number) {
   return date.toISOString().slice(0, 10);
 }
 
+// 在庫アイテムの数量を、記憶された表示形式（分数 or 小数）に従って表示する。g/cc は常に小数。
+function stockQuantityDisplay(item: { id: string; unit: string; quantity: number }): string {
+  return displayQuantity(
+    item.quantity,
+    isFractionalUnit(item.unit) ? getQuantityNotation(item.id) : "decimal",
+    getCustomFractions()
+  );
+}
+
 function recipeStepRows(value: string) {
   const rows = value.split(/\r?\n/);
   return rows.length > 0 ? rows : [""];
@@ -139,7 +166,7 @@ function normalizeRecipeForm(values: RecipeFormValues): NormalizedRecipeForm {
   }
 
   const ingredients = values.ingredients.map((ingredient, index) => {
-    const amount = Number(ingredient.amount);
+    const amount = quantityToNumber(ingredient.amount);
     return {
       item_type: ingredient.item_type,
       name: ingredient.name.trim(),
@@ -773,7 +800,12 @@ export function RecipeMealWorkspace({
         // default: 在庫を選んでいる行だけ既定量（min(必要量, 在庫量)）を入れる。在庫未選択の行は0のまま。
         const stockItem = inventoryItemsForMeals.find((item) => item.id === draft.stockItemId);
         if (!stockItem) return draft;
-        return { ...draft, amount: String(Math.min(draft.requestedAmount, Number(stockItem.quantity || 0))) };
+        return {
+          ...draft,
+          amount: formatQuantityForInput(Math.min(draft.requestedAmount, Number(stockItem.quantity || 0)), {
+            allowFraction: isFractionalUnit(draft.requestedUnit)
+          })
+        };
       })
     );
   }
@@ -832,7 +864,9 @@ export function RecipeMealWorkspace({
         ingredientName: ingredient.name,
         requestedAmount: ingredient.amount,
         requestedUnit: ingredient.unit,
-        amount: exactStock ? String(Math.min(ingredient.amount, exactStock.quantity)) : "0",
+        amount: exactStock
+          ? formatQuantityForInput(Math.min(ingredient.amount, exactStock.quantity), { allowFraction: isFractionalUnit(ingredient.unit) })
+          : "0",
         stockItemId: exactStock?.id ?? ""
       };
     });
@@ -1316,7 +1350,7 @@ export function RecipeMealWorkspace({
     setInventoryItemsForMeals((items) =>
       items.map((item) => {
         const update = rollbackUpdates.find((entry) => entry.id === item.id);
-        return update ? { ...item, quantity: update.nextQuantity } : item;
+        return update ? { ...item, quantity: update.nextQuantity, ...archiveFieldsForCookingQuantity(update.nextQuantity) } : item;
       })
     );
     if (selectedScheduleId === schedule.id) {
@@ -1344,7 +1378,10 @@ export function RecipeMealWorkspace({
     for (const update of updates) {
       const { error: inventoryError } = await supabase
         .from("inventory_items")
-        .update({ quantity: update.nextQuantity })
+        .update({
+          quantity: update.nextQuantity,
+          ...archiveFieldsForCookingQuantity(update.nextQuantity)
+        })
         .eq("id", update.id)
         .eq("user_id", userId);
 
@@ -1417,7 +1454,7 @@ export function RecipeMealWorkspace({
     setInventoryItemsForMeals((items) =>
       items.map((item) => {
         const update = rollbackResult.updates.find((entry) => entry.id === item.id);
-        return update ? { ...item, quantity: update.nextQuantity } : item;
+        return update ? { ...item, quantity: update.nextQuantity, ...archiveFieldsForCookingQuantity(update.nextQuantity) } : item;
       })
     );
     router.refresh();
@@ -1512,7 +1549,7 @@ export function RecipeMealWorkspace({
 
     const normalizedDrafts = consumptionDrafts.map((draft) => ({
       ...draft,
-      consumedAmount: Number(draft.amount)
+      consumedAmount: quantityToNumber(draft.amount)
     }));
     const invalidDraft = normalizedDrafts.find((draft) => draft.stockItemId && (!Number.isFinite(draft.consumedAmount) || draft.consumedAmount < 0));
     if (invalidDraft) {
@@ -1540,14 +1577,17 @@ export function RecipeMealWorkspace({
       consumedRows.push({
         draft,
         stockItem,
-        nextQuantity: Math.max(0, Number(stockItem.quantity || 0) - draft.consumedAmount)
+        nextQuantity: roundQuantity(Math.max(0, Number(stockItem.quantity || 0) - draft.consumedAmount))
       });
     }
 
     for (const row of consumedRows) {
       const { error: inventoryError } = await supabase
         .from("inventory_items")
-        .update({ quantity: row.nextQuantity })
+        .update({
+          quantity: row.nextQuantity,
+          ...archiveFieldsForCookingQuantity(row.nextQuantity)
+        })
         .eq("id", row.stockItem.id)
         .eq("user_id", userId);
 
@@ -1556,6 +1596,12 @@ export function RecipeMealWorkspace({
         setFeedback({ tone: "error", message: "原因: 在庫を減算できませんでした。影響: 調理完了と料理履歴の作成を中止しました。修正方法: ログイン状態と在庫データを確認してください。" });
         return;
       }
+
+      // 減らすときに使った形式（分数 or 小数）を記憶し、在庫一覧の残量を同じ形式で表示する。
+      setQuantityNotation(
+        row.stockItem.id,
+        isFractionalUnit(row.stockItem.unit) ? detectNotation(row.draft.amount) : "decimal"
+      );
     }
 
     const completedAt = new Date().toISOString();
@@ -1697,7 +1743,7 @@ export function RecipeMealWorkspace({
     setInventoryItemsForMeals((items) =>
       items.map((item) => {
         const consumed = consumedRows.find((row) => row.stockItem.id === item.id);
-        return consumed ? { ...item, quantity: consumed.nextQuantity } : item;
+        return consumed ? { ...item, quantity: consumed.nextQuantity, ...archiveFieldsForCookingQuantity(consumed.nextQuantity) } : item;
       })
     );
     setIsSaving(false);
@@ -2049,6 +2095,7 @@ export function RecipeMealWorkspace({
                       showSteppers={false}
                       value={ingredient.amount}
                       onChange={(next) => updateIngredient(index, { amount: next, item_type: "食材" })}
+                      allowFraction={isFractionalUnit(ingredient.unit)}
                     />
                     <UnitPicker value={ingredient.unit} onSelect={(unit) => updateIngredient(index, { unit, item_type: "食材" })} />
                     <button className="danger-button compact-button" type="button" onClick={() => removeIngredientRow(index)} aria-label="材料を削除">
@@ -2075,6 +2122,7 @@ export function RecipeMealWorkspace({
                       showSteppers={false}
                       value={ingredient.amount}
                       onChange={(next) => updateIngredient(index, { amount: next, item_type: "調味料" })}
+                      allowFraction={isFractionalUnit(ingredient.unit)}
                     />
                     <UnitPicker value={ingredient.unit} onSelect={(unit) => updateIngredient(index, { unit, item_type: "調味料" })} />
                     <button className="danger-button compact-button" type="button" onClick={() => removeIngredientRow(index)} aria-label="調味料を削除">
@@ -2193,7 +2241,7 @@ export function RecipeMealWorkspace({
                     <input checked={item.selected} onChange={(event) => toggleShortageSelection(item.key, event.target.checked)} type="checkbox" />
                     <span>
                       <strong>{item.name}</strong>
-                      <small>不足 {item.shortageQuantity}{item.unit}</small>
+                      <small>不足 {formatQuantity(item.shortageQuantity)}{item.unit}</small>
                     </span>
                     <em data-type={item.type}>{item.type}</em>
                   </label>
@@ -2888,7 +2936,7 @@ function ConsumptionEditor({
     .map((draft, index) => {
       const ingredient = recipe.ingredients.find((item) => item.name === draft.ingredientName && item.unit === draft.requestedUnit);
       const stockItem = inventoryItems.find((item) => item.id === draft.stockItemId);
-      const amount = Number(draft.amount);
+      const amount = quantityToNumber(draft.amount);
       // おすすめ = 同分類・同単位・在庫あり。それ以外は代替材料として選べるよう「その他の在庫」に出す。
       const options = ingredient
         ? inventoryItems.filter((item) => item.category === ingredient.item_type && item.unit === ingredient.unit && item.quantity > 0)
@@ -2954,11 +3002,11 @@ function ConsumptionEditor({
           {rows.map(({ draft, index, ingredient, isShortage, options, otherOptions, stockItem }) => {
             const hasAnyStock = options.length > 0 || otherOptions.length > 0;
             return (
-              <article className="consumption-row" data-active={Number(draft.amount) > 0} key={`${draft.ingredientName}-${draft.requestedUnit}-${index}`}>
+              <article className="consumption-row" data-active={quantityToNumber(draft.amount) > 0} key={`${draft.ingredientName}-${draft.requestedUnit}-${index}`}>
                 <div className="consumption-row-top">
                   <div className="consumption-row-label">
                     <strong>{draft.ingredientName}</strong>
-                    <small>必要 {draft.requestedAmount}{draft.requestedUnit}・{ingredient?.item_type ?? "未分類"}</small>
+                    <small>必要 {formatQuantity(draft.requestedAmount)}{draft.requestedUnit}・{ingredient?.item_type ?? "未分類"}</small>
                   </div>
                   <div className="consumption-row-controls">
                     <select
@@ -2971,7 +3019,7 @@ function ConsumptionEditor({
                         <optgroup label="おすすめ（同分類・同単位）">
                           {options.map((item) => (
                             <option key={item.id} value={item.id}>
-                              {item.name} / {item.quantity}{item.unit} / {item.storage_location}
+                              {item.name} / {stockQuantityDisplay(item)}{item.unit} / {item.storage_location}
                             </option>
                           ))}
                         </optgroup>
@@ -2980,7 +3028,7 @@ function ConsumptionEditor({
                         <optgroup label="その他の在庫（代替材料）">
                           {otherOptions.map((item) => (
                             <option key={item.id} value={item.id}>
-                              {item.name} / {item.quantity}{item.unit} / {item.storage_location}
+                              {item.name} / {stockQuantityDisplay(item)}{item.unit} / {item.storage_location}
                             </option>
                           ))}
                         </optgroup>
@@ -2991,6 +3039,7 @@ function ConsumptionEditor({
                         ariaLabel="消費量"
                         value={draft.amount}
                         onChange={(next) => onChange(index, { amount: next })}
+                        allowFraction={isFractionalUnit(draft.requestedUnit)}
                       />
                       <span className="consumption-unit">{draft.requestedUnit}</span>
                     </span>
@@ -2998,7 +3047,7 @@ function ConsumptionEditor({
                 </div>
                 {isShortage && stockItem ? (
                   <p className="consumption-item-warning">
-                    在庫 {stockItem.quantity}{stockItem.unit} に対して消費量が多いです。
+                    在庫 {stockQuantityDisplay(stockItem)}{stockItem.unit} に対して消費量が多いです。
                   </p>
                 ) : null}
               </article>

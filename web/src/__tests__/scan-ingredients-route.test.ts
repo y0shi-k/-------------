@@ -42,6 +42,12 @@ const samplePhoto = {
   content_type: "image/jpeg"
 };
 
+const samplePhoto2 = {
+  ...samplePhoto,
+  id: "photo-2",
+  storage_path: "user-1/ingredient-scan/photo-2.jpg"
+};
+
 function imageBlob() {
   return {
     type: "image/jpeg",
@@ -54,6 +60,27 @@ function reservationOk() {
     if (fn === "consume_ai_usage") return { data: { ok: true, event_id: "event-1" }, error: null };
     return { data: true, error: null };
   });
+}
+
+function geminiResponse(name: string, category = "食材") {
+  return {
+    ok: true,
+    json: async () => ({
+      candidates: [
+        {
+          content: {
+            parts: [
+              {
+                text: JSON.stringify({
+                  items: [{ category, name, quantity: 1, unit: "個", storage_location: "冷蔵庫" }]
+                })
+              }
+            ]
+          }
+        }
+      ]
+    })
+  } as Response;
 }
 
 describe("POST /api/ai/scan-ingredients", () => {
@@ -209,5 +236,76 @@ describe("POST /api/ai/scan-ingredients", () => {
     expect(body).toEqual({ items: [candidate] });
     expect(JSON.stringify(body)).not.toContain("user-owned-test-key");
     expect(rpc).not.toHaveBeenCalledWith("refund_ai_usage", expect.anything());
+  });
+
+  it("scans multiple photos and merges candidates", async () => {
+    getUser.mockResolvedValue({ data: { user: { id: "user-1" } } });
+    from
+      .mockReturnValueOnce(photoQuery(samplePhoto))
+      .mockReturnValueOnce(photoQuery(samplePhoto2));
+    reservationOk();
+    storageFrom.mockReturnValue({
+      download: vi.fn().mockResolvedValue({ data: imageBlob(), error: null })
+    });
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(geminiResponse("牛乳"))
+      .mockResolvedValueOnce(geminiResponse("醤油", "調味料"));
+
+    const response = await POST(request({ photoIds: ["photo-1", "photo-2"], geminiApiKey: "user-owned-test-key" }));
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      items: [
+        expect.objectContaining({ name: "牛乳", source: "ai_photo", user_id: "user-1" }),
+        expect.objectContaining({ name: "醤油", category: "調味料", source: "ai_photo", user_id: "user-1" })
+      ]
+    });
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(rpc).toHaveBeenCalledWith("consume_ai_usage", { p_feature: "ingredient_scan" });
+    expect(rpc).toHaveBeenCalledTimes(2);
+  });
+
+  it("returns successful candidates with a failed count when one of multiple photos fails", async () => {
+    getUser.mockResolvedValue({ data: { user: { id: "user-1" } } });
+    from
+      .mockReturnValueOnce(photoQuery(samplePhoto))
+      .mockReturnValueOnce(photoQuery(samplePhoto2));
+    reservationOk();
+    storageFrom.mockReturnValue({
+      download: vi
+        .fn()
+        .mockResolvedValueOnce({ data: imageBlob(), error: null })
+        .mockResolvedValueOnce({ data: null, error: new Error("download failed") })
+    });
+    vi.mocked(fetch).mockResolvedValueOnce(geminiResponse("牛乳"));
+
+    const response = await POST(request({ photoIds: ["photo-1", "photo-2"], geminiApiKey: "user-owned-test-key" }));
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      items: [expect.objectContaining({ name: "牛乳" })],
+      failedCount: 1,
+      errors: [expect.stringContaining("原因: 非公開Storageから写真を読み出せませんでした。")]
+    });
+    expect(rpc).toHaveBeenCalledWith("refund_ai_usage", { p_event_id: "event-1" });
+  });
+
+  it("returns an error when all selected photos fail", async () => {
+    getUser.mockResolvedValue({ data: { user: { id: "user-1" } } });
+    from
+      .mockReturnValueOnce(photoQuery(samplePhoto))
+      .mockReturnValueOnce(photoQuery(samplePhoto2));
+    reservationOk();
+    storageFrom.mockReturnValue({
+      download: vi.fn().mockResolvedValue({ data: null, error: new Error("download failed") })
+    });
+
+    const response = await POST(request({ photoIds: ["photo-1", "photo-2"], geminiApiKey: "user-owned-test-key" }));
+
+    expect(response.status).toBe(500);
+    await expect(response.json()).resolves.toEqual({
+      error: expect.stringContaining("原因: 非公開Storageから写真を読み出せませんでした。")
+    });
+    expect(fetch).not.toHaveBeenCalled();
   });
 });

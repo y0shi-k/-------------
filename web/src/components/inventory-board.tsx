@@ -6,6 +6,17 @@ import { DeleteConfirmPanel } from "@/components/delete-confirm-panel";
 import { ShoppingListSection } from "@/components/shopping-list-section";
 import { IngredientIcon } from "@/components/ui/ingredient-icon";
 import { NumberField } from "@/components/number-field";
+import {
+  detectNotation,
+  displayQuantity,
+  formatQuantityForInput,
+  isFractionalUnit,
+  parseQuantityInput,
+  roundQuantity,
+  type QuantityNotation
+} from "@/lib/format/numeric";
+import { clearQuantityNotation, getQuantityNotation, setQuantityNotation } from "@/lib/format/quantity-notation";
+import { getCustomFractions } from "@/lib/format/fraction-candidates";
 import { UnitPicker } from "@/components/unit-picker";
 import { useShellAiUsage, useShellSubView, type InventoryShellLeaf } from "@/components/web-mode-shell";
 import { loadUserGeminiApiKey } from "@/lib/ai/user-gemini-api-key";
@@ -34,6 +45,7 @@ import { normalizeIngredientImageName, resolveUserIngredientImage, type UserIngr
 type InventoryBoardProps = {
   userId: string;
   initialInventoryItems: StockItem[];
+  initialArchivedInventoryItems?: StockItem[];
   initialShoppingItems?: ShoppingItem[];
   initialStorageLocations?: StorageLocation[];
   initialUserIngredientImages?: UserIngredientImage[];
@@ -63,6 +75,7 @@ type PendingDelete = {
 type ScanIngredientsResponse = {
   items?: InventoryInsert[];
   error?: string;
+  failedCount?: number;
 };
 
 type EditingTarget = { item: StockItem } | null;
@@ -84,12 +97,19 @@ type ShoppingFormValues = {
 
 type AddFlow = "choice" | "manual" | "photo" | null;
 
-type InventoryInsert = Omit<StockItem, "id" | "created_at" | "updated_at" | "image_storage_path">;
+type InventoryInsert = Omit<StockItem, "id" | "created_at" | "updated_at" | "image_storage_path" | "archived_at" | "archived_reason"> &
+  Partial<Pick<StockItem, "archived_at" | "archived_reason">>;
 
 type ScanCandidate = {
   clientId: string;
   item: InventoryInsert;
 };
+
+const inventoryCategoryFilterOptions: { label: string; value: InventoryFilters["category"] }[] = [
+  { label: "All", value: "all" },
+  { label: "材料", value: "食材" },
+  { label: "調味料", value: "調味料" }
+];
 
 type NormalizedForm =
   | { data: InventoryInsert }
@@ -115,15 +135,15 @@ function normalizeUnitConversion(values: StockItemFormValues): UnitConversion | 
 }
 
 function normalizeForm(values: StockItemFormValues, userId: string): NormalizedForm {
-  const quantity = Number(values.quantity);
-
   if (!values.name.trim()) {
     return { error: "品名を入力してください。" };
   }
 
-  if (!Number.isFinite(quantity) || quantity < 0) {
-    return { error: "数量は0以上の数字で入力してください。" };
+  const parsedQuantity = parseQuantityInput(values.quantity);
+  if (!parsedQuantity.ok) {
+    return { error: parsedQuantity.error };
   }
+  const quantity = parsedQuantity.value;
 
   if (!values.unit.trim()) {
     return { error: "単位を入力してください。" };
@@ -192,14 +212,31 @@ function sortItems(items: StockItem[], sort: InventoryFilters["sort"]) {
 
 const defaultStorageLocationNames = ["冷蔵庫", "冷凍庫", "常温", "その他"];
 
+function archiveFieldsForQuantity(
+  quantity: number,
+  reason: "manual_zero" | "restore" | "insert_zero"
+): Pick<StockItem, "archived_at" | "archived_reason"> {
+  if (quantity > 0 || reason === "restore") {
+    return { archived_at: null, archived_reason: null };
+  }
+  return { archived_at: new Date().toISOString(), archived_reason: reason };
+}
+
 export function InventoryBoard({
   userId,
   initialInventoryItems,
+  initialArchivedInventoryItems = [],
   initialShoppingItems = [],
   initialStorageLocations = [],
   initialUserIngredientImages = []
 }: InventoryBoardProps) {
-  const [inventoryItems, setInventoryItems] = useState(initialInventoryItems);
+  const [inventoryItems, setInventoryItems] = useState(initialInventoryItems.filter((item) => !item.archived_at && item.quantity > 0));
+  const [archivedInventoryItems, setArchivedInventoryItems] = useState(initialArchivedInventoryItems);
+  const [restoreQuantities, setRestoreQuantities] = useState<Record<string, string>>({});
+  // 数量の表示形式（分数 or 小数）。SSRとの不一致を避けるため初期は空にし、マウント後に localStorage から読み込む。
+  const [quantityNotations, setQuantityNotations] = useState<Record<string, QuantityNotation>>({});
+  // ユーザーが追加した分数候補（例 "3/8"）。一覧で帯分数表示に使う。
+  const [customFractions, setCustomFractions] = useState<string[]>([]);
   const [shoppingItems, setShoppingItems] = useState(initialShoppingItems);
   const [selectedShoppingIds, setSelectedShoppingIds] = useState<string[]>([]);
   const [shoppingValues, setShoppingValues] = useState<ShoppingFormValues>({ name: "", required_quantity: "1", unit: "個" });
@@ -213,8 +250,8 @@ export function InventoryBoard({
   const [addFlow, setAddFlow] = useState<AddFlow>(null);
   const [photoFeedback, setPhotoFeedback] = useState<Feedback | null>(null);
   const [geminiApiKey, setGeminiApiKey] = useState("");
-  const [selectedPhoto, setSelectedPhoto] = useState<File | null>(null);
-  const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
+  const [selectedPhotos, setSelectedPhotos] = useState<File[]>([]);
+  const [photoPreviewUrls, setPhotoPreviewUrls] = useState<string[]>([]);
   const [selectedIngredientImage, setSelectedIngredientImage] = useState<File | null>(null);
   const [ingredientImagePreviewUrl, setIngredientImagePreviewUrl] = useState<string | null>(null);
   const [applyImageToSameName, setApplyImageToSameName] = useState(true);
@@ -222,6 +259,7 @@ export function InventoryBoard({
   const [removeUserNameImageOnSave, setRemoveUserNameImageOnSave] = useState(false);
   const [scanCandidates, setScanCandidates] = useState<ScanCandidate[]>([]);
   const [selectedScanCandidateIds, setSelectedScanCandidateIds] = useState<string[]>([]);
+  const [editingScanCandidateId, setEditingScanCandidateId] = useState<string | null>(null);
   const [inventoryFilters, setInventoryFilters] = useState<InventoryFilters>({
     category: "all",
     storageLocation: "all",
@@ -257,6 +295,19 @@ export function InventoryBoard({
   useEffect(() => {
     setGeminiApiKey(loadUserGeminiApiKey());
   }, []);
+
+  // マウント後に、現在の在庫アイテムの表示形式と分数候補を localStorage から読み込む。
+  useEffect(() => {
+    const next: Record<string, QuantityNotation> = {};
+    for (const item of inventoryItems) {
+      const stored = getQuantityNotation(item.id);
+      if (stored) {
+        next[item.id] = stored;
+      }
+    }
+    setQuantityNotations(next);
+    setCustomFractions(getCustomFractions());
+  }, [inventoryItems]);
 
   useEffect(() => {
     setActiveView(selectedSubViews.ingredients);
@@ -424,9 +475,9 @@ export function InventoryBoard({
 
   useEffect(() => {
     return () => {
-      if (photoPreviewUrl) URL.revokeObjectURL(photoPreviewUrl);
+      photoPreviewUrls.forEach((url) => URL.revokeObjectURL(url));
     };
-  }, [photoPreviewUrl]);
+  }, [photoPreviewUrls]);
 
   useEffect(() => {
     return () => {
@@ -474,6 +525,7 @@ export function InventoryBoard({
   function resetForm() {
     setValues(emptyStockItemFormValues);
     setEditing(null);
+    setEditingScanCandidateId(null);
     resetIngredientImageSelection();
   }
 
@@ -499,6 +551,13 @@ export function InventoryBoard({
   }
 
   function closeAddModal() {
+    if (editingScanCandidateId) {
+      resetForm();
+      setAddFlow("photo");
+      setPhotoFeedback({ tone: "info", message: "候補編集をキャンセルしました。候補一覧から確認を続けられます。" });
+      return;
+    }
+
     resetForm();
     resetPhoto();
     setScanCandidates([]);
@@ -524,9 +583,9 @@ export function InventoryBoard({
   }
 
   function resetPhoto() {
-    if (photoPreviewUrl) URL.revokeObjectURL(photoPreviewUrl);
-    setSelectedPhoto(null);
-    setPhotoPreviewUrl(null);
+    photoPreviewUrls.forEach((url) => URL.revokeObjectURL(url));
+    setSelectedPhotos([]);
+    setPhotoPreviewUrls([]);
     setPhotoFeedback(null);
     if (photoInputRef.current) {
       photoInputRef.current.value = "";
@@ -546,22 +605,23 @@ export function InventoryBoard({
   }
 
   function selectPhoto(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0] ?? null;
-    if (!file) return;
+    const files = Array.from(event.target.files ?? []);
+    if (files.length === 0) return;
+    const invalidFile = files.find((file) => !file.type.startsWith("image/"));
 
-    if (!file.type.startsWith("image/")) {
+    if (invalidFile) {
       resetPhoto();
       setPhotoFeedback({
         tone: "error",
-        message: "原因: 画像ではないファイルです。影響: 写真を保存できません。修正方法: カメラで撮影するか画像を選んでください。"
+        message: "原因: 画像ではないファイルが含まれています。影響: 写真を保存できません。修正方法: カメラで撮影するか画像だけを選んでください。"
       });
       return;
     }
 
-    if (photoPreviewUrl) URL.revokeObjectURL(photoPreviewUrl);
-    setSelectedPhoto(file);
-    setPhotoPreviewUrl(URL.createObjectURL(file));
-    setPhotoFeedback({ tone: "info", message: "写真を選びました。内容を確認してから保存してください。" });
+    photoPreviewUrls.forEach((url) => URL.revokeObjectURL(url));
+    setSelectedPhotos(files);
+    setPhotoPreviewUrls(files.map((file) => URL.createObjectURL(file)));
+    setPhotoFeedback({ tone: "info", message: `${files.length}枚の写真を選びました。内容を確認してから解析してください。` });
   }
 
   function selectIngredientImageFile(file: File) {
@@ -599,7 +659,7 @@ export function InventoryBoard({
   }
 
   async function scanPhoto() {
-    if (!selectedPhoto) {
+    if (selectedPhotos.length === 0) {
       setPhotoFeedback({
         tone: "error",
         message: "原因: 写真が未選択です。影響: AI解析できません。修正方法: 先に写真を撮るか選んでください。"
@@ -628,53 +688,66 @@ export function InventoryBoard({
     setPhotoFeedback(null);
 
     try {
-      const compressed = await compressImageFile(selectedPhoto);
-      const storagePath = buildPhotoStoragePath(userId);
-      const { error: uploadError } = await supabase.storage.from("photos").upload(storagePath, compressed.blob, {
-        contentType: compressed.contentType,
-        upsert: false
-      });
+      const photoIds: string[] = [];
+      let failedPhotoSaveCount = 0;
 
-      if (uploadError) {
+      for (const photo of selectedPhotos) {
+        try {
+          const compressed = await compressImageFile(photo);
+          const storagePath = buildPhotoStoragePath(userId);
+          const { error: uploadError } = await supabase.storage.from("photos").upload(storagePath, compressed.blob, {
+            contentType: compressed.contentType,
+            upsert: false
+          });
+
+          if (uploadError) {
+            failedPhotoSaveCount += 1;
+            continue;
+          }
+
+          const { data: photoRow, error: insertError } = await supabase
+            .from("photos")
+            .insert({
+              user_id: userId,
+              bucket_id: "photos",
+              storage_path: storagePath,
+              usage_type: "ingredient_scan",
+              content_type: compressed.contentType,
+              byte_size: compressed.byteSize,
+              width: compressed.width,
+              height: compressed.height
+            })
+            .select("id")
+            .single();
+
+          if (insertError || !photoRow) {
+            failedPhotoSaveCount += 1;
+            await supabase.storage.from("photos").remove([storagePath]);
+            continue;
+          }
+
+          photoIds.push(photoRow.id);
+        } catch {
+          failedPhotoSaveCount += 1;
+        }
+      }
+
+      if (photoIds.length === 0) {
         setPhotoFeedback({
           tone: "error",
-          message: "原因: 写真をStorageへ保存できませんでした。影響: AI解析用の写真が残りません。修正方法: 通信状態とログイン状態を確認してください。"
+          message: "原因: 選択した写真をStorageまたはDBへ保存できませんでした。影響: AI解析を開始できません。修正方法: 通信状態とログイン状態を確認してください。"
         });
         return;
       }
 
-      const { data: photo, error: insertError } = await supabase
-        .from("photos")
-        .insert({
-          user_id: userId,
-          bucket_id: "photos",
-          storage_path: storagePath,
-          usage_type: "ingredient_scan",
-          content_type: compressed.contentType,
-          byte_size: compressed.byteSize,
-          width: compressed.width,
-          height: compressed.height
-        })
-        .select("id")
-        .single();
-
-      if (insertError || !photo) {
-        await supabase.storage.from("photos").remove([storagePath]);
-        setPhotoFeedback({
-          tone: "error",
-          message: "原因: 写真情報をDBへ保存できませんでした。影響: 保存した写真を後で探せません。修正方法: ログイン状態を確認して再度保存してください。"
-        });
-        return;
-      }
-
-      setPhotoFeedback({ tone: "info", message: "写真を保存しました。AIで食材候補を解析しています。" });
+      setPhotoFeedback({ tone: "info", message: `${photoIds.length}枚の写真を保存しました。AIで食材候補を解析しています。` });
 
       const scanResponse = await fetch("/api/ai/scan-ingredients", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
         },
-        body: JSON.stringify({ photoId: photo.id, geminiApiKey: trimmedApiKey })
+        body: JSON.stringify({ photoIds, geminiApiKey: trimmedApiKey })
       });
       const scanResult = (await scanResponse.json().catch(() => ({}))) as ScanIngredientsResponse;
 
@@ -698,7 +771,14 @@ export function InventoryBoard({
       setScanCandidates(candidates);
       setSelectedScanCandidateIds(candidates.map((candidate) => candidate.clientId));
       resetPhoto();
-      setPhotoFeedback({ tone: "success", message: `${candidates.length}件の候補を見つけました。確認してから在庫に追加してください。` });
+      const failedCount = failedPhotoSaveCount + (scanResult.failedCount ?? 0);
+      setPhotoFeedback({
+        tone: failedCount > 0 ? "info" : "success",
+        message:
+          failedCount > 0
+            ? `${candidates.length}件の候補を見つけました。${failedCount}枚は解析できませんでした。成功分を確認してから在庫に追加してください。`
+            : `${candidates.length}件の候補を見つけました。確認してから在庫に追加してください。`
+      });
     } catch {
       setPhotoFeedback({
         tone: "error",
@@ -710,7 +790,7 @@ export function InventoryBoard({
   }
 
   function startEdit(_list: "inventory", item: StockItem) {
-    setValues(toFormValues(item));
+    setValues(toFormValues(item, isFractionalUnit(item.unit) ? quantityNotations[item.id] : "decimal"));
     setEditing({ item });
     resetIngredientImageSelection();
     setAddFlow("manual");
@@ -721,7 +801,7 @@ export function InventoryBoard({
     setValues({
       category: candidate.item.category,
       name: candidate.item.name,
-      quantity: String(candidate.item.quantity),
+      quantity: formatQuantityForInput(candidate.item.quantity, { allowFraction: isFractionalUnit(candidate.item.unit) }),
       unit: candidate.item.unit,
       conversion_from_qty: "",
       conversion_from_unit: "",
@@ -733,10 +813,19 @@ export function InventoryBoard({
       storage_location: candidate.item.storage_location,
       status_note: candidate.item.status_note
     });
-    setScanCandidates((items) => items.filter((item) => item.clientId !== candidate.clientId));
-    setSelectedScanCandidateIds((ids) => ids.filter((id) => id !== candidate.clientId));
+    setEditingScanCandidateId(candidate.clientId);
+    resetIngredientImageSelection();
     setAddFlow("manual");
-    setPhotoFeedback({ tone: "info", message: `${candidate.item.name} をフォームで編集中です。保存すると在庫に追加されます。` });
+    setFeedback({ tone: "info", message: `${candidate.item.name} を候補として編集中です。保存しても在庫にはまだ追加されません。` });
+  }
+
+  // 保存した数量の表示形式（分数 or 小数）を端末に記憶する。g/cc は常に小数。
+  function rememberQuantityNotation(itemId: string, unit: string, rawQuantity: string) {
+    const notation: QuantityNotation = isFractionalUnit(unit) ? detectNotation(rawQuantity) : "decimal";
+    setQuantityNotation(itemId, notation);
+    setQuantityNotations((current) => ({ ...current, [itemId]: notation }));
+    // ピッカーで追加された分数候補を一覧表示にも反映する。
+    setCustomFractions(getCustomFractions());
   }
 
   async function saveInventory(event: FormEvent<HTMLFormElement>) {
@@ -747,13 +836,41 @@ export function InventoryBoard({
       return;
     }
 
+    if (editingScanCandidateId) {
+      let updatedCandidateName = values.name.trim();
+      setScanCandidates((items) =>
+        items.map((candidate) => {
+          if (candidate.clientId !== editingScanCandidateId) return candidate;
+          updatedCandidateName = normalized.data.name;
+          return {
+            ...candidate,
+            item: {
+              ...normalized.data,
+              source: candidate.item.source
+            }
+          };
+        })
+      );
+      resetForm();
+      setAddFlow("photo");
+      setPhotoFeedback({ tone: "success", message: `${updatedCandidateName}の候補を更新しました。確認してから在庫に追加してください。` });
+      return;
+    }
+
     setIsSaving(true);
     setFeedback(null);
+    const inventoryPayload = {
+      ...normalized.data,
+      ...archiveFieldsForQuantity(normalized.data.quantity, normalized.data.quantity <= 0 ? "insert_zero" : "restore")
+    };
 
     if (editing) {
       const { data, error } = await supabase
         .from("inventory_items")
-        .update(normalized.data)
+        .update({
+          ...normalized.data,
+          ...archiveFieldsForQuantity(normalized.data.quantity, "manual_zero")
+        })
         .eq("id", editing.item.id)
         .eq("user_id", userId)
         .select()
@@ -776,7 +893,13 @@ export function InventoryBoard({
         setFeedback({ tone: "error", message: imageResult.error });
       }
       const savedItem = { ...(data as StockItem), image_storage_path: imageResult.ok ? imageResult.imageStoragePath : (data as StockItem).image_storage_path };
-      setInventoryItems((items) => items.map((item) => (item.id === data.id ? savedItem : item)));
+      rememberQuantityNotation(savedItem.id, values.unit, values.quantity);
+      if (savedItem.archived_at || savedItem.quantity <= 0) {
+        setInventoryItems((items) => items.filter((item) => item.id !== savedItem.id));
+        setArchivedInventoryItems((items) => [savedItem, ...items.filter((item) => item.id !== savedItem.id)].slice(0, 50));
+      } else {
+        setInventoryItems((items) => items.map((item) => (item.id === data.id ? savedItem : item)));
+      }
       resetForm();
       setAddFlow(null);
       setFeedback({
@@ -786,7 +909,7 @@ export function InventoryBoard({
       return;
     }
 
-    const { data, error } = await supabase.from("inventory_items").insert(normalized.data).select().single();
+    const { data, error } = await supabase.from("inventory_items").insert(inventoryPayload).select().single();
     setIsSaving(false);
 
     if (error || !data) {
@@ -797,7 +920,12 @@ export function InventoryBoard({
 
     const imageResult = await persistIngredientImageChange(data as StockItem);
     const savedItem = { ...(data as StockItem), image_storage_path: imageResult.ok ? imageResult.imageStoragePath : (data as StockItem).image_storage_path };
-    setInventoryItems((items) => [savedItem, ...items]);
+    rememberQuantityNotation(savedItem.id, values.unit, values.quantity);
+    if (savedItem.archived_at || savedItem.quantity <= 0) {
+      setArchivedInventoryItems((items) => [savedItem, ...items.filter((item) => item.id !== savedItem.id)].slice(0, 50));
+    } else {
+      setInventoryItems((items) => [savedItem, ...items]);
+    }
     resetForm();
     setAddFlow(null);
     setFeedback({
@@ -945,13 +1073,16 @@ export function InventoryBoard({
   }
 
   async function adjustInventoryQuantity(item: StockItem, delta: number) {
-    const nextQuantity = Math.max(0, Number((item.quantity + delta).toFixed(2)));
+    const nextQuantity = Math.max(0, roundQuantity(item.quantity + delta));
     setIsSaving(true);
     setFeedback(null);
 
     const { data, error } = await supabase
       .from("inventory_items")
-      .update({ quantity: nextQuantity })
+      .update({
+        quantity: nextQuantity,
+        ...archiveFieldsForQuantity(nextQuantity, "manual_zero")
+      })
       .eq("id", item.id)
       .eq("user_id", userId)
       .select()
@@ -964,7 +1095,57 @@ export function InventoryBoard({
       return;
     }
 
-    setInventoryItems((items) => items.map((current) => (current.id === item.id ? (data as StockItem) : current)));
+    const savedItem = data as StockItem;
+    if (savedItem.archived_at || savedItem.quantity <= 0) {
+      setInventoryItems((items) => items.filter((current) => current.id !== item.id));
+      setArchivedInventoryItems((items) => [savedItem, ...items.filter((current) => current.id !== item.id)].slice(0, 50));
+      setSelectedInventoryIds((ids) => ids.filter((id) => id !== item.id));
+      setFeedback({ tone: "info", message: `${item.name} は数量0になったため、通常一覧から復元履歴へ移しました。` });
+      return;
+    }
+
+    setInventoryItems((items) => items.map((current) => (current.id === item.id ? savedItem : current)));
+  }
+
+  async function restoreArchivedInventory(item: StockItem) {
+    const rawQuantity = restoreQuantities[item.id] ?? "1";
+    const parsedQuantity = parseQuantityInput(rawQuantity);
+    if (!parsedQuantity.ok || parsedQuantity.value <= 0) {
+      setFeedback({ tone: "error", message: "原因: 復元数量に不備があります。影響: 在庫へ戻せません。修正方法: 0より大きい数量を入力してください。" });
+      return;
+    }
+
+    setIsSaving(true);
+    setFeedback(null);
+
+    const { data, error } = await supabase
+      .from("inventory_items")
+      .update({
+        quantity: parsedQuantity.value,
+        ...archiveFieldsForQuantity(parsedQuantity.value, "restore")
+      })
+      .eq("id", item.id)
+      .eq("user_id", userId)
+      .select()
+      .single();
+
+    setIsSaving(false);
+
+    if (error || !data) {
+      setFeedback({ tone: "error", message: "原因: 復元をDBへ保存できませんでした。影響: 食材は通常一覧へ戻りません。修正方法: ログイン状態を確認してください。" });
+      return;
+    }
+
+    const restoredItem = data as StockItem;
+    rememberQuantityNotation(restoredItem.id, restoredItem.unit, rawQuantity);
+    setArchivedInventoryItems((items) => items.filter((current) => current.id !== restoredItem.id));
+    setInventoryItems((items) => [restoredItem, ...items.filter((current) => current.id !== restoredItem.id)]);
+    setRestoreQuantities((current) => {
+      const next = { ...current };
+      delete next[restoredItem.id];
+      return next;
+    });
+    setFeedback({ tone: "success", message: `${restoredItem.name} を数量${displayQuantity(restoredItem.quantity, isFractionalUnit(restoredItem.unit) ? quantityNotations[restoredItem.id] : "decimal")}${restoredItem.unit}で戻しました。` });
   }
 
   async function deleteItem(_list: "inventory", item: StockItem) {
@@ -980,6 +1161,13 @@ export function InventoryBoard({
       return;
     }
 
+    clearQuantityNotation(item.id);
+    setQuantityNotations((current) => {
+      if (!(item.id in current)) return current;
+      const next = { ...current };
+      delete next[item.id];
+      return next;
+    });
     setInventoryItems((items) => items.filter((current) => current.id !== item.id));
     setSelectedInventoryIds((ids) => ids.filter((id) => id !== item.id));
     if (editing?.item.id === item.id) resetForm();
@@ -1058,8 +1246,8 @@ export function InventoryBoard({
           <button className="modal-close-button" type="button" onClick={closeAddModal} aria-label="閉じる">×</button>
           <div className="panel-title">
             <div>
-              <span>{editing ? "EDIT STOCK" : "MANUAL ADD"}</span>
-              <h3 id="inventory-editor-heading">{editing ? "在庫を編集" : "食材をリストへ"}</h3>
+              <span>{editingScanCandidateId ? "EDIT AI CANDIDATE" : editing ? "EDIT STOCK" : "MANUAL ADD"}</span>
+              <h3 id="inventory-editor-heading">{editingScanCandidateId ? "AI候補を編集" : editing ? "在庫を編集" : "食材をリストへ"}</h3>
             </div>
           </div>
 
@@ -1073,100 +1261,102 @@ export function InventoryBoard({
               品名
               <input value={values.name} onChange={(event) => updateValue("name", event.target.value)} placeholder="例: 牛乳" />
             </label>
-            <section
-              className="ingredient-image-editor"
-              aria-label="食材画像"
-              data-dragging-over={isIngredientImageDraggingOver}
-              data-active={isIngredientImageActive}
-              {...ingredientImageDragHandlers}
-              {...ingredientImagePasteAreaProps}
-            >
-              <div className="ingredient-image-preview">
-                {ingredientImagePreviewUrl ? (
-                  <>
-                    {/* Blob URL previews are local-only, so Next Image optimization is not useful here. */}
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={ingredientImagePreviewUrl} alt="選択した食材画像のプレビュー" />
-                  </>
-                ) : editing && imageUrlForItem(editing.item) && !removeInventoryImageOnSave ? (
-                  <>
-                    {/* Supabase signed URLs are already scoped and short lived. */}
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={imageUrlForItem(editing.item) ?? ""} alt="現在の食材画像" />
-                  </>
-                ) : (
-                  <IngredientIcon category={values.category} name={values.name || "食材"} size="lg" />
-                )}
-              </div>
-              <div className="ingredient-image-controls">
-                <label className="photo-file-button ingredient-image-file-button">
-                  画像を選ぶ
-                  <input
-                    ref={ingredientImageInputRef}
-                    accept="image/*"
-                    capture="environment"
-                    type="file"
-                    onChange={selectIngredientImage}
-                    disabled={isSaving}
-                  />
-                </label>
-                <label className="image-memory-toggle">
-                  <input
-                    checked={applyImageToSameName}
-                    disabled={isSaving}
-                    onChange={(event) => setApplyImageToSameName(event.currentTarget.checked)}
-                    type="checkbox"
-                  />
-                  同じ食材名にも使う
-                </label>
-                <div className="ingredient-image-remove-row">
-                  <button
-                    className="secondary-button compact-button"
-                    type="button"
-                    disabled={isSaving || (!selectedIngredientImage && !ingredientImagePreviewUrl)}
-                    onClick={resetIngredientImageSelection}
-                  >
-                    選択を取り消す
-                  </button>
-                  {editing?.item.image_storage_path ? (
-                    <button
-                      className="danger-button compact-button"
-                      type="button"
-                      disabled={isSaving}
-                      onClick={() => {
-                        resetIngredientImageSelection();
-                        setRemoveInventoryImageOnSave(true);
-                      }}
-                    >
-                      個別画像を削除
-                    </button>
-                  ) : null}
-                  {currentUserNameImage() ? (
-                    <button
-                      className="danger-button compact-button"
-                      type="button"
-                      disabled={isSaving}
-                      onClick={() => {
-                        resetIngredientImageSelection();
-                        setRemoveUserNameImageOnSave(true);
-                      }}
-                    >
-                      同名画像を削除
-                    </button>
-                  ) : null}
+            {!editingScanCandidateId ? (
+              <section
+                className="ingredient-image-editor"
+                aria-label="食材画像"
+                data-dragging-over={isIngredientImageDraggingOver}
+                data-active={isIngredientImageActive}
+                {...ingredientImageDragHandlers}
+                {...ingredientImagePasteAreaProps}
+              >
+                <div className="ingredient-image-preview">
+                  {ingredientImagePreviewUrl ? (
+                    <>
+                      {/* Blob URL previews are local-only, so Next Image optimization is not useful here. */}
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={ingredientImagePreviewUrl} alt="選択した食材画像のプレビュー" />
+                    </>
+                  ) : editing && imageUrlForItem(editing.item) && !removeInventoryImageOnSave ? (
+                    <>
+                      {/* Supabase signed URLs are already scoped and short lived. */}
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={imageUrlForItem(editing.item) ?? ""} alt="現在の食材画像" />
+                    </>
+                  ) : (
+                    <IngredientIcon category={values.category} name={values.name || "食材"} size="lg" />
+                  )}
                 </div>
-                {removeInventoryImageOnSave || removeUserNameImageOnSave ? (
-                  <p className="ingredient-image-note">保存すると画像を削除し、標準画像または絵文字へ戻します。</p>
-                ) : (
-                  <p className="ingredient-image-note">画像は非公開Storageへ保存します。公開URLは保存しません。</p>
-                )}
-                <p className="photo-paste-hint ingredient-image-paste-hint" data-active={isIngredientImageActive} aria-live="polite">
-                  {isIngredientImageActive
-                    ? "クリップボードから貼り付け可（Ctrl+V）"
-                    : "画像エリアをクリックすると Ctrl+V で貼り付けできます"}
-                </p>
-              </div>
-            </section>
+                <div className="ingredient-image-controls">
+                  <label className="photo-file-button ingredient-image-file-button">
+                    画像を選ぶ
+                    <input
+                      ref={ingredientImageInputRef}
+                      accept="image/*"
+                      capture="environment"
+                      type="file"
+                      onChange={selectIngredientImage}
+                      disabled={isSaving}
+                    />
+                  </label>
+                  <label className="image-memory-toggle">
+                    <input
+                      checked={applyImageToSameName}
+                      disabled={isSaving}
+                      onChange={(event) => setApplyImageToSameName(event.currentTarget.checked)}
+                      type="checkbox"
+                    />
+                    同じ食材名にも使う
+                  </label>
+                  <div className="ingredient-image-remove-row">
+                    <button
+                      className="secondary-button compact-button"
+                      type="button"
+                      disabled={isSaving || (!selectedIngredientImage && !ingredientImagePreviewUrl)}
+                      onClick={resetIngredientImageSelection}
+                    >
+                      選択を取り消す
+                    </button>
+                    {editing?.item.image_storage_path ? (
+                      <button
+                        className="danger-button compact-button"
+                        type="button"
+                        disabled={isSaving}
+                        onClick={() => {
+                          resetIngredientImageSelection();
+                          setRemoveInventoryImageOnSave(true);
+                        }}
+                      >
+                        個別画像を削除
+                      </button>
+                    ) : null}
+                    {currentUserNameImage() ? (
+                      <button
+                        className="danger-button compact-button"
+                        type="button"
+                        disabled={isSaving}
+                        onClick={() => {
+                          resetIngredientImageSelection();
+                          setRemoveUserNameImageOnSave(true);
+                        }}
+                      >
+                        同名画像を削除
+                      </button>
+                    ) : null}
+                  </div>
+                  {removeInventoryImageOnSave || removeUserNameImageOnSave ? (
+                    <p className="ingredient-image-note">保存すると画像を削除し、標準画像または絵文字へ戻します。</p>
+                  ) : (
+                    <p className="ingredient-image-note">画像は非公開Storageへ保存します。公開URLは保存しません。</p>
+                  )}
+                  <p className="photo-paste-hint ingredient-image-paste-hint" data-active={isIngredientImageActive} aria-live="polite">
+                    {isIngredientImageActive
+                      ? "クリップボードから貼り付け可（Ctrl+V）"
+                      : "画像エリアをクリックすると Ctrl+V で貼り付けできます"}
+                  </p>
+                </div>
+              </section>
+            ) : null}
             <div className="form-row two-columns">
               <label>
                 分類
@@ -1189,7 +1379,12 @@ export function InventoryBoard({
               <label>
                 数量・単位
                 <div className="qty-unit-wrap">
-                  <NumberField ariaLabel="数量" value={values.quantity} onChange={(next) => updateValue("quantity", next)} />
+                  <NumberField
+                    ariaLabel="数量"
+                    value={values.quantity}
+                    onChange={(next) => updateValue("quantity", next)}
+                    allowFraction={isFractionalUnit(values.unit)}
+                  />
                   <UnitPicker value={values.unit} onSelect={(unit) => updateValue("unit", unit)} />
                 </div>
               </label>
@@ -1240,8 +1435,13 @@ export function InventoryBoard({
               </div>
             ) : null}
             <div className="form-actions">
+              {editingScanCandidateId ? (
+                <button className="secondary-button submit-large" type="button" disabled={isSaving} onClick={closeAddModal}>
+                  キャンセル
+                </button>
+              ) : null}
               <button className="primary-button submit-large" type="submit" disabled={isSaving}>
-                {editing ? "内容を更新する" : "在庫に追加"}
+                {editingScanCandidateId ? "候補を更新" : editing ? "内容を更新する" : "在庫に追加"}
               </button>
             </div>
           </form>
@@ -1265,6 +1465,7 @@ export function InventoryBoard({
                     ref={photoInputRef}
                     accept="image/*"
                     capture="environment"
+                    multiple
                     type="file"
                     onChange={selectPhoto}
                     disabled={isUploadingPhoto}
@@ -1272,11 +1473,15 @@ export function InventoryBoard({
                 </label>
               </div>
 
-              {photoPreviewUrl ? (
-                <div className="photo-preview">
-                  {/* Blob URL previews are local-only, so Next Image optimization is not useful here. */}
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={photoPreviewUrl} alt="選択した食材写真のプレビュー" />
+              {photoPreviewUrls.length > 0 ? (
+                <div className="photo-preview-grid" aria-label="選択した食材写真">
+                  {photoPreviewUrls.map((url, index) => (
+                    <div className="photo-preview" key={`${url}-${index}`}>
+                      {/* Blob URL previews are local-only, so Next Image optimization is not useful here. */}
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={url} alt={`選択した食材写真のプレビュー ${index + 1}`} />
+                    </div>
+                  ))}
                 </div>
               ) : (
                 <p className="photo-empty">写真は非公開で保存し、入力したGemini APIキーでAI解析します。APIキーはDBに保存しません。</p>
@@ -1289,10 +1494,10 @@ export function InventoryBoard({
               ) : null}
 
               <div className="photo-actions">
-                <button className="primary-button" type="button" disabled={!selectedPhoto || isUploadingPhoto || isSaving || scanLimitReached} onClick={scanPhoto}>
+                <button className="primary-button" type="button" disabled={selectedPhotos.length === 0 || isUploadingPhoto || isSaving || scanLimitReached} onClick={scanPhoto}>
                   {isUploadingPhoto ? "解析中" : "AI解析する"}
                 </button>
-                <button className="secondary-button" type="button" disabled={!selectedPhoto || isUploadingPhoto} onClick={resetPhoto}>
+                <button className="secondary-button" type="button" disabled={selectedPhotos.length === 0 || isUploadingPhoto} onClick={resetPhoto}>
                   別の写真にする
                 </button>
               </div>
@@ -1322,7 +1527,7 @@ export function InventoryBoard({
                     <IngredientIcon className="scan-candidate-icon" name={candidate.item.name} size="sm" />
                     <div className="scan-candidate-main">
                       <h4>{candidate.item.name}</h4>
-                      <p>{candidate.item.quantity}{candidate.item.unit} · {candidate.item.storage_location}</p>
+                      <p>{displayQuantity(candidate.item.quantity, isFractionalUnit(candidate.item.unit) ? undefined : "decimal")}{candidate.item.unit} · {candidate.item.storage_location}</p>
                       {candidate.item.display_expires_on || candidate.item.effective_expires_on ? (
                         <small>期限 {candidate.item.effective_expires_on ?? candidate.item.display_expires_on}</small>
                       ) : null}
@@ -1401,6 +1606,23 @@ export function InventoryBoard({
 
         {activeView === "inventory" ? (
         <section className="canvas-inventory-list" aria-labelledby="inventory-list-heading">
+          <div className="inventory-category-row" aria-label="カテゴリフィルタ">
+            {inventoryCategoryFilterOptions.map((option) => (
+              <button
+                className="inventory-category-chip"
+                data-active={inventoryFilters.category === option.value}
+                key={option.value}
+                type="button"
+                onClick={() => updateInventoryFilter("category", option.value)}
+              >
+                {option.label}
+                <span>
+                  {option.value === "all" ? inventoryItems.length : inventoryItems.filter((item) => item.category === option.value).length}
+                </span>
+              </button>
+            ))}
+          </div>
+
           <div className="location-tab-row" aria-label="保存場所タブ">
             <button className="location-tab" data-active={inventoryFilters.storageLocation === "all"} type="button" onClick={() => updateInventoryFilter("storageLocation", "all")}>
               すべて <span>{inventoryItems.length}</span>
@@ -1439,6 +1661,8 @@ export function InventoryBoard({
             items={filteredInventoryItems}
             imageUrls={ingredientImageUrls}
             list="inventory"
+            notations={quantityNotations}
+            customFractions={customFractions}
             onDelete={(list, item) => requestDelete(item.name, "この在庫を削除します。元には戻せません。", () => deleteItem(list, item))}
             onEdit={startEdit}
             onQuantityChange={adjustInventoryQuantity}
@@ -1456,6 +1680,43 @@ export function InventoryBoard({
             disabled={isSaving}
             userIngredientImages={userIngredientImages}
           />
+
+          <section className="inventory-archive-panel" aria-labelledby="inventory-archive-heading">
+            <div>
+              <h3 id="inventory-archive-heading">復元履歴</h3>
+              <p>数量0になった食材の直近50件</p>
+            </div>
+            {archivedInventoryItems.length === 0 ? (
+              <p className="empty-list">復元できる0在庫はありません。</p>
+            ) : (
+              <div className="inventory-archive-list">
+                {archivedInventoryItems.map((item) => (
+                  <article className="inventory-archive-item" key={item.id}>
+                    <IngredientIcon category={item.category} className="stock-item-icon" imageUrl={resolveItemImageUrl(item, userIngredientImages, ingredientImageUrls)} name={item.name} size="sm" />
+                    <div className="item-main">
+                      <h4>{item.name}</h4>
+                      <p>
+                        {item.storage_location} · 0在庫 {compactDate((item.archived_at ?? item.updated_at).slice(0, 10)) || "-"}
+                      </p>
+                    </div>
+                    <NumberField
+                      ariaLabel={`${item.name}の復元数量`}
+                      allowFraction={isFractionalUnit(item.unit)}
+                      min={0}
+                      onChange={(next) => setRestoreQuantities((current) => ({ ...current, [item.id]: next }))}
+                      placeholder="1"
+                      showSteppers={false}
+                      value={restoreQuantities[item.id] ?? "1"}
+                    />
+                    <span className="restore-unit">{item.unit}</span>
+                    <button className="secondary-button compact-button" disabled={isSaving} type="button" onClick={() => restoreArchivedInventory(item)}>
+                      戻す
+                    </button>
+                  </article>
+                ))}
+              </div>
+            )}
+          </section>
         </section>
         ) : null}
       </div>
@@ -1469,6 +1730,8 @@ type ItemListProps = {
   imageUrls: Map<string, string>;
   items: StockItem[];
   list: "inventory";
+  notations: Record<string, QuantityNotation>;
+  customFractions: string[];
   onDelete: (list: "inventory", item: StockItem) => void;
   onEdit: (list: "inventory", item: StockItem) => void;
   onQuantityChange?: (item: StockItem, delta: number) => void;
@@ -1478,7 +1741,7 @@ type ItemListProps = {
   userIngredientImages: UserIngredientImage[];
 };
 
-function ItemList({ disabled, emptyText, imageUrls, items, list, onDelete, onEdit, onQuantityChange, onSelect, selectedIds, toolbar, userIngredientImages }: ItemListProps) {
+function ItemList({ disabled, emptyText, imageUrls, items, list, notations, customFractions, onDelete, onEdit, onQuantityChange, onSelect, selectedIds, toolbar, userIngredientImages }: ItemListProps) {
   if (items.length === 0) {
     return <p className="empty-list">{emptyText}</p>;
   }
@@ -1506,14 +1769,16 @@ function ItemList({ disabled, emptyText, imageUrls, items, list, onDelete, onEdi
             </div>
             <p>{item.storage_location} · 購入 {compactDate(item.created_at.slice(0, 10)) || "-"}</p>
           </div>
-          {item.status_note ? <p className="item-note">{item.status_note}</p> : null}
+          <p className="item-note" data-empty={!item.status_note} aria-hidden={!item.status_note}>
+            {item.status_note}
+          </p>
           {onQuantityChange ? (
             <div className="quantity-stepper" aria-label={`${item.name}の数量`}>
               <button type="button" disabled={disabled || item.quantity <= 0} onClick={() => onQuantityChange(item, item.unit === "g" || item.unit === "ml" ? -50 : -1)}>
                 -
               </button>
               <span>
-                {item.quantity}
+                {displayQuantity(item.quantity, isFractionalUnit(item.unit) ? notations[item.id] : "decimal", customFractions)}
                 <small>{item.unit}</small>
               </span>
               <button type="button" disabled={disabled} onClick={() => onQuantityChange(item, item.unit === "g" || item.unit === "ml" ? 50 : 1)}>
