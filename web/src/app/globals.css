@@ -562,11 +562,19 @@ h1 {
 }
 
 .inventory-canvas-header {
+  /* TKT-0186: 上部 sticky で在庫リストをスクロール中も「＋」が常時表示される。
+   * .canvas-status-bar は position:fixed; min-height:32px; z-index:60 のため
+   * top:32px で潜り込まないようにする。背景を付けてリストと重なっても視認できる。 */
+  position: sticky;
+  top: 32px;
+  z-index: 40;
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
   gap: 18px;
   margin-bottom: 28px;
+  background: var(--surface, #fff);
+  padding-bottom: 8px;
 }
 
 .inventory-canvas-header h2 {
@@ -1645,12 +1653,20 @@ h1 {
 }
 
 .modal-close-button {
-  position: absolute;
+  /* TKT-0186: sticky 化してスクロール中もモーダル右上に残す。
+   * .canvas-modal は display:grid(gap:14px) + overflow:auto なので
+   * グリッドアイテムとして sticky が機能する。
+   * justify-self:end + align-self:start で右端上部に配置する。
+   * margin-bottom:-40px でグリッドトラックの高さを 0 に縮小し、
+   * タイトルとの余白を gap(14px)のみにする（元の絶対配置に近い見た目を維持）。 */
+  position: sticky;
   top: 14px;
-  right: 14px;
   display: grid;
+  align-self: start;
+  justify-self: end;
   width: 40px;
   height: 40px;
+  margin-bottom: -40px;
   place-items: center;
   border: 0;
   border-radius: 999px;
@@ -1658,6 +1674,7 @@ h1 {
   color: #cbd5e1;
   font-size: 1.6rem;
   line-height: 1;
+  z-index: 10;
 }
 
 .canvas-modal h3 {
@@ -2057,6 +2074,19 @@ h1 {
   display: grid;
   grid-template-columns: 1fr;
   gap: 8px;
+}
+
+/* TKT-0186: モーダル内の送信ボタンをモーダル下端に sticky 固定。
+ * .canvas-modal は overflow:auto なので bottom:0 の sticky が機能する。
+ * 背景・上境界線で本文と重なっても視認できるようにする。 */
+.canvas-modal .form-actions {
+  position: sticky;
+  bottom: 0;
+  background: #fff;
+  border-top: 1px solid #edf1f7;
+  padding-top: 12px;
+  margin-top: 4px;
+  z-index: 5;
 }
 
 .operation-message {
@@ -5266,6 +5296,7 @@ h1 {
 
 .item-main h4 {
   overflow: hidden;
+  min-width: 0;
   margin: 0;
   color: #172033;
   font-size: 0.92rem;
@@ -5910,7 +5941,12 @@ h1 {
   }
 
   .inventory-workspace .inventory-canvas-header {
+    /* TKT-0186: PC ではスクロール量が少なくデスクトップトップバーとの z-index 競合を避けるため、
+     * スマホ用の sticky を解除して通常フロー配置に戻す。 */
+    position: static;
     align-items: center;
+    background: transparent;
+    padding-bottom: 0;
   }
 
   .inventory-view-control {
@@ -5985,6 +6021,7 @@ h1 {
   }
 
   .canvas-inventory-list .item-main h4 {
+    min-width: 0;
     font-size: 1rem;
     white-space: normal;
   }
@@ -6023,6 +6060,7 @@ h1 {
     position: absolute;
     top: 14px;
     right: 14px;
+    margin-bottom: 0;
   }
 
   .photo-scan-modal:has(.scan-candidate-panel) .scan-candidate-list {
@@ -7603,4 +7641,128 @@ h1 {
 
 .ingredient-icon--lg {
   --ingredient-icon-size: 56px;
+}
+
+/* ============================================================
+ * スマホ幅（〜719px）横はみ出し解消 — TKT-0184
+ * PC幅（>=720px）の既存ルールには触れない。
+ * ============================================================ */
+@media (max-width: 719px) {
+  /* 保険: body に overflow-x ガード。
+   * 意図的横スクロール（.location-tab-row / .canvas-sort-row の overflow-x:auto）と
+   * sticky は子要素に overflow-x:auto が残るため破壊されない。 */
+  body {
+    overflow-x: hidden;
+  }
+
+  /* 1. .consumption-row-controls
+   *    PC: flex: 1 1 260px; min-width: 220px;
+   *    → スマホ: min-width を緩和し折返し可に */
+  .consumption-row-controls {
+    flex: 1 1 auto;
+    min-width: 0;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+
+  /* 2. .cooking-filter-row
+   *    PC: repeat(5, minmax(0,1fr))
+   *    → スマホ: 2列 */
+  .cooking-filter-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* 3. .conversion-row（全体に当て、モーダル内は後の高詳細度ルールで上書き）
+   *    PC: minmax(72px,auto) auto minmax(96px,1fr) minmax(120px,1fr)
+   *    → スマホ: 2列折返し。入力2列（単位 + 数値）を2行に分ける。 */
+  .conversion-row {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    row-gap: 8px;
+  }
+
+  /* モーダル内の .conversion-row は既存 @media(max-width:640px) ルールを優先させるため
+   * 詳細度を上げて既存値を維持する */
+  .inventory-editor-modal .conversion-row {
+    grid-template-columns: minmax(78px, auto) auto minmax(80px, 0.8fr) minmax(104px, 1.2fr);
+    row-gap: 0;
+  }
+
+  /* 4. グリッド類のスマホ列数 */
+
+  /* .cooking-summary-grid: PC 4列 → スマホ 2列 */
+  .cooking-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* .insight-grid: PC 2列 → スマホ 1列 */
+  .insight-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* .home-feature-grid: PC 2列 → スマホ 1列 */
+  .home-feature-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* 5. 在庫カード（.stock-item）スマホ崩れ対策
+   *    PC(5列): icon | main | note | qty | actions がすべて1行に並ぶ
+   *    → スマホ(3列): icon | (select/main) | actions の grid-areas 配置で
+   *      main が十分な幅を持ち、h4 + チップが重ならないようにする。
+   *    h4 は min-width:0 + ellipsis で flex コンテナ内で縮小。
+   *    チップ（flex:0 0 auto）は押し出されず h4 の右に固定。 */
+  .canvas-inventory-list .stock-item {
+    grid-template-columns: 44px minmax(0, 1fr) auto;
+    grid-template-areas:
+      "icon select actions"
+      "icon main   main"
+      "icon note   note"
+      "icon qty    qty";
+    align-content: start;
+  }
+
+  .canvas-inventory-list .stock-item > .stock-item-icon {
+    grid-area: icon;
+    align-self: start;
+  }
+
+  .canvas-inventory-list .stock-item > .select-row {
+    grid-area: select;
+    align-self: start;
+  }
+
+  .canvas-inventory-list .stock-item > .item-main {
+    grid-area: main;
+    min-width: 0;
+  }
+
+  .canvas-inventory-list .stock-item > .item-note {
+    grid-area: note;
+  }
+
+  .canvas-inventory-list .stock-item > .quantity-stepper {
+    grid-area: qty;
+    justify-content: space-between;
+  }
+
+  .canvas-inventory-list .stock-item > .item-actions {
+    grid-area: actions;
+    align-self: start;
+    justify-self: end;
+  }
+
+  /* .item-title-row: flex-wrap なし・h4 が縮んで ellipsis になるよう保証 */
+  .canvas-inventory-list .item-title-row {
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 6px;
+  }
+
+  /* h4 が flex コンテナ内で正しく縮小・省略されるよう min-width:0 を明示 */
+  .canvas-inventory-list .item-main h4 {
+    min-width: 0;
+    overflow: hidden;
+    font-size: 0.92rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 }

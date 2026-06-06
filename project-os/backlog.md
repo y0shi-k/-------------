@@ -18,10 +18,7 @@
 ## 次にやる候補（優先度つき・要ユーザー確認）
 0f. (料理記録の写真UX・2026-06-06 起票／独立並行可) 料理記録の写真まわりの使い勝手改善。全🟢非危険（UI・既存 signed_url/削除/追加経路の再利用、Storage/schema/auth 無変更）。`photo_upload_storage` は語彙過剰マッチ＝report記録運用。TKT-0188 完了（changelog 参照）。残1 TKT:
    - TKT-0189（次の候補）: カレンダー/タイムラインの複数写真 閲覧導線。カードに枚数バッジ＋写真タップで全画像・評価・コメントを読み取り専用表示する閲覧モーダル新設（編集へ遷移可）。TKT-0188と独立・実装可。
-0e. (新規イニシアチブ・2026-06-06 /breakdown 展開／依存順) **スマホ画面のレイアウト崩れ解消**。PC中心編集でスマホ未調整→テスト時に崩れる件への対応。全🟢非危険（CSS中心、`web/src/app/globals.css` ＋一部 `inventory-board.tsx`。schema/auth/Storage/AI/CSV 無変更）。eval=`pwa_mobile_ui`。主BP=`@media (max-width: 719px)`。方針確定: 対象=全画面の横はみ出しも網羅／「固定」=sticky追従で常時表示。3 TKT（+ SPEC-0184/0185/0186 新設）:
-   - **TKT-0184（土台・先行必須）**: スマホ横はみ出し（overflow）の一掃。`.consumption-row-controls`(min-width220px)/`.cooking-filter-row`(5列)/`.conversion-row`(固定列)/各種グリッドのスマホBP整備＋overflow-xガード。← これを先に。
-   - TKT-0185: 食材管理の食材名行の文字重なり修正（スマホで `.item-main h4` white-space:normal × `.item-title-row` flex-wrap でバッジと重なる）。TKT-0184依存。
-   - TKT-0186: 主要操作ボタンの sticky 固定（上部＋ボタン／手動追加の「在庫に追加」下部／全モーダルの「×」右上）。TKT-0184依存。
+0e. (スマホ画面のレイアウト崩れ解消・2026-06-06) **TKT-0184/0185/0186 全完了**（changelog 参照）。横はみ出し一掃・食材名行の重なり修正・主要ボタンの sticky 固定。残: 実機/DevTools 375px 目視と、TKT-0189 と分けたコミット。
 0c. (献立スケジュール改善・2026-06-06 /breakdown 展開／依存順) 完了状態の取り消し・完了済み削除の巻き戻し・1スロット複数献立表示・完成写真の候補化。承認済み plan を3 TKT（+ spec 新設）へ展開:
    - **TKT-0178（先行・危険変更扱い＝データ削除/在庫巻き戻し）**: 献立の「完了を外す」＋完了済み×削除。完了時の在庫減算を `cooking_consumption_events` 根拠で復元し `cooking_history`/consumption_events を削除（完成写真は残す）。全カードに×ボタン。FK は `on delete set null` のため events→history→schedule の順厳守。**schema変更なし**（supabase_schema_change はテーブル名トークンの過剰マッチ／report に実schema無変更と記録）。manual-smokes/review 必須。
    - TKT-0179（非危険・表示のみ）: 1スロット（日付×食事タイプ）に複数献立を全件表示（find→filter+map＋CSS高さ自動）。DB既に複数行対応済み（unique制約なし）。TKT-0178 と同じカードDOMを触るため 0178→0179 推奨。

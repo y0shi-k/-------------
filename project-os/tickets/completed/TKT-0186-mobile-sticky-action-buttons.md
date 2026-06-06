@@ -1,7 +1,7 @@
 ---
 id: TKT-0186-mobile-sticky-action-buttons
 title: 主要操作ボタン（上部プラス/在庫に追加/モーダル×）をスクロール追従で固定する
-status: implementation_ready
+status: completed
 goal: スクロールで主要ボタンが画面外へ消えて押せなくなる問題を解消し、常に操作できるようにする。
 acceptance:
   - 食材管理で在庫リストを下までスクロールしても「＋」追加ボタンが常に画面内に見えて押せる。

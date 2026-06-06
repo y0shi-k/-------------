@@ -7,6 +7,9 @@
 
 ## 2026-06
 
+- TKT-0186 — 主要操作ボタンの sticky 固定。食材管理ヘッダーの「＋」(スマホ sticky/PC static)・手動追加モーダルの「在庫に追加」(`.form-actions` sticky bottom)・全モーダルの「×」(`.modal-close-button` を absolute→sticky top:14px+grid右上、`margin-bottom:-40px` で見た目維持)。実差分は globals.css のみ（schema/Storage 無変更）。残: 実機/DevTools 375px 目視。
+- TKT-0185 — 食材管理の食材名行の文字重なり修正。`.item-title-row`(flex)の子 `h4` に `min-width:0` を補い flex 縮小＋ellipsis を機能させ、スマホは `@media(max-width:719px)` で `.stock-item` を3列grid-areas再定義＋`h4` nowrap/ellipsis 化（チップと重ならない）。実差分は globals.css のみ（schema/Storage 無変更）。残: 実機/DevTools 375px 目視。
+- TKT-0184 — スマホ横はみ出しの一掃（土台）。globals.css 末尾に `@media (max-width: 719px)` を追記し `.consumption-row-controls`(min-width220px解除)/`.cooking-filter-row`(5→2列)/`.conversion-row`(2列折返し・モーダル内は維持)/各種グリッド列数を緩和＋`body overflow-x:hidden` 保険。実差分は globals.css のみ（schema/Storage 無変更／eval過剰マッチはreport記録）。残: 実機/DevTools 375px 目視。
 - TKT-0188 — 料理記録 編集モーダルの写真UI改善（既存写真をサムネ右上×で確認なし削除予定化＝実削除は確定時・キャンセルで残る・「削除予定N件（元に戻す）」で救済、新規写真はファイル名→サムネ表示＋×取り消し、objectURLは useEffect クリーンアップで解放）。実差分は Storage/schema 無変更（既存削除/追加経路の再利用）。残: 実機での削除/復元・サムネ・スマホ幅目視。
 - TKT-0183 — 料理完成写真2エリア（調理完了フローの料理記録パネル／料理記録の編集モーダル・複数対応）へファイルD&D登録＋Ctrl+V貼り付け（TKT-0187整合の追補）を適用（共通フック `useImageFileDrop` の `pasteAreaProps`/`isActive` も再利用、`handleNewPhotosChange` を `addNewPhotos(File[])` に分離、ハイライト/アクティブCSS追加）。実差分は Storage/schema 無変更（既存圧縮・`photos` 登録経路の再利用）。残: 実機でのPCドロップ/貼り付け目視。
 - TKT-0187 — 画像エリアのクリックフォーカス＋クリップボード貼り付け（Ctrl+V）対応（共通フック `useImageFileDrop` に `onPaste`/フォーカス管理を追加・アクティブ時のみ貼り付け＝ページ全体のCtrl+Vを奪わない・既存画像の差し替えも対応）。実差分は Storage/schema 無変更。残: 実機での Ctrl+V 貼り付け目視。

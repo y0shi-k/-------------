@@ -1,7 +1,7 @@
 ---
 id: TKT-0184-mobile-horizontal-overflow-fix
 title: スマホ幅で全画面の横はみ出し（horizontal overflow）を一掃する【土台】
-status: implementation_ready
+status: completed
 goal: スマホでアプリが横にはみ出して崩れる問題を解消し、以降のスマホUI調整（TKT-0185/0186）の土台を作る。
 acceptance:
   - iPhone幅（375px）相当で主要画面（ホーム/食材管理/料理履歴/献立/各モーダル）が横スクロールを起こさない（document幅 <= viewport幅）。

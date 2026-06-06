@@ -1,7 +1,7 @@
 ---
 id: TKT-0185-inventory-name-row-overlap-fix
 title: 食材管理の食材名行でスマホ時に文字が重なる崩れを直す
-status: implementation_ready
+status: completed
 goal: スマホの在庫カードで食材名とバッジ（期限・換算チップ）が重なって読めない崩れを解消する。
 acceptance:
   - スマホ幅（375px）で在庫カードの食材名とバッジ（期限・換算）が重ならず、両方が読める。
