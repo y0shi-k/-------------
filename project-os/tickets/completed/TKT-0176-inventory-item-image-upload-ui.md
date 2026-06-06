@@ -1,7 +1,7 @@
 ---
 id: TKT-0176-inventory-item-image-upload-ui
 title: 食材画像の登録・差し替え・削除UI（同名食材の記憶つき）
-status: implementation_ready
+status: completed
 goal: 標準画像で足りない食材をユーザーが変更でき、次回から同じ食材名ではユーザー画像を優先表示できるようにする
 acceptance:
   - 在庫編集画面で画像選択、プレビュー、保存ができる

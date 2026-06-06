@@ -3,26 +3,27 @@
 > 「現在のフォーカス」と「次にやる候補」の live な正本。短く保つ。詳細はチケットへ。
 > 長期ロードマップは `project-os/knowledge/phase-map.md`、決定経緯は `decisions.md` を参照。
 > 着手時にここの「次」を見て `/new-ticket` する。完了時に `/finalize` がここを更新する。
+>
+> **運用ルール（肥大化防止）**:
+> - 「現在のフォーカス」は**進行中（in_progress）／直近の判断待ちのみ**。各項目は1〜2行に保つ。
+> - 完了した TKT は**ここに残さない**。`/finalize` が `knowledge/changelog.md` へ1行追記し、ここから消す。
+>   完了の詳細正本は `artifacts/<TKT>/report.md`。
+> - `/verify` が「現在のフォーカス」の肥大化（完了行の残留・長文化）を warn で検知する。
 
 ## 現在のフォーカス
-- (TKT-0177) 完了。「テキストからレシピを追加」→「AIで構造化」でURL込み本文を貼ってもリンクが消える不具合を Canvas版に合わせて解消。サーバ側 `recipe-generation.ts` に「AIのsource優先＋structureモードで空なら本文から `https?://...` 正規表現抽出（複数=改行区切り・ユニーク化）」のフォールバックを追加し、`parseGeminiRecipeResponse(res,{mode,sourceText})` へ拡張。source は string 改行区切り・1000字保持（160字制限回避）・"AI提案"除外。表示は共通部品 `RecipeSourceLinks`（URLはリンク/他はテキスト・Reactエスケープ）を調理ビューア上部とレシピ詳細「参考元」に適用。編集画面「出典」欄は既存で手動URL入力対応済み（任意）。テスト8件追加・verify pass。`/check-gates` の🔴 `supabase_schema_change` は `recipes` テーブル名トークン＋他チケット未コミットmigrationの過剰マッチ＝実schema/Storage/auth無変更（軽量プロセスで完了・report記録）。**実機での貼付→構造化→保存→リンク表示の目視はユーザー残課題**。
-- (ユーザー登録画像イニシアチブ TKT-0173〜0176) デモ固定画像（TKT-0168〜0172）の次段＝ユーザー自身が画像を登録できる実運用層。TKT-0173（DB列`image_storage_path`＋非公開`photos`バケット流用・本人領域限定policy）完了→**TKT-0174（レシピ画像の登録・差し替え・削除UI）完了**。次は TKT-0175（食材標準画像カタログ）/ TKT-0176（在庫食材画像の登録UI）。
-- (TKT-0174) 完了。レシピ編集UIに画像ピッカー（選択/プレビュー/差し替え/削除・二重送信防止）を追加し、一覧/詳細/候補/ホームfeaturedで「ユーザー登録画像(署名付きURL)→固定デモ画像→プレースホルダ」に表示優先順位を統一。非公開Storageへ4:3/1280px/WebP圧縮保存・DBはpathのみ・後始末（差し替え/削除/孤児/レシピ削除）実装。危険変更（photo_upload_storage/supabase_schema_change）。verify pass・全gate閉。**実機スモーク（圧縮品質・スマホUI重なり・クロスユーザー拒否）はユーザー残課題**。
-- 公開前セキュリティ整備（TKT-0149/0150/0151）が一段落。次は本番Supabase/Vercelへの適用・手動確認。
-- (TKT-0154) 数量・単位入力のUX改善（単位ピッカー／単位換算の上単位連動／数量スピン1刻み／数値欄IMEオフ）。spec_ready・実装はCodexで実施予定。
-- (TKT-0155) 完了。レシピ編集モーダルの材料行レイアウト改善（TKT-0154の単位ピッカーが64px列で縦積み崩れ→モーダル720px化＋単位列拡大＋nowrap化、CSSのみ）。verify pass。目視確認は手元dev推奨。
-- (TKT-0156) 完了。消費量調整画面で調味料が分類されない不具合の修正。原因①履歴編集が在庫categoryで分類→レシピ材料 item_type 由来へ統一（完了画面と一致）。原因②AI生成プロンプトに調味料分類指示を追加。スキーマ変更なし。verify pass・全gate閉。実機目視と既存AI生成レシピの再分類（データ移行要否）は残課題。
-- (TKT-0164) 完了。完了モーダル（実際の消費量を調整 / ConsumptionEditor）のUI簡素化・1行高密度化。除外を「消費量0」だけに一本化（チェックボックスと「減算しない」option廃止）、材料名＋在庫select＋消費量(+単位)を横一列＋NumberField化。料理履歴編集モーダルは固有の在庫差分意味があり無改変（別チケット候補）。verify pass・全gate閉。実機スモークと編集モーダルの見た目統一は残課題。
-- (TKT-0165) 完了。PC幅の献立スケジュールを TKT-0159 の7列横並びから「1日=1行」の縦アジェンダ表示へ戻した（各日カードが盤面全高まで伸びてスロット下に死に余白が出る問題を解消）。CSSのみ（globals.css 1024pxブロック）、`.schedule-board` を max760px中央寄せに制限。verify pass・危険evalなし。実機目視と最大幅の好みは残課題。
-- (デザイン正本) `docs/design/pc-design-language.md` を新設。PC幅のトーンを Image #3（indigo+白基調・余白広め）に統一する設計正本。デザイントークン（--accent-soft/--favorite/--shadow-card）＋コンポーネント規定。今後のPC各画面はこれに収束させる。
-- (TKT-0166) 完了。PCレシピカードを縦型へ刷新（上部プレースホルダ＋名前2行クランプ＋操作ボタンをホバー退避＋タグ折り返し）。トークン土台を :root に追加。CSS+1行JSXのみ、スマホ温存。verify pass・全gate閉（check-gatesの🔴危険は散文由来の過剰マッチと記録）。実機目視は残課題。
-- (TKT-0160) 完了。料理・記録のPC多カラム化。`useShellSubView` で `selectedSubViews.cooking→historyView` を同期しPCで内部タブ（`.cooking-view-tabs`）を非表示、タブonClickを `selectShellLeaf("cooking",view)` 経由に（recipe/inventory と同形）。CSSはタイムライン複数カラム（auto-fill minmax320）・カレンダーセル/サムネ拡大（72→110/34→60px）・インサイト広幅化を1024pxブロックに追加。スマホ温存。verify pass・全gate閉（🔴 photo/schema eval は写真語彙とテストfixtureによる過剰マッチと記録、実ロジック無変更）。実機目視は残課題。
-- (TKT-0161) 完了。散在設定（Gemini APIキー入力・AI残り回数・アカウント/ログアウト）をPC=サイドバー下部ギア／スマホ=ステータスバーのアカウントタップから開く設定画面（`settings-panel.tsx` 新設）へ集約。TKT-0157配線済みの `activeDesktopTarget.kind==="settings"` の描画先を実装。APIキー入力は設定へ移設しボード内4箇所撤去、ボードはマウント時 `loadUserGeminiApiKey()` でキー読込を代替（旧パネルのuseEffect依存を補完）、未入力エラー文を「設定画面で登録」に更新。AI残量メーターは上部バー＋設定に集約しボード内4箇所撤去。ログアウトは設定に新設＋PC上部バー据え置き。認証・キー保存ロジック不変。verify pass・全gate閉（🔴 schema/photo eval は changed_paths 過剰マッチ、実ロジック無変更）。**実機ブラウザの目視スモーク（設定遷移・APIキー保存→AI実行・ログアウト・スマホ全画面化）はユーザー残課題**。`.photo-empty` 旧文言は据え置き（軽微）。
-- (TKT-0167) 完了。レシピお気に入り `recipes.is_favorite`（boolean not null default false）を新設（危険変更=schema+RLS）。縦型カードにハート（楽観的更新＋失敗ロールバック・トグル専用更新で saveRecipe と分離）、絞り込みに「お気に入り」チップ追加。既存行ポリシー（auth.uid()=user_id）で充足し新規RLSなし。Docker未導入でローカルSupabase不可のため、ユーザー承認のうえ hosted（wwtompvneobysieofxkl）へ `supabase db push` 適用し schema/RLS/後方互換を hosted で実検証。verify pass・全gate閉。**UI happy-path（保存・絞り込み・モバイル・ハート見た目）のブラウザ確認はユーザー残課題**。ハートSVGは非対称崩れを対称パスへ修正済み。
-- (TKT-0169) 完了。ホームのビジュアル刷新（TKT-0168基盤ドリブン）。ヒーローを `HomeHero` 化し `/images/hero/home-hero.webp` を onError 付きで読み、無ければ従来テキストヒーローへフォールバック（テキスト常時表示で画像ゼロでも崩れない）。「最近作ったレシピ／無ければお気に入り」を既存 `recipes`（page.tsx で取得済み・新規クエリなし）から `pickFeaturedRecipes` で選び `<RecipeThumb size="card">` の写真カードで表示（対象ゼロなら枠を出さない）。各カードは `selectShellLeaf("recipes","recipes")` で遷移。サマリー4枚＋`TodayDashboard` は維持。CSSは `.home-hero` flex化＋`.home-feature*` 追加（PC3列）、`:root` 追加なし、スマホ温存。テスト3件追加。verify pass・全gate閉（🔴 supabase_schema_change/photo_upload_storage は散文・命名の過剰マッチ＝review/manual-smokes に静的確認記録）。**実機目視（PC feature 3列・ヒーロー・スマホ回帰）と実画像配置後の見栄えはユーザー残課題（TKT-0172後）**。
-- (TKT-0162) 完了。PCホーム/ダッシュボード新設（案A・PCデスクトップUI化の最終ピース）。挨拶＋サマリーカード4枚（既存カウント、クリックで該当モードへ `selectShellLeaf`）＋既存 `TodayDashboard`（今日の確認）を集約。ホームの中身は page.tsx で組み立て `home` ReactNode として WebModeShell へ渡す設計（shell はデータ非依存）。PC初期表示=ホームは初期 state を ingredients 据え置き＋マウント後 `matchMedia(≥1024px)` で home へ昇格（スマホは食材管理起点・下部タブ3つ据え置き、jsdom 未定義で既存テストも無改変通過）。新規DBクエリ・新規データソースなし＝非危険変更。新規 `home-dashboard.tsx`＋web-mode-shell の描画分岐/トップバー/matchMedia 昇格、CSS、テスト4件追加。verify pass・全gate閉（🔴 supabase_schema_change はテーブル名トークンの過剰マッチ、実 schema/RLS/Storage 無変更＝review/manual-smokes に静的確認記録）。**UI happy-path（PC初回ホーム・カード遷移、スマホ食材管理起点・ホーム非表示）のブラウザ確認はユーザー残課題**。これで TKT-0157〜0162（PCデスクトップUI化）の主要チケットは完了。
+- (ユーザー登録画像イニシアチブ TKT-0173〜0176) **全チケット完了**（changelog 参照）。残るユーザー作業は実機スモーク（圧縮品質・スマホUI・クロスユーザー拒否）。
+- (TKT-0154) 数量・単位入力のUX改善（単位ピッカー／単位換算の上単位連動／数量スピン1刻み／数値欄IMEオフ）。spec_ready・実装は Codex で実施予定。
+- 公開前セキュリティ整備（TKT-0149/0150/0151）が一段落。次は本番Supabase/Vercelへの適用・手動確認（→「次にやる候補」P1）。
 
 ## 次にやる候補（優先度つき・要ユーザー確認）
+0d. (新規イニシアチブ・2026-06-06 /breakdown 展開) **写真エリアへのドラッグ&ドロップ登録**（SPEC-0181）。現状4箇所すべてクリック/タップ選択のみ→PCでファイルをエリアにドロップ登録できるようにする。全🟢非危険（UIのみ・既存圧縮/アップロード経路を再利用、Storage/schema/auth無変更）。`photo_upload_storage` eval は写真語彙で過剰マッチ＝report記録運用（TKT-0169/0177同方針）。依存順3チケット:
+   - **TKT-0181（土台・先行必須）**: 共通フック `useImageFileDrop`＋画像ファイル抽出の純関数（単体テスト）＋レシピ画像エリア(`RecipeImagePicker`)へ適用＋ドラッグ時ハイライトCSS。← これを先に完了させる。
+   - TKT-0182: 食材画像エリア（inventory-board.tsx）へ適用（単一画像）。TKT-0181依存。
+   - TKT-0183: 料理完成写真2エリア（recipe-meal-workspace.tsx / cooking-record-edit-modal.tsx・複数対応）へ適用。TKT-0181依存。
+0c. (献立スケジュール改善・2026-06-06 /breakdown 展開／依存順) 完了状態の取り消し・完了済み削除の巻き戻し・1スロット複数献立表示・完成写真の候補化。承認済み plan を3 TKT（+ spec 新設）へ展開:
+   - **TKT-0178（先行・危険変更扱い＝データ削除/在庫巻き戻し）**: 献立の「完了を外す」＋完了済み×削除。完了時の在庫減算を `cooking_consumption_events` 根拠で復元し `cooking_history`/consumption_events を削除（完成写真は残す）。全カードに×ボタン。FK は `on delete set null` のため events→history→schedule の順厳守。**schema変更なし**（supabase_schema_change はテーブル名トークンの過剰マッチ／report に実schema無変更と記録）。manual-smokes/review 必須。
+   - TKT-0179（非危険・表示のみ）: 1スロット（日付×食事タイプ）に複数献立を全件表示（find→filter+map＋CSS高さ自動）。DB既に複数行対応済み（unique制約なし）。TKT-0178 と同じカードDOMを触るため 0178→0179 推奨。
+   - TKT-0180（危険変更＝写真Storage）: 残した完成写真・過去の調理完成写真を、レシピ画像登録と料理写真登録で「過去の完成写真から選ぶ」候補に。設定時は Storage object をコピーして独立。依存: TKT-0178（孤立写真の発生源）＋TKT-0174（レシピ画像土台）。manual-smokes/review 必須。
 0b. (PCデザイン刷新・design正本ドリブン) `docs/design/pc-design-language.md` のトーン（Image #3）へPC各画面を収束させる。①TKT-0166（レシピカード縦型化）=完了。②TKT-0167（お気に入り is_favorite 新設・schema=危険変更）=完了（hosted適用済み・UI目視はユーザー残）。③**献立スケジュールの配色トーン統一（sky-blue抑制）=次の候補**。④在庫/料理記録/設定/ホームの順次トーン統一。各ステップ独立チケット、危険変更（0167）は分離。
 0a. (新規イニシアチブ・2026-06-04) **ビジュアルレイヤー導入**（参考モック `レシピイメージ図` の写真・絵文字に寄せる）。ホームがテキスト主体で参考図と程遠い件への対応。方針=**レイアウト先行＋6画面まとめて**（ユーザー確定）。写真は当面 `web/public/` 静的デモ画像（schema/Storage変更なし）、食材は絵文字、画像はCodex生成。設計正本に §8 追記済み（`docs/design/pc-design-language.md`）＋発注書 `docs/design/demo-image-assets.md` 新設。5チケット（依存順）:
    - **TKT-0168（基盤・統一の要／0169-0172の前提）**: `recipe-image.ts`（名前→静的画像resolver）/ `ingredient-emoji.ts` / `<RecipeThumb>` / `<IngredientIcon>` ＋CSS＋正本§8。← これを先に完了させる。
