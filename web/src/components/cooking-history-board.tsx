@@ -103,6 +103,7 @@ export function CookingHistoryBoard({ initialHistory, initialInventoryItems, use
   const [calendarMonth, setCalendarMonth] = useState(monthKey(today));
   const [selectedDate, setSelectedDate] = useState(localDateKey(today));
   const [editingItem, setEditingItem] = useState<CookingHistoryItem | null>(null);
+  const [viewingItem, setViewingItem] = useState<CookingHistoryItem | null>(null);
   const { requestViewRecipe } = useShellNavigation();
   const { selectedSubViews, selectShellLeaf } = useShellSubView();
 
@@ -192,6 +193,11 @@ export function CookingHistoryBoard({ initialHistory, initialInventoryItems, use
   function handleSaved() {
     setEditingItem(null);
     router.refresh();
+  }
+
+  function handleViewEdit(item: CookingHistoryItem) {
+    setViewingItem(null);
+    setEditingItem(item);
   }
 
   return (
@@ -306,6 +312,7 @@ export function CookingHistoryBoard({ initialHistory, initialInventoryItems, use
             <HistoryDateGroup
               items={selectedItems}
               onEdit={setEditingItem}
+              onView={setViewingItem}
               onViewRecipe={requestViewRecipe}
               title={formatCookingDateLabel(selectedDate)}
             />
@@ -345,6 +352,7 @@ export function CookingHistoryBoard({ initialHistory, initialInventoryItems, use
                 items={groupedHistory[key]}
                 key={key}
                 onEdit={setEditingItem}
+                onView={setViewingItem}
                 onViewRecipe={requestViewRecipe}
                 title={formatCookingDateLabel(key)}
               />
@@ -360,6 +368,14 @@ export function CookingHistoryBoard({ initialHistory, initialInventoryItems, use
           onClose={() => setEditingItem(null)}
           onSaved={handleSaved}
           userId={userId}
+        />
+      ) : null}
+
+      {viewingItem ? (
+        <CookingRecordViewModal
+          item={viewingItem}
+          onClose={() => setViewingItem(null)}
+          onEdit={() => handleViewEdit(viewingItem)}
         />
       ) : null}
     </section>
@@ -378,11 +394,13 @@ function SummaryTile({ compact, label, tone, value }: { compact?: boolean; label
 function HistoryDateGroup({
   items,
   onEdit,
+  onView,
   onViewRecipe,
   title
 }: {
   items: CookingHistoryItem[];
   onEdit: (item: CookingHistoryItem) => void;
+  onView: (item: CookingHistoryItem) => void;
   onViewRecipe: (recipeId: string, origin?: "recipes" | "cooking") => void;
   title: string;
 }) {
@@ -399,7 +417,7 @@ function HistoryDateGroup({
               <button className="history-edit-button" onClick={() => onEdit(item)} type="button">
                 編集
               </button>
-              <HistoryPhoto photos={item.photos} recipeName={displayRecipeName(item.recipe_name)} />
+              <HistoryPhoto photos={item.photos} recipeName={displayRecipeName(item.recipe_name)} onView={() => onView(item)} />
               <div className="history-item-body">
                 <div className="history-item-topline">
                   <div>
@@ -452,18 +470,83 @@ function InsightPanel({ green, rows, stars, title }: { green?: boolean; rows: st
   );
 }
 
-function HistoryPhoto({ photos, recipeName }: { photos: CookingHistoryPhoto[]; recipeName: string }) {
-  const photo = photos.find((item) => item.signed_url) ?? photos[0];
+function CookingRecordViewModal({
+  item,
+  onClose,
+  onEdit
+}: {
+  item: CookingHistoryItem;
+  onClose: () => void;
+  onEdit: () => void;
+}) {
+  const visiblePhotos = item.photos.filter((photo) => photo.signed_url);
+  const recipeName = displayRecipeName(item.recipe_name);
+
+  return (
+    <div className="modal-backdrop cooking-record-view-backdrop" role="dialog" aria-modal="true" aria-labelledby="cooking-record-view-heading" onClick={onClose}>
+      <section className="canvas-modal cooking-record-view-modal" onClick={(event) => event.stopPropagation()}>
+        <button className="modal-close-button" aria-label="閉じる" onClick={onClose} type="button">
+          ×
+        </button>
+        <div className="cooking-record-view-header">
+          <span>{formatTimestamp(item.cooked_at)}</span>
+          <h3 id="cooking-record-view-heading">{recipeName}</h3>
+        </div>
+
+        <div className="cooking-record-view-photos" aria-label={`${recipeName}の写真`}>
+          {visiblePhotos.length ? (
+            visiblePhotos.map((photo, index) => (
+              <figure className="cooking-record-view-photo" key={photo.id}>
+                {/* Supabase signed URLs are already scoped and short lived, so Next Image optimization is not needed here. */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={photo.signed_url!} alt={`${recipeName}の完成写真 ${index + 1}`} />
+              </figure>
+            ))
+          ) : (
+            <div className="cooking-record-view-photo-empty">写真なし</div>
+          )}
+        </div>
+
+        <div className="cooking-record-view-meta">
+          <section>
+            <span>評価</span>
+            <div className="history-stars" aria-label={ratingLabel(item.rating)}>
+              {renderStars(item.rating)}
+            </div>
+          </section>
+          <section>
+            <span>コメント</span>
+            <p>{item.note || "感想なし"}</p>
+          </section>
+        </div>
+
+        <div className="cooking-record-view-actions">
+          <button type="button" onClick={onEdit}>
+            編集
+          </button>
+          <button type="button" onClick={onClose}>
+            閉じる
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function HistoryPhoto({ photos, recipeName, onView }: { photos: CookingHistoryPhoto[]; recipeName: string; onView: () => void }) {
+  const visiblePhotos = photos.filter((item) => item.signed_url);
+  const photo = visiblePhotos[0] ?? photos[0];
 
   if (!photo?.signed_url) {
     return <div className="history-photo-empty">写真なし</div>;
   }
 
   return (
-    <div className="history-photo">
+    <button className="history-photo history-photo-button" aria-label={`${recipeName}の写真を表示`} onClick={onView} type="button">
       {/* Supabase signed URLs are already scoped and short lived, so Next Image optimization is not needed here. */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={photo.signed_url} alt={`${recipeName}の完成写真`} />
-    </div>
+      {visiblePhotos.length >= 2 ? <span className="history-photo-count-badge">📷{visiblePhotos.length}</span> : null}
+    </button>
   );
 }

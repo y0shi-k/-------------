@@ -1,7 +1,7 @@
 ---
 id: SPEC-0189-cooking-record-photo-viewer
 title: 料理記録の複数写真 閲覧導線（カード枚数バッジ＋閲覧モーダル）
-status: draft
+status: spec_ready
 scope:
   - 料理・記録（カレンダー/タイムライン）の料理記録カード `cooking-history-board.tsx`
   - 複数写真の枚数バッジ表示と、写真タップで開く読み取り専用の閲覧モーダル（全画像＋評価＋コメント）

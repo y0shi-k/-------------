@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CookingHistoryBoard } from "@/components/cooking-history-board";
 import type { CookingHistoryItem } from "@/lib/cooking-history/types";
@@ -57,6 +57,24 @@ const baseHistory: CookingHistoryItem = {
   photos: []
 };
 
+function buildPhoto(id: string, signedUrl = `https://signed.example/${id}.jpg`) {
+  return {
+    id,
+    user_id: "user-1",
+    bucket_id: "photos",
+    storage_path: `user-1/cooking-history/${id}.jpg`,
+    usage_type: "cooking_history",
+    cooking_history_id: "history-1",
+    content_type: "image/jpeg",
+    byte_size: 100,
+    width: 1024,
+    height: 768,
+    signed_url: signedUrl,
+    created_at: "2026-05-24T10:00:00.000Z",
+    updated_at: "2026-05-24T10:00:00.000Z"
+  };
+}
+
 function renderBoard(props?: Partial<React.ComponentProps<typeof CookingHistoryBoard>>) {
   return render(
     <CookingHistoryBoard
@@ -83,23 +101,7 @@ describe("CookingHistoryBoard", () => {
       initialHistory: [
         {
           ...baseHistory,
-          photos: [
-            {
-              id: "photo-1",
-              user_id: "user-1",
-              bucket_id: "photos",
-              storage_path: "user-1/cooking-history/photo-1.jpg",
-              usage_type: "cooking_history",
-              cooking_history_id: "history-1",
-              content_type: "image/jpeg",
-              byte_size: 100,
-              width: 1024,
-              height: 768,
-              signed_url: "https://signed.example/photo.jpg",
-              created_at: "2026-05-24T10:00:00.000Z",
-              updated_at: "2026-05-24T10:00:00.000Z"
-            }
-          ]
+          photos: [buildPhoto("photo-1", "https://signed.example/photo.jpg")]
         },
         { ...baseHistory, id: "history-2", recipe_id: null, recipe_name: "味噌汁", photos: [] }
       ]
@@ -110,6 +112,43 @@ describe("CookingHistoryBoard", () => {
     expect(screen.getByAltText("カレーの完成写真")).toBeTruthy();
     expect(screen.getByText("味噌汁")).toBeTruthy();
     expect(screen.getAllByText("写真なし").length).toBeGreaterThan(0);
+  });
+
+  it("shows a photo count badge and opens the read-only photo viewer", () => {
+    renderBoard({
+      initialHistory: [
+        {
+          ...baseHistory,
+          photos: [buildPhoto("photo-1"), buildPhoto("photo-2")]
+        }
+      ]
+    });
+
+    expect(screen.getByText("📷2")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "カレーの写真を表示" }));
+
+    const dialog = screen.getByRole("dialog", { name: "カレー" });
+    expect(within(dialog).getAllByAltText(/カレーの完成写真/)).toHaveLength(2);
+    expect(within(dialog).getByLabelText("評価 4/5")).toBeTruthy();
+    expect(within(dialog).getByText("辛さ控えめ")).toBeTruthy();
+  });
+
+  it("moves from the read-only photo viewer to the existing edit modal", () => {
+    renderBoard({
+      initialHistory: [
+        {
+          ...baseHistory,
+          photos: [buildPhoto("photo-1"), buildPhoto("photo-2")]
+        }
+      ]
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "カレーの写真を表示" }));
+    fireEvent.click(within(screen.getByRole("dialog", { name: "カレー" })).getByRole("button", { name: "編集" }));
+
+    expect(screen.getByRole("dialog", { name: "料理記録を編集" })).toBeTruthy();
+    expect(screen.getByText("カレーを編集中")).toBeTruthy();
+    expect(screen.queryByRole("dialog", { name: "カレー" })).toBeNull();
   });
 
   it("filters history and switches calendar and analysis views", () => {
