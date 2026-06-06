@@ -613,6 +613,26 @@ describe("RecipeMealWorkspace", () => {
     expect(await screen.findByText("献立を 肉じゃが に変更しました。")).toBeTruthy();
   });
 
+  it("shows every scheduled meal in the same day and meal type slot", () => {
+    const otherRecipe: Recipe = { ...baseRecipe, id: "recipe-2", name: "肉じゃが" };
+    const sameSlotSchedule: MealSchedule = {
+      ...baseSchedule,
+      id: "schedule-2",
+      recipe_id: "recipe-2",
+      recipe_name: "肉じゃが"
+    };
+
+    renderWorkspace({
+      initialMealSchedules: [baseSchedule, sameSlotSchedule],
+      initialRecipes: [baseRecipe, otherRecipe]
+    });
+    openScheduleView();
+
+    const scheduleBoard = screen.getByLabelText("7日献立");
+    expect(within(scheduleBoard).getByRole("button", { name: "カレー の操作" })).toBeTruthy();
+    expect(within(scheduleBoard).getByRole("button", { name: "肉じゃが の操作" })).toBeTruthy();
+  });
+
   it("moves a scheduled meal to another slot via drag and drop", async () => {
     const movedSchedule: MealSchedule = { ...baseSchedule, scheduled_on: "2026-05-26", meal_type: "朝" };
     const scheduleUpdate = updateSingleQuery(movedSchedule);

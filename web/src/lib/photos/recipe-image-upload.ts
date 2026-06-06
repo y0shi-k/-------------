@@ -12,6 +12,8 @@ import { buildRecipeImageStoragePath, imageExtensionFromContentType, type Compre
 import { PHOTOS_BUCKET } from "@/lib/photos/user-image";
 
 type StorageBucketApi = {
+  copy?: (fromPath: string, toPath: string) => Promise<{ error: { message: string } | null }>;
+  download?: (path: string) => Promise<{ data: Blob | null; error: { message: string } | null }>;
   upload: (path: string, body: Blob, options?: { contentType?: string; upsert?: boolean }) => Promise<{ error: { message: string } | null }>;
   remove: (paths: string[]) => Promise<{ error: { message: string } | null }>;
 };
@@ -43,6 +45,43 @@ const DB_UPDATE_ERROR =
   "原因: レシピ画像の保存先をDBへ反映できませんでした。影響: アップロードした画像が表示されません。修正方法: 画面を再読み込みし、もう一度保存してください。";
 const DB_CLEAR_ERROR =
   "原因: レシピ画像の削除をDBへ反映できませんでした。影響: 画像が残ったままになります。修正方法: 画面を再読み込みし、もう一度削除してください。";
+const COPY_ERROR =
+  "原因: 過去の完成写真をコピーできませんでした。影響: レシピ画像は登録されません。修正方法: 通信状態を確認して、もう一度選び直してください。";
+
+function extensionFromStoragePath(storagePath: string) {
+  const rawExtension = storagePath.split(".").pop()?.toLowerCase() ?? "";
+  return ["jpg", "jpeg", "png", "webp"].includes(rawExtension) ? (rawExtension === "jpeg" ? "jpg" : rawExtension) : "webp";
+}
+
+export async function copyPhotoStorageObject(
+  client: RecipeImageClient,
+  params: { contentType?: string | null; fromPath: string; toPath: string }
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const bucket = client.storage.from(PHOTOS_BUCKET);
+  if (bucket.copy) {
+    const { error } = await bucket.copy(params.fromPath, params.toPath);
+    if (!error) return { ok: true };
+  }
+
+  if (!bucket.download) {
+    return { ok: false, error: COPY_ERROR };
+  }
+
+  const { data, error: downloadError } = await bucket.download(params.fromPath);
+  if (downloadError || !data) {
+    return { ok: false, error: COPY_ERROR };
+  }
+
+  const { error: uploadError } = await bucket.upload(params.toPath, data, {
+    contentType: params.contentType || data.type || "image/jpeg",
+    upsert: false
+  });
+  if (uploadError) {
+    return { ok: false, error: COPY_ERROR };
+  }
+
+  return { ok: true };
+}
 
 /**
  * 画像をアップロードし、`recipes.image_storage_path` を更新する。
@@ -73,6 +112,42 @@ export async function uploadRecipeImage(
     .eq("user_id", userId);
   if (updateError) {
     // DB 更新に失敗したので、いまアップロードした孤児 object を後始末する（残しても表示には使われない）。
+    await client.storage.from(PHOTOS_BUCKET).remove([storagePath]);
+    return { ok: false, error: DB_UPDATE_ERROR };
+  }
+
+  let staleRemovalFailed = false;
+  if (previousPath && previousPath !== storagePath) {
+    const { error: removeError } = await client.storage.from(PHOTOS_BUCKET).remove([previousPath]);
+    staleRemovalFailed = Boolean(removeError);
+  }
+
+  return { ok: true, storagePath, staleRemovalFailed };
+}
+
+export async function setRecipeImageFromCandidate(
+  client: RecipeImageClient,
+  params: { userId: string; recipeId: string; candidatePath: string; candidateContentType?: string | null; previousPath?: string | null }
+): Promise<RecipeImageUploadResult> {
+  const { userId, recipeId, candidatePath, candidateContentType, previousPath } = params;
+  const extension = candidateContentType ? imageExtensionFromContentType(candidateContentType) : extensionFromStoragePath(candidatePath);
+  const storagePath = buildRecipeImageStoragePath(userId, recipeId, extension);
+
+  const copyResult = await copyPhotoStorageObject(client, {
+    contentType: candidateContentType,
+    fromPath: candidatePath,
+    toPath: storagePath
+  });
+  if (!copyResult.ok) {
+    return { ok: false, error: copyResult.error };
+  }
+
+  const { error: updateError } = await client
+    .from("recipes")
+    .update({ image_storage_path: storagePath })
+    .eq("id", recipeId)
+    .eq("user_id", userId);
+  if (updateError) {
     await client.storage.from(PHOTOS_BUCKET).remove([storagePath]);
     return { ok: false, error: DB_UPDATE_ERROR };
   }

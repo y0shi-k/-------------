@@ -1,7 +1,7 @@
 ---
 id: TKT-0178-meal-schedule-uncomplete-and-delete-rollback
 title: 献立の完了解除・完了済み削除（在庫と料理履歴の巻き戻し・確認つき）＋全カード×ボタン
-status: implementation_ready
+status: compleated
 goal: 完了にした献立を「調理していない状態」へ安全に戻せるようにし、完了時に減らした在庫と作成した料理履歴を正しく巻き戻す。誤操作による在庫ズレ・履歴汚染を防ぐ。
 acceptance:
   - 7日スケジュールの完了済みカードのスロットメニューに「完了を外す」ボタンが表示される（status="完了"のときだけ）。

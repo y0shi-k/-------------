@@ -4,6 +4,7 @@ import { type ChangeEvent, FormEvent, type ReactNode, useCallback, useEffect, us
 import { useRouter } from "next/navigation";
 import { DeleteConfirmPanel } from "@/components/delete-confirm-panel";
 import { NumberField } from "@/components/number-field";
+import { PhotoCandidatePicker } from "@/components/photo-candidate-picker";
 import { UnitPicker } from "@/components/unit-picker";
 import { RecipeThumb } from "@/components/ui/recipe-thumb";
 import { useShellAiUsage, useShellNavigation, useShellStatusMessage, useShellSubView, type RecipeShellLeaf } from "@/components/web-mode-shell";
@@ -27,8 +28,10 @@ import { loadUserGeminiApiKey } from "@/lib/ai/user-gemini-api-key";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import { buildCookingHistoryPhotoStoragePath, compressImageFile, compressRecipeImageFile } from "@/lib/photos/compress";
 import { computeRollbackQuantityUpdates, type RollbackConsumptionEvent } from "@/lib/cooking-history/rollback";
-import { deleteRecipeImage, uploadRecipeImage } from "@/lib/photos/recipe-image-upload";
+import { copyPhotoStorageObject, deleteRecipeImage, setRecipeImageFromCandidate, uploadRecipeImage } from "@/lib/photos/recipe-image-upload";
+import { useCookingPhotoCandidates, type CookingPhotoCandidate } from "@/lib/photos/use-cooking-photo-candidates";
 import { useRecipeImageUrls } from "@/lib/photos/use-recipe-image-urls";
+import { PHOTOS_BUCKET } from "@/lib/photos/user-image";
 
 type RecipeMealWorkspaceProps = {
   initialCookCandidates: CookCandidate[];
@@ -84,6 +87,7 @@ type CookingStepTab = "all" | "prep" | "steps";
 type ShortageSelectionTab = "all" | "ingredients" | "seasonings";
 type CookingViewerOrigin = "recipes" | "cooking";
 type ConsumptionTab = "all" | "食材" | "調味料";
+type PhotoCandidatePickerTarget = "recipe-image" | "cooking-photo";
 
 const mealTypes: MealType[] = ["朝", "昼", "晩", "その他"];
 const scheduleMealTypes: MealType[] = ["朝", "昼", "晩"];
@@ -268,6 +272,7 @@ export function RecipeMealWorkspace({
   const [editingRecipeImageUrl, setEditingRecipeImageUrl] = useState<string | null>(null);
   // 新規選択した画像ファイル（保存時にアップロードする。未保存の状態）。
   const [recipeImageFile, setRecipeImageFile] = useState<File | null>(null);
+  const [recipeImageCandidate, setRecipeImageCandidate] = useState<CookingPhotoCandidate | null>(null);
   // 新規選択画像のプレビュー（object URL）。
   const [recipeImagePreviewUrl, setRecipeImagePreviewUrl] = useState<string | null>(null);
   // 既存画像を削除する操作を選んだか（保存時に Storage/DB から消す）。
@@ -292,6 +297,7 @@ export function RecipeMealWorkspace({
   const [consumptionDrafts, setConsumptionDrafts] = useState<ConsumptionDraft[]>([]);
   const [consumptionTab, setConsumptionTab] = useState<ConsumptionTab>("all");
   const [selectedCookingPhoto, setSelectedCookingPhoto] = useState<File | null>(null);
+  const [selectedCookingPhotoCandidate, setSelectedCookingPhotoCandidate] = useState<CookingPhotoCandidate | null>(null);
   const [cookingPhotoPreviewUrl, setCookingPhotoPreviewUrl] = useState<string | null>(null);
   const [cookingRating, setCookingRating] = useState("");
   const [cookingComment, setCookingComment] = useState("");
@@ -311,6 +317,7 @@ export function RecipeMealWorkspace({
   const [isTextImportOpen, setIsTextImportOpen] = useState(false);
   const [isAiMenuOpen, setIsAiMenuOpen] = useState(false);
   const [isRecipeEditorOpen, setIsRecipeEditorOpen] = useState(false);
+  const [photoCandidatePickerTarget, setPhotoCandidatePickerTarget] = useState<PhotoCandidatePickerTarget | null>(null);
   const [shortageSelectionItems, setShortageSelectionItems] = useState<RecipeShoppingShortage[]>([]);
   const [shortageSelectionTab, setShortageSelectionTab] = useState<ShortageSelectionTab>("all");
   const [shortageSelectionRecipeName, setShortageSelectionRecipeName] = useState("");
@@ -330,6 +337,11 @@ export function RecipeMealWorkspace({
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
   // 一覧・詳細・候補で使うユーザー登録画像の署名付きURL（recipe.id -> url）。
   const recipeImageUrls = useRecipeImageUrls(recipes, supabase);
+  const {
+    candidates: cookingPhotoCandidates,
+    error: cookingPhotoCandidatesError,
+    loading: cookingPhotoCandidatesLoading
+  } = useCookingPhotoCandidates(supabase, userId);
   const { aiUsageSummary, refreshAiUsage } = useShellAiUsage();
   const recipeLimitReached = Boolean(
     aiUsageSummary?.ok && (aiUsageSummary.recipe_generation.remaining <= 0 || aiUsageSummary.total.remaining <= 0)
@@ -388,6 +400,7 @@ export function RecipeMealWorkspace({
       return null;
     });
     setRecipeImageFile(null);
+    setRecipeImageCandidate(null);
     setRecipeImageRemoved(false);
     if (recipeImageInputRef.current) {
       recipeImageInputRef.current.value = "";
@@ -418,7 +431,36 @@ export function RecipeMealWorkspace({
       return URL.createObjectURL(file);
     });
     setRecipeImageFile(file);
+    setRecipeImageCandidate(null);
     setRecipeImageRemoved(false);
+  }
+
+  function choosePhotoCandidate(candidate: CookingPhotoCandidate) {
+    if (photoCandidatePickerTarget === "recipe-image") {
+      setRecipeImagePreviewUrl((current) => {
+        if (current) URL.revokeObjectURL(current);
+        return null;
+      });
+      setRecipeImageFile(null);
+      setRecipeImageRemoved(false);
+      setRecipeImageCandidate(candidate);
+      if (recipeImageInputRef.current) {
+        recipeImageInputRef.current.value = "";
+      }
+      setPhotoCandidatePickerTarget(null);
+      return;
+    }
+
+    if (photoCandidatePickerTarget === "cooking-photo") {
+      if (cookingPhotoPreviewUrl) URL.revokeObjectURL(cookingPhotoPreviewUrl);
+      setSelectedCookingPhoto(null);
+      setCookingPhotoPreviewUrl(null);
+      setSelectedCookingPhotoCandidate(candidate);
+      if (cookingPhotoInputRef.current) {
+        cookingPhotoInputRef.current.value = "";
+      }
+      setPhotoCandidatePickerTarget(null);
+    }
   }
 
   function removeRecipeImage() {
@@ -664,6 +706,7 @@ export function RecipeMealWorkspace({
   function resetCookingPhoto() {
     if (cookingPhotoPreviewUrl) URL.revokeObjectURL(cookingPhotoPreviewUrl);
     setSelectedCookingPhoto(null);
+    setSelectedCookingPhotoCandidate(null);
     setCookingPhotoPreviewUrl(null);
     if (cookingPhotoInputRef.current) {
       cookingPhotoInputRef.current.value = "";
@@ -698,6 +741,7 @@ export function RecipeMealWorkspace({
 
     if (cookingPhotoPreviewUrl) URL.revokeObjectURL(cookingPhotoPreviewUrl);
     setSelectedCookingPhoto(file);
+    setSelectedCookingPhotoCandidate(null);
     setCookingPhotoPreviewUrl(URL.createObjectURL(file));
   }
 
@@ -938,6 +982,20 @@ export function RecipeMealWorkspace({
     recipeId: string,
     currentImagePath: string | null
   ): Promise<{ ok: true; imagePath: string | null; staleRemovalFailed: boolean } | { ok: false; error: string }> {
+    if (recipeImageCandidate) {
+      const result = await setRecipeImageFromCandidate(supabase, {
+        userId,
+        recipeId,
+        candidatePath: recipeImageCandidate.storagePath,
+        candidateContentType: recipeImageCandidate.contentType,
+        previousPath: currentImagePath
+      });
+      if (!result.ok) {
+        return { ok: false, error: `${result.error}（レシピ本文は保存済みです）` };
+      }
+      return { ok: true, imagePath: result.storagePath, staleRemovalFailed: result.staleRemovalFailed };
+    }
+
     // 新規画像を選んでいる場合: 圧縮 → アップロード → DB 更新（差し替え時は旧 object を削除）。
     if (recipeImageFile) {
       let compressed;
@@ -1559,11 +1617,38 @@ export function RecipeMealWorkspace({
     }
 
     let photoWarning = "";
-    if (selectedCookingPhoto) {
+    if (selectedCookingPhotoCandidate) {
+      const storagePath = buildCookingHistoryPhotoStoragePath(userId);
+      const copyResult = await copyPhotoStorageObject(supabase, {
+        contentType: selectedCookingPhotoCandidate.contentType,
+        fromPath: selectedCookingPhotoCandidate.storagePath,
+        toPath: storagePath
+      });
+      if (!copyResult.ok) {
+        photoWarning = "過去の完成写真のコピーに失敗しました。料理履歴は写真なしで保存済みです。";
+      } else {
+        const { error: photoInsertError } = await supabase.from("photos").insert({
+          user_id: userId,
+          bucket_id: PHOTOS_BUCKET,
+          storage_path: storagePath,
+          usage_type: "cooking_history",
+          cooking_history_id: String(historyData.id),
+          content_type: selectedCookingPhotoCandidate.contentType,
+          byte_size: selectedCookingPhotoCandidate.byteSize,
+          width: selectedCookingPhotoCandidate.width,
+          height: selectedCookingPhotoCandidate.height
+        });
+
+        if (photoInsertError) {
+          await supabase.storage.from(PHOTOS_BUCKET).remove([storagePath]);
+          photoWarning = "写真情報の保存に失敗しました。料理履歴は写真なしで保存済みです。";
+        }
+      }
+    } else if (selectedCookingPhoto) {
       try {
         const compressed = await compressImageFile(selectedCookingPhoto);
         const storagePath = buildCookingHistoryPhotoStoragePath(userId);
-        const { error: uploadError } = await supabase.storage.from("photos").upload(storagePath, compressed.blob, {
+        const { error: uploadError } = await supabase.storage.from(PHOTOS_BUCKET).upload(storagePath, compressed.blob, {
           contentType: compressed.contentType,
           upsert: false
         });
@@ -1573,7 +1658,7 @@ export function RecipeMealWorkspace({
         } else {
           const { error: photoInsertError } = await supabase.from("photos").insert({
             user_id: userId,
-            bucket_id: "photos",
+            bucket_id: PHOTOS_BUCKET,
             storage_path: storagePath,
             usage_type: "cooking_history",
             cooking_history_id: String(historyData.id),
@@ -1584,7 +1669,7 @@ export function RecipeMealWorkspace({
           });
 
           if (photoInsertError) {
-            await supabase.storage.from("photos").remove([storagePath]);
+            await supabase.storage.from(PHOTOS_BUCKET).remove([storagePath]);
             photoWarning = "写真情報の保存に失敗しました。料理履歴は写真なしで保存済みです。";
           }
         }
@@ -1617,6 +1702,17 @@ export function RecipeMealWorkspace({
         <div className="app-toast" data-tone={toast.tone} role="status" aria-live="polite">
           {toast.message}
         </div>
+      ) : null}
+
+      {photoCandidatePickerTarget ? (
+        <PhotoCandidatePicker
+          candidates={cookingPhotoCandidates}
+          error={cookingPhotoCandidatesError}
+          loading={cookingPhotoCandidatesLoading}
+          onClose={() => setPhotoCandidatePickerTarget(null)}
+          onSelect={choosePhotoCandidate}
+          title={photoCandidatePickerTarget === "recipe-image" ? "レシピ画像に使う完成写真" : "料理記録に使う完成写真"}
+        />
       ) : null}
 
       {activeCookingRecipe ? (
@@ -1699,15 +1795,23 @@ export function RecipeMealWorkspace({
                     type="file"
                   />
                 </label>
-                {cookingPhotoPreviewUrl ? (
+                <button
+                  className="secondary-button compact-button"
+                  type="button"
+                  disabled={isSaving}
+                  onClick={() => setPhotoCandidatePickerTarget("cooking-photo")}
+                >
+                  過去の完成写真から選ぶ
+                </button>
+                {cookingPhotoPreviewUrl || selectedCookingPhotoCandidate?.signedUrl ? (
                   <div className="photo-preview">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img alt="完成写真のプレビュー" src={cookingPhotoPreviewUrl} />
+                    <img alt="完成写真のプレビュー" src={cookingPhotoPreviewUrl ?? selectedCookingPhotoCandidate?.signedUrl ?? ""} />
                   </div>
                 ) : (
                   <p className="photo-empty">写真なしでも完了できます。</p>
                 )}
-                {selectedCookingPhoto ? (
+                {selectedCookingPhoto || selectedCookingPhotoCandidate ? (
                   <button className="secondary-button compact-button" type="button" onClick={resetCookingPhoto} disabled={isSaving}>
                     写真を外す
                   </button>
@@ -1879,7 +1983,9 @@ export function RecipeMealWorkspace({
                 disabled={isSaving}
                 inputRef={recipeImageInputRef}
                 previewUrl={
-                  recipeImagePreviewUrl
+                  recipeImageCandidate?.signedUrl
+                    ? recipeImageCandidate.signedUrl
+                    : recipeImagePreviewUrl
                     ? recipeImagePreviewUrl
                     : !recipeImageRemoved
                       ? // 署名付きURLは非同期に揃うため、最新の Map を優先しつつ開始時スナップショットへフォールバック。
@@ -1888,9 +1994,11 @@ export function RecipeMealWorkspace({
                 }
                 recipeName={recipeValues.name}
                 removalPending={recipeImageRemoved && Boolean(editingRecipeImagePath)}
+                selectedCandidate={Boolean(recipeImageCandidate)}
                 selectedFileName={recipeImageFile?.name ?? null}
-                showCancel={Boolean(recipeImageFile || recipeImageRemoved)}
+                showCancel={Boolean(recipeImageFile || recipeImageRemoved || recipeImageCandidate)}
                 onCancel={cancelRecipeImageChange}
+                onOpenCandidatePicker={() => setPhotoCandidatePickerTarget("recipe-image")}
                 onRemove={removeRecipeImage}
                 onSelect={selectRecipeImage}
               />
@@ -2407,12 +2515,11 @@ export function RecipeMealWorkspace({
                     </div>
                     <div className="schedule-day-slots">
                       {scheduleMealTypes.map((mealType) => {
-                        const schedule = daySchedules.find((item) => item.meal_type === mealType);
-                        const isSelected = Boolean(schedule) && selectedSchedule?.id === schedule?.id;
+                        const slotSchedules = daySchedules.filter((item) => item.meal_type === mealType);
                         return (
                           <div
                             className="schedule-slot"
-                            data-empty={!schedule}
+                            data-empty={slotSchedules.length === 0}
                             key={`${day}-${mealType}`}
                             onDragOver={(event) => {
                               event.preventDefault();
@@ -2444,8 +2551,11 @@ export function RecipeMealWorkspace({
                                 ＋
                               </button>
                             </div>
-                            {schedule ? (
+                            {slotSchedules.map((schedule) => {
+                              const isSelected = selectedSchedule?.id === schedule.id;
+                              return (
                               <article
+                                key={schedule.id}
                                 className="schedule-meal-card"
                                 data-active={isSelected}
                                 data-done={schedule.status === "完了"}
@@ -2488,7 +2598,8 @@ export function RecipeMealWorkspace({
                                   </span>
                                 </button>
                               </article>
-                            ) : null}
+                              );
+                            })}
                           </div>
                         );
                       })}
@@ -3282,9 +3393,11 @@ function RecipeImagePicker({
   previewUrl,
   recipeName,
   removalPending,
+  selectedCandidate,
   selectedFileName,
   showCancel,
   onCancel,
+  onOpenCandidatePicker,
   onRemove,
   onSelect
 }: {
@@ -3293,9 +3406,11 @@ function RecipeImagePicker({
   previewUrl: string | null;
   recipeName: string;
   removalPending: boolean;
+  selectedCandidate: boolean;
   selectedFileName: string | null;
   showCancel: boolean;
   onCancel: () => void;
+  onOpenCandidatePicker: () => void;
   onRemove: () => void;
   onSelect: (event: ChangeEvent<HTMLInputElement>) => void;
 }) {
@@ -3323,6 +3438,9 @@ function RecipeImagePicker({
           {selectLabel}
           <input accept="image/*" disabled={disabled} onChange={onSelect} ref={inputRef} type="file" />
         </label>
+        <button className="secondary-button compact-button" disabled={disabled} onClick={onOpenCandidatePicker} type="button">
+          過去の完成写真から選ぶ
+        </button>
         {hasPreview ? (
           <button className="danger-button compact-button" disabled={disabled} onClick={onRemove} type="button">
             画像を削除
@@ -3335,6 +3453,7 @@ function RecipeImagePicker({
         ) : null}
       </div>
       {selectedFileName ? <p className="recipe-image-hint">選択中: {selectedFileName}（保存時に圧縮して登録します）</p> : null}
+      {selectedCandidate ? <p className="recipe-image-hint">過去の完成写真を選択中です。保存時にコピーして登録します。</p> : null}
       {removalPending ? <p className="recipe-image-hint">現在の画像を削除します。保存すると反映されます。</p> : null}
     </div>
   );
