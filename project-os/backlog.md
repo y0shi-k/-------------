@@ -16,6 +16,10 @@
 - 公開前セキュリティ整備（TKT-0149/0150/0151）が一段落。次は本番Supabase/Vercelへの適用・手動確認（→「次にやる候補」P1）。
 
 ## 次にやる候補（優先度つき・要ユーザー確認）
+0e. (新規イニシアチブ・2026-06-06 /breakdown 展開／依存順) **スマホ画面のレイアウト崩れ解消**。PC中心編集でスマホ未調整→テスト時に崩れる件への対応。全🟢非危険（CSS中心、`web/src/app/globals.css` ＋一部 `inventory-board.tsx`。schema/auth/Storage/AI/CSV 無変更）。eval=`pwa_mobile_ui`。主BP=`@media (max-width: 719px)`。方針確定: 対象=全画面の横はみ出しも網羅／「固定」=sticky追従で常時表示。3 TKT（+ SPEC-0184/0185/0186 新設）:
+   - **TKT-0184（土台・先行必須）**: スマホ横はみ出し（overflow）の一掃。`.consumption-row-controls`(min-width220px)/`.cooking-filter-row`(5列)/`.conversion-row`(固定列)/各種グリッドのスマホBP整備＋overflow-xガード。← これを先に。
+   - TKT-0185: 食材管理の食材名行の文字重なり修正（スマホで `.item-main h4` white-space:normal × `.item-title-row` flex-wrap でバッジと重なる）。TKT-0184依存。
+   - TKT-0186: 主要操作ボタンの sticky 固定（上部＋ボタン／手動追加の「在庫に追加」下部／全モーダルの「×」右上）。TKT-0184依存。
 0d. (新規イニシアチブ・2026-06-06 /breakdown 展開) **写真エリアへのドラッグ&ドロップ登録**（SPEC-0181）。現状4箇所すべてクリック/タップ選択のみ→PCでファイルをエリアにドロップ登録できるようにする。全🟢非危険（UIのみ・既存圧縮/アップロード経路を再利用、Storage/schema/auth無変更）。`photo_upload_storage` eval は写真語彙で過剰マッチ＝report記録運用（TKT-0169/0177同方針）。依存順3チケット:
    - **TKT-0181（土台・先行必須）**: 共通フック `useImageFileDrop`＋画像ファイル抽出の純関数（単体テスト）＋レシピ画像エリア(`RecipeImagePicker`)へ適用＋ドラッグ時ハイライトCSS。← これを先に完了させる。
    - TKT-0182: 食材画像エリア（inventory-board.tsx）へ適用（単一画像）。TKT-0181依存。
