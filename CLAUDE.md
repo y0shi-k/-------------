@@ -15,7 +15,9 @@
 
 ## ワークフロー（Claude Code Skills）
 
-- `/new-ticket` … `.agents/templates/ticket.md` から次番 TKT を雛形生成（着手前に `project-os/backlog.md` の「次」を見る）。
+- `/plan-initiative` … （plan mode で使う）要望を対話で詰め、複数チケットへの**ラフな分割案**を作る。`ExitPlanMode` で構成を承認させる。新機能・大きめ変更の入口。
+- `/breakdown` … `/plan-initiative` で承認済みの分割案を、別セッション/Codex が迷わず実装できる粒度の**詳細 TKT へ連番展開**（依存順に採番、`/new-ticket` 相当の中身）。
+- `/new-ticket` … `.agents/templates/ticket.md` から次番 TKT を雛形生成（着手前に `project-os/backlog.md` の「次」を見る）。単票で足りる軽い変更はこちら。
 - `/implement [TKT-xxxx]` … 危険度に応じ Opus(impl-deep)/Sonnet(impl-fast) に振り分けて実装 → verify → check-gates。
 - `/verify [TKT-xxxx]` … Web版の lint/typecheck/test/build + policy チェックを実行し `verify.json` を残す。
 - `/check-gates [TKT-xxxx]` … git diff から required_evals を自動判定し、未閉の phase gate を表示。

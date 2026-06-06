@@ -19,7 +19,12 @@ description: チケットの完了成果物（report.md、危険変更時はrevi
 6. **ナレッジ層を更新する**:
    - `project-os/knowledge/decisions.md` に今回の決定（決定/理由/却下案/次に確認）を追記（重要な判断があった場合）。
    - 踏んだ地雷・再発防止があれば `project-os/knowledge/learnings.md` に追記。
-   - `project-os/backlog.md` の「現在のフォーカス」「次にやる候補」を更新（完了項目を外し、次を繰り上げ）。
+   - **完了ログ**: `project-os/knowledge/changelog.md` の最新月の先頭に**1行**追記する:
+     `- TKT-xxxx — <一言要約>（残: 実機スモーク等があれば）`。詳細は report.md が正本なので書きすぎない。
+   - **backlog 更新（肥大化させない）**:
+     - `project-os/backlog.md` の「現在のフォーカス」から**完了した当該行を削除**する（changelog へ移したので残さない）。
+     - 「現在のフォーカス」は**進行中（in_progress）／判断待ちのみ**・各1〜2行に保つ。完了サマリをここに置かない。
+     - 「次にやる候補」を必要に応じ繰り上げる。
 7. ticket を完了状態にする。**直接 front-matter を書き換えず、ヘルパーを使う**:
    ```bash
    harness/bin/ticket_status.py <TKT> completed

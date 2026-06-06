@@ -66,8 +66,25 @@ if [ -d supabase/migrations ]; then
   fi
 fi
 
+# 4) backlog.md「現在のフォーカス」の肥大化チェック（警告止まり・OVERALL に影響しない）
+#    完了サマリの残留や長文化を検知する。完了は knowledge/changelog.md へ1行で移し、フォーカスは進行中のみに保つ。
+POLICY_BACKLOG="skip"; BACKLOG_NOTE=""
+BACKLOG_FILE="project-os/backlog.md"
+if [ -f "$BACKLOG_FILE" ]; then
+  FOCUS="$(awk '/^## 現在のフォーカス/{f=1;next} /^## /{f=0} f' "$BACKLOG_FILE")"
+  DONE_CNT="$(printf '%s\n' "$FOCUS" | grep -c '完了' || true)"
+  MAXLEN="$(printf '%s\n' "$FOCUS" | awk 'BEGIN{m=0}{if(length>m)m=length}END{print m+0}')"
+  if [ "${DONE_CNT:-0}" -gt 2 ] || [ "${MAXLEN:-0}" -gt 800 ]; then
+    POLICY_BACKLOG="warn"
+    BACKLOG_NOTE="現在のフォーカスに「完了」行 ${DONE_CNT} 件 / 最長 ${MAXLEN} バイト。完了は knowledge/changelog.md へ1行移し、フォーカスは進行中のみ・各行を短く保つ。"
+  else
+    POLICY_BACKLOG="pass"
+  fi
+fi
+
 # --- emit verify.json -----------------------------------------------------
 export TKT OVERALL LINT TYPECHECK TEST BUILD POLICY_GAS POLICY_SECRET POLICY_RLS RLS_NOTE GAS_HITS SECRET_HITS REPO_ROOT
+export POLICY_BACKLOG BACKLOG_NOTE
 
 ARTIFACT_PATH=""
 if [ -n "$TKT" ]; then
@@ -98,11 +115,13 @@ data = {
         "no_gas_dependency": os.environ["POLICY_GAS"],
         "no_hardcoded_secret": os.environ["POLICY_SECRET"],
         "supabase_rls_present": os.environ["POLICY_RLS"],
+        "backlog_focus_lean": os.environ.get("POLICY_BACKLOG", "skip"),
     },
     "details": {
         "gas_hits": lines(os.environ.get("GAS_HITS")),
         "secret_hits": lines(os.environ.get("SECRET_HITS")),
         "rls_note": os.environ.get("RLS_NOTE") or "",
+        "backlog_note": os.environ.get("BACKLOG_NOTE") or "",
     },
     "note": "Canvas版 app.html は凍結・参照専用のため verify 対象外。",
 }
