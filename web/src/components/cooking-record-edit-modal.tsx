@@ -6,6 +6,7 @@ import type { ConsumptionEditDraft, CookingConsumptionEvent, CookingHistoryItem,
 import type { StockItem } from "@/lib/inventory/types";
 import type { RecipeIngredient } from "@/lib/recipes/types";
 import { buildCookingHistoryPhotoStoragePath, compressImageFile } from "@/lib/photos/compress";
+import { useImageFileDrop } from "@/lib/photos/use-image-file-drop";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 
 type Feedback = {
@@ -35,6 +36,16 @@ export function CookingRecordEditModal({ inventoryItems, item, onClose, onSaved,
   const [newPhotos, setNewPhotos] = useState<File[]>([]);
   const [consumptionTab, setConsumptionTab] = useState<ConsumptionTab>("all");
   const [isRebuiltFromRecipe, setIsRebuiltFromRecipe] = useState(false);
+  const [newPhotoPreviews, setNewPhotoPreviews] = useState<string[]>([]);
+
+  // 新規追加写真のサムネ用 objectURL を生成し、差し替え/取り消し/破棄で必ず解放する（リーク防止）。
+  useEffect(() => {
+    const urls = newPhotos.map((file) => URL.createObjectURL(file));
+    setNewPhotoPreviews(urls);
+    return () => {
+      urls.forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, [newPhotos]);
 
   useEffect(() => {
     let mounted = true;
@@ -119,15 +130,29 @@ export function CookingRecordEditModal({ inventoryItems, item, onClose, onSaved,
     setDeletedPhotoIds((current) => (current.includes(photoId) ? current.filter((id) => id !== photoId) : [...current, photoId]));
   }
 
+  // 削除予定にした既存写真をすべて復元する（確認ダイアログは出さず、誤操作の救済導線）。
+  function restoreDeletedPhotos() {
+    setDeletedPhotoIds([]);
+  }
+
+  // 完成写真の追加（input選択・ファイルドロップの共通経路）。複数画像を受け付ける。
+  function addNewPhotos(files: File[]) {
+    const images = files.filter((file) => file.type.startsWith("image/"));
+    if (images.length === 0) return;
+    setNewPhotos((current) => [...current, ...images]);
+  }
+
   function handleNewPhotosChange(event: ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(event.target.files ?? []).filter((file) => file.type.startsWith("image/"));
-    setNewPhotos((current) => [...current, ...files]);
+    addNewPhotos(Array.from(event.target.files ?? []));
     event.target.value = "";
   }
 
   function removeNewPhoto(index: number) {
     setNewPhotos((current) => current.filter((_, currentIndex) => currentIndex !== index));
   }
+
+  // 完成写真エリアのファイルD&D＋クリックでアクティブ化してのCtrl+V貼り付け（いずれも複数対応）。クリック選択は従来どおり。
+  const newPhotoDrop = useImageFileDrop({ disabled: isSaving, onFiles: addNewPhotos });
 
   async function saveRecord() {
     const normalizedDrafts = drafts.map((draft) => ({ ...draft, consumedAmount: Number(draft.amount) }));
@@ -347,9 +372,25 @@ export function CookingRecordEditModal({ inventoryItems, item, onClose, onSaved,
             </div>
           </div>
 
-          <ExistingPhotoList deletedPhotoIds={deletedPhotoIds} photos={item.photos} onToggleDeleted={toggleDeletedPhoto} />
+          <ExistingPhotoList
+            deletedPhotoIds={deletedPhotoIds}
+            disabled={isSaving}
+            photos={item.photos}
+            onRestoreDeleted={restoreDeletedPhotos}
+            onToggleDeleted={toggleDeletedPhoto}
+          />
 
-          <div className="cooking-photo-picker">
+          <div
+            className="cooking-photo-picker photo-drop-area"
+            data-dragging-over={newPhotoDrop.isDraggingOver}
+            data-active={newPhotoDrop.isActive}
+            aria-label="完成写真"
+            {...newPhotoDrop.dragHandlers}
+            {...newPhotoDrop.pasteAreaProps}
+          >
+            <small className="photo-paste-hint" data-active={newPhotoDrop.isActive} aria-live="polite">
+              {newPhotoDrop.isActive ? "クリップボードから貼り付け可（Ctrl+V）" : "クリックすると Ctrl+V で貼り付けできます"}
+            </small>
             <label className="photo-file-button">
               完成写真を撮る / 選ぶ
               <input accept="image/*" capture="environment" disabled={isSaving} multiple onChange={handleNewPhotosChange} type="file" />
@@ -357,11 +398,27 @@ export function CookingRecordEditModal({ inventoryItems, item, onClose, onSaved,
             {item.photos.length === 0 && newPhotos.length === 0 ? <p className="photo-empty">写真なしでも完了できます。</p> : null}
           </div>
           {newPhotos.length ? (
-            <div className="new-photo-list">
+            <div className="photo-thumb-grid new-photo-list" aria-label="追加する写真">
               {newPhotos.map((photo, index) => (
-                <button className="secondary-button compact-button" disabled={isSaving} key={`${photo.name}-${index}`} onClick={() => removeNewPhoto(index)} type="button">
-                  {photo.name} を取り消す
-                </button>
+                <div className="photo-thumb" key={`${photo.name}-${index}`}>
+                  {newPhotoPreviews[index] ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img alt={`追加する写真 ${index + 1}（${photo.name}）`} src={newPhotoPreviews[index]} />
+                  ) : (
+                    <span className="photo-thumb-fallback" aria-hidden="true">
+                      画像
+                    </span>
+                  )}
+                  <button
+                    className="photo-thumb-remove"
+                    disabled={isSaving}
+                    onClick={() => removeNewPhoto(index)}
+                    type="button"
+                    aria-label={`${photo.name} を取り消す`}
+                  >
+                    ×
+                  </button>
+                </div>
               ))}
             </div>
           ) : null}
@@ -525,10 +582,14 @@ function ConsumptionEditList({
 
 function ExistingPhotoList({
   deletedPhotoIds,
+  disabled,
+  onRestoreDeleted,
   onToggleDeleted,
   photos
 }: {
   deletedPhotoIds: string[];
+  disabled: boolean;
+  onRestoreDeleted: () => void;
   onToggleDeleted: (photoId: string) => void;
   photos: CookingHistoryPhoto[];
 }) {
@@ -536,22 +597,47 @@ function ExistingPhotoList({
     return <p className="empty-list">既存写真はありません。</p>;
   }
 
+  // 削除予定（×を押した写真）はグリッドから即非表示にし、確定時に実削除する。
+  const visiblePhotos = photos.filter((photo) => !deletedPhotoIds.includes(photo.id));
+  const deletedCount = photos.length - visiblePhotos.length;
+
   return (
-    <div className="existing-photo-list" aria-label="既存写真">
-      {photos.map((photo) => {
-        const deleted = deletedPhotoIds.includes(photo.id);
-        return (
-          <button data-deleted={deleted} key={photo.id} onClick={() => onToggleDeleted(photo.id)} type="button">
-            {photo.signed_url ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img alt="既存の料理写真" src={photo.signed_url} />
-            ) : (
-              <span>写真</span>
-            )}
-            <strong>{deleted ? "削除を取り消す" : "削除"}</strong>
+    <div className="existing-photo-block">
+      {visiblePhotos.length ? (
+        <div className="photo-thumb-grid existing-photo-list" aria-label="既存写真">
+          {visiblePhotos.map((photo) => (
+            <div className="photo-thumb" key={photo.id}>
+              {photo.signed_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img alt="既存の料理写真" src={photo.signed_url} />
+              ) : (
+                <span className="photo-thumb-fallback" aria-hidden="true">
+                  写真
+                </span>
+              )}
+              <button
+                className="photo-thumb-remove"
+                disabled={disabled}
+                onClick={() => onToggleDeleted(photo.id)}
+                type="button"
+                aria-label="この写真を削除"
+              >
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="empty-list">表示できる既存写真はありません。</p>
+      )}
+      {deletedCount > 0 ? (
+        <p className="photo-deleted-note" aria-live="polite">
+          削除予定 {deletedCount}件（確定で削除）
+          <button className="photo-restore-button" disabled={disabled} onClick={onRestoreDeleted} type="button">
+            元に戻す
           </button>
-        );
-      })}
+        </p>
+      ) : null}
     </div>
   );
 }

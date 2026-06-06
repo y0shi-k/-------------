@@ -4613,60 +4613,122 @@ h1 {
   width: fit-content;
 }
 
+/* 完成写真エリアのファイルD&Dハイライト（recipe-image-field と同じトーン）。 */
+.photo-drop-area {
+  padding: 10px;
+  border: 1px dashed transparent;
+  border-radius: 16px;
+  transition: border-color 0.16s ease, background-color 0.16s ease;
+}
+
+.photo-drop-area[data-dragging-over="true"] {
+  border-color: #38bdf8;
+  background: #f0f9ff;
+}
+
+.photo-drop-area:focus {
+  outline: none;
+}
+
+/* クリックでアクティブ化＝Ctrl+V 貼り付け可の状態（recipe-image-field と同トーン）。 */
+.photo-drop-area[data-active="true"] {
+  border-color: #38bdf8;
+  border-style: solid;
+  background: #f0f9ff;
+  box-shadow: 0 0 0 3px rgb(56 189 248 / 18%);
+}
+
 .cooking-record-panel .photo-preview img {
   max-height: 240px;
 }
 
-.existing-photo-list {
+.existing-photo-block {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
   gap: 8px;
 }
 
-.existing-photo-list button {
+/* 既存写真・新規追加写真で共有するサムネグリッド。各サムネ右上に×ボタンを重ねる。 */
+.photo-thumb-grid {
   display: grid;
-  gap: 6px;
+  grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+  gap: 8px;
+}
+
+.photo-thumb {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
   border: 1px solid #dbe4f0;
   border-radius: 8px;
-  background: #fff;
-  padding: 8px;
-  color: #475569;
+  overflow: hidden;
+  background: #f1f5f9;
+}
+
+.photo-thumb img,
+.photo-thumb-fallback {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+  object-fit: cover;
+  color: #94a3b8;
+  font-size: 0.74rem;
+  font-weight: 800;
+}
+
+.photo-thumb-remove {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: rgb(15 23 42 / 62%);
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 900;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.photo-thumb-remove:hover {
+  background: rgb(190 18 60 / 88%);
+}
+
+.photo-thumb-remove:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.photo-deleted-note {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  color: #be123c;
   font-size: 0.76rem;
   font-weight: 800;
 }
 
-.existing-photo-list button[data-deleted="true"] {
-  border-color: #fecdd3;
+.photo-restore-button {
+  border: 1px solid #fecdd3;
+  border-radius: 999px;
   background: #fff1f2;
   color: #be123c;
-}
-
-.existing-photo-list img,
-.existing-photo-list span {
-  display: grid;
-  width: 100%;
-  aspect-ratio: 1;
-  place-items: center;
-  border-radius: 6px;
-  background: #f1f5f9;
-  object-fit: cover;
-}
-
-.new-photo-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.new-photo-list button {
-  min-height: 34px;
-  border: 1px solid #dbe4f0;
-  border-radius: 999px;
-  background: #fff;
-  color: #475569;
-  padding: 7px 10px;
+  padding: 4px 12px;
   font-size: 0.74rem;
   font-weight: 800;
+  cursor: pointer;
+}
+
+.photo-restore-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .cooking-rating-picker {

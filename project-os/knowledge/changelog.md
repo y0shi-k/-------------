@@ -7,6 +7,8 @@
 
 ## 2026-06
 
+- TKT-0188 — 料理記録 編集モーダルの写真UI改善（既存写真をサムネ右上×で確認なし削除予定化＝実削除は確定時・キャンセルで残る・「削除予定N件（元に戻す）」で救済、新規写真はファイル名→サムネ表示＋×取り消し、objectURLは useEffect クリーンアップで解放）。実差分は Storage/schema 無変更（既存削除/追加経路の再利用）。残: 実機での削除/復元・サムネ・スマホ幅目視。
+- TKT-0183 — 料理完成写真2エリア（調理完了フローの料理記録パネル／料理記録の編集モーダル・複数対応）へファイルD&D登録＋Ctrl+V貼り付け（TKT-0187整合の追補）を適用（共通フック `useImageFileDrop` の `pasteAreaProps`/`isActive` も再利用、`handleNewPhotosChange` を `addNewPhotos(File[])` に分離、ハイライト/アクティブCSS追加）。実差分は Storage/schema 無変更（既存圧縮・`photos` 登録経路の再利用）。残: 実機でのPCドロップ/貼り付け目視。
 - TKT-0187 — 画像エリアのクリックフォーカス＋クリップボード貼り付け（Ctrl+V）対応（共通フック `useImageFileDrop` に `onPaste`/フォーカス管理を追加・アクティブ時のみ貼り付け＝ページ全体のCtrl+Vを奪わない・既存画像の差し替えも対応）。実差分は Storage/schema 無変更。残: 実機での Ctrl+V 貼り付け目視。
 - TKT-0176 — 食材画像の登録・差し替え・削除UI（同名食材の記憶／`user_ingredient_images` 新設・個別在庫画像優先の表示順）。危険変更（photo_upload_storage/auth_and_rls_policy）。残: 実機スモーク（圧縮品質・スマホUI・クロスユーザー拒否）。
 - TKT-0177 — AI構造化でURL込み本文のリンク消失を修正（AIのsource優先＋structureで空なら本文から `https?://` 正規表現抽出のフォールバック、共通部品 `RecipeSourceLinks`）。残: 実機での貼付→保存→リンク表示の目視。

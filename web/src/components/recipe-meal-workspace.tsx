@@ -732,10 +732,7 @@ export function RecipeMealWorkspace({
     resetCookingRecordDraft();
   }
 
-  function selectCookingPhoto(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0] ?? null;
-    if (!file) return;
-
+  function applyCookingPhotoFile(file: File) {
     if (!file.type.startsWith("image/")) {
       resetCookingRecordDraft();
       setFeedback({
@@ -749,6 +746,18 @@ export function RecipeMealWorkspace({
     setSelectedCookingPhoto(file);
     setSelectedCookingPhotoCandidate(null);
     setCookingPhotoPreviewUrl(URL.createObjectURL(file));
+  }
+
+  function selectCookingPhoto(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0] ?? null;
+    if (!file) return;
+    applyCookingPhotoFile(file);
+  }
+
+  // 料理完成写真エリアへのファイルD&D（複数ドロップ時は先頭1件のみ採用＝既存の単一選択挙動に合わせる）。
+  function handleCookingPhotoDrop(files: File[]) {
+    const file = files[0];
+    if (file) applyCookingPhotoFile(file);
   }
 
   function setVisibleConsumptionAmount(mode: ConsumptionBulkMode) {
@@ -1702,6 +1711,9 @@ export function RecipeMealWorkspace({
     showToast(photoWarning || `${schedule.recipe_name} を調理完了にしました。料理履歴にも記録済みです。`, photoWarning ? "error" : "success");
   }
 
+  // 料理完成写真エリアのドラッグ&ドロップ＋クリックでアクティブ化してのCtrl+V貼り付け（クリック選択は従来どおり）。
+  const cookingPhotoDrop = useImageFileDrop({ disabled: isSaving, onFiles: handleCookingPhotoDrop });
+
   return (
     <section className="recipe-meal-workspace" aria-labelledby="recipe-meal-heading">
       {toast ? (
@@ -1789,7 +1801,17 @@ export function RecipeMealWorkspace({
                   <h4>写真・評価・コメント</h4>
                 </div>
               </div>
-              <div className="cooking-photo-picker">
+              <div
+                className="cooking-photo-picker photo-drop-area"
+                data-dragging-over={cookingPhotoDrop.isDraggingOver}
+                data-active={cookingPhotoDrop.isActive}
+                aria-label="完成写真"
+                {...cookingPhotoDrop.dragHandlers}
+                {...cookingPhotoDrop.pasteAreaProps}
+              >
+                <small className="photo-paste-hint" data-active={cookingPhotoDrop.isActive} aria-live="polite">
+                  {cookingPhotoDrop.isActive ? "クリップボードから貼り付け可（Ctrl+V）" : "クリックすると Ctrl+V で貼り付けできます"}
+                </small>
                 <label className="photo-file-button">
                   完成写真を撮る / 選ぶ
                   <input

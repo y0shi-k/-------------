@@ -1,7 +1,7 @@
 ---
 id: TKT-0183-photo-drop-cooking-photos
 title: 料理完成写真エリアへドラッグ&ドロップ登録を適用（複数対応）
-status: implementation_ready
+status: completed
 goal: 料理完成写真の2エリア（レシピ編集内・料理記録モーダル）で画像ファイルのドラッグ&ドロップ登録を可能にする。料理記録モーダルは複数画像のドロップに対応する（TKT-0181の共通基盤を流用）。
 acceptance:
   - レシピ編集内の料理完成写真エリア（recipe-meal-workspace.tsx）に画像をドロップすると、既存のクリック選択と同じ圧縮→プレビュー→保存フローが走る
@@ -18,6 +18,7 @@ eval_selection_mode: auto
 changed_paths:
   - web/src/components/recipe-meal-workspace.tsx
   - web/src/components/cooking-record-edit-modal.tsx
+  - web/src/__tests__/cooking-record-edit-modal.test.tsx
   - web/src/app/globals.css
   - project-os/artifacts/TKT-0183-photo-drop-cooking-photos/
 required_gates:
