@@ -7,6 +7,7 @@
 
 ## 2026-06
 
+- TKT-0187 — 画像エリアのクリックフォーカス＋クリップボード貼り付け（Ctrl+V）対応（共通フック `useImageFileDrop` に `onPaste`/フォーカス管理を追加・アクティブ時のみ貼り付け＝ページ全体のCtrl+Vを奪わない・既存画像の差し替えも対応）。実差分は Storage/schema 無変更。残: 実機での Ctrl+V 貼り付け目視。
 - TKT-0176 — 食材画像の登録・差し替え・削除UI（同名食材の記憶／`user_ingredient_images` 新設・個別在庫画像優先の表示順）。危険変更（photo_upload_storage/auth_and_rls_policy）。残: 実機スモーク（圧縮品質・スマホUI・クロスユーザー拒否）。
 - TKT-0177 — AI構造化でURL込み本文のリンク消失を修正（AIのsource優先＋structureで空なら本文から `https?://` 正規表現抽出のフォールバック、共通部品 `RecipeSourceLinks`）。残: 実機での貼付→保存→リンク表示の目視。
 - TKT-0175 — 食材標準画像カタログ（自作SVG標準アイコン＋表記ゆれ吸収 resolver、未対応食材は絵文字フォールバック）。

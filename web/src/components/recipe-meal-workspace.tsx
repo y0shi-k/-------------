@@ -29,6 +29,7 @@ import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import { buildCookingHistoryPhotoStoragePath, compressImageFile, compressRecipeImageFile } from "@/lib/photos/compress";
 import { computeRollbackQuantityUpdates, type RollbackConsumptionEvent } from "@/lib/cooking-history/rollback";
 import { copyPhotoStorageObject, deleteRecipeImage, setRecipeImageFromCandidate, uploadRecipeImage } from "@/lib/photos/recipe-image-upload";
+import { useImageFileDrop } from "@/lib/photos/use-image-file-drop";
 import { useCookingPhotoCandidates, type CookingPhotoCandidate, type CookingPhotoCandidateClient } from "@/lib/photos/use-cooking-photo-candidates";
 import { useRecipeImageUrls } from "@/lib/photos/use-recipe-image-urls";
 import { PHOTOS_BUCKET } from "@/lib/photos/user-image";
@@ -416,9 +417,7 @@ export function RecipeMealWorkspace({
     clearRecipeImageDraft();
   }
 
-  function selectRecipeImage(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0] ?? null;
-    event.target.value = "";
+  function setRecipeImageDraftFromFile(file: File | null) {
     if (!file) return;
     if (!file.type.startsWith("image/")) {
       setFeedback({
@@ -434,6 +433,12 @@ export function RecipeMealWorkspace({
     setRecipeImageFile(file);
     setRecipeImageCandidate(null);
     setRecipeImageRemoved(false);
+  }
+
+  function selectRecipeImage(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0] ?? null;
+    event.target.value = "";
+    setRecipeImageDraftFromFile(file);
   }
 
   function choosePhotoCandidate(candidate: CookingPhotoCandidate) {
@@ -2001,6 +2006,7 @@ export function RecipeMealWorkspace({
                 onCancel={cancelRecipeImageChange}
                 onOpenCandidatePicker={() => setPhotoCandidatePickerTarget("recipe-image")}
                 onRemove={removeRecipeImage}
+                onDropFiles={(files) => setRecipeImageDraftFromFile(files[0] ?? null)}
                 onSelect={selectRecipeImage}
               />
 
@@ -3399,6 +3405,7 @@ function RecipeImagePicker({
   showCancel,
   onCancel,
   onOpenCandidatePicker,
+  onDropFiles,
   onRemove,
   onSelect
 }: {
@@ -3412,17 +3419,32 @@ function RecipeImagePicker({
   showCancel: boolean;
   onCancel: () => void;
   onOpenCandidatePicker: () => void;
+  onDropFiles: (files: File[]) => void;
   onRemove: () => void;
   onSelect: (event: ChangeEvent<HTMLInputElement>) => void;
 }) {
   const hasPreview = Boolean(previewUrl);
   const selectLabel = hasPreview ? "画像を差し替える" : "画像を選ぶ";
+  const { dragHandlers, pasteAreaProps, isActive, isDraggingOver } = useImageFileDrop({
+    disabled,
+    onFiles: onDropFiles
+  });
 
   return (
-    <div className="recipe-image-field" aria-label="レシピ画像">
+    <div
+      className="recipe-image-field"
+      data-dragging-over={isDraggingOver}
+      data-active={isActive}
+      aria-label="レシピ画像"
+      {...dragHandlers}
+      {...pasteAreaProps}
+    >
       <div className="recipe-image-field-heading">
         <span>レシピ画像</span>
         <small>カードや詳細に表示されます（任意）</small>
+        <small className="photo-paste-hint" data-active={isActive} aria-live="polite">
+          {isActive ? "クリップボードから貼り付け可（Ctrl+V）" : "クリックすると Ctrl+V で貼り付けできます"}
+        </small>
       </div>
       <div className="recipe-image-preview">
         {hasPreview && previewUrl ? (

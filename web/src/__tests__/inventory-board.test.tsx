@@ -305,6 +305,37 @@ describe("InventoryBoard", () => {
     expect(await screen.findByText("在庫に追加しました。")).toBeTruthy();
   });
 
+  it("previews the first dropped ingredient image", () => {
+    renderBoard();
+    openManualAdd();
+
+    const firstImage = new File(["first"], "first.jpg", { type: "image/jpeg" });
+    const secondImage = new File(["second"], "second.png", { type: "image/png" });
+    const editor = document.querySelector(".ingredient-image-editor");
+
+    expect(editor).toBeTruthy();
+    fireEvent.dragOver(editor as Element, {
+      dataTransfer: {
+        dropEffect: "",
+        files: [firstImage, secondImage],
+        types: ["Files"]
+      }
+    });
+    expect(editor?.getAttribute("data-dragging-over")).toBe("true");
+
+    fireEvent.drop(editor as Element, {
+      dataTransfer: {
+        dropEffect: "",
+        files: [firstImage, secondImage],
+        types: ["Files"]
+      }
+    });
+
+    expect(URL.createObjectURL).toHaveBeenCalledWith(firstImage);
+    expect(screen.getByAltText("選択した食材画像のプレビュー")).toBeTruthy();
+    expect(editor?.getAttribute("data-dragging-over")).toBe("false");
+  });
+
   it("shows inventory insert errors inside the modal and logs details for debugging", async () => {
     const dbError = { code: "42703", message: "column inventory_items.unit_conversion does not exist" };
     const single = vi.fn().mockResolvedValue({ data: null, error: dbError });

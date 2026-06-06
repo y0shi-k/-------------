@@ -27,6 +27,7 @@ import {
   compressIngredientImageFile,
   imageExtensionFromContentType
 } from "@/lib/photos/compress";
+import { useImageFileDrop } from "@/lib/photos/use-image-file-drop";
 import { createUserImageSignedUrl, PHOTOS_BUCKET } from "@/lib/photos/user-image";
 import { normalizeIngredientImageName, resolveUserIngredientImage, type UserIngredientImage } from "@/lib/ui/ingredient-image";
 
@@ -240,6 +241,18 @@ export function InventoryBoard({
   const scanLimitReached = Boolean(
     aiUsageSummary?.ok && (aiUsageSummary.ingredient_scan.remaining <= 0 || aiUsageSummary.total.remaining <= 0)
   );
+  const {
+    dragHandlers: ingredientImageDragHandlers,
+    pasteAreaProps: ingredientImagePasteAreaProps,
+    isActive: isIngredientImageActive,
+    isDraggingOver: isIngredientImageDraggingOver
+  } = useImageFileDrop({
+    disabled: isSaving,
+    onFiles: (files) => {
+      const file = files[0] ?? null;
+      if (file) selectIngredientImageFile(file);
+    }
+  });
 
   useEffect(() => {
     setGeminiApiKey(loadUserGeminiApiKey());
@@ -551,10 +564,7 @@ export function InventoryBoard({
     setPhotoFeedback({ tone: "info", message: "写真を選びました。内容を確認してから保存してください。" });
   }
 
-  function selectIngredientImage(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0] ?? null;
-    if (!file) return;
-
+  function selectIngredientImageFile(file: File) {
     if (!file.type.startsWith("image/")) {
       resetIngredientImageSelection();
       setFeedback({
@@ -570,6 +580,12 @@ export function InventoryBoard({
     setRemoveInventoryImageOnSave(false);
     setRemoveUserNameImageOnSave(false);
     setFeedback({ tone: "info", message: "画像を選びました。保存するとこの食材に反映します。" });
+  }
+
+  function selectIngredientImage(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0] ?? null;
+    if (!file) return;
+    selectIngredientImageFile(file);
   }
 
   function imageUrlForItem(item: StockItem) {
@@ -1057,7 +1073,14 @@ export function InventoryBoard({
               品名
               <input value={values.name} onChange={(event) => updateValue("name", event.target.value)} placeholder="例: 牛乳" />
             </label>
-            <section className="ingredient-image-editor" aria-label="食材画像">
+            <section
+              className="ingredient-image-editor"
+              aria-label="食材画像"
+              data-dragging-over={isIngredientImageDraggingOver}
+              data-active={isIngredientImageActive}
+              {...ingredientImageDragHandlers}
+              {...ingredientImagePasteAreaProps}
+            >
               <div className="ingredient-image-preview">
                 {ingredientImagePreviewUrl ? (
                   <>
@@ -1137,6 +1160,11 @@ export function InventoryBoard({
                 ) : (
                   <p className="ingredient-image-note">画像は非公開Storageへ保存します。公開URLは保存しません。</p>
                 )}
+                <p className="photo-paste-hint ingredient-image-paste-hint" data-active={isIngredientImageActive} aria-live="polite">
+                  {isIngredientImageActive
+                    ? "クリップボードから貼り付け可（Ctrl+V）"
+                    : "画像エリアをクリックすると Ctrl+V で貼り付けできます"}
+                </p>
               </div>
             </section>
             <div className="form-row two-columns">

@@ -6448,6 +6448,27 @@ h1 {
   border-radius: 12px;
   background: #f8fafc;
   padding: 14px;
+  transition:
+    background 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.ingredient-image-editor[data-dragging-over="true"] {
+  border-style: dashed;
+  border-color: #4f46e5;
+  background: #eef0ff;
+  box-shadow: 0 0 0 3px rgb(79 70 229 / 12%);
+}
+
+.ingredient-image-editor:focus {
+  outline: none;
+}
+
+.ingredient-image-editor[data-active="true"] {
+  border-color: #4f46e5;
+  background: #eef0ff;
+  box-shadow: 0 0 0 3px rgb(79 70 229 / 18%);
 }
 
 .ingredient-image-preview {
@@ -6739,6 +6760,41 @@ h1 {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  width: fit-content;
+  max-width: 100%;
+  padding: 10px;
+  border: 1px dashed transparent;
+  border-radius: 16px;
+  transition: border-color 0.16s ease, background-color 0.16s ease;
+}
+
+.recipe-image-field[data-dragging-over="true"] {
+  border-color: #38bdf8;
+  background: #f0f9ff;
+}
+
+.recipe-image-field:focus {
+  outline: none;
+}
+
+.recipe-image-field[data-active="true"] {
+  border-color: #38bdf8;
+  border-style: solid;
+  background: #f0f9ff;
+  box-shadow: 0 0 0 3px rgb(56 189 248 / 18%);
+}
+
+/* クリックでアクティブ化したエリアに表示する貼り付け案内。アクティブ時のみ強調する。 */
+.photo-paste-hint {
+  margin: 0;
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.photo-paste-hint[data-active="true"] {
+  color: #0284c7;
 }
 
 .recipe-image-field-heading {
