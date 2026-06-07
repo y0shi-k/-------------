@@ -866,6 +866,7 @@ describe("RecipeMealWorkspace", () => {
     await waitFor(() => {
       expect(from).toHaveBeenCalledWith("meal_schedules");
       expect(scheduleUpdate.update).toHaveBeenCalledWith({ scheduled_on: "2026-05-26", meal_type: "朝" });
+      expect(refresh).toHaveBeenCalled();
     });
     expect(await screen.findByText("カレー を 2026/05/26 朝 へ移動しました。")).toBeTruthy();
   });
@@ -885,6 +886,7 @@ describe("RecipeMealWorkspace", () => {
     await waitFor(() => {
       expect(from).toHaveBeenCalledWith("meal_schedules");
       expect(scheduleDelete.deleteRows).toHaveBeenCalled();
+      expect(refresh).toHaveBeenCalled();
     });
     expect(await screen.findByText("カレー を献立から削除しました。")).toBeTruthy();
   });
@@ -977,6 +979,7 @@ describe("RecipeMealWorkspace", () => {
       expect(consumptionDelete.deleteRows).toHaveBeenCalled();
       expect(historyDelete.deleteRows).toHaveBeenCalled();
       expect(scheduleDelete.deleteRows).toHaveBeenCalled();
+      expect(refresh).toHaveBeenCalled();
     });
     expect(await screen.findByText("カレー を献立から削除しました。")).toBeTruthy();
     expect(within(screen.getByLabelText("7日献立")).queryByText("カレー")).toBeNull();

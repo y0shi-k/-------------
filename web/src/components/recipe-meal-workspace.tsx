@@ -1575,6 +1575,7 @@ export function RecipeMealWorkspace({
     }
 
     setMealSchedules((items) => items.map((item) => (item.id === schedule.id ? (data as MealSchedule) : item)));
+    router.refresh();
   }
 
   // お気に入りの切替（TKT-0167）。moveScheduleToSlot 同様、まず画面を即時反転（楽観的更新）し、
@@ -1679,6 +1680,7 @@ export function RecipeMealWorkspace({
       const nextSchedule = mealSchedules.find((item) => item.id !== schedule.id);
       setSelectedScheduleId(nextSchedule?.id ?? "");
     }
+    router.refresh();
     setFeedback({ tone: "info", message: `${schedule.recipe_name || "献立"} を献立から削除しました。` });
   }
 
