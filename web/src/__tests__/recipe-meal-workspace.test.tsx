@@ -172,6 +172,24 @@ function updateEqQuery(error: unknown = null) {
   return { update, eqId, eqUser };
 }
 
+function updateTripleEqQuery(error: unknown = null) {
+  const eqUser = vi.fn().mockResolvedValue({ error });
+  const eqRecipe = vi.fn(() => ({ eq: eqUser }));
+  const eqId = vi.fn(() => ({ eq: eqRecipe }));
+  const update = vi.fn(() => ({ eq: eqId }));
+  return { update, eqId, eqRecipe, eqUser };
+}
+
+function dragDataTransfer() {
+  const values = new Map<string, string>();
+  return {
+    dropEffect: "",
+    effectAllowed: "",
+    getData: vi.fn((key: string) => values.get(key) ?? ""),
+    setData: vi.fn((key: string, value: string) => values.set(key, value))
+  };
+}
+
 function deleteQuery(error: unknown = null) {
   const eqUser = vi.fn().mockResolvedValue({ error });
   const eqRecipe = vi.fn(() => ({ eq: eqUser }));
@@ -232,6 +250,16 @@ describe("RecipeMealWorkspace", () => {
     expect(screen.getByText("玉ねぎ 2個")).toBeTruthy();
     expect(screen.getByText("切る")).toBeTruthy();
     expect(screen.getByText("煮る")).toBeTruthy();
+  });
+
+  it("opens the recipe editor from the cooking detail viewer", () => {
+    renderWorkspace();
+
+    fireEvent.click(screen.getByRole("button", { name: "調理ビューを開く" }));
+    fireEvent.click(screen.getByRole("button", { name: "このレシピを編集" }));
+
+    expect(screen.getByRole("heading", { name: "レシピを編集" })).toBeTruthy();
+    expect((screen.getByLabelText("レシピ名") as HTMLInputElement).value).toBe("カレー");
   });
 
   it("keeps recipe photo placeholders when no static image matches", () => {
@@ -845,7 +873,7 @@ describe("RecipeMealWorkspace", () => {
     const viewerRecipe: Recipe = {
       ...baseRecipe,
       prep_steps: ["玉ねぎを切る"],
-      steps: ["玉ねぎを炒めて醤油を加える"],
+      steps: ["玉ねぎを炒めて醤油 大さじ1を加える"],
       ingredients: [baseIngredient, seasoning]
     };
 
@@ -860,6 +888,7 @@ describe("RecipeMealWorkspace", () => {
     // 在庫トグルで在庫状況（必要量との比較）を表示する。
     fireEvent.click(within(viewer).getByRole("button", { name: "在庫" }));
     expect(within(viewer).getByText("在庫: 1個 / 必要: 2個")).toBeTruthy();
+    expect(within(viewer).getAllByText("2個").length).toBeGreaterThan(0);
 
     // 調味料タブで調味料に絞る。
     fireEvent.click(within(viewer).getByRole("button", { name: /^調味料/ }));
@@ -869,6 +898,8 @@ describe("RecipeMealWorkspace", () => {
     fireEvent.click(within(viewer).getByRole("button", { name: /^調理工程/ }));
     const stepChips = within(viewer).getAllByRole("button", { name: "玉ねぎ" });
     expect(stepChips.length).toBeGreaterThan(0);
+    expect(within(viewer).getAllByText("大さじ1").length).toBeGreaterThan(0);
+    expect(within(viewer).queryByText("1大さじ")).toBeNull();
     fireEvent.click(stepChips[0]);
 
     // 全画面オーバーレイで開き、戻るで閉じられる（Canvas版同様）。
@@ -877,6 +908,117 @@ describe("RecipeMealWorkspace", () => {
     fireEvent.click(within(overlay).getByRole("button", { name: "戻る" }));
     expect(screen.queryByLabelText("調理ビューア")).toBeNull();
     expect(shellMocks.returnToMode).not.toHaveBeenCalled();
+  });
+
+  it("saves cooking step reorder changes back to the recipe", async () => {
+    const recipeUpdate = updateSingleQuery({
+      ...baseRecipe,
+      prep_steps: [],
+      steps: ["煮る", "切る"],
+      updated_at: "2026-05-28T12:30:00.000Z"
+    });
+
+    from.mockImplementation((table: string) => {
+      if (table === "recipes") return { update: recipeUpdate.update };
+      return {};
+    });
+
+    renderWorkspace();
+
+    fireEvent.click(screen.getByRole("button", { name: "調理ビューを開く" }));
+    const overlay = screen.getByRole("dialog", { name: "調理ビューア全画面" });
+
+    const dataTransfer = dragDataTransfer();
+    const prepCard = within(overlay).getByText("切る").closest("article") as HTMLElement;
+    const cookGroup = overlay.querySelectorAll(".cooking-step-group")[1] as HTMLElement;
+    fireEvent.dragStart(prepCard, { dataTransfer });
+    fireEvent.drop(cookGroup, { dataTransfer });
+    fireEvent.click(within(overlay).getByRole("button", { name: "並び替えを確定" }));
+
+    await waitFor(() => {
+      expect(recipeUpdate.update).toHaveBeenCalledWith({
+        prep_steps: [],
+        steps: ["煮る", "切る"]
+      });
+      expect(refresh).toHaveBeenCalled();
+    });
+    expect(await screen.findByText("並び替えを保存しました。")).toBeTruthy();
+  });
+
+  it("saves cooking ingredient reorder changes back to the recipe", async () => {
+    const secondIngredient: RecipeIngredient = {
+      ...baseIngredient,
+      id: "ingredient-2",
+      name: "にんじん",
+      sort_order: 1
+    };
+    const ingredientUpdate = updateTripleEqQuery();
+
+    from.mockImplementation((table: string) => {
+      if (table === "recipe_ingredients") return { update: ingredientUpdate.update };
+      return {};
+    });
+
+    renderWorkspace({ initialRecipes: [{ ...baseRecipe, ingredients: [baseIngredient, secondIngredient] }] });
+
+    fireEvent.click(screen.getByRole("button", { name: "調理ビューを開く" }));
+    const overlay = screen.getByRole("dialog", { name: "調理ビューア全画面" });
+
+    const dataTransfer = dragDataTransfer();
+    const carrotCard = within(overlay).getByText("にんじん").closest("article") as HTMLElement;
+    const onionCard = within(overlay).getByText("玉ねぎ").closest("article") as HTMLElement;
+    fireEvent.dragStart(carrotCard, { dataTransfer });
+    fireEvent.drop(onionCard, { dataTransfer });
+    fireEvent.click(within(overlay).getByRole("button", { name: "並び替えを確定" }));
+
+    await waitFor(() => {
+      expect(ingredientUpdate.update).toHaveBeenCalledWith({ item_type: "食材", sort_order: 0 });
+      expect(ingredientUpdate.update).toHaveBeenCalledWith({ item_type: "食材", sort_order: 1 });
+      expect(refresh).toHaveBeenCalled();
+    });
+    expect(await screen.findByText("並び替えを保存しました。")).toBeTruthy();
+  });
+
+  it("moves ingredients across food and seasoning groups with undo and redo", async () => {
+    const seasoning: RecipeIngredient = {
+      ...baseIngredient,
+      id: "ingredient-seasoning",
+      item_type: "調味料",
+      name: "塩",
+      amount: 1,
+      unit: "小さじ",
+      sort_order: 1
+    };
+    const ingredientUpdate = updateTripleEqQuery();
+
+    from.mockImplementation((table: string) => {
+      if (table === "recipe_ingredients") return { update: ingredientUpdate.update };
+      return {};
+    });
+
+    renderWorkspace({ initialRecipes: [{ ...baseRecipe, ingredients: [baseIngredient, seasoning] }] });
+
+    fireEvent.click(screen.getByRole("button", { name: "調理ビューを開く" }));
+    const overlay = screen.getByRole("dialog", { name: "調理ビューア全画面" });
+    const foodGroup = overlay.querySelectorAll(".cooking-ing-group")[0] as HTMLElement;
+    const seasoningCard = within(overlay).getByText("塩").closest("article") as HTMLElement;
+    const dataTransfer = dragDataTransfer();
+
+    fireEvent.dragStart(seasoningCard, { dataTransfer });
+    fireEvent.drop(foodGroup, { dataTransfer });
+    expect(within(overlay).getByText("塩").closest("article")?.getAttribute("data-changed")).toBe("true");
+
+    fireEvent.click(within(overlay).getByRole("button", { name: "Undo" }));
+    expect(within(overlay).getByText("塩").closest("article")?.getAttribute("data-changed")).toBe("false");
+
+    fireEvent.click(within(overlay).getByRole("button", { name: "Redo" }));
+    fireEvent.click(within(overlay).getByRole("button", { name: "並び替えを確定" }));
+
+    await waitFor(() => {
+      expect(ingredientUpdate.update).toHaveBeenCalledWith({ item_type: "食材", sort_order: 1 });
+      expect(refresh).toHaveBeenCalled();
+    });
+    expect(await screen.findByText("並び替えを保存しました。")).toBeTruthy();
   });
 
   it("renders multiple source URLs as separate links in the cooking overlay", () => {

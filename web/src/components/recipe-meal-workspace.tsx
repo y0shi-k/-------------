@@ -96,10 +96,26 @@ type RecipeSearchMode = "name" | "ingredient" | "all";
 type RecipeSort = "created_desc" | "updated_desc" | "name_asc" | "count_desc" | "ingredients_desc";
 type CookingIngredientTab = "all" | "食材" | "調味料";
 type CookingStepTab = "all" | "prep" | "steps";
+type CookingStepKind = "prep_steps" | "steps";
 type ShortageSelectionTab = "all" | "ingredients" | "seasonings";
 type CookingViewerOrigin = "recipes" | "cooking";
 type ConsumptionTab = "all" | "食材" | "調味料";
 type PhotoCandidatePickerTarget = "recipe-image" | "cooking-photo";
+
+type CookingStepDraft = {
+  id: string;
+  kind: CookingStepKind;
+  text: string;
+};
+
+type CookingIngredientDraft = {
+  ingredient: RecipeIngredient;
+};
+
+type CookingReorderSnapshot = {
+  ingredients: CookingIngredientDraft[];
+  steps: CookingStepDraft[];
+};
 
 function archiveFieldsForCookingQuantity(quantity: number) {
   if (quantity > 0) {
@@ -157,6 +173,46 @@ function stockQuantityDisplay(item: { id: string; unit: string; quantity: number
 function recipeStepRows(value: string) {
   const rows = value.split(/\r?\n/);
   return rows.length > 0 ? rows : [""];
+}
+
+function buildCookingStepDrafts(recipe: Recipe): CookingStepDraft[] {
+  return [
+    ...recipe.prep_steps.map((text, index) => ({ id: `${recipe.id}-prep-${index}-${text}`, kind: "prep_steps" as const, text })),
+    ...recipe.steps.map((text, index) => ({ id: `${recipe.id}-cook-${index}-${text}`, kind: "steps" as const, text }))
+  ];
+}
+
+function buildCookingIngredientDrafts(recipe: Recipe): CookingIngredientDraft[] {
+  return recipe.ingredients
+    .slice()
+    .sort((a, b) => a.sort_order - b.sort_order)
+    .map((ingredient) => ({ ingredient }));
+}
+
+function cloneCookingReorderSnapshot(snapshot: CookingReorderSnapshot): CookingReorderSnapshot {
+  return {
+    ingredients: snapshot.ingredients.map((draft) => ({ ingredient: { ...draft.ingredient } })),
+    steps: snapshot.steps.map((draft) => ({ ...draft }))
+  };
+}
+
+function splitCookingStepDrafts(drafts: CookingStepDraft[]) {
+  return {
+    prep_steps: drafts.filter((draft) => draft.kind === "prep_steps").map((draft) => draft.text),
+    steps: drafts.filter((draft) => draft.kind === "steps").map((draft) => draft.text)
+  };
+}
+
+function sameStringList(left: string[], right: string[]) {
+  return left.length === right.length && left.every((value, index) => value === right[index]);
+}
+
+function sameIngredientOrder(left: CookingIngredientDraft[], right: RecipeIngredient[]) {
+  const sortedRight = right.slice().sort((a, b) => a.sort_order - b.sort_order);
+  return (
+    left.length === sortedRight.length &&
+    left.every((value, index) => value.ingredient.id === sortedRight[index]?.id && value.ingredient.item_type === sortedRight[index]?.item_type)
+  );
 }
 
 function normalizeRecipeForm(values: RecipeFormValues): NormalizedRecipeForm {
@@ -331,6 +387,10 @@ export function RecipeMealWorkspace({
   const [cookingComment, setCookingComment] = useState("");
   const [cookingIngredientTab, setCookingIngredientTab] = useState<CookingIngredientTab>("all");
   const [cookingStepTab, setCookingStepTab] = useState<CookingStepTab>("all");
+  const [cookingStepDrafts, setCookingStepDrafts] = useState<CookingStepDraft[]>([]);
+  const [cookingIngredientDrafts, setCookingIngredientDrafts] = useState<CookingIngredientDraft[]>([]);
+  const [cookingReorderUndoStack, setCookingReorderUndoStack] = useState<CookingReorderSnapshot[]>([]);
+  const [cookingReorderRedoStack, setCookingReorderRedoStack] = useState<CookingReorderSnapshot[]>([]);
   const [cookingStockCheck, setCookingStockCheck] = useState(false);
   const [highlightedIngredientName, setHighlightedIngredientName] = useState("");
   const [aiMode, setAiMode] = useState<AiRecipeMode>("generate");
@@ -378,6 +438,16 @@ export function RecipeMealWorkspace({
 
   const selectedRecipe = recipes.find((recipe) => recipe.id === selectedRecipeId) ?? recipes[0] ?? null;
   const activeCookingRecipe = recipes.find((recipe) => recipe.id === activeCookingRecipeId) ?? null;
+  const cookingStepParts = splitCookingStepDrafts(cookingStepDrafts);
+  const hasCookingStepOrderChanges = Boolean(
+    activeCookingRecipe &&
+      (!sameStringList(cookingStepParts.prep_steps, activeCookingRecipe.prep_steps) ||
+        !sameStringList(cookingStepParts.steps, activeCookingRecipe.steps))
+  );
+  const hasCookingIngredientOrderChanges = Boolean(activeCookingRecipe && !sameIngredientOrder(cookingIngredientDrafts, activeCookingRecipe.ingredients));
+  const hasCookingReorderChanges = hasCookingStepOrderChanges || hasCookingIngredientOrderChanges;
+  const canUndoCookingReorder = cookingReorderUndoStack.length > 0;
+  const canRedoCookingReorder = cookingReorderRedoStack.length > 0;
   const favoriteFilteredRecipes = recipeFavoriteOnly ? recipes.filter((recipe) => recipe.is_favorite) : recipes;
   const visibleRecipes = filterAndSortRecipes(favoriteFilteredRecipes, recipeSearch, recipeSort, recipeSearchMode, recipeSearchLogic);
   const selectedSchedule = mealSchedules.find((schedule) => schedule.id === selectedScheduleId) ?? mealSchedules[0] ?? null;
@@ -725,15 +795,45 @@ export function RecipeMealWorkspace({
     setCookingViewerOrigin(origin);
   }, []);
 
+  useEffect(() => {
+    if (!activeCookingRecipe) {
+      setCookingStepDrafts([]);
+      setCookingIngredientDrafts([]);
+      setCookingReorderUndoStack([]);
+      setCookingReorderRedoStack([]);
+      return;
+    }
+    setCookingStepDrafts(buildCookingStepDrafts(activeCookingRecipe));
+    setCookingIngredientDrafts(buildCookingIngredientDrafts(activeCookingRecipe));
+    setCookingReorderUndoStack([]);
+    setCookingReorderRedoStack([]);
+  }, [activeCookingRecipe]);
+
   function closeCookingViewer() {
     const shouldReturnToCooking = cookingViewerOrigin === "cooking";
     setActiveCookingRecipeId("");
     setCookingScheduleId(null);
     setPendingConsumptionScheduleId(null);
+    setCookingStepDrafts([]);
+    setCookingIngredientDrafts([]);
+    setCookingReorderUndoStack([]);
+    setCookingReorderRedoStack([]);
     setCookingViewerOrigin("recipes");
     if (shouldReturnToCooking) {
       returnToMode("cooking");
     }
+  }
+
+  function editActiveCookingRecipe(recipe: Recipe) {
+    setActiveCookingRecipeId("");
+    setCookingScheduleId(null);
+    setPendingConsumptionScheduleId(null);
+    setCookingStepDrafts([]);
+    setCookingIngredientDrafts([]);
+    setCookingReorderUndoStack([]);
+    setCookingReorderRedoStack([]);
+    setCookingViewerOrigin("recipes");
+    startEditRecipe(recipe);
   }
 
   function resetCookingPhoto() {
@@ -1531,6 +1631,187 @@ export function RecipeMealWorkspace({
     router.refresh();
   }
 
+  function moveCookingStep(draggedId: string, targetKind: CookingStepKind, targetIndex: number) {
+    if (!cookingStepDrafts.some((item) => item.id === draggedId)) return;
+    pushCookingReorderUndo();
+    setCookingStepDrafts((current) => {
+      const dragged = current.find((item) => item.id === draggedId);
+      if (!dragged) return current;
+      const remaining = current.filter((item) => item.id !== draggedId);
+      const prepSteps = remaining.filter((item) => item.kind === "prep_steps");
+      const cookSteps = remaining.filter((item) => item.kind === "steps");
+      const moved = { ...dragged, kind: targetKind };
+      const targetList = targetKind === "prep_steps" ? prepSteps : cookSteps;
+      const insertIndex = Math.max(0, Math.min(targetIndex, targetList.length));
+      targetList.splice(insertIndex, 0, moved);
+      return [...prepSteps, ...cookSteps];
+    });
+  }
+
+  function moveCookingIngredient(draggedId: string, targetType: "食材" | "調味料", targetIndex: number) {
+    if (!cookingIngredientDrafts.some((item) => item.ingredient.id === draggedId)) return;
+    pushCookingReorderUndo();
+    setCookingIngredientDrafts((current) => {
+      const dragged = current.find((item) => item.ingredient.id === draggedId);
+      if (!dragged) return current;
+      const remaining = current.filter((item) => item.ingredient.id !== draggedId);
+      const foods = remaining.filter((item) => item.ingredient.item_type === "食材");
+      const seasonings = remaining.filter((item) => item.ingredient.item_type === "調味料");
+      const moved: CookingIngredientDraft = { ingredient: { ...dragged.ingredient, item_type: targetType } };
+      const targetList = targetType === "食材" ? foods : seasonings;
+      const insertIndex = Math.max(0, Math.min(targetIndex, targetList.length));
+      targetList.splice(insertIndex, 0, moved);
+      return [...foods, ...seasonings];
+    });
+  }
+
+  function currentCookingReorderSnapshot(): CookingReorderSnapshot {
+    return cloneCookingReorderSnapshot({
+      ingredients: cookingIngredientDrafts,
+      steps: cookingStepDrafts
+    });
+  }
+
+  function pushCookingReorderUndo() {
+    const snapshot = currentCookingReorderSnapshot();
+    setCookingReorderUndoStack((current) => [...current.slice(-19), snapshot]);
+    setCookingReorderRedoStack([]);
+  }
+
+  function undoCookingReorder() {
+    const previous = cookingReorderUndoStack.at(-1);
+    if (!previous) return;
+    const current = currentCookingReorderSnapshot();
+    setCookingReorderUndoStack((items) => items.slice(0, -1));
+    setCookingReorderRedoStack((items) => [...items.slice(-19), current]);
+    const restored = cloneCookingReorderSnapshot(previous);
+    setCookingStepDrafts(restored.steps);
+    setCookingIngredientDrafts(restored.ingredients);
+  }
+
+  function redoCookingReorder() {
+    const next = cookingReorderRedoStack.at(-1);
+    if (!next) return;
+    const current = currentCookingReorderSnapshot();
+    setCookingReorderRedoStack((items) => items.slice(0, -1));
+    setCookingReorderUndoStack((items) => [...items.slice(-19), current]);
+    const restored = cloneCookingReorderSnapshot(next);
+    setCookingStepDrafts(restored.steps);
+    setCookingIngredientDrafts(restored.ingredients);
+  }
+
+  async function saveCookingReorder(recipe: Recipe): Promise<boolean> {
+    if (!hasCookingReorderChanges) {
+      showToast("並び替えの変更はありません。", "info");
+      return true;
+    }
+
+    const nextSteps = splitCookingStepDrafts(cookingStepDrafts);
+    const nextIngredients = cookingIngredientDrafts.map((draft, index) => ({ ...draft.ingredient, sort_order: index }));
+    setIsSaving(true);
+    setFeedback(null);
+
+    let savedRecipe: Omit<Recipe, "ingredients"> | null = null;
+
+    if (hasCookingStepOrderChanges) {
+      const { data, error } = await supabase
+        .from("recipes")
+        .update({
+          prep_steps: nextSteps.prep_steps,
+          steps: nextSteps.steps
+        })
+        .eq("id", recipe.id)
+        .eq("user_id", userId)
+        .select()
+        .single();
+
+      if (error || !data) {
+        setIsSaving(false);
+        setFeedback({
+          tone: "error",
+          message: "原因: 手順の並び替えを保存できませんでした。影響: レシピ本体の順番はまだ変わっていません。修正方法: ログイン状態を確認して、もう一度保存してください。"
+        });
+        return false;
+      }
+
+      savedRecipe = data as Omit<Recipe, "ingredients">;
+    }
+
+    if (hasCookingIngredientOrderChanges) {
+      for (const ingredient of nextIngredients) {
+        const { error } = await supabase
+          .from("recipe_ingredients")
+          .update({
+            item_type: ingredient.item_type,
+            sort_order: ingredient.sort_order
+          })
+          .eq("id", ingredient.id)
+          .eq("recipe_id", recipe.id)
+          .eq("user_id", userId);
+
+        if (error) {
+          setIsSaving(false);
+          setFeedback({
+            tone: "error",
+            message: "原因: 材料の並び替えを保存できませんでした。影響: レシピ本体の材料順はまだ変わっていません。修正方法: ログイン状態を確認して、もう一度保存してください。"
+          });
+          return false;
+        }
+      }
+    }
+
+    setIsSaving(false);
+
+    setRecipes((items) =>
+      items.map((item) =>
+        item.id === recipe.id
+          ? {
+              ...item,
+              ingredients: hasCookingIngredientOrderChanges ? nextIngredients : item.ingredients,
+              prep_steps: savedRecipe?.prep_steps ?? item.prep_steps,
+              steps: savedRecipe?.steps ?? item.steps,
+              updated_at: savedRecipe?.updated_at ?? item.updated_at
+            }
+          : item
+      )
+    );
+    setCookingStepDrafts((current) =>
+      current.map((draft, index) => ({
+        ...draft,
+        id: `${recipe.id}-${draft.kind === "prep_steps" ? "prep" : "cook"}-${index}-${draft.text}`
+      }))
+    );
+    setCookingIngredientDrafts(nextIngredients.map((ingredient) => ({ ingredient })));
+    setCookingReorderUndoStack([]);
+    setCookingReorderRedoStack([]);
+    showToast("並び替えを保存しました。", "success");
+    router.refresh();
+    return true;
+  }
+
+  async function completeAfterSavingCookingReorder(schedule: MealSchedule, recipe: Recipe) {
+    const saved = await saveCookingReorder(recipe);
+    if (saved) {
+      await completeSchedule(schedule);
+    }
+  }
+
+  function requestCompleteSchedule(schedule: MealSchedule, recipe: Recipe) {
+    if (!hasCookingReorderChanges) {
+      void completeSchedule(schedule);
+      return;
+    }
+
+    requestDelete(
+      recipe.name,
+      "並び替えがまだ保存されていません。並び替えを保存してから調理完了へ進みますか？",
+      () => {
+        void completeAfterSavingCookingReorder(schedule, recipe);
+      },
+      { confirmLabel: "保存して完了", title: "並び替え確認", tone: "default" }
+    );
+  }
+
   async function completeSchedule(schedule: MealSchedule) {
     if (schedule.status === "完了") {
       setFeedback({ tone: "info", message: "この献立は完了済みです。" });
@@ -1787,35 +2068,59 @@ export function RecipeMealWorkspace({
               <h2>{activeCookingRecipe.name}</h2>
               <RecipeSourceLinks source={activeCookingRecipe.source} />
             </div>
+            <button className="cooking-overlay-edit" type="button" onClick={() => editActiveCookingRecipe(activeCookingRecipe)} aria-label="このレシピを編集">
+              編集
+            </button>
           </header>
 
           <div className="cooking-overlay-body">
             <CookingViewer
               highlightedIngredientName={highlightedIngredientName}
               ingredientTab={cookingIngredientTab}
+              ingredientDrafts={cookingIngredientDrafts}
               inventoryItems={inventoryItemsForMeals}
+              isReorderDirty={hasCookingReorderChanges}
               onHighlightIngredient={setHighlightedIngredientName}
               onIngredientTabChange={setCookingIngredientTab}
+              onMoveIngredient={moveCookingIngredient}
+              onMoveStep={moveCookingStep}
               onStepTabChange={setCookingStepTab}
               onToggleStockCheck={() => setCookingStockCheck((value) => !value)}
               recipe={activeCookingRecipe}
+              stepDrafts={cookingStepDrafts}
               stepTab={cookingStepTab}
               stockCheck={cookingStockCheck}
             />
           </div>
 
-          {cookingSchedule && cookingSchedule.recipe_id === activeCookingRecipe.id ? (
-            <footer className="cooking-overlay-footer">
+          <footer className="cooking-overlay-footer">
+            <div className="cooking-reorder-history-actions" aria-label="並び替え履歴操作">
+              <button className="secondary-button" type="button" disabled={!canUndoCookingReorder || isSaving} onClick={undoCookingReorder}>
+                Undo
+              </button>
+              <button className="secondary-button" type="button" disabled={!canRedoCookingReorder || isSaving} onClick={redoCookingReorder}>
+                Redo
+              </button>
+            </div>
+            <button
+              className="secondary-button cooking-reorder-save-cta"
+              type="button"
+              disabled={isSaving || !hasCookingReorderChanges}
+              onClick={() => void saveCookingReorder(activeCookingRecipe)}
+            >
+              {hasCookingReorderChanges ? "並び替えを確定" : "並び替え保存済み"}
+            </button>
+            {cookingSchedule && cookingSchedule.recipe_id === activeCookingRecipe.id ? (
               <button
                 className="primary-button cooking-complete-cta"
                 type="button"
                 disabled={isSaving || cookingSchedule.status === "完了"}
-                onClick={() => completeSchedule(cookingSchedule)}
+                onClick={() => requestCompleteSchedule(cookingSchedule, activeCookingRecipe)}
               >
                 {cookingSchedule.status === "完了" ? "調理完了済み" : "料理を完了する"}
               </button>
-            </footer>
-          ) : null}
+            ) : null}
+          </footer>
         </div>
       ) : null}
 
@@ -2448,7 +2753,7 @@ export function RecipeMealWorkspace({
               <h3 id="recipe-detail-heading">レシピ詳細</h3>
             </div>
           </div>
-          <RecipeDetail imageUrl={recipeImageUrls.get(selectedRecipe.id) ?? null} recipe={selectedRecipe} />
+          <RecipeDetail imageUrl={recipeImageUrls.get(selectedRecipe.id) ?? null} onEdit={startEditRecipe} recipe={selectedRecipe} />
           <button className="primary-button" type="button" disabled={!selectedRecipe} onClick={() => selectedRecipe && openCookingViewer(selectedRecipe)}>
             調理ビューを開く
           </button>
@@ -3059,14 +3364,30 @@ function ConsumptionEditor({
   );
 }
 
-function chipifyStep(text: string, foodNames: string[], seasoningNames: string[], onHighlight: (name: string) => void) {
-  const names = [
-    ...foodNames.map((name) => ({ name, type: "食材" as const })),
-    ...seasoningNames.map((name) => ({ name, type: "調味料" as const }))
-  ]
+function ingredientAmountText(ingredient: RecipeIngredient) {
+  if (!ingredient.amount) return "";
+  const amount = formatQuantity(ingredient.amount);
+  if (ingredient.unit === "大さじ" || ingredient.unit === "小さじ") return `${ingredient.unit}${amount}`;
+  return `${amount}${ingredient.unit}`;
+}
+
+function hasExplicitAmountAfterName(value: string) {
+  return /^\s*(大さじ|小さじ)\s*[0-9０-９]+(?:[\/／．.][0-9０-９]+)?/.test(value);
+}
+
+function cookingAmountChip(text: string, unit: string, key: string) {
+  return (
+    <span className="cooking-amount-chip" data-unit={unit} key={key}>
+      {text}
+    </span>
+  );
+}
+
+function chipifyStep(text: string, ingredients: RecipeIngredient[], onHighlight: (name: string) => void) {
+  const names = ingredients
+    .map((ingredient) => ({ ingredient, name: ingredient.name, type: ingredient.item_type }))
     .filter((entry) => entry.name)
     .sort((a, b) => b.name.length - a.name.length);
-  if (names.length === 0) return [text];
 
   const nodes: ReactNode[] = [];
   let remaining = text;
@@ -3074,26 +3395,49 @@ function chipifyStep(text: string, foodNames: string[], seasoningNames: string[]
   let guard = 0;
   while (remaining.length > 0 && guard++ < 500) {
     let bestIdx = -1;
-    let bestName: { name: string; type: "食材" | "調味料" } | null = null;
+    let bestName: { ingredient: RecipeIngredient; name: string; type: "食材" | "調味料" } | null = null;
+    let bestAmount: RegExpMatchArray | null = null;
+    const amountMatch = remaining.match(/(大さじ|小さじ)\s*([0-9０-９]+(?:[\/／．.][0-9０-９]+)?)/);
+    if (amountMatch?.index !== undefined) {
+      bestIdx = amountMatch.index;
+      bestAmount = amountMatch;
+    }
     for (const entry of names) {
       const idx = remaining.indexOf(entry.name);
       if (idx !== -1 && (bestIdx === -1 || idx < bestIdx)) {
         bestIdx = idx;
         bestName = entry;
+        bestAmount = null;
       }
     }
-    if (bestIdx === -1 || !bestName) {
+    if (bestIdx === -1) {
       nodes.push(remaining);
       break;
     }
     if (bestIdx > 0) nodes.push(remaining.slice(0, bestIdx));
+    if (bestAmount) {
+      const [matchedText, unit, amount] = bestAmount;
+      nodes.push(cookingAmountChip(`${unit}${amount}`, unit, `amount-${key++}`));
+      remaining = remaining.slice(bestIdx + matchedText.length);
+      continue;
+    }
+    if (!bestName) {
+      nodes.push(remaining.slice(bestIdx, bestIdx + 1));
+      remaining = remaining.slice(bestIdx + 1);
+      continue;
+    }
     const matched = bestName;
+    const nextRemaining = remaining.slice(bestIdx + matched.name.length);
+    const amountText = ingredientAmountText(matched.ingredient);
     nodes.push(
-      <button className="cooking-step-chip" data-type={matched.type} type="button" key={`chip-${key++}`} onClick={() => onHighlight(matched.name)}>
+      <button aria-label={matched.name} className="cooking-step-chip" data-type={matched.type} type="button" key={`chip-${key++}`} onClick={() => onHighlight(matched.name)}>
         {matched.name}
       </button>
     );
-    remaining = remaining.slice(bestIdx + matched.name.length);
+    if (amountText && !hasExplicitAmountAfterName(nextRemaining)) {
+      nodes.push(cookingAmountChip(amountText, matched.ingredient.unit, `registered-amount-${key++}`));
+    }
+    remaining = nextRemaining;
   }
   return nodes;
 }
@@ -3101,23 +3445,33 @@ function chipifyStep(text: string, foodNames: string[], seasoningNames: string[]
 function CookingViewer({
   highlightedIngredientName,
   ingredientTab,
+  ingredientDrafts,
   inventoryItems,
+  isReorderDirty,
   onHighlightIngredient,
   onIngredientTabChange,
+  onMoveIngredient,
+  onMoveStep,
   onStepTabChange,
   onToggleStockCheck,
   recipe,
+  stepDrafts,
   stepTab,
   stockCheck
 }: {
   highlightedIngredientName: string;
   ingredientTab: CookingIngredientTab;
+  ingredientDrafts: CookingIngredientDraft[];
   inventoryItems: StockItem[];
+  isReorderDirty: boolean;
   onHighlightIngredient: (name: string) => void;
   onIngredientTabChange: (tab: CookingIngredientTab) => void;
+  onMoveIngredient: (draggedId: string, targetType: "食材" | "調味料", targetIndex: number) => void;
+  onMoveStep: (draggedId: string, targetKind: CookingStepKind, targetIndex: number) => void;
   onStepTabChange: (tab: CookingStepTab) => void;
   onToggleStockCheck: () => void;
   recipe: Recipe | null;
+  stepDrafts: CookingStepDraft[];
   stepTab: CookingStepTab;
   stockCheck: boolean;
 }) {
@@ -3125,30 +3479,80 @@ function CookingViewer({
     return <p className="empty-list">レシピを選ぶと調理ビューを確認できます。</p>;
   }
 
-  const foods = recipe.ingredients.filter((ingredient) => ingredient.item_type === "食材");
-  const seasonings = recipe.ingredients.filter((ingredient) => ingredient.item_type === "調味料");
-  const foodNames = foods.map((ingredient) => ingredient.name).filter(Boolean);
-  const seasoningNames = seasonings.map((ingredient) => ingredient.name).filter(Boolean);
-  const prepSteps = recipe.prep_steps;
-  const cookSteps = recipe.steps;
+  const foods = ingredientDrafts.filter((draft) => draft.ingredient.item_type === "食材");
+  const seasonings = ingredientDrafts.filter((draft) => draft.ingredient.item_type === "調味料");
+  const prepStepDrafts = stepDrafts.filter((draft) => draft.kind === "prep_steps");
+  const cookStepDrafts = stepDrafts.filter((draft) => draft.kind === "steps");
+  const prepSteps = prepStepDrafts.map((draft) => draft.text);
+  const cookSteps = cookStepDrafts.map((draft) => draft.text);
+  const originalIngredients = recipe.ingredients.slice().sort((a, b) => a.sort_order - b.sort_order);
+  const originalStepDrafts = buildCookingStepDrafts(recipe);
+  const currentIngredients = ingredientDrafts.map((draft) => draft.ingredient);
 
-  const renderIngredientGroup = (label: string, tone: "食材" | "調味料", items: RecipeIngredient[]) => {
+  const ingredientChanged = (ingredient: RecipeIngredient) => {
+    const originalIndex = originalIngredients.findIndex((item) => item.id === ingredient.id);
+    const currentIndex = currentIngredients.findIndex((item) => item.id === ingredient.id);
+    const original = originalIngredients[originalIndex];
+    return originalIndex !== currentIndex || original?.item_type !== ingredient.item_type;
+  };
+
+  const stepChanged = (draft: CookingStepDraft) => {
+    const originalIndex = originalStepDrafts.findIndex((item) => item.id === draft.id);
+    const currentIndex = stepDrafts.findIndex((item) => item.id === draft.id);
+    const original = originalStepDrafts[originalIndex];
+    return originalIndex !== currentIndex || original?.kind !== draft.kind;
+  };
+
+  const renderIngredientGroup = (label: string, tone: "食材" | "調味料", items: CookingIngredientDraft[]) => {
     if (items.length === 0) return null;
     return (
-      <div className="cooking-ing-group" key={label}>
+      <div
+        className="cooking-ing-group"
+        key={label}
+        onDragOver={(event) => event.preventDefault()}
+        onDrop={(event) => {
+          event.preventDefault();
+          const draggedId = event.dataTransfer.getData("text/plain");
+          if (draggedId) onMoveIngredient(draggedId, tone, items.length);
+        }}
+      >
         <p className="cooking-ing-group-label" data-tone={tone}>{label}</p>
-        {items.map((ingredient) => {
+        {items.map((draft, index) => {
+          const ingredient = draft.ingredient;
           const stockAmount = inventoryAmountByNameAndUnit(inventoryItems, ingredient.name, ingredient.unit);
           const isShortage = ingredient.amount > 0 && stockAmount < ingredient.amount;
-          const amountText = [ingredient.amount, ingredient.unit].filter(Boolean).join("");
+          const amountText = ingredientAmountText(ingredient);
           return (
             <article
               className="cooking-ing-card"
+              draggable
               data-detailed={stockCheck}
+              data-changed={ingredientChanged(ingredient)}
               data-shortage={stockCheck && isShortage}
               data-highlight={highlightedIngredientName === ingredient.name}
               key={ingredient.id || ingredient.name}
+              onDragStart={(event) => {
+                event.dataTransfer.effectAllowed = "move";
+                event.dataTransfer.setData("text/plain", ingredient.id);
+                event.currentTarget.classList.add("is-dragging");
+              }}
+              onDragEnd={(event) => event.currentTarget.classList.remove("is-dragging")}
+              onDragOver={(event) => {
+                event.preventDefault();
+                event.currentTarget.classList.add("is-dragover");
+              }}
+              onDragLeave={(event) => event.currentTarget.classList.remove("is-dragover")}
+              onDrop={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                event.currentTarget.classList.remove("is-dragover");
+                const draggedId = event.dataTransfer.getData("text/plain");
+                if (draggedId) onMoveIngredient(draggedId, tone, index);
+              }}
             >
+              <span className="cooking-row-drag-handle" aria-label={`${ingredient.name}をドラッグして並び替え`} role="img">
+                <span aria-hidden="true">☰</span>
+              </span>
               <div className="cooking-ing-info">
                 <div className="cooking-ing-head">
                   <strong>{ingredient.name}</strong>
@@ -3173,15 +3577,51 @@ function CookingViewer({
     );
   };
 
-  const renderStepGroup = (label: string, tone: "prep" | "cook", steps: string[]) => {
-    if (steps.length === 0) return null;
+  const renderStepGroup = (label: string, tone: "prep" | "cook", drafts: CookingStepDraft[]) => {
+    const kind: CookingStepKind = tone === "prep" ? "prep_steps" : "steps";
     return (
-      <div className="cooking-step-group" key={label}>
+      <div
+        className="cooking-step-group"
+        key={label}
+        onDragOver={(event) => event.preventDefault()}
+        onDrop={(event) => {
+          event.preventDefault();
+          const draggedId = event.dataTransfer.getData("text/plain");
+          if (draggedId) onMoveStep(draggedId, kind, drafts.length);
+        }}
+      >
         <p className="cooking-step-group-label">{label}</p>
-        {steps.map((step, index) => (
-          <article className="cooking-step-card" key={`${label}-${index}`}>
+        {drafts.length === 0 ? <p className="empty-list">ここへ手順を移動できます。</p> : null}
+        {drafts.map((draft, index) => (
+          <article
+            className="cooking-step-card"
+            draggable
+            data-changed={stepChanged(draft)}
+            key={draft.id}
+            onDragStart={(event) => {
+              event.dataTransfer.effectAllowed = "move";
+              event.dataTransfer.setData("text/plain", draft.id);
+              event.currentTarget.classList.add("is-dragging");
+            }}
+            onDragEnd={(event) => event.currentTarget.classList.remove("is-dragging")}
+            onDragOver={(event) => {
+              event.preventDefault();
+              event.currentTarget.classList.add("is-dragover");
+            }}
+            onDragLeave={(event) => event.currentTarget.classList.remove("is-dragover")}
+            onDrop={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              event.currentTarget.classList.remove("is-dragover");
+              const draggedId = event.dataTransfer.getData("text/plain");
+              if (draggedId) onMoveStep(draggedId, kind, index);
+            }}
+          >
+            <span className="cooking-row-drag-handle" aria-label={`${label}${index + 1}をドラッグして並び替え`} role="img">
+              <span aria-hidden="true">☰</span>
+            </span>
             <span className="cooking-step-badge" data-tone={tone}>{index + 1}</span>
-            <p className="cooking-step-text">{chipifyStep(step, foodNames, seasoningNames, onHighlightIngredient)}</p>
+            <p className="cooking-step-text">{chipifyStep(draft.text, recipe.ingredients, onHighlightIngredient)}</p>
           </article>
         ))}
       </div>
@@ -3245,7 +3685,7 @@ function CookingViewer({
       <section className="cooking-pane cooking-pane-step" aria-label="手順">
         <div className="cooking-pane-head">
           <span className="cooking-pane-eyebrow" data-tone="step">手順</span>
-          <span className="cooking-pane-hint">文中の材料をタップで照合</span>
+          <span className="cooking-pane-hint">{isReorderDirty ? "並び替え未保存" : "文中の材料をタップで照合"}</span>
         </div>
         <div className="cooking-tabs" data-tone="step">
           {stepTabs.map((tab) => (
@@ -3265,13 +3705,13 @@ function CookingViewer({
         <div className="cooking-step-list">
           {stepTab === "all" ? (
             <>
-              {renderStepGroup("下ごしらえ", "prep", prepSteps)}
-              {renderStepGroup("調理工程", "cook", cookSteps)}
+              {renderStepGroup("下ごしらえ", "prep", prepStepDrafts)}
+              {renderStepGroup("調理工程", "cook", cookStepDrafts)}
             </>
           ) : stepTab === "prep" ? (
-            renderStepGroup("下ごしらえ", "prep", prepSteps)
+            renderStepGroup("下ごしらえ", "prep", prepStepDrafts)
           ) : (
-            renderStepGroup("調理工程", "cook", cookSteps)
+            renderStepGroup("調理工程", "cook", cookStepDrafts)
           )}
           {prepSteps.length + cookSteps.length === 0 ? <p className="empty-list">手順は登録されていません。</p> : null}
         </div>
@@ -3553,7 +3993,7 @@ function RecipeImagePicker({
   );
 }
 
-function RecipeDetail({ imageUrl, recipe }: { imageUrl?: string | null; recipe: Recipe | null }) {
+function RecipeDetail({ imageUrl, onEdit, recipe }: { imageUrl?: string | null; onEdit: (recipe: Recipe) => void; recipe: Recipe | null }) {
   if (!recipe) {
     return <p className="empty-list">レシピを選ぶと材料と手順を確認できます。</p>;
   }
@@ -3572,6 +4012,9 @@ function RecipeDetail({ imageUrl, recipe }: { imageUrl?: string | null; recipe: 
           {recipe.source ? (
             <p className="item-note">参考元: <RecipeSourceLinks source={recipe.source} inline /></p>
           ) : null}
+          <button aria-label="レシピ詳細を編集" className="secondary-button recipe-detail-edit-button" type="button" onClick={() => onEdit(recipe)}>
+            編集
+          </button>
         </div>
       </section>
       <div className="recipe-detail-columns">
