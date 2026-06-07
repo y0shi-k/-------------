@@ -66,6 +66,7 @@ const baseIngredient: RecipeIngredient = {
   amount: 2,
   unit: "個",
   sort_order: 0,
+  group_index: 0,
   created_at: "2026-05-24T00:00:00.000Z",
   updated_at: "2026-05-24T00:00:00.000Z"
 };
@@ -378,6 +379,87 @@ describe("RecipeMealWorkspace", () => {
       expect(ingredientInsert.insert).toHaveBeenCalled();
     });
     expect(await screen.findByText("レシピを更新しました。")).toBeTruthy();
+  });
+
+  it("reorders edit-modal food ingredients via drag and drop and persists sort_order", async () => {
+    const carrot: RecipeIngredient = { ...baseIngredient, id: "ingredient-2", name: "にんじん", sort_order: 1 };
+    const salt: RecipeIngredient = {
+      ...baseIngredient,
+      id: "ingredient-3",
+      item_type: "調味料",
+      name: "塩",
+      amount: 1,
+      unit: "小さじ",
+      sort_order: 2
+    };
+    const recipeUpdate = updateSingleQuery({ ...baseRecipe, ingredients: undefined });
+    const ingredientDelete = deleteQuery();
+    const ingredientInsert = insertListQuery([{ ...baseIngredient }]);
+
+    from.mockImplementation((table: string) => {
+      if (table === "recipes") return { update: recipeUpdate.update };
+      if (table === "recipe_ingredients") return { delete: ingredientDelete.deleteRows, insert: ingredientInsert.insert };
+      return {};
+    });
+
+    renderWorkspace({ initialRecipes: [{ ...baseRecipe, ingredients: [baseIngredient, carrot, salt] }] });
+    fireEvent.click(screen.getByRole("button", { name: "編集" }));
+
+    const dataTransfer = dragDataTransfer();
+    const carrotRow = screen.getByLabelText("にんじんをドラッグして並び替え").closest(".ingredient-row") as HTMLElement;
+    const onionRow = screen.getByLabelText("玉ねぎをドラッグして並び替え").closest(".ingredient-row") as HTMLElement;
+    fireEvent.dragStart(carrotRow, { dataTransfer });
+    fireEvent.drop(onionRow, { dataTransfer });
+
+    fireEvent.click(screen.getByRole("button", { name: "レシピを更新" }));
+
+    await waitFor(() => {
+      expect(ingredientInsert.insert).toHaveBeenCalledWith([
+        expect.objectContaining({ name: "にんじん", item_type: "食材", sort_order: 0 }),
+        expect.objectContaining({ name: "玉ねぎ", item_type: "食材", sort_order: 1 }),
+        expect.objectContaining({ name: "塩", item_type: "調味料", sort_order: 2 })
+      ]);
+    });
+  });
+
+  it("keeps edit-modal reordering within a section and never crosses food/seasoning", async () => {
+    const salt: RecipeIngredient = {
+      ...baseIngredient,
+      id: "ingredient-3",
+      item_type: "調味料",
+      name: "塩",
+      amount: 1,
+      unit: "小さじ",
+      sort_order: 1
+    };
+    const recipeUpdate = updateSingleQuery({ ...baseRecipe, ingredients: undefined });
+    const ingredientDelete = deleteQuery();
+    const ingredientInsert = insertListQuery([{ ...baseIngredient }]);
+
+    from.mockImplementation((table: string) => {
+      if (table === "recipes") return { update: recipeUpdate.update };
+      if (table === "recipe_ingredients") return { delete: ingredientDelete.deleteRows, insert: ingredientInsert.insert };
+      return {};
+    });
+
+    renderWorkspace({ initialRecipes: [{ ...baseRecipe, ingredients: [baseIngredient, salt] }] });
+    fireEvent.click(screen.getByRole("button", { name: "編集" }));
+
+    // 食材（玉ねぎ）を調味料（塩）の行へドロップしてもセクションをまたがない。
+    const dataTransfer = dragDataTransfer();
+    const onionRow = screen.getByLabelText("玉ねぎをドラッグして並び替え").closest(".ingredient-row") as HTMLElement;
+    const saltRow = screen.getByLabelText("塩をドラッグして並び替え").closest(".ingredient-row") as HTMLElement;
+    fireEvent.dragStart(onionRow, { dataTransfer });
+    fireEvent.drop(saltRow, { dataTransfer });
+
+    fireEvent.click(screen.getByRole("button", { name: "レシピを更新" }));
+
+    await waitFor(() => {
+      expect(ingredientInsert.insert).toHaveBeenCalledWith([
+        expect.objectContaining({ name: "玉ねぎ", item_type: "食材", sort_order: 0 }),
+        expect.objectContaining({ name: "塩", item_type: "調味料", sort_order: 1 })
+      ]);
+    });
   });
 
   it("toggles selected genres from the whole option row", () => {
@@ -934,6 +1016,7 @@ describe("RecipeMealWorkspace", () => {
     fireEvent.dragStart(prepCard, { dataTransfer });
     fireEvent.drop(cookGroup, { dataTransfer });
     fireEvent.click(within(overlay).getByRole("button", { name: "並び替えを確定" }));
+    fireEvent.click(screen.getByRole("button", { name: "並びを確定" }));
 
     await waitFor(() => {
       expect(recipeUpdate.update).toHaveBeenCalledWith({
@@ -970,10 +1053,55 @@ describe("RecipeMealWorkspace", () => {
     fireEvent.dragStart(carrotCard, { dataTransfer });
     fireEvent.drop(onionCard, { dataTransfer });
     fireEvent.click(within(overlay).getByRole("button", { name: "並び替えを確定" }));
+    fireEvent.click(screen.getByRole("button", { name: "並びを確定" }));
 
     await waitFor(() => {
-      expect(ingredientUpdate.update).toHaveBeenCalledWith({ item_type: "食材", sort_order: 0 });
-      expect(ingredientUpdate.update).toHaveBeenCalledWith({ item_type: "食材", sort_order: 1 });
+      expect(ingredientUpdate.update).toHaveBeenCalledWith({ item_type: "食材", sort_order: 0, group_index: 0 });
+      expect(ingredientUpdate.update).toHaveBeenCalledWith({ item_type: "食材", sort_order: 1, group_index: 0 });
+      expect(refresh).toHaveBeenCalled();
+    });
+    expect(await screen.findByText("並び替えを保存しました。")).toBeTruthy();
+  });
+
+  it("confirms before committing a cooking reorder and cancels without saving", async () => {
+    const secondIngredient: RecipeIngredient = {
+      ...baseIngredient,
+      id: "ingredient-2",
+      name: "にんじん",
+      sort_order: 1
+    };
+    const ingredientUpdate = updateTripleEqQuery();
+
+    from.mockImplementation((table: string) => {
+      if (table === "recipe_ingredients") return { update: ingredientUpdate.update };
+      return {};
+    });
+
+    renderWorkspace({ initialRecipes: [{ ...baseRecipe, ingredients: [baseIngredient, secondIngredient] }] });
+
+    fireEvent.click(screen.getByRole("button", { name: "調理ビューを開く" }));
+    const overlay = screen.getByRole("dialog", { name: "調理ビューア全画面" });
+
+    const dataTransfer = dragDataTransfer();
+    const carrotCard = within(overlay).getByText("にんじん").closest("article") as HTMLElement;
+    const onionCard = within(overlay).getByText("玉ねぎ").closest("article") as HTMLElement;
+    fireEvent.dragStart(carrotCard, { dataTransfer });
+    fireEvent.drop(onionCard, { dataTransfer });
+
+    // 確定ボタンは保存前に確認を出す。やめるを押すと保存されず未確定のまま残る。
+    fireEvent.click(within(overlay).getByRole("button", { name: "並び替えを確定" }));
+    expect(screen.getByRole("alertdialog", { name: "並び替え確認" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "やめる" }));
+    expect(ingredientUpdate.update).not.toHaveBeenCalled();
+    expect(within(overlay).getByRole("button", { name: "並び替えを確定" })).toBeTruthy();
+
+    // もう一度確定し、今度は確認OKで既存の保存フローが走る。
+    fireEvent.click(within(overlay).getByRole("button", { name: "並び替えを確定" }));
+    fireEvent.click(screen.getByRole("button", { name: "並びを確定" }));
+
+    await waitFor(() => {
+      expect(ingredientUpdate.update).toHaveBeenCalledWith({ item_type: "食材", sort_order: 0, group_index: 0 });
+      expect(ingredientUpdate.update).toHaveBeenCalledWith({ item_type: "食材", sort_order: 1, group_index: 0 });
       expect(refresh).toHaveBeenCalled();
     });
     expect(await screen.findByText("並び替えを保存しました。")).toBeTruthy();
@@ -1013,9 +1141,10 @@ describe("RecipeMealWorkspace", () => {
 
     fireEvent.click(within(overlay).getByRole("button", { name: "Redo" }));
     fireEvent.click(within(overlay).getByRole("button", { name: "並び替えを確定" }));
+    fireEvent.click(screen.getByRole("button", { name: "並びを確定" }));
 
     await waitFor(() => {
-      expect(ingredientUpdate.update).toHaveBeenCalledWith({ item_type: "食材", sort_order: 1 });
+      expect(ingredientUpdate.update).toHaveBeenCalledWith({ item_type: "食材", sort_order: 1, group_index: 0 });
       expect(refresh).toHaveBeenCalled();
     });
     expect(await screen.findByText("並び替えを保存しました。")).toBeTruthy();

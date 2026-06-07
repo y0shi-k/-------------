@@ -2212,7 +2212,8 @@ h1 {
 .delete-confirm-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 80;
+  /* 確認は最前面に出す。全画面ビュー(.cooking-overlay=85)や消費量/不足選択モーダル(=90)の上へ。 */
+  z-index: 100;
   display: grid;
   place-items: center;
   background: rgb(15 23 42 / 0.42);
@@ -7599,13 +7600,26 @@ h1 {
   font-weight: 700;
 }
 
-.recipe-row-handle {
-  display: grid;
-  place-items: center;
-  color: #cbd5e1;
+/* 編集モーダルの材料・調味料行ハンドル。全画面ビューの cooking-row-drag-handle を流用しつつ、
+   1行グリッド（先頭20px列）に収まるようサイズを詰める。 */
+.canvas-recipe-item-row .recipe-row-drag-handle {
+  width: 20px;
+  height: 36px;
+  flex: 0 0 20px;
   font-size: 1.05rem;
-  font-weight: 800;
-  line-height: 1;
+}
+
+.canvas-recipe-item-row[draggable="true"] {
+  cursor: grab;
+}
+
+.canvas-recipe-item-row.is-dragging {
+  opacity: 0.45;
+}
+
+.canvas-recipe-item-row.is-dragover {
+  border-radius: 10px;
+  box-shadow: 0 0 0 2px rgb(99 102 241 / 35%);
 }
 
 .recipe-step-sections {

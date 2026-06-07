@@ -61,6 +61,8 @@ export default async function Home() {
       .from("recipe_ingredients")
       .select("*")
       .eq("user_id", user.id)
+      .order("item_type", { ascending: true })
+      .order("group_index", { ascending: true })
       .order("sort_order", { ascending: true }),
     supabase
       .from("meal_schedules")

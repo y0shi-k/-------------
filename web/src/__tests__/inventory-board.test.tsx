@@ -536,6 +536,30 @@ describe("InventoryBoard", () => {
     expect(screen.getByText("写真は非公開で保存し、入力したGemini APIキーでAI解析します。APIキーはDBに保存しません。")).toBeTruthy();
   });
 
+  it("appends a later selected photo before running AI scan", () => {
+    renderBoard();
+    openPhotoScan();
+
+    fireEvent.change(screen.getByLabelText("写真を撮る"), {
+      target: {
+        files: [new File(["first"], "ingredient-1.jpg", { type: "image/jpeg" })]
+      }
+    });
+
+    expect(screen.getByAltText("選択した食材写真のプレビュー 1")).toBeTruthy();
+    expect(screen.getByText("1枚の写真を選びました。内容を確認してから解析してください。")).toBeTruthy();
+
+    fireEvent.change(screen.getByLabelText("次の写真を撮る"), {
+      target: {
+        files: [new File(["second"], "ingredient-2.jpg", { type: "image/jpeg" })]
+      }
+    });
+
+    expect(screen.getByAltText("選択した食材写真のプレビュー 1")).toBeTruthy();
+    expect(screen.getByAltText("選択した食材写真のプレビュー 2")).toBeTruthy();
+    expect(screen.getByText("2枚の写真を選びました。内容を確認してから解析してください。")).toBeTruthy();
+  });
+
   it("disables the AI scan button when the daily scan limit is reached", async () => {
     shellAiMocks.aiUsageSummary = {
       ok: true,
@@ -736,6 +760,76 @@ describe("InventoryBoard", () => {
     expect(await screen.findByText("2件の候補を見つけました。確認してから在庫に追加してください。")).toBeTruthy();
     expect(screen.getByText("牛乳")).toBeTruthy();
     expect(screen.getByText("醤油")).toBeTruthy();
+  });
+
+  it("appends later scan candidates before saving them into inventory", async () => {
+    localStorage.setItem("stock-master:user-gemini-api-key", "user-owned-test-key");
+    buildPhotoStoragePath.mockReturnValueOnce("user-1/ingredient-scan/photo-1.jpg").mockReturnValueOnce("user-1/ingredient-scan/photo-2.jpg");
+    const upload = vi.fn().mockResolvedValue({ error: null });
+    const remove = vi.fn().mockResolvedValue({ error: null });
+    const photoSingle = vi
+      .fn()
+      .mockResolvedValueOnce({ data: { id: "photo-1" }, error: null })
+      .mockResolvedValueOnce({ data: { id: "photo-2" }, error: null });
+    const photoSelect = vi.fn(() => ({ single: photoSingle }));
+    const photoInsert = vi.fn(() => ({ select: photoSelect }));
+    const compressedBlob = new Blob(["compressed"], { type: "image/jpeg" });
+    const firstItem = { user_id: "user-1", category: "食材", name: "牛乳", quantity: 1, unit: "本", unit_conversion: null, display_expires_on: null, effective_expires_on: null, storage_location: "冷蔵庫", status_note: "AI解析候補", source: "ai_photo" };
+    const secondItem = { user_id: "user-1", category: "食材", name: "トマト", quantity: 3, unit: "個", unit_conversion: null, display_expires_on: null, effective_expires_on: null, storage_location: "野菜室", status_note: "AI解析候補", source: "ai_photo" };
+
+    storageFrom.mockReturnValue({ upload, remove });
+    from.mockImplementation((table: string) => {
+      if (table === "photos") return { insert: photoInsert };
+      return {};
+    });
+    compressImageFile.mockResolvedValue({
+      blob: compressedBlob,
+      byteSize: compressedBlob.size,
+      contentType: "image/jpeg",
+      width: 1024,
+      height: 768
+    });
+    vi.mocked(fetch)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ items: [firstItem] })
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ items: [secondItem] })
+      } as Response);
+
+    renderBoard();
+    openPhotoScan();
+
+    fireEvent.change(screen.getByLabelText("写真を撮る"), {
+      target: {
+        files: [new File(["photo-1"], "ingredient-1.jpg", { type: "image/jpeg" })]
+      }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "AI解析する" }));
+
+    expect(await screen.findByText("1件の候補を見つけました。確認してから在庫に追加してください。")).toBeTruthy();
+    expect(screen.getByText("牛乳")).toBeTruthy();
+
+    fireEvent.change(screen.getByLabelText("写真を撮る"), {
+      target: {
+        files: [new File(["photo-2"], "ingredient-2.jpg", { type: "image/jpeg" })]
+      }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "AI解析する" }));
+
+    expect(await screen.findByText("1件の候補を追加しました。確認してから在庫に追加してください。")).toBeTruthy();
+    expect(screen.getByText("牛乳")).toBeTruthy();
+    expect(screen.getByText("トマト")).toBeTruthy();
+    expect(screen.getByText("2件選択中")).toBeTruthy();
+    expect(fetch).toHaveBeenLastCalledWith("/api/ai/scan-ingredients", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ photoIds: ["photo-2"], geminiApiKey: "user-owned-test-key" })
+    });
   });
 
   it("edits one AI scan candidate without losing the remaining selected candidates", async () => {

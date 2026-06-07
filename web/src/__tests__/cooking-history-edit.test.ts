@@ -48,6 +48,7 @@ const baseIngredient: RecipeIngredient = {
   amount: 200,
   unit: "g",
   sort_order: 1,
+  group_index: 0,
   created_at: "2026-06-01T00:00:00.000Z",
   updated_at: "2026-06-01T00:00:00.000Z"
 };

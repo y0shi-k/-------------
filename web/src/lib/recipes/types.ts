@@ -11,6 +11,7 @@ export type RecipeIngredient = {
   amount: number;
   unit: string;
   sort_order: number;
+  group_index: number;
   created_at: string;
   updated_at: string;
 };
@@ -75,6 +76,7 @@ export type RecipeIngredientFormValues = {
   name: string;
   amount: string;
   unit: string;
+  group_index: number;
 };
 
 export type RecipeFormValues = {
@@ -90,7 +92,8 @@ export const emptyRecipeIngredientFormValues: RecipeIngredientFormValues = {
   item_type: "食材",
   name: "",
   amount: "1",
-  unit: "個"
+  unit: "個",
+  group_index: 0
 };
 
 export const emptyRecipeFormValues: RecipeFormValues = {
@@ -137,7 +140,8 @@ export function toRecipeFormValues(recipe: Recipe): RecipeFormValues {
             item_type: ingredient.item_type,
             name: ingredient.name,
             amount: String(ingredient.amount),
-            unit: ingredient.unit
+            unit: ingredient.unit,
+            group_index: ingredient.group_index ?? 0
           }))
         : [{ ...emptyRecipeIngredientFormValues }]
   };

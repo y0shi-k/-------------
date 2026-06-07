@@ -195,7 +195,8 @@ function normalizeIngredient(value: unknown): RecipeIngredientFormValues | null 
     item_type: raw.item_type === "調味料" || raw.type === "調味料" ? "調味料" : "食材",
     name,
     amount: amount || "1",
-    unit: cleanText(raw.unit) || "個"
+    unit: cleanText(raw.unit) || "個",
+    group_index: 0
   };
 }
 

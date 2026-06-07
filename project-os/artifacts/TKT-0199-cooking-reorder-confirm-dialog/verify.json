@@ -1,7 +1,7 @@
 {
-  "ticket_id": "TKT-0193-multi-image-ingredient-scan",
+  "ticket_id": "TKT-0199-cooking-reorder-confirm-dialog",
   "scope": "web",
-  "generated_at": "2026-06-07T15:57:06+09:00",
+  "generated_at": "2026-06-07T12:26:07+09:00",
   "status": "pass",
   "checks": {
     "lint": "pass",

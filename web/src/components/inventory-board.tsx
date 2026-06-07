@@ -618,10 +618,14 @@ export function InventoryBoard({
       return;
     }
 
-    photoPreviewUrls.forEach((url) => URL.revokeObjectURL(url));
-    setSelectedPhotos(files);
-    setPhotoPreviewUrls(files.map((file) => URL.createObjectURL(file)));
-    setPhotoFeedback({ tone: "info", message: `${files.length}枚の写真を選びました。内容を確認してから解析してください。` });
+    const newPreviewUrls = files.map((file) => URL.createObjectURL(file));
+    const totalCount = selectedPhotos.length + files.length;
+    setSelectedPhotos((current) => [...current, ...files]);
+    setPhotoPreviewUrls((current) => [...current, ...newPreviewUrls]);
+    setPhotoFeedback({ tone: "info", message: `${totalCount}枚の写真を選びました。内容を確認してから解析してください。` });
+    if (photoInputRef.current) {
+      photoInputRef.current.value = "";
+    }
   }
 
   function selectIngredientImageFile(file: File) {
@@ -764,20 +768,22 @@ export function InventoryBoard({
         return;
       }
 
+      const hadExistingCandidates = scanCandidates.length > 0;
+      const candidateBatchId = `${Date.now()}-${photoIds.join("-")}`;
       const candidates = (scanResult.items ?? []).map((item, index) => ({
-        clientId: `${Date.now()}-${index}`,
+        clientId: `${candidateBatchId}-${index}`,
         item
       }));
-      setScanCandidates(candidates);
-      setSelectedScanCandidateIds(candidates.map((candidate) => candidate.clientId));
+      setScanCandidates((current) => [...current, ...candidates]);
+      setSelectedScanCandidateIds((current) => [...new Set([...current, ...candidates.map((candidate) => candidate.clientId)])]);
       resetPhoto();
       const failedCount = failedPhotoSaveCount + (scanResult.failedCount ?? 0);
       setPhotoFeedback({
         tone: failedCount > 0 ? "info" : "success",
         message:
           failedCount > 0
-            ? `${candidates.length}件の候補を見つけました。${failedCount}枚は解析できませんでした。成功分を確認してから在庫に追加してください。`
-            : `${candidates.length}件の候補を見つけました。確認してから在庫に追加してください。`
+            ? `${candidates.length}件の候補を${hadExistingCandidates ? "追加しました" : "見つけました"}。${failedCount}枚は解析できませんでした。成功分を確認してから在庫に追加してください。`
+            : `${candidates.length}件の候補を${hadExistingCandidates ? "追加しました" : "見つけました"}。確認してから在庫に追加してください。`
       });
     } catch {
       setPhotoFeedback({
@@ -1460,7 +1466,7 @@ export function InventoryBoard({
                   <h4 id="photo-capture-heading">写真を解析して在庫へ</h4>
                 </div>
                 <label className="photo-file-button">
-                  写真を撮る
+                  {selectedPhotos.length > 0 ? "次の写真を撮る" : "写真を撮る"}
                   <input
                     ref={photoInputRef}
                     accept="image/*"

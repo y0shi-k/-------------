@@ -7,6 +7,9 @@
 
 ## 2026-06
 
+- TKT-0200 — 材料・調味料サブグループのDB土台（`recipe_ingredients.group_index` 0=未グループ追加＝危険変更/supabase_schema_change、`check(group_index>=0)`、型・取得順`item_type,group_index,sort_order`・保存ペイロード対応。UI未実装＝常に0保存で挙動不変、policy/RLS無変更）。残: リモートmigration適用と適用後のRLSライブ確認（manual-smokes.md 手順あり）。
+- TKT-0199 — 全画面ビュー「並び替えを確定」に確認を追加（保存前に `requestDelete`/`DeleteConfirmPanel` を流用した確認、OK時のみ既存 `saveCookingReorder` 実行・やめるで未確定保持）。並び替えロジック・保存対象カラム無変更。残: 実機での文言・操作感確認。
+- TKT-0198 — レシピ編集モーダルの材料・調味料を3本線ハンドルD&D並び替え（`moveIngredient` で immutable 入替・同一 item_type 内限定、保存は既存 `saveRecipe`→`sort_order` 採番流用）。schema/新規DB書き込み無変更。残: 実機スマホでのD&D操作感確認。
 - TKT-0186 — 主要操作ボタンの sticky 固定。食材管理ヘッダーの「＋」(スマホ sticky/PC static)・手動追加モーダルの「在庫に追加」(`.form-actions` sticky bottom)・全モーダルの「×」(`.modal-close-button` を absolute→sticky top:14px+grid右上、`margin-bottom:-40px` で見た目維持)。実差分は globals.css のみ（schema/Storage 無変更）。残: 実機/DevTools 375px 目視。
 - TKT-0185 — 食材管理の食材名行の文字重なり修正。`.item-title-row`(flex)の子 `h4` に `min-width:0` を補い flex 縮小＋ellipsis を機能させ、スマホは `@media(max-width:719px)` で `.stock-item` を3列grid-areas再定義＋`h4` nowrap/ellipsis 化（チップと重ならない）。実差分は globals.css のみ（schema/Storage 無変更）。残: 実機/DevTools 375px 目視。
 - TKT-0184 — スマホ横はみ出しの一掃（土台）。globals.css 末尾に `@media (max-width: 719px)` を追記し `.consumption-row-controls`(min-width220px解除)/`.cooking-filter-row`(5→2列)/`.conversion-row`(2列折返し・モーダル内は維持)/各種グリッド列数を緩和＋`body overflow-x:hidden` 保険。実差分は globals.css のみ（schema/Storage 無変更／eval過剰マッチはreport記録）。残: 実機/DevTools 375px 目視。
