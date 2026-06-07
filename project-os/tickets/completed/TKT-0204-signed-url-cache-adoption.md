@@ -1,7 +1,7 @@
 ---
 id: TKT-0204-signed-url-cache-adoption
 title: レシピ/食材/料理候補の署名URL取得を共有キャッシュ経由に統一
-status: draft
+status: completed
 goal: 再マウント（モード往復）でも同一署名URLを再利用し、画像の再ダウンロード・チラつきを解消する。
 acceptance:
   - `web/src/lib/photos/use-recipe-image-urls.ts` の署名URL生成が TKT-0203 の共有キャッシュ（`getCachedUserImageSignedUrl` または `useCachedSignedUrls`）経由になる

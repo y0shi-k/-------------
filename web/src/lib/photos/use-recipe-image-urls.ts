@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { createUserImageSignedUrl, type SignedUrlCapableClient } from "@/lib/photos/user-image";
+import type { SignedUrlCapableClient } from "@/lib/photos/user-image";
+import { getCachedUserImageSignedUrl } from "@/lib/photos/signed-url-cache";
 
 type RecipeWithImage = { id: string; image_storage_path: string | null };
 
@@ -35,7 +36,7 @@ export function useRecipeImageUrls(recipes: RecipeWithImage[], client: SignedUrl
     async function resolveAll() {
       const entries = await Promise.all(
         targets.map(async (recipe) => {
-          const url = await createUserImageSignedUrl(client, recipe.image_storage_path);
+          const url = await getCachedUserImageSignedUrl(client, recipe.image_storage_path);
           return url ? ([recipe.id, url] as const) : null;
         })
       );

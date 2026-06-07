@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { createUserImageSignedUrl, type SignedUrlCapableClient } from "@/lib/photos/user-image";
+import type { SignedUrlCapableClient } from "@/lib/photos/user-image";
+import { getCachedUserImageSignedUrl } from "@/lib/photos/signed-url-cache";
 
 export type CookingPhotoCandidate = {
   byteSize: number | null;
@@ -89,7 +90,7 @@ export function useCookingPhotoCandidates(client: CookingPhotoCandidateClient, u
           createdAt: row.created_at,
           height: row.height,
           id: row.id,
-          signedUrl: await createUserImageSignedUrl(client, row.storage_path),
+          signedUrl: await getCachedUserImageSignedUrl(client, row.storage_path),
           storagePath: row.storage_path,
           width: row.width
         }))

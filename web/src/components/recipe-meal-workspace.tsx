@@ -43,6 +43,7 @@ import { copyPhotoStorageObject, deleteRecipeImage, setRecipeImageFromCandidate,
 import { useImageFileDrop } from "@/lib/photos/use-image-file-drop";
 import { useCookingPhotoCandidates, type CookingPhotoCandidate, type CookingPhotoCandidateClient } from "@/lib/photos/use-cooking-photo-candidates";
 import { useRecipeImageUrls } from "@/lib/photos/use-recipe-image-urls";
+import { invalidateUserImageSignedUrl } from "@/lib/photos/signed-url-cache";
 import { PHOTOS_BUCKET } from "@/lib/photos/user-image";
 
 type RecipeMealWorkspaceProps = {
@@ -1356,6 +1357,9 @@ export function RecipeMealWorkspace({
       if (!result.ok) {
         return { ok: false, error: `${result.error}（レシピ本文は保存済みです）` };
       }
+      if (currentImagePath && currentImagePath !== result.storagePath) {
+        invalidateUserImageSignedUrl(currentImagePath);
+      }
       return { ok: true, imagePath: result.storagePath, staleRemovalFailed: result.staleRemovalFailed };
     }
 
@@ -1377,6 +1381,9 @@ export function RecipeMealWorkspace({
       if (!result.ok) {
         return { ok: false, error: `${result.error}（レシピ本文は保存済みです）` };
       }
+      if (currentImagePath && currentImagePath !== result.storagePath) {
+        invalidateUserImageSignedUrl(currentImagePath);
+      }
       return { ok: true, imagePath: result.storagePath, staleRemovalFailed: result.staleRemovalFailed };
     }
 
@@ -1386,6 +1393,7 @@ export function RecipeMealWorkspace({
       if (!result.ok) {
         return { ok: false, error: `${result.error}（レシピ本文は保存済みです）` };
       }
+      invalidateUserImageSignedUrl(currentImagePath);
       return { ok: true, imagePath: null, staleRemovalFailed: result.staleRemovalFailed };
     }
 

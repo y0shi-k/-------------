@@ -1,7 +1,7 @@
 ---
 id: TKT-0203-signed-url-cache-foundation
 title: 画像署名URLの共有キャッシュ基盤（module キャッシュ＋共有フック）
-status: draft
+status: completed
 goal: path 単位で署名URLを module スコープに保持し、コンポーネント再マウントを越えて同一URLを返す土台を作る（再ダウンロードの根本原因を断つ）。
 acceptance:
   - 新規 `web/src/lib/photos/signed-url-cache.ts` に module-level の path→{url, expiresAt} キャッシュと in-flight Promise dedup が実装される

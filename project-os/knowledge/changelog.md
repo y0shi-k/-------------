@@ -7,6 +7,8 @@
 
 ## 2026-06
 
+- TKT-0204 — レシピ/食材/料理写真候補の署名URL取得を共有キャッシュ（TKT-0203）経由に統一（`use-recipe-image-urls`/`use-cooking-photo-candidates` を `getCachedUserImageSignedUrl` に差し替え、`inventory-board` の自前 effect を共有フック `useCachedSignedUrls` に置換、画像差し替え/削除フローに `invalidateUserImageSignedUrl` 追加）。再マウントで同一URLを返しブラウザ画像キャッシュをヒットさせ再DLを解消。読み取り専用＝公開設定/RLS/Storage無変更（photo_upload_storage/supabase_schema_change/auth_and_rls_policy は語彙の過剰マッチ／report に静的記録）。残: DevTools Network でモード往復の disk/memory cache ヒットと差し替え後の旧画像非表示の手動確認。
+- TKT-0203 — 画像署名URLの共有キャッシュ基盤 `web/src/lib/photos/signed-url-cache.ts` 新設（path→{url,expiresAt} の module キャッシュ＋満了5分前マージン再発行＋in-flight Promise dedup＋`getCachedUserImageSignedUrl`/`invalidateUserImageSignedUrl`/共有フック `useCachedSignedUrls`、vitest 5件）。既存 `createUserImageSignedUrl`/TTL をラップする薄い層で表示箇所は無変更（差し替えは TKT-0204）。読み取り専用＝Storage/RLS/auth無変更（photo_upload_storage は語彙の過剰マッチ／report に静的記録）。
 - TKT-0201 — 全画面ビューの材料・調味料サブグルーピングUI（行クリック＋Cmd/Ctrl複数選択→ラベル隣「グルーピング」で同一 item_type 内に `group_index` 付与、サブグループ見出し「解除」/選択行「グループ解除」で 0 へ戻す、見出し自動採番=材料A/B/C・調味料あ/い/う、D&Dはドロップ先の group_index 継承、`sameIngredientOrder` に group_index 比較追加で位置不変でも確定有効化）。保存は `recipe_ingredients` の item_type/sort_order/group_index 更新に限定＝schema変更なし（supabase_schema_change は語彙の過剰マッチ／report・manual-smokes に静的記録）。残: 実機375pxでのサブグループ枠・選択/D&D共存の目視。
 - TKT-0200 — 材料・調味料サブグループのDB土台（`recipe_ingredients.group_index` 0=未グループ追加＝危険変更/supabase_schema_change、`check(group_index>=0)`、型・取得順`item_type,group_index,sort_order`・保存ペイロード対応。UI未実装＝常に0保存で挙動不変、policy/RLS無変更）。残: リモートmigration適用と適用後のRLSライブ確認（manual-smokes.md 手順あり）。
 - TKT-0199 — 全画面ビュー「並び替えを確定」に確認を追加（保存前に `requestDelete`/`DeleteConfirmPanel` を流用した確認、OK時のみ既存 `saveCookingReorder` 実行・やめるで未確定保持）。並び替えロジック・保存対象カラム無変更。残: 実機での文言・操作感確認。

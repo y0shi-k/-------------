@@ -39,7 +39,8 @@ import {
   imageExtensionFromContentType
 } from "@/lib/photos/compress";
 import { useImageFileDrop } from "@/lib/photos/use-image-file-drop";
-import { createUserImageSignedUrl, PHOTOS_BUCKET } from "@/lib/photos/user-image";
+import { PHOTOS_BUCKET } from "@/lib/photos/user-image";
+import { invalidateUserImageSignedUrl, useCachedSignedUrls } from "@/lib/photos/signed-url-cache";
 import { normalizeIngredientImageName, resolveUserIngredientImage, type UserIngredientImage } from "@/lib/ui/ingredient-image";
 
 type InventoryBoardProps = {
@@ -242,7 +243,6 @@ export function InventoryBoard({
   const [shoppingValues, setShoppingValues] = useState<ShoppingFormValues>({ name: "", required_quantity: "1", unit: "個" });
   const [storageLocations, setStorageLocations] = useState(initialStorageLocations);
   const [userIngredientImages, setUserIngredientImages] = useState(initialUserIngredientImages);
-  const [ingredientImageUrls, setIngredientImageUrls] = useState<Map<string, string>>(() => new Map());
   const [values, setValues] = useState<StockItemFormValues>(emptyStockItemFormValues);
   const [editing, setEditing] = useState<EditingTarget>(null);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
@@ -485,38 +485,14 @@ export function InventoryBoard({
     };
   }, [ingredientImagePreviewUrl]);
 
-  const imageSignatureKey = useMemo(() => {
+  // 食材画像（在庫＋ユーザー登録画像）の署名URLを path 単位の共有キャッシュ経由で解決する。
+  // 再マウント（モード往復）でも同一URLを返すため、ブラウザ画像キャッシュがヒットし再DLが消える（TKT-0204）。
+  const ingredientImagePaths = useMemo(() => {
     const inventoryPaths = inventoryItems.map((item) => item.image_storage_path).filter(Boolean) as string[];
     const userPaths = userIngredientImages.map((image) => image.image_storage_path).filter(Boolean);
-    return [...new Set([...inventoryPaths, ...userPaths])].sort().join(",");
+    return [...inventoryPaths, ...userPaths];
   }, [inventoryItems, userIngredientImages]);
-
-  useEffect(() => {
-    let active = true;
-    const paths = imageSignatureKey ? imageSignatureKey.split(",").filter(Boolean) : [];
-    if (paths.length === 0) {
-      setIngredientImageUrls(new Map());
-      return () => {
-        active = false;
-      };
-    }
-
-    async function resolveUrls() {
-      const entries = await Promise.all(
-        paths.map(async (path) => {
-          const url = await createUserImageSignedUrl(supabase, path);
-          return url ? ([path, url] as const) : null;
-        })
-      );
-      if (!active) return;
-      setIngredientImageUrls(new Map(entries.filter((entry): entry is readonly [string, string] => entry !== null)));
-    }
-
-    resolveUrls();
-    return () => {
-      active = false;
-    };
-  }, [imageSignatureKey, supabase]);
+  const ingredientImageUrls = useCachedSignedUrls(supabase, ingredientImagePaths);
 
   function updateValue<K extends keyof StockItemFormValues>(key: K, value: StockItemFormValues[K]) {
     setValues((current) => ({ ...current, [key]: value }));
@@ -1003,11 +979,13 @@ export function InventoryBoard({
           ]);
           if (previousUserImage?.image_storage_path && previousUserImage.image_storage_path !== userPath) {
             await supabase.storage.from(PHOTOS_BUCKET).remove([previousUserImage.image_storage_path]);
+            invalidateUserImageSignedUrl(previousUserImage.image_storage_path);
           }
         }
 
         if (previousItemPath && previousItemPath !== inventoryPath) {
           await supabase.storage.from(PHOTOS_BUCKET).remove([previousItemPath]);
+          invalidateUserImageSignedUrl(previousItemPath);
         }
         return { ok: true, imageStoragePath: inventoryPath };
       }
@@ -1021,6 +999,7 @@ export function InventoryBoard({
           .eq("user_id", userId);
         if (updateError) return { ok: false, error: ingredientImageSaveErrorMessage };
         await supabase.storage.from(PHOTOS_BUCKET).remove([previousItemPath]);
+        invalidateUserImageSignedUrl(previousItemPath);
         imageStoragePath = null;
       }
 
@@ -1032,6 +1011,7 @@ export function InventoryBoard({
           .eq("normalized_name", previousUserImage.normalized_name);
         if (deleteError) return { ok: false, error: ingredientImageSaveErrorMessage };
         await supabase.storage.from(PHOTOS_BUCKET).remove([previousUserImage.image_storage_path]);
+        invalidateUserImageSignedUrl(previousUserImage.image_storage_path);
         setUserIngredientImages((images) => images.filter((image) => image.normalized_name !== previousUserImage.normalized_name));
       }
 
