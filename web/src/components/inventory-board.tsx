@@ -677,6 +677,7 @@ export function InventoryBoard({
           const storagePath = buildPhotoStoragePath(userId);
           const { error: uploadError } = await supabase.storage.from("photos").upload(storagePath, compressed.blob, {
             contentType: compressed.contentType,
+            cacheControl: "31536000",
             upsert: false
           });
 
@@ -935,6 +936,7 @@ export function InventoryBoard({
 
         const { error: uploadError } = await supabase.storage.from(PHOTOS_BUCKET).upload(inventoryPath, compressed.blob, {
           contentType: compressed.contentType,
+          cacheControl: "31536000",
           upsert: false
         });
         if (uploadError) return { ok: false, error: ingredientImageSaveErrorMessage };
@@ -953,6 +955,7 @@ export function InventoryBoard({
           const userPath = buildUserIngredientImageStoragePath(userId, normalizedName, extension);
           const { error: userUploadError } = await supabase.storage.from(PHOTOS_BUCKET).upload(userPath, compressed.blob, {
             contentType: compressed.contentType,
+            cacheControl: "31536000",
             upsert: false
           });
           if (userUploadError) {

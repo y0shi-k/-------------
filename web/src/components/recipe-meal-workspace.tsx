@@ -2321,6 +2321,7 @@ export function RecipeMealWorkspace({
         const storagePath = buildCookingHistoryPhotoStoragePath(userId);
         const { error: uploadError } = await supabase.storage.from(PHOTOS_BUCKET).upload(storagePath, compressed.blob, {
           contentType: compressed.contentType,
+          cacheControl: "31536000",
           upsert: false
         });
 

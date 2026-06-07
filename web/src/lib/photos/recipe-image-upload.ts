@@ -14,7 +14,7 @@ import { PHOTOS_BUCKET } from "@/lib/photos/user-image";
 type StorageBucketApi = {
   copy?: (fromPath: string, toPath: string) => Promise<{ error: { message: string } | null }>;
   download?: (path: string) => Promise<{ data: Blob | null; error: { message: string } | null }>;
-  upload: (path: string, body: Blob, options?: { contentType?: string; upsert?: boolean }) => Promise<{ error: { message: string } | null }>;
+  upload: (path: string, body: Blob, options?: { contentType?: string; cacheControl?: string; upsert?: boolean }) => Promise<{ error: { message: string } | null }>;
   remove: (paths: string[]) => Promise<{ error: { message: string } | null }>;
 };
 
@@ -74,6 +74,7 @@ export async function copyPhotoStorageObject(
 
   const { error: uploadError } = await bucket.upload(params.toPath, data, {
     contentType: params.contentType || data.type || "image/jpeg",
+    cacheControl: "31536000",
     upsert: false
   });
   if (uploadError) {
@@ -99,6 +100,7 @@ export async function uploadRecipeImage(
 
   const { error: uploadError } = await client.storage.from(PHOTOS_BUCKET).upload(storagePath, compressed.blob, {
     contentType: compressed.contentType,
+    cacheControl: "31536000",
     upsert: false
   });
   if (uploadError) {

@@ -27,7 +27,7 @@ function makeClient(options?: {
     data: options?.downloadError ? null : new Blob(["candidate"], { type: "image/jpeg" }),
     error: options?.downloadError ?? null
   }));
-  const upload = vi.fn<(path: string, body: Blob, opts?: { contentType?: string; upsert?: boolean }) => Promise<{ error: StorageError }>>(
+  const upload = vi.fn<(path: string, body: Blob, opts?: { contentType?: string; cacheControl?: string; upsert?: boolean }) => Promise<{ error: StorageError }>>(
     async () => ({ error: options?.uploadError ?? null })
   );
   const remove = vi.fn<(paths: string[]) => Promise<{ error: StorageError }>>(async () => ({ error: options?.removeError ?? null }));
@@ -54,7 +54,7 @@ describe("uploadRecipeImage", () => {
     const uploadedPath = upload.mock.calls[0][0] as string;
     expect(uploadedPath.startsWith(`${USER_ID}/recipe-images/${RECIPE_ID}/`)).toBe(true);
     expect(uploadedPath.endsWith(".webp")).toBe(true);
-    expect(upload.mock.calls[0][2]).toMatchObject({ contentType: "image/webp", upsert: false });
+    expect(upload.mock.calls[0][2]).toMatchObject({ contentType: "image/webp", cacheControl: "31536000", upsert: false });
     expect(update).toHaveBeenCalledWith({ image_storage_path: uploadedPath });
     if (result.ok) {
       expect(result.staleRemovalFailed).toBe(false);
@@ -146,6 +146,7 @@ describe("setRecipeImageFromCandidate", () => {
     expect(download).toHaveBeenCalledWith(`${USER_ID}/cooking-history/source.jpg`);
     expect(upload).toHaveBeenCalledWith(expect.stringContaining(`${USER_ID}/recipe-images/${RECIPE_ID}/`), expect.any(Blob), {
       contentType: "image/jpeg",
+      cacheControl: "31536000",
       upsert: false
     });
   });

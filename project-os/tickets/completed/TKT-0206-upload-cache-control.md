@@ -1,7 +1,7 @@
 ---
 id: TKT-0206-upload-cache-control
 title: 写真アップロードに cacheControl を付与しブラウザHTTPキャッシュ寿命を延ばす
-status: draft
+status: completed
 goal: content-addressed path（再アップロードは別 path）前提で、アップロード時に長め＋immutable 相当の cacheControl を付け、署名URL再利用時のブラウザHTTPキャッシュ寿命を延ばす。
 acceptance:
   - 各 `supabase.storage.from(...).upload(...)` の options に `cacheControl`（長め、例 `"31536000"`）が付与される

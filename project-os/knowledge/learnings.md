@@ -75,3 +75,22 @@ TKT-0160（料理・記録のPC多カラム化、CSS+state同期のみ）で `/c
 ### 再発防止
 - レイアウト/表示のみの変更で🔴evalが点いたら、止めずに manual-smokes.md（execution_mode: static_only）+ review.md で「写真Storage/schemaに実変更なし」を静的に立証し、誤検知である旨を明記して閉じる（ticket の required_gates に manual_smokes_done/review_ready を追加）。チケット作成時に owner_notes へ過剰マッチの可能性を先に書いておくと判断が速い。
 - 将来 `diff_regex_any` を `__tests__`/`*.test.*` 除外やコメント除外まで精密化するかは保留（誤検知側に倒すのは安全寄りで許容）。
+
+---
+
+## 2026-06-07 Supabase 非公開バケットの署名URLは upload の cacheControl をブラウザ向けに伝播しない（TKT-0206）
+
+### 事象
+TKT-0206 で写真アップロード全経路の `upload()` に `cacheControl: "31536000"` を付与し「署名URL再利用時のブラウザHTTPキャッシュ寿命を1年に延ばす」狙いだったが、実Supabaseへのプローブ検証（極小PNGを一時アップロード→署名URL→curl→即削除）で目的未達と判明。
+
+### 実測（curl 生ヘッダ）
+- `storage.list` の metadata には `cacheControl: "max-age=31536000"` が**保存される**（options の値は届いている＝コード変更は正しい）。
+- しかし**署名URL（`/object/sign/...`）のGET配信レスポンスには `cache-control` が出ない**（HEADは `cache-control: no-cache`）。代わりに `expires` ヘッダが**署名URL発行時のTTL**（アプリ既定 `USER_IMAGE_SIGNED_URL_TTL_SECONDS = 30分`）に連動する。前段に Cloudflare CDN（`cf-cache-status`）。
+
+### 原因
+非公開バケットの署名URL配信では、Supabase はオブジェクトの `cacheControl` メタをブラウザ向け `Cache-Control` に伝播しない設計。`cacheControl` が素直に効くのは主に**公開バケットの公開URL**。本アプリは写真を非公開のまま署名URLで配信する方針なので、その経路を使わない。
+
+### 再発防止 / 判断基準
+- 「写真のブラウザキャッシュ寿命」を実際に決めるのは **署名URL TTL（`expires`）＋ 同一URL再利用（[[TKT-0203]]/0204/0205 の `signed-url-cache`）**。upload の `cacheControl` ではない。
+- 体感のブラウザキャッシュ改善を狙うなら `USER_IMAGE_SIGNED_URL_TTL_SECONDS`（現30分）を延ばすのが正攻法。ただし署名URLの長寿命化はセキュリティトレードオフ（URL漏洩時の有効期間が延びる）。別チケットで要検討。
+- 効果が前提に依存する「最適化チケット」は、実装前か直後に**実環境プローブ（使い捨てスクリプトで上げて curl→即削除）**で配信ヘッダを実測してから効果を断定する。静的verifyだけでは「メタは保存されたが配信に出ない」を見抜けない。

@@ -326,6 +326,7 @@ describe("InventoryBoard", () => {
     await waitFor(() => {
       expect(upload).toHaveBeenCalledWith("user-1/inventory-images/item-1/image.webp", compressedBlob, {
         contentType: "image/webp",
+        cacheControl: "31536000",
         upsert: false
       });
       expect(update).toHaveBeenCalledWith({ image_storage_path: "user-1/inventory-images/item-1/image.webp" });
@@ -657,6 +658,7 @@ describe("InventoryBoard", () => {
       expect(storageFrom).toHaveBeenCalledWith("photos");
       expect(upload).toHaveBeenCalledWith("user-1/ingredient-scan/photo-1.jpg", compressedBlob, {
         contentType: "image/jpeg",
+        cacheControl: "31536000",
         upsert: false
       });
       expect(from).toHaveBeenCalledWith("photos");
