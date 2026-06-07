@@ -43,6 +43,20 @@ vi.mock("next/navigation", () => ({
   })
 }));
 
+vi.mock("@/lib/supabase/browser", () => ({
+  createBrowserSupabaseClient: () => ({})
+}));
+
+// 共有署名URLキャッシュは storage_path を同期解決する（テストでは即時に URL を返す）。
+vi.mock("@/lib/photos/signed-url-cache", () => ({
+  useCachedSignedUrls: (_client: unknown, paths: Array<string | null | undefined>) =>
+    new Map(
+      paths
+        .filter((path): path is string => Boolean(path))
+        .map((path) => [path, `https://signed.example/${path}`])
+    )
+}));
+
 const baseHistory: CookingHistoryItem = {
   id: "history-1",
   user_id: "user-1",

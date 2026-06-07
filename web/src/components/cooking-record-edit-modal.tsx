@@ -7,6 +7,7 @@ import type { StockItem } from "@/lib/inventory/types";
 import type { RecipeIngredient } from "@/lib/recipes/types";
 import { buildCookingHistoryPhotoStoragePath, compressImageFile } from "@/lib/photos/compress";
 import { useImageFileDrop } from "@/lib/photos/use-image-file-drop";
+import { useCachedSignedUrls } from "@/lib/photos/signed-url-cache";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 
 type Feedback = {
@@ -376,6 +377,7 @@ export function CookingRecordEditModal({ inventoryItems, item, onClose, onSaved,
             deletedPhotoIds={deletedPhotoIds}
             disabled={isSaving}
             photos={item.photos}
+            supabase={supabase}
             onRestoreDeleted={restoreDeletedPhotos}
             onToggleDeleted={toggleDeletedPhoto}
           />
@@ -585,14 +587,20 @@ function ExistingPhotoList({
   disabled,
   onRestoreDeleted,
   onToggleDeleted,
-  photos
+  photos,
+  supabase
 }: {
   deletedPhotoIds: string[];
   disabled: boolean;
   onRestoreDeleted: () => void;
   onToggleDeleted: (photoId: string) => void;
   photos: CookingHistoryPhoto[];
+  supabase: Parameters<typeof useCachedSignedUrls>[0];
 }) {
+  // storage_path の一覧を収集し、共有キャッシュで署名URL解決する（TKT-0205）。
+  const paths = useMemo(() => photos.map((photo) => photo.storage_path), [photos]);
+  const photoUrlMap = useCachedSignedUrls(supabase, paths);
+
   if (photos.length === 0) {
     return <p className="empty-list">既存写真はありません。</p>;
   }
@@ -605,27 +613,30 @@ function ExistingPhotoList({
     <div className="existing-photo-block">
       {visiblePhotos.length ? (
         <div className="photo-thumb-grid existing-photo-list" aria-label="既存写真">
-          {visiblePhotos.map((photo) => (
-            <div className="photo-thumb" key={photo.id}>
-              {photo.signed_url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img alt="既存の料理写真" src={photo.signed_url} />
-              ) : (
-                <span className="photo-thumb-fallback" aria-hidden="true">
-                  写真
-                </span>
-              )}
-              <button
-                className="photo-thumb-remove"
-                disabled={disabled}
-                onClick={() => onToggleDeleted(photo.id)}
-                type="button"
-                aria-label="この写真を削除"
-              >
-                ×
-              </button>
-            </div>
-          ))}
+          {visiblePhotos.map((photo) => {
+            const photoUrl = photoUrlMap.get(photo.storage_path);
+            return (
+              <div className="photo-thumb" key={photo.id}>
+                {photoUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img alt="既存の料理写真" src={photoUrl} />
+                ) : (
+                  <span className="photo-thumb-fallback" aria-hidden="true">
+                    写真
+                  </span>
+                )}
+                <button
+                  className="photo-thumb-remove"
+                  disabled={disabled}
+                  onClick={() => onToggleDeleted(photo.id)}
+                  type="button"
+                  aria-label="この写真を削除"
+                >
+                  ×
+                </button>
+              </div>
+            );
+          })}
         </div>
       ) : (
         <p className="empty-list">表示できる既存写真はありません。</p>

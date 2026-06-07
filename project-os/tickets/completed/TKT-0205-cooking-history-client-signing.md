@@ -1,7 +1,7 @@
 ---
 id: TKT-0205-cooking-history-client-signing
 title: 料理履歴の完成写真をサーバ署名からクライアント側キャッシュ取得へ移行
-status: draft
+status: completed
 goal: page.tsx のサーバ署名依存をやめ、料理履歴写真をクライアント共有キャッシュで解決することで、router.refresh() 後の再ダウンロードも解消する。
 acceptance:
   - `web/src/app/page.tsx` が料理履歴写真の `signed_url` をサーバ側で発行せず、`storage_path`（と必要メタ）をクライアントへ渡す

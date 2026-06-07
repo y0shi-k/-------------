@@ -6,6 +6,8 @@ import { CookingRecordEditModal } from "@/components/cooking-record-edit-modal";
 import { useShellNavigation, useShellSubView } from "@/components/web-mode-shell";
 import { CookingHistoryItem, CookingHistoryPhoto } from "@/lib/cooking-history/types";
 import type { StockItem } from "@/lib/inventory/types";
+import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
+import { useCachedSignedUrls } from "@/lib/photos/signed-url-cache";
 
 type CookingHistoryBoardProps = {
   initialHistory: CookingHistoryItem[];
@@ -92,6 +94,15 @@ function renderStars(rating: number | null) {
 export function CookingHistoryBoard({ initialHistory, initialInventoryItems, userId }: CookingHistoryBoardProps) {
   const router = useRouter();
   const history = initialHistory;
+  const supabase = useMemo(() => createBrowserSupabaseClient(), []);
+
+  // 全履歴写真の storage_path を収集し、共有キャッシュで署名URL解決する（TKT-0205）。
+  const allPhotoPaths = useMemo(
+    () => history.flatMap((item) => item.photos.map((photo) => photo.storage_path)).filter(Boolean),
+    [history]
+  );
+  const photoUrlMap = useCachedSignedUrls(supabase, allPhotoPaths);
+
   const [historyView, setHistoryView] = useState<HistoryView>("timeline");
   const [historySearch, setHistorySearch] = useState("");
   const [ratingFilter, setRatingFilter] = useState<RatingFilter>("all");
@@ -121,7 +132,7 @@ export function CookingHistoryBoard({ initialHistory, initialInventoryItems, use
     const cookedDate = toLocalDate(dateKey(item.cooked_at));
     const currentDate = new Date(today);
     currentDate.setHours(0, 0, 0, 0);
-    const hasPhoto = item.photos.some((photo) => photo.signed_url);
+    const hasPhoto = item.photos.some((photo) => photo.storage_path);
     const matchesQuery = query
       ? [item.recipe_name, item.note, ratingLabel(item.rating)].join(" ").toLowerCase().includes(query)
       : true;
@@ -162,7 +173,7 @@ export function CookingHistoryBoard({ initialHistory, initialInventoryItems, use
   weekStart.setDate(today.getDate() - today.getDay());
   weekStart.setHours(0, 0, 0, 0);
   const weekCount = history.filter((item) => toLocalDate(dateKey(item.cooked_at)) >= weekStart).length;
-  const photoCount = history.filter((item) => item.photos.some((photo) => photo.signed_url)).length;
+  const photoCount = history.filter((item) => item.photos.some((photo) => photo.storage_path)).length;
   const photoRate = history.length ? Math.round((photoCount / history.length) * 100) : 0;
   const groupedHistory = visibleHistory.reduce<Record<string, CookingHistoryItem[]>>((groups, item) => {
     const key = dateKey(item.cooked_at);
@@ -180,7 +191,7 @@ export function CookingHistoryBoard({ initialHistory, initialInventoryItems, use
     .sort((a, b) => a.lastDate.localeCompare(b.lastDate))
     .slice(0, 5);
   const monthPhotos = history
-    .filter((item) => dateKey(item.cooked_at).startsWith(monthKey(today)) && item.photos.some((photo) => photo.signed_url))
+    .filter((item) => dateKey(item.cooked_at).startsWith(monthKey(today)) && item.photos.some((photo) => photo.storage_path))
     .slice(0, 6);
 
   function shiftCalendarMonth(offset: number) {
@@ -277,8 +288,10 @@ export function CookingHistoryBoard({ initialHistory, initialInventoryItems, use
               {calendarCells.map((cell) => {
                 const key = localDateKey(cell);
                 const items = groupedHistory[key] ?? [];
-                const photoItem = items.find((item) => item.photos.some((photo) => photo.signed_url));
-                const photo = photoItem?.photos.find((item) => item.signed_url);
+                // 写真あり判定は storage_path の有無で行う（TKT-0205）。
+                const photoItem = items.find((item) => item.photos.some((photo) => photo.storage_path));
+                const photo = photoItem?.photos.find((photo) => photo.storage_path);
+                const photoUrl = photo ? photoUrlMap.get(photo.storage_path) : undefined;
                 const selected = selectedDate === key;
                 return (
                   <button
@@ -295,9 +308,9 @@ export function CookingHistoryBoard({ initialHistory, initialInventoryItems, use
                       {photo ? <i data-kind="photo" /> : null}
                       {items.some((item) => Number(item.rating) >= 4) ? <i data-kind="rating" /> : null}
                     </div>
-                    {photo?.signed_url ? (
+                    {photoUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img alt="" src={photo.signed_url} />
+                      <img alt="" src={photoUrl} />
                     ) : null}
                   </button>
                 );
@@ -314,6 +327,7 @@ export function CookingHistoryBoard({ initialHistory, initialInventoryItems, use
               onEdit={setEditingItem}
               onView={setViewingItem}
               onViewRecipe={requestViewRecipe}
+              photoUrlMap={photoUrlMap}
               title={formatCookingDateLabel(selectedDate)}
             />
           </div>
@@ -333,10 +347,12 @@ export function CookingHistoryBoard({ initialHistory, initialInventoryItems, use
               {monthPhotos.length ? (
                 <div className="photo-month-grid">
                   {monthPhotos.map((item) => {
-                    const photo = item.photos.find((entry) => entry.signed_url);
-                    return photo?.signed_url ? (
+                    // storage_path があるものを代表写真として選択し、キャッシュMapから URL を引く。
+                    const photo = item.photos.find((entry) => entry.storage_path);
+                    const photoUrl = photo ? photoUrlMap.get(photo.storage_path) : undefined;
+                    return photoUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img alt={`${displayRecipeName(item.recipe_name)}の完成写真`} key={item.id} src={photo.signed_url} />
+                      <img alt={`${displayRecipeName(item.recipe_name)}の完成写真`} key={item.id} src={photoUrl} />
                     ) : null;
                   })}
                 </div>
@@ -354,6 +370,7 @@ export function CookingHistoryBoard({ initialHistory, initialInventoryItems, use
                 onEdit={setEditingItem}
                 onView={setViewingItem}
                 onViewRecipe={requestViewRecipe}
+                photoUrlMap={photoUrlMap}
                 title={formatCookingDateLabel(key)}
               />
             ))}
@@ -376,6 +393,7 @@ export function CookingHistoryBoard({ initialHistory, initialInventoryItems, use
           item={viewingItem}
           onClose={() => setViewingItem(null)}
           onEdit={() => handleViewEdit(viewingItem)}
+          photoUrlMap={photoUrlMap}
         />
       ) : null}
     </section>
@@ -396,12 +414,14 @@ function HistoryDateGroup({
   onEdit,
   onView,
   onViewRecipe,
+  photoUrlMap,
   title
 }: {
   items: CookingHistoryItem[];
   onEdit: (item: CookingHistoryItem) => void;
   onView: (item: CookingHistoryItem) => void;
   onViewRecipe: (recipeId: string, origin?: "recipes" | "cooking") => void;
+  photoUrlMap: Map<string, string>;
   title: string;
 }) {
   return (
@@ -417,7 +437,7 @@ function HistoryDateGroup({
               <button className="history-edit-button" onClick={() => onEdit(item)} type="button">
                 編集
               </button>
-              <HistoryPhoto photos={item.photos} recipeName={displayRecipeName(item.recipe_name)} onView={() => onView(item)} />
+              <HistoryPhoto photos={item.photos} photoUrlMap={photoUrlMap} recipeName={displayRecipeName(item.recipe_name)} onView={() => onView(item)} />
               <div className="history-item-body">
                 <div className="history-item-topline">
                   <div>
@@ -428,7 +448,7 @@ function HistoryDateGroup({
                 </div>
                 <div className="history-tags">
                   <em>その他</em>
-                  {item.photos.some((photo) => photo.signed_url) ? <em>写真あり</em> : null}
+                  {item.photos.some((photo) => photo.storage_path) ? <em>写真あり</em> : null}
                   {item.note ? <em>メモあり</em> : null}
                 </div>
                 <p className="item-note">{item.note || "感想なし"}</p>
@@ -473,13 +493,16 @@ function InsightPanel({ green, rows, stars, title }: { green?: boolean; rows: st
 function CookingRecordViewModal({
   item,
   onClose,
-  onEdit
+  onEdit,
+  photoUrlMap
 }: {
   item: CookingHistoryItem;
   onClose: () => void;
   onEdit: () => void;
+  photoUrlMap: Map<string, string>;
 }) {
-  const visiblePhotos = item.photos.filter((photo) => photo.signed_url);
+  // storage_path があるものを「写真あり」とみなす（TKT-0205）。
+  const visiblePhotos = item.photos.filter((photo) => photo.storage_path);
   const recipeName = displayRecipeName(item.recipe_name);
 
   return (
@@ -495,13 +518,19 @@ function CookingRecordViewModal({
 
         <div className="cooking-record-view-photos" aria-label={`${recipeName}の写真`}>
           {visiblePhotos.length ? (
-            visiblePhotos.map((photo, index) => (
-              <figure className="cooking-record-view-photo" key={photo.id}>
-                {/* Supabase signed URLs are already scoped and short lived, so Next Image optimization is not needed here. */}
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={photo.signed_url!} alt={`${recipeName}の完成写真 ${index + 1}`} />
-              </figure>
-            ))
+            visiblePhotos.map((photo, index) => {
+              const photoUrl = photoUrlMap.get(photo.storage_path);
+              return (
+                <figure className="cooking-record-view-photo" key={photo.id}>
+                  {photoUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={photoUrl} alt={`${recipeName}の完成写真 ${index + 1}`} />
+                  ) : (
+                    <span className="photo-thumb-fallback" aria-hidden="true">読み込み中…</span>
+                  )}
+                </figure>
+              );
+            })
           ) : (
             <div className="cooking-record-view-photo-empty">写真なし</div>
           )}
@@ -533,20 +562,36 @@ function CookingRecordViewModal({
   );
 }
 
-function HistoryPhoto({ photos, recipeName, onView }: { photos: CookingHistoryPhoto[]; recipeName: string; onView: () => void }) {
-  const visiblePhotos = photos.filter((item) => item.signed_url);
-  const photo = visiblePhotos[0] ?? photos[0];
+function HistoryPhoto({
+  photos,
+  photoUrlMap,
+  recipeName,
+  onView
+}: {
+  photos: CookingHistoryPhoto[];
+  photoUrlMap: Map<string, string>;
+  recipeName: string;
+  onView: () => void;
+}) {
+  // storage_path がある写真を「写真あり」とみなす（TKT-0205）。
+  const photosWithPath = photos.filter((photo) => photo.storage_path);
+  const photo = photosWithPath[0];
+  const photoUrl = photo ? photoUrlMap.get(photo.storage_path) : undefined;
 
-  if (!photo?.signed_url) {
+  if (!photo) {
+    return <div className="history-photo-empty">写真なし</div>;
+  }
+
+  if (!photoUrl) {
+    // storage_path はあるが署名URLがまだ解決されていない（初回レンダリング直後）。
     return <div className="history-photo-empty">写真なし</div>;
   }
 
   return (
     <button className="history-photo history-photo-button" aria-label={`${recipeName}の写真を表示`} onClick={onView} type="button">
-      {/* Supabase signed URLs are already scoped and short lived, so Next Image optimization is not needed here. */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={photo.signed_url} alt={`${recipeName}の完成写真`} />
-      {visiblePhotos.length >= 2 ? <span className="history-photo-count-badge">📷{visiblePhotos.length}</span> : null}
+      <img src={photoUrl} alt={`${recipeName}の完成写真`} />
+      {photosWithPath.length >= 2 ? <span className="history-photo-count-badge">📷{photosWithPath.length}</span> : null}
     </button>
   );
 }

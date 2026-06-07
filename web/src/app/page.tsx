@@ -115,15 +115,12 @@ export default async function Home() {
           .in("cooking_history_id", historyIds)
           .order("created_at", { ascending: false })
       : { data: [] };
-  const signedPhotos = await Promise.all(
-    ((historyPhotos ?? []) as CookingHistoryPhoto[]).map(async (photo) => {
-      const { data } = await supabase.storage.from(photo.bucket_id).createSignedUrl(photo.storage_path, 60 * 30);
-      return { ...photo, signed_url: data?.signedUrl ?? null };
-    })
-  );
+  // 署名URLはサーバ側で発行せず、クライアントの共有キャッシュ（TKT-0203 useCachedSignedUrls）で解決する。
+  // storage_path をそのまま渡すことで router.refresh() 後の再ダウンロードを防ぐ。
+  const rawPhotos = (historyPhotos ?? []) as CookingHistoryPhoto[];
   const cookingHistoryWithPhotos = cookingHistoryRows.map((item) => ({
     ...item,
-    photos: signedPhotos.filter((photo) => photo.cooking_history_id === item.id)
+    photos: rawPhotos.filter((photo) => photo.cooking_history_id === item.id)
   }));
 
   return (

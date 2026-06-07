@@ -4,6 +4,7 @@ export type CookingHistoryPhoto = {
   id: string;
   user_id: string;
   bucket_id: string;
+  /** 非公開バケット内のパス。表示時は useCachedSignedUrls(supabase, [storage_path]) で署名URLを解決する。 */
   storage_path: string;
   usage_type: string;
   cooking_history_id: string | null;
@@ -11,6 +12,11 @@ export type CookingHistoryPhoto = {
   byte_size: number | null;
   width: number | null;
   height: number | null;
+  /**
+   * @deprecated サーバ側でのURL発行は廃止（TKT-0205）。
+   * クライアントの useCachedSignedUrls で解決するため、このフィールドはサーバから渡されなくなった。
+   * 「写真あり」判定は storage_path の有無で行うこと。
+   */
   signed_url?: string | null;
   created_at: string;
   updated_at: string;
