@@ -1150,6 +1150,138 @@ describe("RecipeMealWorkspace", () => {
     expect(await screen.findByText("並び替えを保存しました。")).toBeTruthy();
   });
 
+  it("groups selected ingredients into a subgroup and persists group_index", async () => {
+    const carrot: RecipeIngredient = { ...baseIngredient, id: "ingredient-2", name: "にんじん", sort_order: 1 };
+    const salt: RecipeIngredient = {
+      ...baseIngredient,
+      id: "ingredient-3",
+      item_type: "調味料",
+      name: "塩",
+      amount: 1,
+      unit: "小さじ",
+      sort_order: 2
+    };
+    const ingredientUpdate = updateTripleEqQuery();
+    from.mockImplementation((table: string) => {
+      if (table === "recipe_ingredients") return { update: ingredientUpdate.update };
+      return {};
+    });
+
+    renderWorkspace({ initialRecipes: [{ ...baseRecipe, ingredients: [baseIngredient, carrot, salt] }] });
+    fireEvent.click(screen.getByRole("button", { name: "調理ビューを開く" }));
+    const overlay = screen.getByRole("dialog", { name: "調理ビューア全画面" });
+
+    // 1件目はプレーンクリック、2件目はCmd/Ctrlクリックで複数選択。
+    fireEvent.click(within(overlay).getByText("玉ねぎ").closest("article") as HTMLElement);
+    fireEvent.click(within(overlay).getByText("にんじん").closest("article") as HTMLElement, { metaKey: true });
+
+    // 2件以上の選択でラベル隣にグルーピングボタンが出る。
+    fireEvent.click(within(overlay).getByRole("button", { name: "グルーピング" }));
+
+    // サブグループ見出しが自動採番(材料=A)で表示される。
+    expect(within(overlay).getByText("A")).toBeTruthy();
+
+    fireEvent.click(within(overlay).getByRole("button", { name: "並び替えを確定" }));
+    fireEvent.click(screen.getByRole("button", { name: "並びを確定" }));
+
+    await waitFor(() => {
+      expect(ingredientUpdate.update).toHaveBeenCalledWith({ item_type: "食材", sort_order: 0, group_index: 1 });
+      expect(ingredientUpdate.update).toHaveBeenCalledWith({ item_type: "食材", sort_order: 1, group_index: 1 });
+      expect(ingredientUpdate.update).toHaveBeenCalledWith({ item_type: "調味料", sort_order: 2, group_index: 0 });
+    });
+    expect(await screen.findByText("並び替えを保存しました。")).toBeTruthy();
+  });
+
+  it("ungroups a subgroup back to group_index 0 via the 解除 button", async () => {
+    const carrot: RecipeIngredient = {
+      ...baseIngredient,
+      id: "ingredient-2",
+      name: "にんじん",
+      sort_order: 1,
+      group_index: 1
+    };
+    const groupedOnion: RecipeIngredient = { ...baseIngredient, group_index: 1 };
+    const ingredientUpdate = updateTripleEqQuery();
+    from.mockImplementation((table: string) => {
+      if (table === "recipe_ingredients") return { update: ingredientUpdate.update };
+      return {};
+    });
+
+    renderWorkspace({ initialRecipes: [{ ...baseRecipe, ingredients: [groupedOnion, carrot] }] });
+    fireEvent.click(screen.getByRole("button", { name: "調理ビューを開く" }));
+    const overlay = screen.getByRole("dialog", { name: "調理ビューア全画面" });
+
+    // 既存サブグループの見出し「A」と「解除」ボタンが出ている。
+    expect(within(overlay).getByText("A")).toBeTruthy();
+    fireEvent.click(within(overlay).getByRole("button", { name: "解除" }));
+
+    fireEvent.click(within(overlay).getByRole("button", { name: "並び替えを確定" }));
+    fireEvent.click(screen.getByRole("button", { name: "並びを確定" }));
+
+    await waitFor(() => {
+      expect(ingredientUpdate.update).toHaveBeenCalledWith({ item_type: "食材", sort_order: 0, group_index: 0 });
+      expect(ingredientUpdate.update).toHaveBeenCalledWith({ item_type: "食材", sort_order: 1, group_index: 0 });
+    });
+    expect(await screen.findByText("並び替えを保存しました。")).toBeTruthy();
+  });
+
+  it("limits subgroup selection to a single item_type", () => {
+    const salt: RecipeIngredient = {
+      ...baseIngredient,
+      id: "ingredient-3",
+      item_type: "調味料",
+      name: "塩",
+      amount: 1,
+      unit: "小さじ",
+      sort_order: 1
+    };
+
+    renderWorkspace({ initialRecipes: [{ ...baseRecipe, ingredients: [baseIngredient, salt] }] });
+    fireEvent.click(screen.getByRole("button", { name: "調理ビューを開く" }));
+    const overlay = screen.getByRole("dialog", { name: "調理ビューア全画面" });
+
+    // 材料を選び、Cmdクリックで調味料を足しても item_type 混在は不可＝選択は切り替わる。
+    fireEvent.click(within(overlay).getByText("玉ねぎ").closest("article") as HTMLElement);
+    fireEvent.click(within(overlay).getByText("塩").closest("article") as HTMLElement, { metaKey: true });
+
+    // 単一選択しか残らないのでグルーピングボタンは出ない。
+    expect(within(overlay).queryByRole("button", { name: "グルーピング" })).toBeNull();
+    expect((within(overlay).getByText("塩").closest("article") as HTMLElement).getAttribute("data-selected")).toBe("true");
+    expect((within(overlay).getByText("玉ねぎ").closest("article") as HTMLElement).getAttribute("data-selected")).toBe("false");
+  });
+
+  it("labels seasoning subgroups with hiragana", () => {
+    const soy: RecipeIngredient = {
+      ...baseIngredient,
+      id: "ingredient-3",
+      item_type: "調味料",
+      name: "醤油",
+      amount: 1,
+      unit: "大さじ",
+      sort_order: 1
+    };
+    const mirin: RecipeIngredient = {
+      ...baseIngredient,
+      id: "ingredient-4",
+      item_type: "調味料",
+      name: "みりん",
+      amount: 1,
+      unit: "大さじ",
+      sort_order: 2
+    };
+
+    renderWorkspace({ initialRecipes: [{ ...baseRecipe, ingredients: [baseIngredient, soy, mirin] }] });
+    fireEvent.click(screen.getByRole("button", { name: "調理ビューを開く" }));
+    const overlay = screen.getByRole("dialog", { name: "調理ビューア全画面" });
+
+    fireEvent.click(within(overlay).getByText("醤油").closest("article") as HTMLElement);
+    fireEvent.click(within(overlay).getByText("みりん").closest("article") as HTMLElement, { metaKey: true });
+    fireEvent.click(within(overlay).getByRole("button", { name: "グルーピング" }));
+
+    // 調味料の自動採番はひらがな（あ）。
+    expect(within(overlay).getByText("あ")).toBeTruthy();
+  });
+
   it("renders multiple source URLs as separate links in the cooking overlay", () => {
     const sourcedRecipe: Recipe = {
       ...baseRecipe,

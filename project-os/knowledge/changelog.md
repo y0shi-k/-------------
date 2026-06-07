@@ -7,6 +7,7 @@
 
 ## 2026-06
 
+- TKT-0201 — 全画面ビューの材料・調味料サブグルーピングUI（行クリック＋Cmd/Ctrl複数選択→ラベル隣「グルーピング」で同一 item_type 内に `group_index` 付与、サブグループ見出し「解除」/選択行「グループ解除」で 0 へ戻す、見出し自動採番=材料A/B/C・調味料あ/い/う、D&Dはドロップ先の group_index 継承、`sameIngredientOrder` に group_index 比較追加で位置不変でも確定有効化）。保存は `recipe_ingredients` の item_type/sort_order/group_index 更新に限定＝schema変更なし（supabase_schema_change は語彙の過剰マッチ／report・manual-smokes に静的記録）。残: 実機375pxでのサブグループ枠・選択/D&D共存の目視。
 - TKT-0200 — 材料・調味料サブグループのDB土台（`recipe_ingredients.group_index` 0=未グループ追加＝危険変更/supabase_schema_change、`check(group_index>=0)`、型・取得順`item_type,group_index,sort_order`・保存ペイロード対応。UI未実装＝常に0保存で挙動不変、policy/RLS無変更）。残: リモートmigration適用と適用後のRLSライブ確認（manual-smokes.md 手順あり）。
 - TKT-0199 — 全画面ビュー「並び替えを確定」に確認を追加（保存前に `requestDelete`/`DeleteConfirmPanel` を流用した確認、OK時のみ既存 `saveCookingReorder` 実行・やめるで未確定保持）。並び替えロジック・保存対象カラム無変更。残: 実機での文言・操作感確認。
 - TKT-0198 — レシピ編集モーダルの材料・調味料を3本線ハンドルD&D並び替え（`moveIngredient` で immutable 入替・同一 item_type 内限定、保存は既存 `saveRecipe`→`sort_order` 採番流用）。schema/新規DB書き込み無変更。残: 実機スマホでのD&D操作感確認。

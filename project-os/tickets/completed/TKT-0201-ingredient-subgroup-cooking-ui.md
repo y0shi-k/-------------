@@ -1,7 +1,7 @@
 ---
 id: TKT-0201-ingredient-subgroup-cooking-ui
 title: 全画面ビューの材料・調味料サブグルーピングUI（選択→グループ化／解除）
-status: implementation_ready
+status: completed
 goal: 全画面ビューで材料/調味料の中をサブグループに分けられるようにし、TKT-0200のgroup_indexへ永続保存する。
 acceptance:
   - 材料・調味料の行をクリックすると選択状態に切り替わる（再クリックで解除）

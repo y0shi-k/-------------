@@ -3408,8 +3408,16 @@ h1 {
   gap: 8px;
 }
 
-.cooking-ing-group-label {
+.cooking-ing-group-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
   margin: 4px 0 0;
+}
+
+.cooking-ing-group-label {
+  margin: 0;
   font-size: 0.62rem;
   font-weight: 700;
   letter-spacing: 0.12em;
@@ -3421,6 +3429,75 @@ h1 {
 
 .cooking-ing-group-label[data-tone="調味料"] {
   color: #b45309;
+}
+
+.cooking-group-action {
+  border: 1px solid #c7d2fe;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #4338ca;
+  padding: 2px 10px;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+
+.cooking-group-action[data-variant="ungroup"] {
+  border-color: #e2e8f0;
+  background: #f8fafc;
+  color: #64748b;
+}
+
+.cooking-ing-subgroup {
+  display: grid;
+  gap: 8px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 12px;
+  padding: 8px;
+  background: #f8fafc;
+}
+
+.cooking-ing-subgroup[data-tone="食材"] {
+  border-color: #a7f3d0;
+  background: #f0fdf4;
+}
+
+.cooking-ing-subgroup[data-tone="調味料"] {
+  border-color: #fde68a;
+  background: #fffbeb;
+}
+
+.cooking-ing-subgroup-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.cooking-ing-subgroup-label {
+  display: grid;
+  place-items: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 8px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #fff;
+}
+
+.cooking-ing-subgroup-label[data-tone="食材"] {
+  background: #059669;
+}
+
+.cooking-ing-subgroup-label[data-tone="調味料"] {
+  background: #d97706;
+}
+
+.cooking-ing-card[data-selected="true"] {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 2px rgb(99 102 241 / 28%);
 }
 
 .cooking-step-group-label {
