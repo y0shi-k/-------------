@@ -16,6 +16,11 @@
 - 公開前セキュリティ整備（TKT-0149/0150/0151）が一段落。次は本番Supabase/Vercelへの適用・手動確認（→「次にやる候補」P1）。
 
 ## 次にやる候補（優先度つき・要ユーザー確認）
+0h. (画像署名URLの共有キャッシュ化・2026-06-07 /breakdown 展開／依存順) 画像のあるページへ遷移するたび画像読み込みが走る問題（モード切替でアンマウント→署名URL毎回新トークン→ブラウザ画像キャッシュミス）を、path単位の共有キャッシュで同一URL再利用して解消。SPEC-0203 新設。依存順4 TKT:
+   - **TKT-0203（先行・🟢非危険・土台）**: `web/src/lib/photos/signed-url-cache.ts` 新設（module キャッシュ＋in-flight dedup＋`getCachedUserImageSignedUrl`/`invalidateUserImageSignedUrl`/共有フック `useCachedSignedUrls`）＋vitest。`photo_upload_storage` は語彙過剰マッチ＝report記録運用（読み取り専用・Storage無変更）。
+   - TKT-0204（🟢非危険・TKT-0203依存）: recipe/ingredient/cooking候補 の署名URL取得をキャッシュ経由に統一＋差し替え/削除時 invalidate。モード往復で再DLしないことを手動確認。
+   - TKT-0205（🟢非危険・影響広・TKT-0203依存）: 料理履歴の完成写真を `page.tsx` サーバ署名からクライアント側 `useCachedSignedUrls` 解決へ移行。`router.refresh()` 後の再DLも解消。「写真あり」判定を storage_path 有無へ。
+   - TKT-0206（🔴危険変更＝photo_upload_storage・独立・任意/後送り可）: 写真アップロード全経路の `upload()` に長期 `cacheControl` 付与。manual-smokes/review 必須。既存オブジェクトには遡及せず。単独では効果限定、TKT-0204/0205 併用が前提。
 0g. (レシピ並び替え拡張＋材料/調味料サブグルーピング・2026-06-07 /breakdown 展開／依存順) TKT-0197 の全画面ビュー並び替えを編集画面へ展開し、材料・調味料の中をサブグループ化（材料=A/B/C、調味料=あ/い/う 自動採番、行クリック＋Cmd/Ctrl複数選択→ラベル隣のグルーピング/解除ボタン）。グルーピングはDB永続保存。TKT-0198/0199/0200/0201 完了（changelog 参照）。残1 TKT:
    - TKT-0202（次の候補・🟢非危険・TKT-0200/0201/0198依存）: 編集画面のサブグルーピングUI。0201の共通ロジック（`subgroupLabel`/`subgroupRankMap`/`regroupCookingDrafts` 等）を流用、0198のD&Dと整合。
 0f. (料理記録の写真UX・2026-06-06 起票／独立並行可) 料理記録の写真まわりの使い勝手改善。全🟢非危険（UI・既存 signed_url/削除/追加経路の再利用、Storage/schema/auth 無変更）。`photo_upload_storage` は語彙過剰マッチ＝report記録運用。TKT-0188 完了（changelog 参照）。残1 TKT:

@@ -1,7 +1,7 @@
 ---
 id: TKT-0202-ingredient-subgroup-edit-ui
 title: レシピ編集画面の材料・調味料サブグルーピングUI（選択→グループ化／解除）
-status: implementation_ready
+status: verify_passed
 goal: 全画面ビュー（TKT-0201）と同じサブグルーピングを編集モーダルでも使えるようにし、編集・全画面の両画面で材料/調味料のサブグループを永続管理できるようにする。
 acceptance:
   - 編集モーダルの材料・調味料行をクリックで選択／再クリックで解除できる

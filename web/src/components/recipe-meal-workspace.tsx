@@ -244,14 +244,79 @@ function subgroupLabel(itemType: "食材" | "調味料", rank: number): string {
 // item_type内の正のgroup_indexを出現順に並べ、各group_indexのrank(1始まり)を返す。
 // 番号の欠番や非連番は出現順のrankで吸収する（DBの番号は連番でなくてよい）。
 function subgroupRankMap(items: CookingIngredientDraft[]): Map<number, number> {
+  return subgroupRankMapForItems(items.map((draft) => draft.ingredient));
+}
+
+type SubgroupItem = {
+  item_type: "食材" | "調味料";
+  group_index: number;
+};
+
+function subgroupRankMapForItems<T extends SubgroupItem>(items: T[]): Map<number, number> {
   const order: number[] = [];
-  for (const draft of items) {
-    const groupIndex = draft.ingredient.group_index ?? 0;
+  for (const item of items) {
+    const groupIndex = item.group_index ?? 0;
     if (groupIndex > 0 && !order.includes(groupIndex)) order.push(groupIndex);
   }
   const map = new Map<number, number>();
   order.forEach((groupIndex, index) => map.set(groupIndex, index + 1));
   return map;
+}
+
+function subgroupRuns<T extends SubgroupItem>(items: T[]): { groupIndex: number; entries: { item: T; sectionIndex: number }[] }[] {
+  const runs: { groupIndex: number; entries: { item: T; sectionIndex: number }[] }[] = [];
+  items.forEach((item, sectionIndex) => {
+    const groupIndex = item.group_index ?? 0;
+    const last = runs[runs.length - 1];
+    if (last && last.groupIndex === groupIndex) {
+      last.entries.push({ item, sectionIndex });
+    } else {
+      runs.push({ groupIndex, entries: [{ item, sectionIndex }] });
+    }
+  });
+  return runs;
+}
+
+function replaceSubgroupList<T extends SubgroupItem>(
+  current: T[],
+  tone: "食材" | "調味料",
+  mutate: (list: T[]) => T[]
+): T[] {
+  const foods = current.filter((item) => item.item_type === "食材");
+  const seasonings = current.filter((item) => item.item_type === "調味料");
+  return tone === "食材" ? [...mutate(foods), ...seasonings] : [...foods, ...mutate(seasonings)];
+}
+
+function groupSubgroupItems<T extends SubgroupItem>(
+  list: T[],
+  selectedIds: string[],
+  getId: (item: T) => string,
+  updateGroupIndex: (item: T, groupIndex: number) => T
+): T[] {
+  const selectedSet = new Set(selectedIds);
+  const used = new Set(list.map((item) => item.group_index ?? 0).filter((groupIndex) => groupIndex > 0));
+  let newIndex = 1;
+  while (used.has(newIndex)) newIndex += 1;
+  const firstPos = list.findIndex((item) => selectedSet.has(getId(item)));
+  if (firstPos < 0) return list;
+  const insertAt = list.slice(0, firstPos).filter((item) => !selectedSet.has(getId(item))).length;
+  const selected = list.filter((item) => selectedSet.has(getId(item))).map((item) => updateGroupIndex(item, newIndex));
+  const rest = list.filter((item) => !selectedSet.has(getId(item)));
+  const result = [...rest];
+  result.splice(insertAt, 0, ...selected);
+  return result;
+}
+
+function clearSubgroupItems<T extends SubgroupItem>(
+  list: T[],
+  targetIds: string[],
+  getId: (item: T) => string,
+  updateGroupIndex: (item: T, groupIndex: number) => T
+): T[] {
+  const targetSet = new Set(targetIds);
+  const cleared = list.filter((item) => targetSet.has(getId(item))).map((item) => updateGroupIndex(item, 0));
+  const rest = list.filter((item) => !targetSet.has(getId(item)));
+  return [...rest, ...cleared];
 }
 
 function normalizeRecipeForm(values: RecipeFormValues): NormalizedRecipeForm {
@@ -268,8 +333,7 @@ function normalizeRecipeForm(values: RecipeFormValues): NormalizedRecipeForm {
       amount,
       unit: ingredient.unit.trim(),
       sort_order: index,
-      // TKT-0200: グルーピングUI未実装のため常に 0（未グループ）。UIは TKT-0201/0202 で乗る。
-      group_index: 0
+      group_index: ingredient.group_index ?? 0
     };
   });
   const invalidIngredient = ingredients.find((ingredient) => !ingredient.name || !ingredient.unit || !Number.isFinite(ingredient.amount) || ingredient.amount < 0);
@@ -402,6 +466,8 @@ export function RecipeMealWorkspace({
   const [recipeImagePreviewUrl, setRecipeImagePreviewUrl] = useState<string | null>(null);
   // 既存画像を削除する操作を選んだか（保存時に Storage/DB から消す）。
   const [recipeImageRemoved, setRecipeImageRemoved] = useState(false);
+  // 編集モーダルでサブグルーピング選択中の材料行index。同一 item_type 内だけ複数選択できる。
+  const [recipeSelectedIngredientKeys, setRecipeSelectedIngredientKeys] = useState<string[]>([]);
   const [selectedRecipeId, setSelectedRecipeId] = useState(initialRecipes[0]?.id ?? "");
   const [activeCookingRecipeId, setActiveCookingRecipeId] = useState("");
   // Canvas版同様、7日ウィンドウは常に今日を中央（today-3〜today+3）に置く。
@@ -504,6 +570,7 @@ export function RecipeMealWorkspace({
   const recipeIngredientEntries = recipeValues.ingredients.map((ingredient, index) => ({ ingredient, index }));
   const foodIngredientEntries = recipeIngredientEntries.filter(({ ingredient }) => ingredient.item_type === "食材");
   const seasoningIngredientEntries = recipeIngredientEntries.filter(({ ingredient }) => ingredient.item_type === "調味料");
+  const selectedRecipeIngredientEntries = recipeIngredientEntries.filter(({ index }) => recipeSelectedIngredientKeys.includes(String(index)));
   const prepStepEntries = recipeStepRows(recipeValues.prep_steps);
   const cookStepEntries = recipeStepRows(recipeValues.steps);
   const filteredShortageSelectionItems = shortageSelectionItems.filter((item) => {
@@ -552,6 +619,7 @@ export function RecipeMealWorkspace({
   function resetRecipeForm() {
     setRecipeValues(emptyRecipeFormValues);
     setEditingRecipeId(null);
+    setRecipeSelectedIngredientKeys([]);
     setEditingRecipeImagePath(null);
     setEditingRecipeImageUrl(null);
     clearRecipeImageDraft();
@@ -637,7 +705,7 @@ export function RecipeMealWorkspace({
   // 編集モーダルの材料・調味料をD&Dで並び替える。並び替えは同一 item_type 内に限定し、
   // セクションをまたぐ移動は行わない。`recipeValues.ingredients` を immutable に入れ替えるだけで、
   // 保存時に既存の `normalizeRecipeForm`（表示順→`sort_order` 採番）へそのまま乗る。
-  function moveIngredient(fromIndex: number, targetType: RecipeIngredientType, targetSectionIndex: number) {
+  function moveIngredient(fromIndex: number, targetType: RecipeIngredientType, targetSectionIndex: number, targetGroupIndex = 0) {
     setRecipeValues((current) => {
       const items = current.ingredients;
       const moving = items[fromIndex];
@@ -647,11 +715,12 @@ export function RecipeMealWorkspace({
       const seasonings = remaining.filter((ingredient) => ingredient.item_type === "調味料");
       const targetList = targetType === "食材" ? foods : seasonings;
       const insertIndex = Math.max(0, Math.min(targetSectionIndex, targetList.length));
-      targetList.splice(insertIndex, 0, moving);
+      targetList.splice(insertIndex, 0, { ...moving, group_index: targetGroupIndex });
       const next = [...foods, ...seasonings];
       if (sameIngredientFormOrder(items, next)) return current;
       return { ...current, ingredients: next };
     });
+    setRecipeSelectedIngredientKeys([]);
   }
 
   function addIngredientRow(itemType: RecipeIngredientType = "食材") {
@@ -669,6 +738,84 @@ export function RecipeMealWorkspace({
           ? current.ingredients.filter((_, currentIndex) => currentIndex !== index)
           : current.ingredients
     }));
+    setRecipeSelectedIngredientKeys((current) => current.filter((key) => key !== String(index)));
+  }
+
+  function toggleRecipeIngredientSelection(index: number, ingredient: RecipeIngredientFormValues, additive: boolean) {
+    const key = String(index);
+    setRecipeSelectedIngredientKeys((current) => {
+      if (!additive) {
+        return current.length === 1 && current[0] === key ? [] : [key];
+      }
+      if (current.length > 0) {
+        const firstType = recipeValues.ingredients[Number(current[0])]?.item_type;
+        if (firstType && firstType !== ingredient.item_type) {
+          return [key];
+        }
+      }
+      return current.includes(key) ? current.filter((value) => value !== key) : [...current, key];
+    });
+  }
+
+  function replaceRecipeIngredientSubgroup(
+    tone: RecipeIngredientType,
+    mutate: (
+      list: Array<RecipeIngredientFormValues & { selectionKey: string }>
+    ) => Array<RecipeIngredientFormValues & { selectionKey: string }>
+  ) {
+    setRecipeValues((current) => {
+      const keyed = current.ingredients.map((ingredient, index) => ({ ...ingredient, selectionKey: String(index) }));
+      const next = replaceSubgroupList(keyed, tone, mutate).map(({ item_type, name, amount, unit, group_index }) => ({
+        item_type,
+        name,
+        amount,
+        unit,
+        group_index
+      }));
+      return { ...current, ingredients: next };
+    });
+  }
+
+  function groupSelectedRecipeIngredients(tone: RecipeIngredientType) {
+    const selectedInTone = selectedRecipeIngredientEntries.filter(({ ingredient }) => ingredient.item_type === tone);
+    if (selectedInTone.length < 2) return;
+    const selectedKeys = selectedInTone.map(({ index }) => String(index));
+    replaceRecipeIngredientSubgroup(tone, (list) =>
+      groupSubgroupItems(
+        list,
+        selectedKeys,
+        (item) => item.selectionKey,
+        (item, groupIndex) => ({ ...item, group_index: groupIndex })
+      )
+    );
+    setRecipeSelectedIngredientKeys([]);
+  }
+
+  function clearRecipeIngredientGroup(tone: RecipeIngredientType, keys: string[]) {
+    if (keys.length === 0) return;
+    replaceRecipeIngredientSubgroup(tone, (list) =>
+      clearSubgroupItems(
+        list,
+        keys,
+        (item) => item.selectionKey,
+        (item, groupIndex) => ({ ...item, group_index: groupIndex })
+      )
+    );
+    setRecipeSelectedIngredientKeys((current) => current.filter((key) => !keys.includes(key)));
+  }
+
+  function ungroupSelectedRecipeIngredients(tone: RecipeIngredientType) {
+    const keys = selectedRecipeIngredientEntries
+      .filter(({ ingredient }) => ingredient.item_type === tone && (ingredient.group_index ?? 0) > 0)
+      .map(({ index }) => String(index));
+    clearRecipeIngredientGroup(tone, keys);
+  }
+
+  function ungroupRecipeSubgroup(tone: RecipeIngredientType, groupIndex: number) {
+    const keys = recipeIngredientEntries
+      .filter(({ ingredient }) => ingredient.item_type === tone && (ingredient.group_index ?? 0) === groupIndex)
+      .map(({ index }) => String(index));
+    clearRecipeIngredientGroup(tone, keys);
   }
 
   function updateRecipeStep(key: "prep_steps" | "steps", index: number, value: string) {
@@ -1762,11 +1909,10 @@ export function RecipeMealWorkspace({
   function regroupCookingDrafts(
     current: CookingIngredientDraft[],
     tone: "食材" | "調味料",
-    mutate: (list: CookingIngredientDraft[]) => CookingIngredientDraft[]
+    mutate: (list: Array<CookingIngredientDraft & SubgroupItem>) => Array<CookingIngredientDraft & SubgroupItem>
   ): CookingIngredientDraft[] {
-    const foods = current.filter((draft) => draft.ingredient.item_type === "食材");
-    const seasonings = current.filter((draft) => draft.ingredient.item_type === "調味料");
-    return tone === "食材" ? [...mutate(foods), ...seasonings] : [...foods, ...mutate(seasonings)];
+    const keyed = current.map((draft) => ({ ...draft, item_type: draft.ingredient.item_type, group_index: draft.ingredient.group_index ?? 0 }));
+    return replaceSubgroupList(keyed, tone, mutate).map((draft) => ({ ingredient: draft.ingredient }));
   }
 
   // 選択中の行を同一 item_type 内で1サブグループにまとめる。未使用の最小 group_index を割り当て、
@@ -1776,24 +1922,14 @@ export function RecipeMealWorkspace({
     if (ids.length < 2) return;
     pushCookingReorderUndo();
     setCookingIngredientDrafts((current) =>
-      regroupCookingDrafts(current, tone, (list) => {
-        const selectedSet = new Set(ids);
-        const used = new Set(
-          list.map((draft) => draft.ingredient.group_index ?? 0).filter((groupIndex) => groupIndex > 0)
-        );
-        let newIndex = 1;
-        while (used.has(newIndex)) newIndex += 1;
-        const firstPos = list.findIndex((draft) => selectedSet.has(draft.ingredient.id));
-        if (firstPos < 0) return list;
-        const insertAt = list.slice(0, firstPos).filter((draft) => !selectedSet.has(draft.ingredient.id)).length;
-        const selected = list
-          .filter((draft) => selectedSet.has(draft.ingredient.id))
-          .map((draft) => ({ ingredient: { ...draft.ingredient, group_index: newIndex } }));
-        const rest = list.filter((draft) => !selectedSet.has(draft.ingredient.id));
-        const result = [...rest];
-        result.splice(insertAt, 0, ...selected);
-        return result;
-      })
+      regroupCookingDrafts(current, tone, (list) =>
+        groupSubgroupItems(
+          list,
+          ids,
+          (draft) => draft.ingredient.id,
+          (draft, groupIndex) => ({ ...draft, group_index: groupIndex, ingredient: { ...draft.ingredient, group_index: groupIndex } })
+        )
+      )
     );
     setCookingSelectedIngredientIds([]);
   }
@@ -1803,14 +1939,14 @@ export function RecipeMealWorkspace({
     if (ids.length === 0) return;
     pushCookingReorderUndo();
     setCookingIngredientDrafts((current) =>
-      regroupCookingDrafts(current, tone, (list) => {
-        const targetSet = new Set(ids);
-        const cleared = list
-          .filter((draft) => targetSet.has(draft.ingredient.id))
-          .map((draft) => ({ ingredient: { ...draft.ingredient, group_index: 0 } }));
-        const rest = list.filter((draft) => !targetSet.has(draft.ingredient.id));
-        return [...rest, ...cleared];
-      })
+      regroupCookingDrafts(current, tone, (list) =>
+        clearSubgroupItems(
+          list,
+          ids,
+          (draft) => draft.ingredient.id,
+          (draft, groupIndex) => ({ ...draft, group_index: groupIndex, ingredient: { ...draft.ingredient, group_index: groupIndex } })
+        )
+      )
     );
     setCookingSelectedIngredientIds((current) => current.filter((id) => !ids.includes(id)));
   }
@@ -2226,6 +2362,166 @@ export function RecipeMealWorkspace({
   // 料理完成写真エリアのドラッグ&ドロップ＋クリックでアクティブ化してのCtrl+V貼り付け（クリック選択は従来どおり）。
   const cookingPhotoDrop = useImageFileDrop({ disabled: isSaving, onFiles: handleCookingPhotoDrop });
 
+  const renderRecipeIngredientEditor = (
+    label: "材料" | "調味料",
+    tone: RecipeIngredientType,
+    entries: { ingredient: RecipeIngredientFormValues; index: number }[],
+    addButtonClassName = ""
+  ) => {
+    const rankMap = subgroupRankMapForItems(entries.map(({ ingredient }) => ingredient));
+    const runs = subgroupRuns(entries.map(({ ingredient, index }) => ({ ...ingredient, index })));
+    const selectedInTone = selectedRecipeIngredientEntries.filter(({ ingredient }) => ingredient.item_type === tone);
+    const canGroup = selectedInTone.length >= 2;
+    const canUngroup = selectedInTone.some(({ ingredient }) => (ingredient.group_index ?? 0) > 0);
+
+    const renderRow = (ingredient: RecipeIngredientFormValues, index: number, sectionIndex: number) => {
+      const isSelected = recipeSelectedIngredientKeys.includes(String(index));
+      const dropGroupIndex = ingredient.group_index ?? 0;
+      return (
+        <div
+          className="ingredient-row canvas-recipe-item-row"
+          data-selected={isSelected}
+          draggable
+          key={`${tone}-${index}-${ingredient.name}`}
+          onClick={(event) => toggleRecipeIngredientSelection(index, ingredient, event.metaKey || event.ctrlKey)}
+          onDragStart={(event) => {
+            event.dataTransfer.effectAllowed = "move";
+            event.dataTransfer.setData("text/plain", String(index));
+            event.currentTarget.classList.add("is-dragging");
+          }}
+          onDragEnd={(event) => event.currentTarget.classList.remove("is-dragging")}
+          onDragOver={(event) => {
+            event.preventDefault();
+            event.currentTarget.classList.add("is-dragover");
+          }}
+          onDragLeave={(event) => event.currentTarget.classList.remove("is-dragover")}
+          onDrop={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            event.currentTarget.classList.remove("is-dragover");
+            const draggedIndex = Number.parseInt(event.dataTransfer.getData("text/plain"), 10);
+            if (Number.isInteger(draggedIndex)) moveIngredient(draggedIndex, tone, sectionIndex, dropGroupIndex);
+          }}
+        >
+          <span
+            className="cooking-row-drag-handle recipe-row-drag-handle"
+            aria-label={`${ingredient.name || label}をドラッグして並び替え`}
+            role="img"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <span aria-hidden="true">☰</span>
+          </span>
+          <button
+            className="recipe-row-select-target"
+            type="button"
+            aria-label={`${ingredient.name || label}を選択`}
+            aria-pressed={isSelected}
+            onClick={(event) => {
+              event.stopPropagation();
+              toggleRecipeIngredientSelection(index, ingredient, event.metaKey || event.ctrlKey);
+            }}
+          >
+            <span aria-hidden="true" />
+          </button>
+          <input
+            aria-label="品名"
+            value={ingredient.name}
+            onClick={(event) => event.stopPropagation()}
+            onChange={(event) => updateIngredient(index, { name: event.target.value, item_type: tone })}
+            placeholder={tone === "食材" ? "品名" : "調味料名"}
+          />
+          <span onClick={(event) => event.stopPropagation()}>
+            <NumberField
+              ariaLabel="数量"
+              placeholder="数量"
+              showSteppers={false}
+              value={ingredient.amount}
+              onChange={(next) => updateIngredient(index, { amount: next, item_type: tone })}
+              allowFraction={isFractionalUnit(ingredient.unit)}
+            />
+          </span>
+          <span onClick={(event) => event.stopPropagation()}>
+            <UnitPicker value={ingredient.unit} onSelect={(unit) => updateIngredient(index, { unit, item_type: tone })} />
+          </span>
+          <button
+            className="danger-button compact-button"
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              removeIngredientRow(index);
+            }}
+            aria-label={`${label}を削除`}
+          >
+            ×
+          </button>
+        </div>
+      );
+    };
+
+    return (
+      <div
+        className={`ingredient-editor${tone === "調味料" ? " seasoning-editor" : ""}`}
+        aria-label={`${label}入力`}
+        onDragOver={(event) => event.preventDefault()}
+        onDrop={(event) => {
+          event.preventDefault();
+          const draggedIndex = Number.parseInt(event.dataTransfer.getData("text/plain"), 10);
+          if (Number.isInteger(draggedIndex)) moveIngredient(draggedIndex, tone, entries.length, 0);
+        }}
+      >
+        <div className="ingredient-editor-heading">
+          <div className="ingredient-editor-title-actions">
+            <span>{label}</span>
+            {canGroup ? (
+              <button className="cooking-group-action" type="button" onClick={() => groupSelectedRecipeIngredients(tone)}>
+                グルーピング
+              </button>
+            ) : null}
+            {canUngroup ? (
+              <button className="cooking-group-action" data-variant="ungroup" type="button" onClick={() => ungroupSelectedRecipeIngredients(tone)}>
+                グループ解除
+              </button>
+            ) : null}
+          </div>
+          <button className={`secondary-button compact-button${addButtonClassName}`} type="button" onClick={() => addIngredientRow(tone)}>
+            ＋ {label}を追加
+          </button>
+        </div>
+        {runs.map((run, runIndex) =>
+          run.groupIndex > 0 ? (
+            <div
+              className="recipe-ing-subgroup cooking-ing-subgroup"
+              data-tone={tone}
+              key={`${tone}-group-${run.groupIndex}-${runIndex}`}
+              onDragOver={(event) => event.preventDefault()}
+              onDrop={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                const draggedIndex = Number.parseInt(event.dataTransfer.getData("text/plain"), 10);
+                const lastEntry = run.entries[run.entries.length - 1];
+                if (Number.isInteger(draggedIndex)) moveIngredient(draggedIndex, tone, lastEntry.sectionIndex + 1, run.groupIndex);
+              }}
+            >
+              <div className="cooking-ing-subgroup-head">
+                <span className="cooking-ing-subgroup-label" data-tone={tone}>
+                  {subgroupLabel(tone, rankMap.get(run.groupIndex) ?? 0)}
+                </span>
+                <button className="cooking-group-action" data-variant="ungroup" type="button" onClick={() => ungroupRecipeSubgroup(tone, run.groupIndex)}>
+                  解除
+                </button>
+              </div>
+              {run.entries.map(({ item, sectionIndex }) => renderRow(item, item.index, sectionIndex))}
+            </div>
+          ) : (
+            <Fragment key={`${tone}-ungrouped-${runIndex}`}>
+              {run.entries.map(({ item, sectionIndex }) => renderRow(item, item.index, sectionIndex))}
+            </Fragment>
+          )
+        )}
+      </div>
+    );
+  };
+
   return (
     <section className="recipe-meal-workspace" aria-labelledby="recipe-meal-heading">
       {toast ? (
@@ -2573,133 +2869,8 @@ export function RecipeMealWorkspace({
                 onSelect={selectRecipeImage}
               />
 
-              <div
-                className="ingredient-editor"
-                aria-label="材料入力"
-                onDragOver={(event) => event.preventDefault()}
-                onDrop={(event) => {
-                  event.preventDefault();
-                  const draggedIndex = Number.parseInt(event.dataTransfer.getData("text/plain"), 10);
-                  if (Number.isInteger(draggedIndex)) moveIngredient(draggedIndex, "食材", foodIngredientEntries.length);
-                }}
-              >
-                <div className="ingredient-editor-heading">
-                  <span>材料</span>
-                  <button className="secondary-button compact-button" type="button" onClick={() => addIngredientRow("食材")}>
-                    ＋ 材料を追加
-                  </button>
-                </div>
-                {foodIngredientEntries.map(({ ingredient, index }, sectionIndex) => (
-                  <div
-                    className="ingredient-row canvas-recipe-item-row"
-                    key={`food-${index}-${ingredient.name}`}
-                    draggable
-                    onDragStart={(event) => {
-                      event.dataTransfer.effectAllowed = "move";
-                      event.dataTransfer.setData("text/plain", String(index));
-                      event.currentTarget.classList.add("is-dragging");
-                    }}
-                    onDragEnd={(event) => event.currentTarget.classList.remove("is-dragging")}
-                    onDragOver={(event) => {
-                      event.preventDefault();
-                      event.currentTarget.classList.add("is-dragover");
-                    }}
-                    onDragLeave={(event) => event.currentTarget.classList.remove("is-dragover")}
-                    onDrop={(event) => {
-                      event.preventDefault();
-                      event.stopPropagation();
-                      event.currentTarget.classList.remove("is-dragover");
-                      const draggedIndex = Number.parseInt(event.dataTransfer.getData("text/plain"), 10);
-                      if (Number.isInteger(draggedIndex)) moveIngredient(draggedIndex, "食材", sectionIndex);
-                    }}
-                  >
-                    <span
-                      className="cooking-row-drag-handle recipe-row-drag-handle"
-                      aria-label={`${ingredient.name || "材料"}をドラッグして並び替え`}
-                      role="img"
-                    >
-                      <span aria-hidden="true">☰</span>
-                    </span>
-                    <input aria-label="品名" value={ingredient.name} onChange={(event) => updateIngredient(index, { name: event.target.value, item_type: "食材" })} placeholder="品名" />
-                    <NumberField
-                      ariaLabel="数量"
-                      placeholder="数量"
-                      showSteppers={false}
-                      value={ingredient.amount}
-                      onChange={(next) => updateIngredient(index, { amount: next, item_type: "食材" })}
-                      allowFraction={isFractionalUnit(ingredient.unit)}
-                    />
-                    <UnitPicker value={ingredient.unit} onSelect={(unit) => updateIngredient(index, { unit, item_type: "食材" })} />
-                    <button className="danger-button compact-button" type="button" onClick={() => removeIngredientRow(index)} aria-label="材料を削除">
-                      ×
-                    </button>
-                  </div>
-                ))}
-              </div>
-
-              <div
-                className="ingredient-editor seasoning-editor"
-                aria-label="調味料入力"
-                onDragOver={(event) => event.preventDefault()}
-                onDrop={(event) => {
-                  event.preventDefault();
-                  const draggedIndex = Number.parseInt(event.dataTransfer.getData("text/plain"), 10);
-                  if (Number.isInteger(draggedIndex)) moveIngredient(draggedIndex, "調味料", seasoningIngredientEntries.length);
-                }}
-              >
-                <div className="ingredient-editor-heading">
-                  <span>調味料</span>
-                  <button className="secondary-button compact-button seasoning-add-button" type="button" onClick={() => addIngredientRow("調味料")}>
-                    ＋ 調味料を追加
-                  </button>
-                </div>
-                {seasoningIngredientEntries.map(({ ingredient, index }, sectionIndex) => (
-                  <div
-                    className="ingredient-row canvas-recipe-item-row"
-                    key={`seasoning-${index}-${ingredient.name}`}
-                    draggable
-                    onDragStart={(event) => {
-                      event.dataTransfer.effectAllowed = "move";
-                      event.dataTransfer.setData("text/plain", String(index));
-                      event.currentTarget.classList.add("is-dragging");
-                    }}
-                    onDragEnd={(event) => event.currentTarget.classList.remove("is-dragging")}
-                    onDragOver={(event) => {
-                      event.preventDefault();
-                      event.currentTarget.classList.add("is-dragover");
-                    }}
-                    onDragLeave={(event) => event.currentTarget.classList.remove("is-dragover")}
-                    onDrop={(event) => {
-                      event.preventDefault();
-                      event.stopPropagation();
-                      event.currentTarget.classList.remove("is-dragover");
-                      const draggedIndex = Number.parseInt(event.dataTransfer.getData("text/plain"), 10);
-                      if (Number.isInteger(draggedIndex)) moveIngredient(draggedIndex, "調味料", sectionIndex);
-                    }}
-                  >
-                    <span
-                      className="cooking-row-drag-handle recipe-row-drag-handle"
-                      aria-label={`${ingredient.name || "調味料"}をドラッグして並び替え`}
-                      role="img"
-                    >
-                      <span aria-hidden="true">☰</span>
-                    </span>
-                    <input aria-label="品名" value={ingredient.name} onChange={(event) => updateIngredient(index, { name: event.target.value, item_type: "調味料" })} placeholder="調味料名" />
-                    <NumberField
-                      ariaLabel="数量"
-                      placeholder="数量"
-                      showSteppers={false}
-                      value={ingredient.amount}
-                      onChange={(next) => updateIngredient(index, { amount: next, item_type: "調味料" })}
-                      allowFraction={isFractionalUnit(ingredient.unit)}
-                    />
-                    <UnitPicker value={ingredient.unit} onSelect={(unit) => updateIngredient(index, { unit, item_type: "調味料" })} />
-                    <button className="danger-button compact-button" type="button" onClick={() => removeIngredientRow(index)} aria-label="調味料を削除">
-                      ×
-                    </button>
-                  </div>
-                ))}
-              </div>
+              {renderRecipeIngredientEditor("材料", "食材", foodIngredientEntries)}
+              {renderRecipeIngredientEditor("調味料", "調味料", seasoningIngredientEntries, " seasoning-add-button")}
 
               <div className="recipe-step-sections">
                 <div className="recipe-step-editor" aria-label="下ごしらえ入力">

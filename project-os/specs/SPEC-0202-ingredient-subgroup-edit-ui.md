@@ -1,7 +1,7 @@
 ---
 id: SPEC-0202-ingredient-subgroup-edit-ui
 title: レシピ編集画面で材料・調味料をサブグループ化・解除する
-status: draft
+status: spec_ready
 scope:
   - レシピ編集モーダルの材料・調味料行
   - 行の選択（クリック / Cmd・Ctrl複数選択）

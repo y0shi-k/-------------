@@ -462,6 +462,102 @@ describe("RecipeMealWorkspace", () => {
     });
   });
 
+  it("groups edit-modal ingredients, keeps input clicks separate, and persists group_index", async () => {
+    const carrot: RecipeIngredient = { ...baseIngredient, id: "ingredient-2", name: "にんじん", sort_order: 1 };
+    const salt: RecipeIngredient = {
+      ...baseIngredient,
+      id: "ingredient-3",
+      item_type: "調味料",
+      name: "塩",
+      amount: 1,
+      unit: "小さじ",
+      sort_order: 2
+    };
+    const recipeUpdate = updateSingleQuery({ ...baseRecipe, ingredients: undefined });
+    const ingredientDelete = deleteQuery();
+    const ingredientInsert = insertListQuery([{ ...baseIngredient }]);
+
+    from.mockImplementation((table: string) => {
+      if (table === "recipes") return { update: recipeUpdate.update };
+      if (table === "recipe_ingredients") return { delete: ingredientDelete.deleteRows, insert: ingredientInsert.insert };
+      return {};
+    });
+
+    renderWorkspace({ initialRecipes: [{ ...baseRecipe, ingredients: [baseIngredient, carrot, salt] }] });
+    fireEvent.click(screen.getByRole("button", { name: "編集" }));
+
+    const ingredientEditor = screen.getByLabelText("材料入力");
+    const onionRow = within(ingredientEditor).getByDisplayValue("玉ねぎ").closest(".ingredient-row") as HTMLElement;
+    const carrotRow = within(ingredientEditor).getByDisplayValue("にんじん").closest(".ingredient-row") as HTMLElement;
+
+    fireEvent.click(within(onionRow).getByLabelText("品名"));
+    expect(onionRow.getAttribute("data-selected")).toBe("false");
+    expect(within(ingredientEditor).queryByRole("button", { name: "グルーピング" })).toBeNull();
+
+    fireEvent.click(onionRow);
+    fireEvent.click(carrotRow, { metaKey: true });
+    fireEvent.click(within(ingredientEditor).getByRole("button", { name: "グルーピング" }));
+
+    expect(within(ingredientEditor).getByText("A")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "レシピを更新" }));
+
+    await waitFor(() => {
+      expect(ingredientInsert.insert).toHaveBeenCalledWith([
+        expect.objectContaining({ name: "玉ねぎ", item_type: "食材", sort_order: 0, group_index: 1 }),
+        expect.objectContaining({ name: "にんじん", item_type: "食材", sort_order: 1, group_index: 1 }),
+        expect.objectContaining({ name: "塩", item_type: "調味料", sort_order: 2, group_index: 0 })
+      ]);
+    });
+  });
+
+  it("ungroups edit-modal subgroups and labels seasonings with hiragana", async () => {
+    const soy: RecipeIngredient = {
+      ...baseIngredient,
+      id: "ingredient-3",
+      item_type: "調味料",
+      name: "醤油",
+      amount: 1,
+      unit: "大さじ",
+      sort_order: 1,
+      group_index: 1
+    };
+    const mirin: RecipeIngredient = {
+      ...baseIngredient,
+      id: "ingredient-4",
+      item_type: "調味料",
+      name: "みりん",
+      amount: 1,
+      unit: "大さじ",
+      sort_order: 2,
+      group_index: 1
+    };
+    const recipeUpdate = updateSingleQuery({ ...baseRecipe, ingredients: undefined });
+    const ingredientDelete = deleteQuery();
+    const ingredientInsert = insertListQuery([{ ...baseIngredient }]);
+
+    from.mockImplementation((table: string) => {
+      if (table === "recipes") return { update: recipeUpdate.update };
+      if (table === "recipe_ingredients") return { delete: ingredientDelete.deleteRows, insert: ingredientInsert.insert };
+      return {};
+    });
+
+    renderWorkspace({ initialRecipes: [{ ...baseRecipe, ingredients: [baseIngredient, soy, mirin] }] });
+    fireEvent.click(screen.getByRole("button", { name: "編集" }));
+
+    const seasoningEditor = screen.getByLabelText("調味料入力");
+    expect(within(seasoningEditor).getByText("あ")).toBeTruthy();
+    fireEvent.click(within(seasoningEditor).getByRole("button", { name: "解除" }));
+    fireEvent.click(screen.getByRole("button", { name: "レシピを更新" }));
+
+    await waitFor(() => {
+      expect(ingredientInsert.insert).toHaveBeenCalledWith([
+        expect.objectContaining({ name: "玉ねぎ", item_type: "食材", sort_order: 0, group_index: 0 }),
+        expect.objectContaining({ name: "醤油", item_type: "調味料", sort_order: 1, group_index: 0 }),
+        expect.objectContaining({ name: "みりん", item_type: "調味料", sort_order: 2, group_index: 0 })
+      ]);
+    });
+  });
+
   it("toggles selected genres from the whole option row", () => {
     renderWorkspace({ initialRecipes: [{ ...baseRecipe, genre: ["和食", "洋食", "中華"] }] });
 
