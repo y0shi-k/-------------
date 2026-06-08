@@ -4073,10 +4073,6 @@ h1 {
   font-weight: 800;
 }
 
-.schedule-picker-search {
-  margin: 0;
-}
-
 .schedule-picker-list {
   display: grid;
   gap: 8px;
@@ -4110,6 +4106,18 @@ h1 {
 .schedule-picker-option:hover {
   border-color: #0284c7;
   background: #f0f9ff;
+}
+
+/* PC幅ではレシピ選択モーダルを広げ、リストを2カラムにして一覧性を上げる */
+@media (min-width: 720px) {
+  .schedule-picker-modal {
+    width: min(720px, 100%);
+  }
+
+  .schedule-picker-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    max-height: 60vh;
+  }
 }
 
 /* レイアウトを動かさない一時通知トースト（Canvas版 showToast 相当） */

@@ -795,6 +795,62 @@ describe("RecipeMealWorkspace", () => {
     expect(await screen.findByText("献立に追加しました。")).toBeTruthy();
   });
 
+  it("filters the schedule recipe picker with the shared search and favorite controls", () => {
+    const favoriteMiso: Recipe = {
+      ...baseRecipe,
+      id: "recipe-2",
+      name: "味噌汁",
+      is_favorite: true,
+      ingredients: [{ ...baseIngredient, id: "ingredient-2", recipe_id: "recipe-2", name: "豆腐" }]
+    };
+
+    renderWorkspace({ initialMealSchedules: [baseSchedule], initialRecipes: [baseRecipe, favoriteMiso] });
+    openScheduleView();
+
+    fireEvent.click(screen.getAllByRole("button", { name: /朝に追加/ })[0]);
+    const dialog = screen.getByRole("dialog");
+
+    // 初期はレシピ一覧と同じく全レシピが見える。
+    expect(within(dialog).getByRole("button", { name: /カレー/ })).toBeTruthy();
+    expect(within(dialog).getByRole("button", { name: /味噌汁/ })).toBeTruthy();
+
+    // 共通の検索（レシピ名）で filterAndSortRecipes により絞り込める。
+    fireEvent.change(within(dialog).getByLabelText("レシピ検索"), { target: { value: "味噌" } });
+    expect(within(dialog).queryByRole("button", { name: /カレー/ })).toBeNull();
+    expect(within(dialog).getByRole("button", { name: /味噌汁/ })).toBeTruthy();
+
+    // 検索を消し、お気に入り絞り込み（is_favorite 先行フィルタ）に切り替える。
+    fireEvent.change(within(dialog).getByLabelText("レシピ検索"), { target: { value: "" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "お気に入り" }));
+    expect(within(dialog).queryByRole("button", { name: /カレー/ })).toBeNull();
+    expect(within(dialog).getByRole("button", { name: /味噌汁/ })).toBeTruthy();
+  });
+
+  it("resets the picker filter state each time it reopens", () => {
+    const miso: Recipe = {
+      ...baseRecipe,
+      id: "recipe-2",
+      name: "味噌汁",
+      ingredients: [{ ...baseIngredient, id: "ingredient-2", recipe_id: "recipe-2", name: "豆腐" }]
+    };
+
+    renderWorkspace({ initialMealSchedules: [baseSchedule], initialRecipes: [baseRecipe, miso] });
+    openScheduleView();
+
+    fireEvent.click(screen.getAllByRole("button", { name: /朝に追加/ })[0]);
+    const firstDialog = screen.getByRole("dialog");
+    fireEvent.change(within(firstDialog).getByLabelText("レシピ検索"), { target: { value: "味噌" } });
+    expect(within(firstDialog).queryByRole("button", { name: /カレー/ })).toBeNull();
+
+    // 閉じて開き直すと picker 専用状態が初期化され、前回の検索語が残らない。
+    fireEvent.click(within(firstDialog).getByRole("button", { name: "閉じる" }));
+    fireEvent.click(screen.getAllByRole("button", { name: /朝に追加/ })[0]);
+    const secondDialog = screen.getByRole("dialog");
+    expect((within(secondDialog).getByLabelText("レシピ検索") as HTMLInputElement).value).toBe("");
+    expect(within(secondDialog).getByRole("button", { name: /カレー/ })).toBeTruthy();
+    expect(within(secondDialog).getByRole("button", { name: /味噌汁/ })).toBeTruthy();
+  });
+
   it("changes the recipe of a scheduled meal from the slot menu", async () => {
     const otherRecipe: Recipe = { ...baseRecipe, id: "recipe-2", name: "肉じゃが" };
     const replaced: MealSchedule = { ...baseSchedule, recipe_id: "recipe-2", recipe_name: "肉じゃが" };

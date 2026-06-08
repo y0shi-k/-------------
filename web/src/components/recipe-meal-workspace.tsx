@@ -18,6 +18,12 @@ import { getCustomFractions } from "@/lib/format/fraction-candidates";
 import { PhotoCandidatePicker } from "@/components/photo-candidate-picker";
 import { UnitPicker } from "@/components/unit-picker";
 import { RecipeThumb } from "@/components/ui/recipe-thumb";
+import {
+  RecipeFilterControls,
+  type RecipeSearchLogic,
+  type RecipeSearchMode,
+  type RecipeSort
+} from "@/components/recipe-filter-controls";
 import { useShellAiUsage, useShellNavigation, useShellStatusMessage, useShellSubView, type RecipeShellLeaf } from "@/components/web-mode-shell";
 import type { StockItem } from "@/lib/inventory/types";
 import {
@@ -92,9 +98,6 @@ type ConsumptionBulkMode = "default" | "zero";
 type AiRecipeMode = "generate" | "structure";
 type RecipeWorkspaceView = "recipes" | "schedule";
 
-type RecipeSearchLogic = "and" | "or";
-type RecipeSearchMode = "name" | "ingredient" | "all";
-type RecipeSort = "created_desc" | "updated_desc" | "name_asc" | "count_desc" | "ingredients_desc";
 type CookingIngredientTab = "all" | "食材" | "調味料";
 type CookingStepTab = "all" | "prep" | "steps";
 type CookingStepKind = "prep_steps" | "steps";
@@ -520,7 +523,11 @@ export function RecipeMealWorkspace({
   const [shortageSelectionTab, setShortageSelectionTab] = useState<ShortageSelectionTab>("all");
   const [shortageSelectionRecipeName, setShortageSelectionRecipeName] = useState("");
   const [pickerSlot, setPickerSlot] = useState<{ date: string; meal: MealType; replaceId?: string } | null>(null);
-  const [pickerQuery, setPickerQuery] = useState("");
+  const [pickerSearch, setPickerSearch] = useState("");
+  const [pickerSearchLogic, setPickerSearchLogic] = useState<RecipeSearchLogic>("and");
+  const [pickerSearchMode, setPickerSearchMode] = useState<RecipeSearchMode>("name");
+  const [pickerSort, setPickerSort] = useState<RecipeSort>("created_desc");
+  const [pickerFavoriteOnly, setPickerFavoriteOnly] = useState(false);
   const [cookingScheduleId, setCookingScheduleId] = useState<string | null>(null);
   const [cookingViewerOrigin, setCookingViewerOrigin] = useState<CookingViewerOrigin>("recipes");
   const [slotMenuId, setSlotMenuId] = useState<string | null>(null);
@@ -1443,7 +1450,6 @@ export function RecipeMealWorkspace({
       setScheduleWindowStart(String(data.scheduled_on));
     }
     setPickerSlot(null);
-    setPickerQuery("");
     setFeedback({ tone: "success", message: "献立に追加しました。" });
   }
 
@@ -1610,11 +1616,20 @@ export function RecipeMealWorkspace({
     openCookingViewer(recipe);
   }
 
+  // レシピ選択モーダルを開く。picker 専用状態は毎回初期値へリセットし、レシピ一覧側状態と独立させる。
+  function openPicker(slot: { date: string; meal: MealType; replaceId?: string }) {
+    setPickerSearch("");
+    setPickerSearchLogic("and");
+    setPickerSearchMode("name");
+    setPickerSort("created_desc");
+    setPickerFavoriteOnly(false);
+    setPickerSlot(slot);
+  }
+
   // Canvas版 changeScheduleSlotRecipe 相当: ピッカーを開いてレシピを差し替える。
   function startSlotRecipeChange(schedule: MealSchedule) {
     setSlotMenuId(null);
-    setPickerQuery("");
-    setPickerSlot({ date: schedule.scheduled_on, meal: schedule.meal_type, replaceId: schedule.id });
+    openPicker({ date: schedule.scheduled_on, meal: schedule.meal_type, replaceId: schedule.id });
   }
 
   async function replaceScheduleRecipe(scheduleId: string, recipeId: string) {
@@ -1641,7 +1656,6 @@ export function RecipeMealWorkspace({
 
     setMealSchedules((items) => items.map((item) => (item.id === scheduleId ? (data as MealSchedule) : item)));
     setPickerSlot(null);
-    setPickerQuery("");
     showToast(`献立を ${recipe.name} に変更しました。`, "success");
   }
 
@@ -3018,10 +3032,7 @@ export function RecipeMealWorkspace({
             <button
               className="modal-close-button"
               type="button"
-              onClick={() => {
-                setPickerSlot(null);
-                setPickerQuery("");
-              }}
+              onClick={() => setPickerSlot(null)}
               aria-label="閉じる"
             >
               ×
@@ -3034,33 +3045,41 @@ export function RecipeMealWorkspace({
               <p className="empty-list">レシピがありません。先に「レシピ集」でレシピを追加してください。</p>
             ) : (
               <>
-                <input
-                  className="schedule-picker-search"
-                  type="search"
-                  value={pickerQuery}
-                  onChange={(event) => setPickerQuery(event.target.value)}
-                  placeholder="レシピ名で絞り込み"
-                  aria-label="レシピ名で絞り込み"
+                <RecipeFilterControls
+                  favoriteOnly={pickerFavoriteOnly}
+                  search={pickerSearch}
+                  searchLogic={pickerSearchLogic}
+                  searchMode={pickerSearchMode}
+                  sort={pickerSort}
+                  onFavoriteFilterChange={setPickerFavoriteOnly}
+                  onSearchChange={setPickerSearch}
+                  onSearchLogicChange={setPickerSearchLogic}
+                  onSearchModeChange={setPickerSearchMode}
+                  onSortChange={setPickerSort}
                 />
                 <div className="schedule-picker-list">
-                  {recipes
-                    .filter((recipe) => recipe.name.toLowerCase().includes(pickerQuery.trim().toLowerCase()))
-                    .map((recipe) => (
-                      <button
-                        className="schedule-picker-option"
-                        type="button"
-                        key={recipe.id}
-                        disabled={isSaving}
-                        onClick={() =>
-                          pickerSlot.replaceId
-                            ? replaceScheduleRecipe(pickerSlot.replaceId, recipe.id)
-                            : addScheduleEntry(pickerSlot.date, pickerSlot.meal, recipe.id)
-                        }
-                      >
-                        <strong>{recipe.name}</strong>
-                        {recipe.genre.length > 0 ? <small>{recipe.genre.join("・")}</small> : null}
-                      </button>
-                    ))}
+                  {filterAndSortRecipes(
+                    pickerFavoriteOnly ? recipes.filter((recipe) => recipe.is_favorite) : recipes,
+                    pickerSearch,
+                    pickerSort,
+                    pickerSearchMode,
+                    pickerSearchLogic
+                  ).map((recipe) => (
+                    <button
+                      className="schedule-picker-option"
+                      type="button"
+                      key={recipe.id}
+                      disabled={isSaving}
+                      onClick={() =>
+                        pickerSlot.replaceId
+                          ? replaceScheduleRecipe(pickerSlot.replaceId, recipe.id)
+                          : addScheduleEntry(pickerSlot.date, pickerSlot.meal, recipe.id)
+                      }
+                    >
+                      <strong>{recipe.name}</strong>
+                      {recipe.genre.length > 0 ? <small>{recipe.genre.join("・")}</small> : null}
+                    </button>
+                  ))}
                 </div>
               </>
             )}
@@ -3373,7 +3392,7 @@ export function RecipeMealWorkspace({
                               <button
                                 className="schedule-add-button"
                                 type="button"
-                                onClick={() => setPickerSlot({ date: day, meal: mealType })}
+                                onClick={() => openPicker({ date: day, meal: mealType })}
                                 aria-label={`${formatScheduleDayLabel(day)} ${mealType}に追加`}
                               >
                                 ＋
@@ -4299,61 +4318,20 @@ function RecipeList({
   sort: RecipeSort;
   totalCount: number;
 }) {
-  const searchTabs: Array<{ label: string; value: RecipeSearchMode }> = [
-    { label: "レシピ名", value: "name" },
-    { label: "食材", value: "ingredient" },
-    { label: "すべて", value: "all" }
-  ];
-  const sortTabs: Array<{ label: string; value: RecipeSort }> = [
-    { label: "登録日時", value: "created_desc" },
-    { label: "更新日時", value: "updated_desc" },
-    { label: "レシピ名", value: "name_asc" },
-    { label: "調理回数", value: "count_desc" },
-    { label: "材料数", value: "ingredients_desc" }
-  ];
-
   return (
     <section className="recipe-browser" aria-label="レシピ一覧">
-      <div className="recipe-search-controls">
-        <div className="recipe-search-mode-tabs" aria-label="レシピ検索対象">
-          {searchTabs.map((tab) => (
-            <button data-active={searchMode === tab.value} key={tab.value} onClick={() => onSearchModeChange(tab.value)} type="button">
-              {tab.label}
-            </button>
-          ))}
-        </div>
-        <div className="recipe-search-logic" aria-label="検索条件">
-          <button data-active={searchLogic === "and"} onClick={() => onSearchLogicChange("and")} type="button">AND</button>
-          <button data-active={searchLogic === "or"} onClick={() => onSearchLogicChange("or")} type="button">OR</button>
-        </div>
-        <div className="recipe-search-field">
-          <input aria-label="レシピ検索" value={search} onChange={(event) => onSearchChange(event.target.value)} placeholder="検索..." />
-          {search ? <button aria-label="検索をクリア" onClick={() => onSearchChange("")} type="button">×</button> : null}
-        </div>
-        <select className="canvas-hidden-compat" aria-label="レシピの並び順" value={sort} onChange={(event) => onSortChange(event.target.value as RecipeSort)}>
-          <option value="created_desc">登録が新しい順</option>
-          <option value="updated_desc">更新が新しい順</option>
-          <option value="name_asc">名前順</option>
-          <option value="count_desc">調理回数が多い順</option>
-          <option value="ingredients_desc">材料が多い順</option>
-        </select>
-      </div>
-      <div className="recipe-sort-row">
-        <span>並び</span>
-        {sortTabs.map((tab) => (
-          <button data-active={sort === tab.value} key={tab.value} onClick={() => onSortChange(tab.value)} type="button">
-            {tab.label}{sort === tab.value ? "▼" : ""}
-          </button>
-        ))}
-      </div>
-      <div className="recipe-filter-chips" aria-label="レシピの絞り込み">
-        <button className="recipe-filter-chip" data-active={!favoriteOnly} type="button" onClick={() => onFavoriteFilterChange(false)}>
-          すべて
-        </button>
-        <button className="recipe-filter-chip" data-active={favoriteOnly} type="button" onClick={() => onFavoriteFilterChange(true)}>
-          お気に入り
-        </button>
-      </div>
+      <RecipeFilterControls
+        favoriteOnly={favoriteOnly}
+        search={search}
+        searchLogic={searchLogic}
+        searchMode={searchMode}
+        sort={sort}
+        onFavoriteFilterChange={onFavoriteFilterChange}
+        onSearchChange={onSearchChange}
+        onSearchLogicChange={onSearchLogicChange}
+        onSearchModeChange={onSearchModeChange}
+        onSortChange={onSortChange}
+      />
       <div className="recipe-count-row">
         <span>{totalCount} レシピ</span>
         <small>同期は上部の同期ボタンで一括反映</small>
