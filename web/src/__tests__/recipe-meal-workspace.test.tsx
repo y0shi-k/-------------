@@ -795,6 +795,58 @@ describe("RecipeMealWorkspace", () => {
     expect(await screen.findByText("献立に追加しました。")).toBeTruthy();
   });
 
+  it("opens the shortage modal after adding via the schedule + picker", async () => {
+    // スケジュール「＋」の新規追加でも、登録成立後に在庫不足チェック→不足モーダルを開く。
+    const scheduleInsert = insertSingleQuery(baseSchedule);
+    const shoppingInsert = insertListQuery([{ id: "shop-1" }]);
+    from.mockImplementation((table: string) => {
+      if (table === "meal_schedules") return { insert: scheduleInsert.insert };
+      if (table === "shopping_items") return { insert: shoppingInsert.insert };
+      return { insert: vi.fn() };
+    });
+
+    renderWorkspace({ initialMealSchedules: [baseSchedule] });
+    openScheduleView();
+
+    fireEvent.click(screen.getAllByRole("button", { name: /朝に追加/ })[0]);
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: /カレー/ }));
+
+    const shortageModal = await screen.findByRole("dialog", { name: "買い物に追加するもの" });
+    expect(within(shortageModal).getByText("玉ねぎ")).toBeTruthy();
+
+    fireEvent.click(within(shortageModal).getByLabelText("表示中をすべて選択"));
+    fireEvent.click(within(shortageModal).getByRole("button", { name: /選択したものを追加/ }));
+
+    await waitFor(() => {
+      expect(shoppingInsert.insert).toHaveBeenCalledWith([
+        expect.objectContaining({ name: "玉ねぎ", required_quantity: 1, source_type: "recipe_detail" })
+      ]);
+    });
+    expect(scheduleInsert.insert).toHaveBeenCalledWith(
+      expect.objectContaining({ meal_type: "朝", recipe_id: "recipe-1", status: "未完了" })
+    );
+  });
+
+  it("does not run the shortage check when changing a slot recipe via the picker", async () => {
+    // 「別のレシピに変更」(replace) は在庫チェック対象外。登録の置換のみ行う。
+    const otherRecipe: Recipe = { ...baseRecipe, id: "recipe-2", name: "肉じゃが" };
+    const replaced: MealSchedule = { ...baseSchedule, recipe_id: "recipe-2", recipe_name: "肉じゃが" };
+    const scheduleUpdate = updateSingleQuery(replaced);
+    from.mockReturnValue({ update: scheduleUpdate.update });
+
+    renderWorkspace({ initialMealSchedules: [baseSchedule], initialRecipes: [baseRecipe, otherRecipe] });
+    openScheduleView();
+
+    fireEvent.click(within(screen.getByLabelText("7日献立")).getByRole("button", { name: "カレー の操作" }));
+    fireEvent.click(screen.getByRole("button", { name: "別のレシピに変更" }));
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: /肉じゃが/ }));
+
+    await waitFor(() => {
+      expect(scheduleUpdate.update).toHaveBeenCalled();
+    });
+    expect(screen.queryByRole("dialog", { name: "買い物に追加するもの" })).toBeNull();
+  });
+
   it("adds a schedule entry from the cooking viewer header via the mini calendar", async () => {
     const scheduleInsert = insertSingleQuery(baseSchedule);
     from.mockReturnValue({ insert: scheduleInsert.insert });
@@ -848,6 +900,99 @@ describe("RecipeMealWorkspace", () => {
         expect.objectContaining({ meal_type: "晩", recipe_id: "recipe-1", status: "未完了" })
       );
     });
+  });
+
+  it("opens the shortage modal after a recipe-originated schedule entry and adds shortages to shopping", async () => {
+    // baseRecipe は玉ねぎ2個、baseInventory は玉ねぎ1個 → 不足1個が発生する。
+    const scheduleInsert = insertSingleQuery(baseSchedule);
+    const shoppingInsert = insertListQuery([{ id: "shop-1" }]);
+    from.mockImplementation((table: string) => {
+      if (table === "meal_schedules") return { insert: scheduleInsert.insert };
+      if (table === "shopping_items") return { insert: shoppingInsert.insert };
+      return { insert: vi.fn() };
+    });
+
+    renderWorkspace({ initialMealSchedules: [baseSchedule] });
+
+    fireEvent.click(screen.getAllByRole("button", { name: "スケジュールに追加" })[0]);
+    const dialog = screen.getByRole("dialog");
+    fireEvent.click(within(dialog).getAllByRole("button", { name: /を選ぶ$/ })[0]);
+    fireEvent.click(within(dialog).getByRole("button", { name: "朝" }));
+
+    // 登録成立後に不足選択モーダルが開く。
+    const shortageModal = await screen.findByRole("dialog", { name: "買い物に追加するもの" });
+    expect(within(shortageModal).getByText("玉ねぎ")).toBeTruthy();
+
+    fireEvent.click(within(shortageModal).getByLabelText("表示中をすべて選択"));
+    fireEvent.click(within(shortageModal).getByRole("button", { name: /選択したものを追加/ }));
+
+    await waitFor(() => {
+      expect(shoppingInsert.insert).toHaveBeenCalledWith([
+        expect.objectContaining({
+          user_id: "user-1",
+          name: "玉ねぎ",
+          required_quantity: 1,
+          unit: "個",
+          status: "未購入",
+          linked_recipe_name: "カレー",
+          source_type: "recipe_detail"
+        })
+      ]);
+    });
+    // スケジュール登録自体は成立している。
+    expect(scheduleInsert.insert).toHaveBeenCalledWith(
+      expect.objectContaining({ meal_type: "朝", recipe_id: "recipe-1", status: "未完了" })
+    );
+  });
+
+  it("keeps the recipe schedule registered when the shortage modal is dismissed", async () => {
+    const scheduleInsert = insertSingleQuery(baseSchedule);
+    const shoppingInsert = insertListQuery([{ id: "shop-1" }]);
+    from.mockImplementation((table: string) => {
+      if (table === "meal_schedules") return { insert: scheduleInsert.insert };
+      if (table === "shopping_items") return { insert: shoppingInsert.insert };
+      return { insert: vi.fn() };
+    });
+
+    renderWorkspace({ initialMealSchedules: [baseSchedule] });
+
+    fireEvent.click(screen.getAllByRole("button", { name: "スケジュールに追加" })[0]);
+    const dialog = screen.getByRole("dialog");
+    fireEvent.click(within(dialog).getAllByRole("button", { name: /を選ぶ$/ })[0]);
+    fireEvent.click(within(dialog).getByRole("button", { name: "朝" }));
+
+    const shortageModal = await screen.findByRole("dialog", { name: "買い物に追加するもの" });
+    fireEvent.click(within(shortageModal).getByRole("button", { name: "あとで" }));
+
+    // モーダルを閉じても買い物追加は走らず、献立は登録済みのまま。
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "買い物に追加するもの" })).toBeNull();
+    });
+    expect(shoppingInsert.insert).not.toHaveBeenCalled();
+    expect(scheduleInsert.insert).toHaveBeenCalledWith(
+      expect.objectContaining({ meal_type: "朝", recipe_id: "recipe-1", status: "未完了" })
+    );
+  });
+
+  it("does not open the shortage modal when inventory covers the recipe", async () => {
+    // 玉ねぎ在庫を2個に増やすと不足は出ない。
+    const scheduleInsert = insertSingleQuery(baseSchedule);
+    from.mockReturnValue({ insert: scheduleInsert.insert });
+
+    renderWorkspace({
+      initialMealSchedules: [baseSchedule],
+      initialInventoryItems: [{ ...baseInventory, quantity: 2 }]
+    });
+
+    fireEvent.click(screen.getAllByRole("button", { name: "スケジュールに追加" })[0]);
+    const dialog = screen.getByRole("dialog");
+    fireEvent.click(within(dialog).getAllByRole("button", { name: /を選ぶ$/ })[0]);
+    fireEvent.click(within(dialog).getByRole("button", { name: "朝" }));
+
+    await waitFor(() => {
+      expect(scheduleInsert.insert).toHaveBeenCalled();
+    });
+    expect(screen.queryByRole("dialog", { name: "買い物に追加するもの" })).toBeNull();
   });
 
   it("filters the schedule recipe picker with the shared search and favorite controls", () => {

@@ -1425,14 +1425,14 @@ export function RecipeMealWorkspace({
     return { ok: true, imagePath: currentImagePath, staleRemovalFailed: false };
   }
 
-  async function addScheduleEntry(date: string, meal: MealType, recipeId: string) {
+  async function addScheduleEntry(date: string, meal: MealType, recipeId: string): Promise<boolean> {
     const recipe = recipes.find((item) => item.id === recipeId);
     if (!date || !recipe) {
       setFeedback({
         tone: "error",
         message: "原因: 日付またはレシピが未選択です。影響: 献立を保存できません。修正方法: 日付とレシピを選んでください。"
       });
-      return;
+      return false;
     }
 
     setIsSaving(true);
@@ -1458,7 +1458,7 @@ export function RecipeMealWorkspace({
         tone: "error",
         message: "原因: 献立をDBへ保存できませんでした。影響: スケジュールに表示されません。修正方法: ログイン状態を確認してください。"
       });
-      return;
+      return false;
     }
 
     setMealSchedules((items) => [data as MealSchedule, ...items]);
@@ -1471,6 +1471,7 @@ export function RecipeMealWorkspace({
     setScheduleAddRecipeId(null);
     setScheduleAddSelectedDate(null);
     setFeedback({ tone: "success", message: "献立に追加しました。" });
+    return true;
   }
 
   // レシピ画面（詳細ヘッダー／各カード）からスケジュール追加モーダルを開く。日付選択ステップから始める。
@@ -1484,10 +1485,35 @@ export function RecipeMealWorkspace({
     setScheduleAddSelectedDate(null);
   }
 
+  // 登録成立後の在庫不足チェック。不足があれば既存の不足選択モーダルを開く（新規DB導線は作らない）。
+  // レシピ起点フロー（assignScheduleFromRecipe）とスケジュール「＋」の新規追加（addScheduleFromPicker）で共有する。
+  function openShortageModalForScheduledRecipe(recipeId: string) {
+    const recipe = recipes.find((item) => item.id === recipeId);
+    if (!recipe) return;
+    // 既存の在庫比較・不足選択モーダルをそのまま再利用する。
+    const shortages = compareRecipeWithInventory(recipe, inventoryItemsForMeals);
+    if (shortages.length === 0) return;
+    setShortageSelectionItems(shortages);
+    setShortageSelectionRecipeName(recipe.name);
+    setShortageSelectionTab("all");
+  }
+
   // 食事タイプ選択で登録を確定する。登録は既存 addScheduleEntry を再利用する（テーブル直叩きしない）。
   async function assignScheduleFromRecipe(meal: MealType) {
     if (!scheduleAddRecipeId || !scheduleAddSelectedDate) return;
-    await addScheduleEntry(scheduleAddSelectedDate, meal, scheduleAddRecipeId);
+    // addScheduleEntry が成功時に scheduleAddRecipeId を null にするため、先に控える。
+    const recipeId = scheduleAddRecipeId;
+    const registered = await addScheduleEntry(scheduleAddSelectedDate, meal, recipeId);
+    // 登録が成立した場合のみ在庫不足を確認する。登録の成否と買い物追加は独立。
+    if (!registered) return;
+    openShortageModalForScheduledRecipe(recipeId);
+  }
+
+  // スケジュール「＋」のレシピ選択（新規追加）からの確定。登録成立後にレシピ起点と同じ不足チェックを通す。
+  async function addScheduleFromPicker(date: string, meal: MealType, recipeId: string) {
+    const registered = await addScheduleEntry(date, meal, recipeId);
+    if (!registered) return;
+    openShortageModalForScheduledRecipe(recipeId);
   }
 
   async function saveSchedule(event: FormEvent<HTMLFormElement>) {
@@ -3120,7 +3146,7 @@ export function RecipeMealWorkspace({
                       onClick={() =>
                         pickerSlot.replaceId
                           ? replaceScheduleRecipe(pickerSlot.replaceId, recipe.id)
-                          : addScheduleEntry(pickerSlot.date, pickerSlot.meal, recipe.id)
+                          : addScheduleFromPicker(pickerSlot.date, pickerSlot.meal, recipe.id)
                       }
                     >
                       <strong>{recipe.name}</strong>

@@ -1,7 +1,7 @@
 ---
 id: TKT-0211-recipe-schedule-add-inventory-shortage
 title: レシピ→スケジュール登録時の在庫不足チェック→買い物リスト追加を接続
-status: draft
+status: completed
 goal: TKT-0210 のレシピ→スケジュール登録フローの登録完了後に在庫不足を判定し、不足があれば既存の不足選択モーダルから買い物リストへ追加できるようにして、Canvas版相当の「登録時に在庫を確認」UXを再現する。
 acceptance:
   - TKT-0210 のフローでスケジュール登録が成立した直後に `compareRecipeWithInventory` で不足材料を判定する
