@@ -1,7 +1,7 @@
 ---
 id: TKT-0210-recipe-to-schedule-add-calendar
 title: レシピ画面からのスケジュール登録（30日ミニカレンダー＋食事選択モーダル）
-status: draft
+status: completed
 goal: レシピ詳細ヘッダーと各レシピカードの両方から、Canvas版相当の「30日ミニカレンダー→朝/昼/晩選択→登録」フローでスケジュール（献立）に直接追加できるようにする。
 acceptance:
   - レシピ詳細（選択中レシピ）のヘッダーに「スケジュール追加」入口ボタンが表示される

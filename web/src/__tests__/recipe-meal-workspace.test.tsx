@@ -795,6 +795,61 @@ describe("RecipeMealWorkspace", () => {
     expect(await screen.findByText("献立に追加しました。")).toBeTruthy();
   });
 
+  it("adds a schedule entry from the cooking viewer header via the mini calendar", async () => {
+    const scheduleInsert = insertSingleQuery(baseSchedule);
+    from.mockReturnValue({ insert: scheduleInsert.insert });
+
+    renderWorkspace({ initialMealSchedules: [baseSchedule] });
+
+    // ユーザーに見えるレシピ詳細ヘッダー＝調理ビューア全画面のヘッダー。そこからモーダルを開く。
+    fireEvent.click(screen.getByRole("button", { name: "調理ビューを開く" }));
+    const overlay = screen.getByRole("dialog", { name: "調理ビューア全画面" });
+    fireEvent.click(within(overlay).getByRole("button", { name: "スケジュールに追加" }));
+
+    const dialog = screen.getByRole("dialog", { name: "スケジュールに追加" });
+
+    // 日付を選ぶ前は食事タイプ選択は出ない。
+    expect(within(dialog).queryByRole("button", { name: "朝" })).toBeNull();
+
+    // 先頭セル（今日）を選ぶと朝/昼/晩が現れる。
+    fireEvent.click(within(dialog).getAllByRole("button", { name: /を選ぶ$/ })[0]);
+    fireEvent.click(within(dialog).getByRole("button", { name: "朝" }));
+
+    await waitFor(() => {
+      expect(from).toHaveBeenCalledWith("meal_schedules");
+      expect(scheduleInsert.insert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          user_id: "user-1",
+          meal_type: "朝",
+          recipe_id: "recipe-1",
+          recipe_name: "カレー",
+          scheduled_on: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+          status: "未完了"
+        })
+      );
+    });
+    expect(await screen.findByText("献立に追加しました。")).toBeTruthy();
+  });
+
+  it("adds a schedule entry from a recipe card calendar button", async () => {
+    const scheduleInsert = insertSingleQuery(baseSchedule);
+    from.mockReturnValue({ insert: scheduleInsert.insert });
+
+    renderWorkspace({ initialMealSchedules: [baseSchedule] });
+
+    // 各レシピカードの小ボタンからも同じモーダルを開ける。
+    fireEvent.click(screen.getAllByRole("button", { name: "スケジュールに追加" })[0]);
+    const dialog = screen.getByRole("dialog");
+    fireEvent.click(within(dialog).getAllByRole("button", { name: /を選ぶ$/ })[0]);
+    fireEvent.click(within(dialog).getByRole("button", { name: "晩" }));
+
+    await waitFor(() => {
+      expect(scheduleInsert.insert).toHaveBeenCalledWith(
+        expect.objectContaining({ meal_type: "晩", recipe_id: "recipe-1", status: "未完了" })
+      );
+    });
+  });
+
   it("filters the schedule recipe picker with the shared search and favorite controls", () => {
     const favoriteMiso: Recipe = {
       ...baseRecipe,

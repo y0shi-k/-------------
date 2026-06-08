@@ -3093,6 +3093,26 @@ h1 {
   font-weight: 800;
 }
 
+.cooking-overlay-header-actions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.cooking-overlay-schedule {
+  height: 40px;
+  flex-shrink: 0;
+  border: 1px solid #bae6fd;
+  border-radius: 999px;
+  background: #f0f9ff;
+  color: #0284c7;
+  padding: 0 14px;
+  font-size: 0.82rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
 .cooking-overlay-title {
   min-width: 0;
   flex: 1;
@@ -4118,6 +4138,116 @@ h1 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     max-height: 60vh;
   }
+}
+
+/* レシピ画面からのスケジュール追加モーダル（Canvas版 openScheduleAddModal 相当） */
+/* 調理ビュー全画面(.cooking-overlay=85)の上に出す。確認(=100)より下。 */
+.schedule-add-backdrop {
+  z-index: 95;
+}
+
+.schedule-add-modal {
+  width: min(560px, 100%);
+}
+
+.schedule-add-recipe-name {
+  margin: 0;
+  color: #172033;
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+
+.schedule-add-step-label {
+  margin: 0;
+  color: #0284c7;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+/* 今日から30日を横スクロールで表示。スマホ/PCともタップ・クリックで選択。 */
+.schedule-add-calendar {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.schedule-add-day {
+  display: grid;
+  gap: 4px;
+  flex: 0 0 auto;
+  width: 84px;
+  border: 1px solid #e0f2fe;
+  border-radius: 10px;
+  background: #f8fafc;
+  padding: 10px 8px;
+  text-align: center;
+  cursor: pointer;
+}
+
+.schedule-add-day:hover {
+  border-color: #0284c7;
+  background: #f0f9ff;
+}
+
+.schedule-add-day[data-today="true"] {
+  border-color: #0ea5e9;
+  background: #e0f2fe;
+}
+
+.schedule-add-day[data-selected="true"] {
+  border-color: #0284c7;
+  background: #0284c7;
+}
+
+.schedule-add-day[data-selected="true"] .schedule-add-day-label,
+.schedule-add-day[data-selected="true"] .schedule-add-day-count {
+  color: #fff;
+}
+
+.schedule-add-day-label {
+  color: #172033;
+  font-size: 0.82rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.schedule-add-day-count {
+  color: #0284c7;
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.schedule-add-day-count[data-empty="true"] {
+  color: #94a3b8;
+}
+
+.schedule-add-meals {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.schedule-add-meal {
+  border: 1px solid #e0f2fe;
+  border-radius: 10px;
+  background: #f0f9ff;
+  padding: 12px;
+  color: #0284c7;
+  font-size: 0.95rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.schedule-add-meal:hover {
+  border-color: #0284c7;
+  background: #e0f2fe;
+}
+
+.schedule-add-meal:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 /* レイアウトを動かさない一時通知トースト（Canvas版 showToast 相当） */

@@ -129,6 +129,12 @@ function archiveFieldsForCookingQuantity(quantity: number) {
 }
 
 const mealTypes: MealType[] = ["朝", "昼", "晩", "その他"];
+
+// レシピ画面からのスケジュール追加モーダルで選べる食事タイプ（Canvas版の朝/昼/晩に合わせる）。
+const scheduleAddMealTypes: MealType[] = ["朝", "昼", "晩"];
+
+// スケジュール追加ミニカレンダーの表示日数（今日から30日）。
+const SCHEDULE_ADD_DAYS = 30;
 const scheduleMealTypes: MealType[] = ["朝", "昼", "晩"];
 const mealTypeOrder: Record<MealType, number> = { 朝: 0, 昼: 1, 晩: 2, その他: 3 };
 
@@ -528,6 +534,10 @@ export function RecipeMealWorkspace({
   const [pickerSearchMode, setPickerSearchMode] = useState<RecipeSearchMode>("name");
   const [pickerSort, setPickerSort] = useState<RecipeSort>("created_desc");
   const [pickerFavoriteOnly, setPickerFavoriteOnly] = useState(false);
+  // レシピ画面（詳細ヘッダー／各カード）からのスケジュール追加モーダル状態。
+  // recipeId が立つとモーダルが開き、日付を選ぶと朝/昼/晩の食事選択ステップへ進む。
+  const [scheduleAddRecipeId, setScheduleAddRecipeId] = useState<string | null>(null);
+  const [scheduleAddSelectedDate, setScheduleAddSelectedDate] = useState<string | null>(null);
   const [cookingScheduleId, setCookingScheduleId] = useState<string | null>(null);
   const [cookingViewerOrigin, setCookingViewerOrigin] = useState<CookingViewerOrigin>("recipes");
   const [slotMenuId, setSlotMenuId] = useState<string | null>(null);
@@ -571,6 +581,13 @@ export function RecipeMealWorkspace({
   const slotMenuSchedule = slotMenuId ? mealSchedules.find((schedule) => schedule.id === slotMenuId) ?? null : null;
   const cookingSchedule = cookingScheduleId ? mealSchedules.find((schedule) => schedule.id === cookingScheduleId) ?? null : null;
   const scheduleDays = Array.from({ length: 7 }, (_, index) => addDays(scheduleWindowStart, index));
+  // スケジュール追加モーダル: 対象レシピと、今日から30日分の日付＋日付ごとの献立件数。
+  const scheduleAddRecipe = scheduleAddRecipeId ? recipes.find((recipe) => recipe.id === scheduleAddRecipeId) ?? null : null;
+  const scheduleAddDays = Array.from({ length: SCHEDULE_ADD_DAYS }, (_, index) => addDays(todayValue(), index));
+  const scheduleCountByDate = mealSchedules.reduce<Record<string, number>>((acc, schedule) => {
+    acc[schedule.scheduled_on] = (acc[schedule.scheduled_on] ?? 0) + 1;
+    return acc;
+  }, {});
   const visibleMealSchedules = mealSchedules
     .filter((schedule) => scheduleDays.includes(schedule.scheduled_on))
     .sort((a, b) => a.scheduled_on.localeCompare(b.scheduled_on) || mealTypeOrder[a.meal_type] - mealTypeOrder[b.meal_type]);
@@ -1450,7 +1467,27 @@ export function RecipeMealWorkspace({
       setScheduleWindowStart(String(data.scheduled_on));
     }
     setPickerSlot(null);
+    // レシピ画面からのスケジュール追加モーダルも、登録成功時はここで閉じる。
+    setScheduleAddRecipeId(null);
+    setScheduleAddSelectedDate(null);
     setFeedback({ tone: "success", message: "献立に追加しました。" });
+  }
+
+  // レシピ画面（詳細ヘッダー／各カード）からスケジュール追加モーダルを開く。日付選択ステップから始める。
+  function openScheduleAddModal(recipeId: string) {
+    setScheduleAddRecipeId(recipeId);
+    setScheduleAddSelectedDate(null);
+  }
+
+  function closeScheduleAddModal() {
+    setScheduleAddRecipeId(null);
+    setScheduleAddSelectedDate(null);
+  }
+
+  // 食事タイプ選択で登録を確定する。登録は既存 addScheduleEntry を再利用する（テーブル直叩きしない）。
+  async function assignScheduleFromRecipe(meal: MealType) {
+    if (!scheduleAddRecipeId || !scheduleAddSelectedDate) return;
+    await addScheduleEntry(scheduleAddSelectedDate, meal, scheduleAddRecipeId);
   }
 
   async function saveSchedule(event: FormEvent<HTMLFormElement>) {
@@ -2574,9 +2611,19 @@ export function RecipeMealWorkspace({
               <h2>{activeCookingRecipe.name}</h2>
               <RecipeSourceLinks source={activeCookingRecipe.source} />
             </div>
-            <button className="cooking-overlay-edit" type="button" onClick={() => editActiveCookingRecipe(activeCookingRecipe)} aria-label="このレシピを編集">
-              編集
-            </button>
+            <div className="cooking-overlay-header-actions">
+              <button
+                className="cooking-overlay-schedule"
+                type="button"
+                onClick={() => openScheduleAddModal(activeCookingRecipe.id)}
+                aria-label="スケジュールに追加"
+              >
+                スケジュール追加
+              </button>
+              <button className="cooking-overlay-edit" type="button" onClick={() => editActiveCookingRecipe(activeCookingRecipe)} aria-label="このレシピを編集">
+                編集
+              </button>
+            </div>
           </header>
 
           <div className="cooking-overlay-body">
@@ -3149,6 +3196,57 @@ export function RecipeMealWorkspace({
         </div>
       ) : null}
 
+      {scheduleAddRecipe ? (
+        <div className="modal-backdrop schedule-add-backdrop" role="dialog" aria-modal="true" aria-labelledby="schedule-add-heading">
+          <section className="canvas-modal schedule-add-modal">
+            <button className="modal-close-button" type="button" onClick={closeScheduleAddModal} aria-label="閉じる">
+              ×
+            </button>
+            <h3 id="schedule-add-heading">スケジュールに追加</h3>
+            <p className="schedule-add-recipe-name">{scheduleAddRecipe.name}</p>
+            <p className="schedule-add-step-label">
+              {scheduleAddSelectedDate ? "食事の時間帯を選んでください" : "日付を選んでください（今日から30日）"}
+            </p>
+            <div className="schedule-add-calendar" aria-label="日付を選ぶ">
+              {scheduleAddDays.map((day) => {
+                const count = scheduleCountByDate[day] ?? 0;
+                return (
+                  <button
+                    className="schedule-add-day"
+                    type="button"
+                    key={day}
+                    aria-label={`${formatScheduleDayLabel(day)} を選ぶ`}
+                    data-today={day === todayValue()}
+                    data-selected={day === scheduleAddSelectedDate}
+                    onClick={() => setScheduleAddSelectedDate(day)}
+                  >
+                    <span className="schedule-add-day-label">{formatScheduleDayLabel(day)}</span>
+                    <span className="schedule-add-day-count" data-empty={count === 0}>
+                      {count > 0 ? `献立 ${count}` : "なし"}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            {scheduleAddSelectedDate ? (
+              <div className="schedule-add-meals" aria-label="食事の時間帯を選ぶ">
+                {scheduleAddMealTypes.map((meal) => (
+                  <button
+                    className="schedule-add-meal"
+                    type="button"
+                    key={meal}
+                    disabled={isSaving}
+                    onClick={() => assignScheduleFromRecipe(meal)}
+                  >
+                    {meal}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </section>
+        </div>
+      ) : null}
+
       <div className="recipe-meal-grid">
         {activeView === "recipes" ? (
         <section className="canvas-recipe-collection" aria-label="レシピ集">
@@ -3189,6 +3287,7 @@ export function RecipeMealWorkspace({
             imageUrls={recipeImageUrls}
             onCook={openCookingViewer}
             onEdit={startEditRecipe}
+            onSchedule={(recipe) => openScheduleAddModal(recipe.id)}
             onDelete={(recipe) => requestDelete(recipe.name, "このレシピを削除します。献立に紐づくレシピ参照も外れます。", () => deleteRecipe(recipe))}
             onSelect={setSelectedRecipeId}
             onToggleFavorite={toggleRecipeFavorite}
@@ -4279,6 +4378,7 @@ function RecipeList({
   onCook,
   onDelete,
   onEdit,
+  onSchedule,
   onSelect,
   onToggleFavorite,
   favoriteOnly,
@@ -4299,6 +4399,7 @@ function RecipeList({
   disabled: boolean;
   imageUrls: Map<string, string>;
   onCook: (recipe: Recipe) => void;
+  onSchedule: (recipe: Recipe) => void;
   onDelete: (recipe: Recipe) => void;
   onEdit: (recipe: Recipe) => void;
   onSelect: (id: string) => void;
@@ -4352,6 +4453,11 @@ function RecipeList({
                   <div className="recipe-card-actions">
                     <button className="recipe-icon-button cook-button" type="button" disabled={disabled} onClick={(event) => { event.stopPropagation(); onCook(recipe); }} aria-label="料理する">
                       <span aria-hidden="true">III</span>
+                    </button>
+                    <button className="recipe-icon-button schedule-icon-button" type="button" disabled={disabled} onClick={(event) => { event.stopPropagation(); onSchedule(recipe); }} aria-label="スケジュールに追加">
+                      <svg aria-hidden="true" viewBox="0 0 24 24">
+                        <path d="M7 3v3M17 3v3M4 8h16M5 6h14a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1ZM12 12v4M10 14h4" />
+                      </svg>
                     </button>
                     <button className="recipe-icon-button" type="button" disabled={disabled} onClick={(event) => { event.stopPropagation(); onEdit(recipe); }} aria-label="編集">
                       <svg aria-hidden="true" viewBox="0 0 24 24">
