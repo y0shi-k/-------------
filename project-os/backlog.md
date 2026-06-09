@@ -41,7 +41,7 @@
    - 拡張: TKT-0161（設定: 案A=サイドバー下部ギア＋スマホ導線、主ナビ非昇格）=完了。/ TKT-0162（ホーム: 案A=新設・PCのみ初期表示、今日の献立をホームに集約）=次の候補。
    - 任意（P低）: TKT-0163（上部バー横断検索の機能化）。
    - 注意: 先行の TKT-0138「PCに広げない」方針は、≥1024px のデスクトップ表示について見直し済み（モバイル温存）。
-1. (P1) 公開前の本番適用ゲート — Supabase Dashboard Auth設定（TKT-0149）、`ai_usage_events` migration適用（TKT-0151 `supabase db push`）、実DB/実機での手動スモーク。
+1. (P1) 公開前の本番適用ゲート — Supabase Dashboard Auth設定（TKT-0149）、`ai_usage_events` migration適用（TKT-0151 `supabase db push`）、**`shopping_items.meal_schedule_id` migration適用（TKT-0212 `20260609120000_shopping_items_meal_schedule_link.sql`・未適用だとスケジュール起点の買い物追加INSERTが失敗）**、実DB/実機での手動スモーク。
 2. (P2) 横断リスク対応 — 緩いCSP（`unsafe-inline`/`unsafe-eval`）× localStorageのGeminiキー保存（XSS時の鍵流出）。CSP nonce化 or sessionStorageオプションを別チケットで検討。
 3. (P2) 画像スキャンからのAI一括登録（参照: phase-map「画像スキャン」, TKT-0003系）。
 4. (P3) `ai_usage_events` の古い行の定期削除（保全）。

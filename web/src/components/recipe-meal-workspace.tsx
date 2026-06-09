@@ -388,10 +388,12 @@ function scheduleDateTone(value: string): "today" | "sun" | "sat" | "weekday" {
 }
 
 function scheduleDeleteMessage(schedule: MealSchedule) {
+  // この予定の登録時に追加した未購入の買い物リスト項目があれば、一緒に削除する（購入済みは残す）。
+  const shoppingNote = "この予定に紐づく未購入の買い物リスト項目も一緒に削除します。";
   if (schedule.status === "完了") {
-    return "在庫を戻して献立を削除します。料理履歴と消費記録も削除されます。完成写真は残ります。";
+    return `在庫を戻して献立を削除します。料理履歴と消費記録も削除されます。完成写真は残ります。${shoppingNote}`;
   }
-  return "この献立予定を削除します。料理履歴は削除されません。";
+  return `この献立予定を削除します。料理履歴は削除されません。${shoppingNote}`;
 }
 
 function inventoryAmountByNameAndUnit(items: StockItem[], name: string, unit: string) {
@@ -528,6 +530,10 @@ export function RecipeMealWorkspace({
   const [shortageSelectionItems, setShortageSelectionItems] = useState<RecipeShoppingShortage[]>([]);
   const [shortageSelectionTab, setShortageSelectionTab] = useState<ShortageSelectionTab>("all");
   const [shortageSelectionRecipeName, setShortageSelectionRecipeName] = useState("");
+  // 不足モーダルがスケジュール登録起点で開かれた場合の、紐づくスケジュール id。
+  // 買い物 INSERT 時に meal_schedule_id として保存し、スケジュール削除時の連動削除に使う。
+  // レシピ詳細の「買い物へ」など、スケジュール起点でない場合は null。
+  const [shortageSelectionScheduleId, setShortageSelectionScheduleId] = useState<string | null>(null);
   const [pickerSlot, setPickerSlot] = useState<{ date: string; meal: MealType; replaceId?: string } | null>(null);
   const [pickerSearch, setPickerSearch] = useState("");
   const [pickerSearchLogic, setPickerSearchLogic] = useState<RecipeSearchLogic>("and");
@@ -871,6 +877,7 @@ export function RecipeMealWorkspace({
     setShortageSelectionItems([]);
     setShortageSelectionRecipeName("");
     setShortageSelectionTab("all");
+    setShortageSelectionScheduleId(null);
   }
 
   function toggleShortageSelection(key: string, selected: boolean) {
@@ -1425,14 +1432,16 @@ export function RecipeMealWorkspace({
     return { ok: true, imagePath: currentImagePath, staleRemovalFailed: false };
   }
 
-  async function addScheduleEntry(date: string, meal: MealType, recipeId: string): Promise<boolean> {
+  // 戻り値: 登録に成功したら作成された献立の id（string）、失敗時は null。
+  // 既存呼び出し（saveSchedule / pickerSlot からの replace 以外の登録）は戻り値を無視するため非破壊。
+  async function addScheduleEntry(date: string, meal: MealType, recipeId: string): Promise<string | null> {
     const recipe = recipes.find((item) => item.id === recipeId);
     if (!date || !recipe) {
       setFeedback({
         tone: "error",
         message: "原因: 日付またはレシピが未選択です。影響: 献立を保存できません。修正方法: 日付とレシピを選んでください。"
       });
-      return false;
+      return null;
     }
 
     setIsSaving(true);
@@ -1458,7 +1467,7 @@ export function RecipeMealWorkspace({
         tone: "error",
         message: "原因: 献立をDBへ保存できませんでした。影響: スケジュールに表示されません。修正方法: ログイン状態を確認してください。"
       });
-      return false;
+      return null;
     }
 
     setMealSchedules((items) => [data as MealSchedule, ...items]);
@@ -1471,7 +1480,7 @@ export function RecipeMealWorkspace({
     setScheduleAddRecipeId(null);
     setScheduleAddSelectedDate(null);
     setFeedback({ tone: "success", message: "献立に追加しました。" });
-    return true;
+    return String(data.id);
   }
 
   // レシピ画面（詳細ヘッダー／各カード）からスケジュール追加モーダルを開く。日付選択ステップから始める。
@@ -1487,7 +1496,8 @@ export function RecipeMealWorkspace({
 
   // 登録成立後の在庫不足チェック。不足があれば既存の不足選択モーダルを開く（新規DB導線は作らない）。
   // レシピ起点フロー（assignScheduleFromRecipe）とスケジュール「＋」の新規追加（addScheduleFromPicker）で共有する。
-  function openShortageModalForScheduledRecipe(recipeId: string) {
+  // scheduleId は紐づくスケジュール id。買い物 INSERT 時に meal_schedule_id として保存する。
+  function openShortageModalForScheduledRecipe(recipeId: string, scheduleId: string) {
     const recipe = recipes.find((item) => item.id === recipeId);
     if (!recipe) return;
     // 既存の在庫比較・不足選択モーダルをそのまま再利用する。
@@ -1496,6 +1506,7 @@ export function RecipeMealWorkspace({
     setShortageSelectionItems(shortages);
     setShortageSelectionRecipeName(recipe.name);
     setShortageSelectionTab("all");
+    setShortageSelectionScheduleId(scheduleId);
   }
 
   // 食事タイプ選択で登録を確定する。登録は既存 addScheduleEntry を再利用する（テーブル直叩きしない）。
@@ -1503,17 +1514,17 @@ export function RecipeMealWorkspace({
     if (!scheduleAddRecipeId || !scheduleAddSelectedDate) return;
     // addScheduleEntry が成功時に scheduleAddRecipeId を null にするため、先に控える。
     const recipeId = scheduleAddRecipeId;
-    const registered = await addScheduleEntry(scheduleAddSelectedDate, meal, recipeId);
+    const scheduleId = await addScheduleEntry(scheduleAddSelectedDate, meal, recipeId);
     // 登録が成立した場合のみ在庫不足を確認する。登録の成否と買い物追加は独立。
-    if (!registered) return;
-    openShortageModalForScheduledRecipe(recipeId);
+    if (!scheduleId) return;
+    openShortageModalForScheduledRecipe(recipeId, scheduleId);
   }
 
   // スケジュール「＋」のレシピ選択（新規追加）からの確定。登録成立後にレシピ起点と同じ不足チェックを通す。
   async function addScheduleFromPicker(date: string, meal: MealType, recipeId: string) {
-    const registered = await addScheduleEntry(date, meal, recipeId);
-    if (!registered) return;
-    openShortageModalForScheduledRecipe(recipeId);
+    const scheduleId = await addScheduleEntry(date, meal, recipeId);
+    if (!scheduleId) return;
+    openShortageModalForScheduledRecipe(recipeId, scheduleId);
   }
 
   async function saveSchedule(event: FormEvent<HTMLFormElement>) {
@@ -1737,6 +1748,27 @@ export function RecipeMealWorkspace({
       rollbackUpdates = rollbackResult.updates;
     }
 
+    // この予定に紐づく未購入の買い物リスト項目を、スケジュール削除より前に明示削除する。
+    // FK は on delete set null（meal_schedule_id）のため、先に予定を消すと紐付けが失われる。順序厳守。
+    const { data: removedShopping, error: shoppingError } = await supabase
+      .from("shopping_items")
+      .delete()
+      .eq("meal_schedule_id", schedule.id)
+      .eq("user_id", userId)
+      .eq("status", "未購入")
+      .select("id");
+
+    if (shoppingError) {
+      setIsSaving(false);
+      setFeedback({
+        tone: "error",
+        message: "原因: 関連する買い物リスト項目を削除できませんでした。影響: 献立は削除していません。修正方法: ログイン状態を確認して再度お試しください。"
+      });
+      return;
+    }
+
+    const removedShoppingCount = removedShopping?.length ?? 0;
+
     const { error } = await supabase.from("meal_schedules").delete().eq("id", schedule.id).eq("user_id", userId);
 
     setIsSaving(false);
@@ -1758,7 +1790,9 @@ export function RecipeMealWorkspace({
       setSelectedScheduleId(nextSchedule?.id ?? "");
     }
     router.refresh();
-    setFeedback({ tone: "info", message: `${schedule.recipe_name || "献立"} を献立から削除しました。` });
+    const baseMessage = `${schedule.recipe_name || "献立"} を献立から削除しました。`;
+    const shoppingMessage = removedShoppingCount > 0 ? ` 関連する未購入の買い物リスト ${removedShoppingCount}件も削除しました。` : "";
+    setFeedback({ tone: "info", message: baseMessage + shoppingMessage });
   }
 
   async function rollbackCompletedSchedule(schedule: MealSchedule): Promise<{ message: string; ok: false } | { ok: true; updates: ReturnType<typeof computeRollbackQuantityUpdates> }> {
@@ -1889,6 +1923,8 @@ export function RecipeMealWorkspace({
     setShortageSelectionItems(shortages);
     setShortageSelectionRecipeName(recipe.name);
     setShortageSelectionTab("all");
+    // レシピ詳細からの買い物追加はスケジュール起点ではないため、紐付けを持たせない。
+    setShortageSelectionScheduleId(null);
   }
 
   async function confirmRecipeShortageSelection() {
@@ -1912,7 +1948,9 @@ export function RecipeMealWorkspace({
           unit: item.unit,
           status: "未購入",
           linked_recipe_name: item.recipeName,
-          source_type: "recipe_detail"
+          source_type: "recipe_detail",
+          // スケジュール起点で開いた場合のみ紐付け。レシピ詳細起点や手動は null。
+          meal_schedule_id: shortageSelectionScheduleId
         }))
       )
       .select();

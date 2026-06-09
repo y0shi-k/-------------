@@ -198,6 +198,16 @@ function deleteQuery(error: unknown = null) {
   return { deleteRows, eqRecipe, eqUser };
 }
 
+// shopping_items の「meal_schedule_id / user_id / status で絞って delete → select("id")」用モック。
+function deleteShoppingByScheduleQuery(data: unknown[], error: unknown = null) {
+  const select = vi.fn().mockResolvedValue({ data, error });
+  const eqStatus = vi.fn(() => ({ select }));
+  const eqUser = vi.fn(() => ({ eq: eqStatus }));
+  const eqSchedule = vi.fn(() => ({ eq: eqUser }));
+  const deleteRows = vi.fn(() => ({ eq: eqSchedule }));
+  return { deleteRows, eqSchedule, eqUser, eqStatus, select };
+}
+
 function selectEqQuery(data: unknown[], error: unknown = null) {
   const eqUser = vi.fn().mockResolvedValue({ data, error });
   const eqSchedule = vi.fn(() => ({ eq: eqUser }));
@@ -1129,7 +1139,12 @@ describe("RecipeMealWorkspace", () => {
 
   it("deletes a meal schedule", async () => {
     const scheduleDelete = deleteQuery();
-    from.mockReturnValue({ delete: scheduleDelete.deleteRows });
+    const shoppingDelete = deleteShoppingByScheduleQuery([]);
+    from.mockImplementation((table: string) => {
+      if (table === "shopping_items") return { delete: shoppingDelete.deleteRows };
+      if (table === "meal_schedules") return { delete: scheduleDelete.deleteRows };
+      return {};
+    });
 
     renderWorkspace({ initialMealSchedules: [baseSchedule] });
     openScheduleView();
@@ -1144,7 +1159,70 @@ describe("RecipeMealWorkspace", () => {
       expect(scheduleDelete.deleteRows).toHaveBeenCalled();
       expect(refresh).toHaveBeenCalled();
     });
+    // 関連買い物の削除（未購入のみ）も走る。
+    expect(from).toHaveBeenCalledWith("shopping_items");
+    expect(shoppingDelete.eqSchedule).toHaveBeenCalledWith("meal_schedule_id", "schedule-1");
+    expect(shoppingDelete.eqStatus).toHaveBeenCalledWith("status", "未購入");
+    // 関連が0件なら買い物の件数は文面に出さない。
     expect(await screen.findByText("カレー を献立から削除しました。")).toBeTruthy();
+  });
+
+  it("deletes related unpurchased shopping items when a schedule is deleted", async () => {
+    const scheduleDelete = deleteQuery();
+    const shoppingDelete = deleteShoppingByScheduleQuery([{ id: "shop-1" }, { id: "shop-2" }]);
+    from.mockImplementation((table: string) => {
+      if (table === "shopping_items") return { delete: shoppingDelete.deleteRows };
+      if (table === "meal_schedules") return { delete: scheduleDelete.deleteRows };
+      return {};
+    });
+
+    renderWorkspace({ initialMealSchedules: [baseSchedule] });
+    openScheduleView();
+
+    fireEvent.click(within(screen.getByLabelText("7日献立")).getByRole("button", { name: "カレー の操作" }));
+    fireEvent.click(screen.getByRole("button", { name: "削除する" }));
+    // 確認ダイアログに連動削除の旨が出る。
+    const confirmDialog = await screen.findByLabelText("削除確認");
+    expect(within(confirmDialog).getByText(/未購入の買い物リスト項目も一緒に削除します/)).toBeTruthy();
+    fireEvent.click(within(confirmDialog).getByRole("button", { name: "削除する" }));
+
+    await waitFor(() => {
+      expect(shoppingDelete.deleteRows).toHaveBeenCalled();
+      expect(scheduleDelete.deleteRows).toHaveBeenCalled();
+    });
+    expect(shoppingDelete.eqSchedule).toHaveBeenCalledWith("meal_schedule_id", "schedule-1");
+    expect(shoppingDelete.eqUser).toHaveBeenCalledWith("user_id", "user-1");
+    expect(shoppingDelete.eqStatus).toHaveBeenCalledWith("status", "未購入");
+    expect(await screen.findByText(/関連する未購入の買い物リスト 2件も削除しました。/)).toBeTruthy();
+  });
+
+  it("links shopping items to the schedule when added via the recipe-originated flow", async () => {
+    // baseRecipe は玉ねぎ2個、baseInventory は1個 → 不足1個。登録後の不足モーダルからの追加で
+    // meal_schedule_id（作成された献立 id）が買い物リストに保存される。
+    const scheduleInsert = insertSingleQuery(baseSchedule);
+    const shoppingInsert = insertListQuery([{ id: "shop-1" }]);
+    from.mockImplementation((table: string) => {
+      if (table === "meal_schedules") return { insert: scheduleInsert.insert };
+      if (table === "shopping_items") return { insert: shoppingInsert.insert };
+      return { insert: vi.fn() };
+    });
+
+    renderWorkspace({ initialMealSchedules: [baseSchedule] });
+
+    fireEvent.click(screen.getAllByRole("button", { name: "スケジュールに追加" })[0]);
+    const dialog = screen.getByRole("dialog");
+    fireEvent.click(within(dialog).getAllByRole("button", { name: /を選ぶ$/ })[0]);
+    fireEvent.click(within(dialog).getByRole("button", { name: "朝" }));
+
+    const shortageModal = await screen.findByRole("dialog", { name: "買い物に追加するもの" });
+    fireEvent.click(within(shortageModal).getByLabelText("表示中をすべて選択"));
+    fireEvent.click(within(shortageModal).getByRole("button", { name: /選択したものを追加/ }));
+
+    await waitFor(() => {
+      expect(shoppingInsert.insert).toHaveBeenCalledWith([
+        expect.objectContaining({ name: "玉ねぎ", meal_schedule_id: "schedule-1" })
+      ]);
+    });
   });
 
   it("uncompletes a meal schedule and rolls inventory/history back", async () => {
@@ -1209,11 +1287,13 @@ describe("RecipeMealWorkspace", () => {
     const historyDelete = deleteQuery();
     const inventoryUpdate = updateEqQuery();
     const scheduleDelete = deleteQuery();
+    const shoppingDelete = deleteShoppingByScheduleQuery([]);
 
     from.mockImplementation((table: string) => {
       if (table === "cooking_consumption_events") return { select: eventsSelect.select, delete: consumptionDelete.deleteRows };
       if (table === "inventory_items") return { update: inventoryUpdate.update };
       if (table === "cooking_history") return { delete: historyDelete.deleteRows };
+      if (table === "shopping_items") return { delete: shoppingDelete.deleteRows };
       if (table === "meal_schedules") return { delete: scheduleDelete.deleteRows };
       return {};
     });
@@ -1222,7 +1302,11 @@ describe("RecipeMealWorkspace", () => {
     openScheduleView();
 
     fireEvent.click(within(screen.getByLabelText("7日献立")).getByRole("button", { name: "カレー を削除" }));
-    expect(await screen.findByText("在庫を戻して献立を削除します。料理履歴と消費記録も削除されます。完成写真は残ります。")).toBeTruthy();
+    expect(
+      await screen.findByText(
+        "在庫を戻して献立を削除します。料理履歴と消費記録も削除されます。完成写真は残ります。この予定に紐づく未購入の買い物リスト項目も一緒に削除します。"
+      )
+    ).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "削除する" }));
 
     await waitFor(() => {
