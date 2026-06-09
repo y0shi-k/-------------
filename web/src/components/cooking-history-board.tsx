@@ -6,12 +6,14 @@ import { CookingRecordEditModal } from "@/components/cooking-record-edit-modal";
 import { useShellNavigation, useShellSubView } from "@/components/web-mode-shell";
 import { CookingHistoryItem, CookingHistoryPhoto } from "@/lib/cooking-history/types";
 import type { StockItem } from "@/lib/inventory/types";
+import type { MealSchedule } from "@/lib/recipes/types";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import { useCachedSignedUrls } from "@/lib/photos/signed-url-cache";
 
 type CookingHistoryBoardProps = {
   initialHistory: CookingHistoryItem[];
   initialInventoryItems: StockItem[];
+  initialMealSchedules: MealSchedule[];
   userId: string;
 };
 
@@ -21,6 +23,9 @@ type PhotoFilter = "all" | "with" | "without";
 type PeriodFilter = "all" | "week" | "month" | "quarter";
 
 const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
+
+// 本文右のサムネ格子に並べる最大枚数。超過分は最後のサムネに +N オーバーレイで畳む（TKT-0214）。
+const PHOTO_GRID_LIMIT = 6;
 
 function displayRecipeName(value: string) {
   return value.trim() || "料理名なし";
@@ -91,9 +96,10 @@ function renderStars(rating: number | null) {
   ));
 }
 
-export function CookingHistoryBoard({ initialHistory, initialInventoryItems, userId }: CookingHistoryBoardProps) {
+export function CookingHistoryBoard({ initialHistory, initialInventoryItems, initialMealSchedules, userId }: CookingHistoryBoardProps) {
   const router = useRouter();
   const history = initialHistory;
+  const mealSchedules = initialMealSchedules;
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
 
   // 全履歴写真の storage_path を収集し、共有キャッシュで署名URL解決する（TKT-0205）。
@@ -182,6 +188,10 @@ export function CookingHistoryBoard({ initialHistory, initialInventoryItems, use
   }, {});
   const { base: calendarBase, cells: calendarCells } = getMonthCells(calendarMonth);
   const selectedItems = groupedHistory[selectedDate] ?? [];
+  // 選択日の「未完了」予定（カレンダー詳細に予定行として表示する）。
+  const selectedSchedules = mealSchedules.filter(
+    (schedule) => schedule.scheduled_on === selectedDate && schedule.status === "未完了"
+  );
   const favoriteItems = history.filter((item) => Number(item.rating) >= 4).slice(0, 5);
   const staleRecipes = Object.entries(allRecipeCounts)
     .map(([name]) => {
@@ -292,6 +302,8 @@ export function CookingHistoryBoard({ initialHistory, initialInventoryItems, use
                 const photoItem = items.find((item) => item.photos.some((photo) => photo.storage_path));
                 const photo = photoItem?.photos.find((photo) => photo.storage_path);
                 const photoUrl = photo ? photoUrlMap.get(photo.storage_path) : undefined;
+                // 予定ドットは「記録が無い日」にのみ点灯し、凡例の「予定のみ」と意味を一致させる（TKT-0213）。
+                const hasScheduleOnly = items.length === 0 && mealSchedules.some((schedule) => schedule.scheduled_on === key);
                 const selected = selectedDate === key;
                 return (
                   <button
@@ -307,6 +319,7 @@ export function CookingHistoryBoard({ initialHistory, initialInventoryItems, use
                       {items.length ? <i data-kind="record" /> : null}
                       {photo ? <i data-kind="photo" /> : null}
                       {items.some((item) => Number(item.rating) >= 4) ? <i data-kind="rating" /> : null}
+                      {hasScheduleOnly ? <i data-kind="schedule" /> : null}
                     </div>
                     {photoUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
@@ -320,7 +333,7 @@ export function CookingHistoryBoard({ initialHistory, initialInventoryItems, use
               <span><i data-kind="record" />記録</span>
               <span><i data-kind="photo" />写真</span>
               <span><i data-kind="rating" />高評価</span>
-              <span>予定のみ</span>
+              <span><i data-kind="schedule" />予定のみ</span>
             </div>
             <HistoryDateGroup
               items={selectedItems}
@@ -328,6 +341,7 @@ export function CookingHistoryBoard({ initialHistory, initialInventoryItems, use
               onView={setViewingItem}
               onViewRecipe={requestViewRecipe}
               photoUrlMap={photoUrlMap}
+              schedules={selectedSchedules}
               title={formatCookingDateLabel(selectedDate)}
             />
           </div>
@@ -393,6 +407,12 @@ export function CookingHistoryBoard({ initialHistory, initialInventoryItems, use
           item={viewingItem}
           onClose={() => setViewingItem(null)}
           onEdit={() => handleViewEdit(viewingItem)}
+          onViewRecipe={() => {
+            if (viewingItem.recipe_id) {
+              requestViewRecipe(viewingItem.recipe_id, "cooking");
+              setViewingItem(null);
+            }
+          }}
           photoUrlMap={photoUrlMap}
         />
       ) : null}
@@ -415,6 +435,7 @@ function HistoryDateGroup({
   onView,
   onViewRecipe,
   photoUrlMap,
+  schedules = [],
   title
 }: {
   items: CookingHistoryItem[];
@@ -422,48 +443,88 @@ function HistoryDateGroup({
   onView: (item: CookingHistoryItem) => void;
   onViewRecipe: (recipeId: string, origin?: "recipes" | "cooking") => void;
   photoUrlMap: Map<string, string>;
+  schedules?: MealSchedule[];
   title: string;
 }) {
+  const hasContent = items.length > 0 || schedules.length > 0;
   return (
     <section className="history-date-group">
       <div className="history-date-heading">
         <h3>{title}</h3>
-        <span>{items.length}件</span>
+        <span>{items.length + schedules.length}件</span>
       </div>
+      {schedules.length ? (
+        <ul className="history-schedule-list" aria-label="この日の未完了の献立予定">
+          {schedules.map((schedule) => (
+            <li className="history-schedule-item" key={schedule.id}>
+              <span className="history-schedule-meal">{schedule.meal_type}</span>
+              <span className="history-schedule-name">{schedule.recipe_name || "レシピ名なし"}</span>
+              <span className="history-schedule-status">未完了</span>
+              {schedule.recipe_id ? (
+                <button
+                  className="history-schedule-link"
+                  onClick={() => onViewRecipe(schedule.recipe_id!, "cooking")}
+                  type="button"
+                >
+                  レシピを見る
+                </button>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      ) : null}
       {items.length ? (
         <div className="history-list">
-          {items.map((item) => (
-            <article className="history-item" key={item.id}>
-              <button className="history-edit-button" onClick={() => onEdit(item)} type="button">
-                編集
-              </button>
-              <HistoryPhoto photos={item.photos} photoUrlMap={photoUrlMap} recipeName={displayRecipeName(item.recipe_name)} onView={() => onView(item)} />
-              <div className="history-item-body">
-                <div className="history-item-topline">
-                  <div>
-                    <span>{formatTimestamp(item.cooked_at)}</span>
-                    <h4>{displayRecipeName(item.recipe_name)}</h4>
+          {items.map((item) => {
+            const photosWithPath = item.photos.filter((photo) => photo.storage_path);
+            const recipeName = displayRecipeName(item.recipe_name);
+            const hasPhotoGrid = photosWithPath.length >= 2;
+            return (
+              // 行（カード本体）クリックで写真モーダルを開くため、透明なヒットエリアボタンを重ねる（TKT-0214）。
+              // article 自体を role="button" にすると jsx-a11y で弾かれるため実 button を使う。
+              <article className={`history-item${hasPhotoGrid ? " has-photo-grid" : ""}`} key={item.id}>
+                <button
+                  className="history-item-hitarea"
+                  aria-label={`${recipeName}の記録を開く`}
+                  onClick={() => onView(item)}
+                  type="button"
+                />
+                <button
+                  className="history-edit-button"
+                  onClick={(event) => {
+                    // 編集ボタンは写真モーダルを開かない。
+                    event.stopPropagation();
+                    onEdit(item);
+                  }}
+                  type="button"
+                >
+                  編集
+                </button>
+                <HistoryPhoto photos={item.photos} photoUrlMap={photoUrlMap} recipeName={recipeName} onView={() => onView(item)} />
+                <div className="history-item-body">
+                  <div className="history-item-topline">
+                    <div>
+                      <span>{formatTimestamp(item.cooked_at)}</span>
+                      <h4>{recipeName}</h4>
+                    </div>
+                    <div className="history-stars">{renderStars(item.rating)}</div>
                   </div>
-                  <div className="history-stars">{renderStars(item.rating)}</div>
-                </div>
-                <div className="history-tags">
-                  <em>その他</em>
-                  {item.photos.some((photo) => photo.storage_path) ? <em>写真あり</em> : null}
-                  {item.note ? <em>メモあり</em> : null}
-                </div>
-                <p className="item-note">{item.note || "感想なし"}</p>
-                {item.recipe_id ? (
-                  <div className="history-card-actions">
-                    <button data-primary="true" type="button" onClick={() => onViewRecipe(item.recipe_id!, "cooking")}>
-                      レシピを見る
-                    </button>
+                  <div className="history-tags">
+                    <em>その他</em>
+                    {photosWithPath.length ? <em>写真あり</em> : null}
+                    {item.note ? <em>メモあり</em> : null}
                   </div>
+                  <p className="item-note">{item.note || "感想なし"}</p>
+                </div>
+                {hasPhotoGrid ? (
+                  <HistoryPhotoGrid photos={item.photos} photoUrlMap={photoUrlMap} recipeName={recipeName} onView={() => onView(item)} />
                 ) : null}
-              </div>
-            </article>
-          ))}
+              </article>
+            );
+          })}
         </div>
-      ) : (
+      ) : null}
+      {hasContent ? null : (
         <p className="empty-list">この日の料理記録・予定はありません。</p>
       )}
     </section>
@@ -494,11 +555,13 @@ function CookingRecordViewModal({
   item,
   onClose,
   onEdit,
+  onViewRecipe,
   photoUrlMap
 }: {
   item: CookingHistoryItem;
   onClose: () => void;
   onEdit: () => void;
+  onViewRecipe: () => void;
   photoUrlMap: Map<string, string>;
 }) {
   // storage_path があるものを「写真あり」とみなす（TKT-0205）。
@@ -550,6 +613,11 @@ function CookingRecordViewModal({
         </div>
 
         <div className="cooking-record-view-actions">
+          {item.recipe_id ? (
+            <button type="button" data-primary="true" onClick={onViewRecipe}>
+              レシピを見る
+            </button>
+          ) : null}
           <button type="button" onClick={onEdit}>
             編集
           </button>
@@ -593,5 +661,57 @@ function HistoryPhoto({
       <img src={photoUrl} alt={`${recipeName}の完成写真`} />
       {photosWithPath.length >= 2 ? <span className="history-photo-count-badge">📷{photosWithPath.length}</span> : null}
     </button>
+  );
+}
+
+// 2枚目以降の写真を本文右側のサムネ格子に並べる。PC幅では余白に入る列数だけ自動で増える（TKT-0214）。
+function HistoryPhotoGrid({
+  photos,
+  photoUrlMap,
+  recipeName,
+  onView
+}: {
+  photos: CookingHistoryPhoto[];
+  photoUrlMap: Map<string, string>;
+  recipeName: string;
+  onView: () => void;
+}) {
+  // 1枚目は左枠で表示済みなので 2枚目以降のみを対象にする（TKT-0205: storage_path のあるもの）。
+  const extras = photos.filter((photo) => photo.storage_path).slice(1);
+  if (extras.length === 0) {
+    return null;
+  }
+  const shown = extras.slice(0, PHOTO_GRID_LIMIT);
+  const hiddenCount = extras.length - shown.length;
+
+  return (
+    <div className="history-photo-grid">
+      {shown.map((photo, index) => {
+        const photoUrl = photoUrlMap.get(photo.storage_path);
+        const isOverflow = hiddenCount > 0 && index === shown.length - 1;
+        const label = isOverflow ? `他${hiddenCount}枚を含む写真を表示` : `${recipeName}の写真 ${index + 2}を表示`;
+        return (
+          <button
+            className="history-photo-grid-item"
+            key={photo.id}
+            aria-label={label}
+            onClick={(event) => {
+              // 行クリックと二重発火させない（写真モーダルは冪等だが明示的に止める）。
+              event.stopPropagation();
+              onView();
+            }}
+            type="button"
+          >
+            {photoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={photoUrl} alt="" />
+            ) : (
+              <span className="photo-thumb-fallback" aria-hidden="true" />
+            )}
+            {isOverflow ? <span className="history-photo-grid-more">+{hiddenCount}</span> : null}
+          </button>
+        );
+      })}
+    </div>
   );
 }

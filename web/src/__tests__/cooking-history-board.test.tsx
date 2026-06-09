@@ -2,6 +2,7 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CookingHistoryBoard } from "@/components/cooking-history-board";
 import type { CookingHistoryItem } from "@/lib/cooking-history/types";
+import type { MealSchedule } from "@/lib/recipes/types";
 
 const shellMocks = vi.hoisted(() => ({
   requestViewRecipe: vi.fn(),
@@ -89,11 +90,25 @@ function buildPhoto(id: string, signedUrl = `https://signed.example/${id}.jpg`) 
   };
 }
 
+const baseSchedule: MealSchedule = {
+  id: "schedule-1",
+  user_id: "user-1",
+  scheduled_on: "2026-05-24",
+  meal_type: "晩",
+  recipe_id: "recipe-9",
+  recipe_name: "肉じゃが",
+  status: "未完了",
+  completed_at: null,
+  created_at: "2026-05-20T00:00:00.000Z",
+  updated_at: "2026-05-20T00:00:00.000Z"
+};
+
 function renderBoard(props?: Partial<React.ComponentProps<typeof CookingHistoryBoard>>) {
   return render(
     <CookingHistoryBoard
       initialHistory={props?.initialHistory ?? []}
       initialInventoryItems={props?.initialInventoryItems ?? []}
+      initialMealSchedules={props?.initialMealSchedules ?? []}
       userId={props?.userId ?? "user-1"}
     />
   );
@@ -216,20 +231,65 @@ describe("CookingHistoryBoard", () => {
     expect(screen.getByText("手入力の記録を編集中")).toBeTruthy();
   });
 
-  it("shows only the recipe viewer action when recipe_id exists", () => {
+  it("moves the recipe viewer action into the photo modal (only when recipe_id exists)", () => {
     renderBoard({
       initialHistory: [
         baseHistory,
-        { ...baseHistory, id: "history-2", recipe_id: null, recipe_name: "手入力の記録" }
+        { ...baseHistory, id: "history-2", recipe_id: null, recipe_name: "手入力ごはん" }
       ]
     });
 
+    // カード本体には「レシピを見る」は無い（モーダルへ移設した）。
+    expect(screen.queryByRole("button", { name: "レシピを見る" })).toBeNull();
     expect(screen.queryByRole("button", { name: "写真を開く" })).toBeNull();
     expect(screen.queryByRole("button", { name: "もう一度作る" })).toBeNull();
-    expect(screen.getAllByRole("button", { name: "レシピを見る" })).toHaveLength(1);
 
-    fireEvent.click(screen.getByRole("button", { name: "レシピを見る" }));
+    // recipe_id ありの記録を開くとモーダル内に「レシピを見る」が出る。
+    fireEvent.click(screen.getByRole("button", { name: "カレーの記録を開く" }));
+    const dialog = screen.getByRole("dialog", { name: "カレー" });
+    fireEvent.click(within(dialog).getByRole("button", { name: "レシピを見る" }));
     expect(shellMocks.requestViewRecipe).toHaveBeenCalledWith("recipe-1", "cooking");
+
+    // recipe_id なしの記録を開いてもモーダルに「レシピを見る」は出ない。
+    fireEvent.click(screen.getByRole("button", { name: "手入力ごはんの記録を開く" }));
+    const manualDialog = screen.getByRole("dialog", { name: "手入力ごはん" });
+    expect(within(manualDialog).queryByRole("button", { name: "レシピを見る" })).toBeNull();
+  });
+
+  it("opens the photo modal from the card body and from a thumbnail in the grid", () => {
+    renderBoard({
+      initialHistory: [
+        { ...baseHistory, photos: [buildPhoto("p1"), buildPhoto("p2"), buildPhoto("p3")] }
+      ]
+    });
+
+    // 2枚目以降のサムネクリックで写真モーダルが開く。
+    fireEvent.click(screen.getByRole("button", { name: "カレーの写真 2を表示" }));
+    expect(screen.getByRole("dialog", { name: "カレー" })).toBeTruthy();
+  });
+
+  it("collapses extra photos into a +N overflow tile that opens the photo modal", () => {
+    renderBoard({
+      initialHistory: [
+        {
+          ...baseHistory,
+          photos: Array.from({ length: 9 }, (_, index) => buildPhoto(`p${index + 1}`))
+        }
+      ]
+    });
+
+    // 9枚 → 左1枚＋格子に上限6枚、残り2枚は最後のサムネに +2 オーバーレイ。
+    expect(screen.getByText("+2")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "他2枚を含む写真を表示" }));
+    expect(screen.getByRole("dialog", { name: "カレー" })).toBeTruthy();
+  });
+
+  it("opens only the edit modal (not the photo modal) when the edit button is clicked", () => {
+    renderBoard({ initialHistory: [baseHistory] });
+
+    fireEvent.click(screen.getByRole("button", { name: "編集" }));
+    expect(screen.getByRole("dialog", { name: "料理記録を編集" })).toBeTruthy();
+    expect(screen.queryByRole("dialog", { name: "カレー" })).toBeNull();
   });
 
   it("syncs the view tab selection to the shell sidebar leaf", () => {
@@ -240,6 +300,28 @@ describe("CookingHistoryBoard", () => {
 
     fireEvent.click(screen.getByRole("tab", { name: "振り返り" }));
     expect(shellMocks.selectShellLeaf).toHaveBeenCalledWith("cooking", "insights");
+  });
+
+  it("shows incomplete meal schedules as rows on the selected calendar day", () => {
+    const today = new Date();
+    const key = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+    renderBoard({
+      // 記録は recipe_id なし → カレンダー詳細の「レシピを見る」は予定行のものだけになる。
+      initialHistory: [{ ...baseHistory, recipe_id: null, cooked_at: `${key}T10:00:00.000Z` }],
+      initialMealSchedules: [
+        { ...baseSchedule, scheduled_on: key },
+        { ...baseSchedule, id: "schedule-done", recipe_name: "完了済み献立", status: "完了", scheduled_on: key }
+      ]
+    });
+
+    fireEvent.click(screen.getByRole("tab", { name: "カレンダー" }));
+    expect(screen.getByLabelText("この日の未完了の献立予定")).toBeTruthy();
+    expect(screen.getByText("肉じゃが")).toBeTruthy();
+    // 完了済みの予定は予定行に出さない。
+    expect(screen.queryByText("完了済み献立")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "レシピを見る" }));
+    expect(shellMocks.requestViewRecipe).toHaveBeenCalledWith("recipe-9", "cooking");
   });
 
   it("renders the view driven by the shell sub-view selection", () => {
