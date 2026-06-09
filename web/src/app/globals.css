@@ -5939,6 +5939,18 @@ h1 {
   visibility: hidden;
 }
 
+.item-badge-row {
+  display: flex;
+  min-height: 20px;
+  align-items: center;
+  gap: 6px;
+  margin-top: 5px;
+}
+
+.item-badge-row[data-empty="true"] {
+  visibility: hidden;
+}
+
 /* TKT-0215: 背景写真があるカードでは、文字ラベルに背景プレートを敷いて可読性を確保する。
    色・不透明度は設定（CSS変数）で変更可。文字色は背景色の明度から自動で濃紺/白を選ぶ。 */
 .stock-item[data-has-bg] .item-main h4,
@@ -5994,6 +6006,24 @@ h1 {
   display: flex;
   align-items: center;
   gap: 6px;
+}
+
+.quantity-meta {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 86px;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.conversion-slot {
+  display: flex;
+  min-width: 0;
+  justify-content: flex-end;
+}
+
+.conversion-slot[data-empty="true"] {
+  visibility: hidden;
 }
 
 .quantity-stepper button {
@@ -6617,10 +6647,10 @@ h1 {
   .canvas-inventory-list .stock-item {
     grid-template-columns: 44px minmax(0, 1fr) auto;
     grid-template-areas:
-      "icon select actions"
+      "select select actions"
       "icon main main"
       "icon note note"
-      "icon qty qty";
+      "icon qtymeta qtymeta";
     align-content: start;
     gap: 10px 12px;
     min-height: 176px;
@@ -6656,6 +6686,7 @@ h1 {
   .canvas-inventory-list .stock-item > .select-row {
     grid-area: select;
     align-self: start;
+    justify-self: start;
   }
 
   .canvas-inventory-list .stock-item > .item-main {
@@ -6686,13 +6717,27 @@ h1 {
     -webkit-line-clamp: 2;
   }
 
-  .canvas-inventory-list .stock-item > .quantity-stepper {
-    grid-area: qty;
+  .canvas-inventory-list .stock-item > .quantity-meta {
+    grid-area: qtymeta;
+    align-self: end;
+    width: 100%;
+  }
+
+  .canvas-inventory-list .stock-item .quantity-stepper {
+    width: 100%;
+    min-width: 0;
     justify-content: space-between;
     border: 1px solid #e2e8f0;
     border-radius: 10px;
     background: #f8fafc;
     padding: 6px;
+  }
+
+  .canvas-inventory-list .stock-item .conversion-chip {
+    max-width: 86px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .canvas-inventory-list .stock-item > .item-actions {
@@ -8721,10 +8766,10 @@ h1 {
   .canvas-inventory-list .stock-item {
     grid-template-columns: 44px minmax(0, 1fr) auto;
     grid-template-areas:
-      "icon select actions"
+      "select select actions"
       "icon main   main"
       "icon note   note"
-      "icon qty    qty";
+      "icon qtymeta qtymeta";
     align-content: start;
   }
 
@@ -8736,6 +8781,7 @@ h1 {
   .canvas-inventory-list .stock-item > .select-row {
     grid-area: select;
     align-self: start;
+    justify-self: start;
   }
 
   .canvas-inventory-list .stock-item > .item-main {
@@ -8747,9 +8793,23 @@ h1 {
     grid-area: note;
   }
 
-  .canvas-inventory-list .stock-item > .quantity-stepper {
-    grid-area: qty;
+  .canvas-inventory-list .stock-item > .quantity-meta {
+    grid-area: qtymeta;
+    grid-template-columns: minmax(0, 1fr) 86px;
+    width: 100%;
+  }
+
+  .canvas-inventory-list .stock-item .quantity-stepper {
+    width: 100%;
+    min-width: 0;
     justify-content: space-between;
+  }
+
+  .canvas-inventory-list .stock-item .conversion-chip {
+    max-width: 86px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .canvas-inventory-list .stock-item > .item-actions {

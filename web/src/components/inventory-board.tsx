@@ -1753,6 +1753,7 @@ function ItemList({ disabled, emptyText, imageUrls, items, list, notations, cust
       {toolbar}
       {items.map((item) => {
         const itemImageUrl = resolveItemImageUrl(item, userIngredientImages, imageUrls);
+        const badge = expiryBadge(item);
         return (
         <article
           className="stock-item"
@@ -1773,26 +1774,34 @@ function ItemList({ disabled, emptyText, imageUrls, items, list, notations, cust
           <div className="item-main">
             <div className="item-title-row">
               <h4>{item.name}</h4>
-              {expiryBadge(item) ? <span className="expiry-chip" data-tone={expiryBadge(item)?.tone}>{expiryBadge(item)?.label}</span> : null}
-              {item.unit_conversion ? <span className="conversion-chip">{unitConversionLabel(item)}</span> : null}
             </div>
             <p>{item.storage_location} · 購入 {compactDate(item.created_at.slice(0, 10)) || "-"}</p>
+            <div className="item-badge-row" data-empty={!badge}>
+              {badge ? <span className="expiry-chip" data-tone={badge.tone}>{badge.label}</span> : null}
+            </div>
           </div>
           <p className="item-note" data-empty={!item.status_note} aria-hidden={!item.status_note}>
             {item.status_note}
           </p>
-          {onQuantityChange ? (
-            <div className="quantity-stepper" aria-label={`${item.name}の数量`}>
-              <button type="button" disabled={disabled || item.quantity <= 0} onClick={() => onQuantityChange(item, item.unit === "g" || item.unit === "ml" ? -50 : -1)}>
-                -
-              </button>
-              <span>
-                {displayQuantity(item.quantity, isFractionalUnit(item.unit) ? notations[item.id] : "decimal", customFractions)}
-                <small>{item.unit}</small>
+          {onQuantityChange || item.unit_conversion ? (
+            <div className="quantity-meta">
+              {onQuantityChange ? (
+                <div className="quantity-stepper" aria-label={`${item.name}の数量`}>
+                  <button type="button" disabled={disabled || item.quantity <= 0} onClick={() => onQuantityChange(item, item.unit === "g" || item.unit === "ml" ? -50 : -1)}>
+                    -
+                  </button>
+                  <span>
+                    {displayQuantity(item.quantity, isFractionalUnit(item.unit) ? notations[item.id] : "decimal", customFractions)}
+                    <small>{item.unit}</small>
+                  </span>
+                  <button type="button" disabled={disabled} onClick={() => onQuantityChange(item, item.unit === "g" || item.unit === "ml" ? 50 : 1)}>
+                    +
+                  </button>
+                </div>
+              ) : null}
+              <span className="conversion-slot" data-empty={!item.unit_conversion}>
+                {item.unit_conversion ? <span className="conversion-chip">{unitConversionLabel(item)}</span> : null}
               </span>
-              <button type="button" disabled={disabled} onClick={() => onQuantityChange(item, item.unit === "g" || item.unit === "ml" ? 50 : 1)}>
-                +
-              </button>
             </div>
           ) : null}
           <div className="item-actions">
