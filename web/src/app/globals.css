@@ -342,6 +342,60 @@ h1 {
   font-size: 0.82rem;
 }
 
+.settings-bg-intensity {
+  display: grid;
+  gap: 8px;
+}
+
+.settings-bg-intensity label {
+  color: var(--ink);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.settings-bg-intensity input[type="range"] {
+  width: 100%;
+  accent-color: var(--accent, #2563eb);
+}
+
+.settings-bg-intensity-scale {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.settings-bg-intensity-hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.settings-label-bg-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.settings-label-bg-row input[type="color"] {
+  width: 48px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: none;
+  cursor: pointer;
+}
+
+.settings-label-bg-color-value {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
 .settings-account {
   display: flex;
   flex-wrap: wrap;
@@ -930,6 +984,70 @@ h1 {
   gap: 8px;
 }
 
+/* 選択日の未完了の献立予定（記録行とは別系統・控えめな緑トーン）（TKT-0213）。 */
+.history-schedule-list {
+  display: grid;
+  gap: 6px;
+  margin: 0 0 10px;
+  padding: 0;
+  list-style: none;
+}
+
+.history-schedule-item {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  border: 1px dashed #bbf7d0;
+  border-left: 3px solid #84cc16;
+  border-radius: 10px;
+  background: rgb(132 204 22 / 8%);
+  padding: 8px 12px;
+  min-width: 0;
+}
+
+.history-schedule-meal {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  background: #84cc16;
+  color: #1a2e05;
+  padding: 1px 9px;
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.history-schedule-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: #2f3e1a;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.history-schedule-status {
+  color: #65803a;
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.history-schedule-link {
+  border: 1px solid #84cc16;
+  border-radius: 999px;
+  background: #fff;
+  color: #4d7c0f;
+  padding: 2px 12px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.history-schedule-link:hover {
+  background: rgb(132 204 22 / 12%);
+}
+
 .history-item {
   display: grid;
   grid-template-columns: 80px minmax(0, 1fr);
@@ -1184,6 +1302,12 @@ h1 {
 .calendar-dots i[data-kind="rating"],
 .calendar-legend i[data-kind="rating"] {
   background: #009f73;
+}
+
+/* 予定のみ日（記録が無く献立予定がある日）。記録/写真/高評価と区別できる明るい緑（TKT-0213）。 */
+.calendar-dots i[data-kind="schedule"],
+.calendar-legend i[data-kind="schedule"] {
+  background: #84cc16;
 }
 
 .calendar-cell[data-selected="true"] .calendar-dots i {
@@ -5736,6 +5860,40 @@ h1 {
   background: #fff7ed;
 }
 
+/* TKT-0215: 登録写真があるカードのみ背景に薄く敷く。
+   オーバーレイ（linear-gradient）を画像の上に重ね、文字/バッジ/ステッパーの可読性を維持する。
+   background-attachment: fixed はモバイル崩れ・スクロール負荷回避のため使わない。
+   オーバーレイ不透明度は CSS変数 --stock-bg-overlay（設定で変更可・既定 0.74）で受け取る。
+   値が小さいほど写真がくっきり、大きいほど背景色寄りになる。 */
+.stock-item[data-has-bg] {
+  background-image: linear-gradient(
+      rgb(248 250 252 / var(--stock-bg-overlay, 0.74)),
+      rgb(248 250 252 / var(--stock-bg-overlay, 0.74))
+    ),
+    var(--bg-image);
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+}
+
+/* 期限トーン併存時はオーバーレイを赤/オレンジ寄りにして識別を維持。
+   併用セレクタは単独の :has ルールより詳細度が高く、確実に優先される。 */
+.stock-item[data-has-bg]:has(.expiry-chip[data-tone="expired"]) {
+  background-image: linear-gradient(
+      rgb(255 241 242 / var(--stock-bg-overlay, 0.74)),
+      rgb(255 241 242 / var(--stock-bg-overlay, 0.74))
+    ),
+    var(--bg-image);
+}
+
+.stock-item[data-has-bg]:has(.expiry-chip[data-tone="soon"]) {
+  background-image: linear-gradient(
+      rgb(255 247 237 / var(--stock-bg-overlay, 0.74)),
+      rgb(255 247 237 / var(--stock-bg-overlay, 0.74))
+    ),
+    var(--bg-image);
+}
+
 .item-main {
   min-width: 0;
   align-self: center;
@@ -5779,6 +5937,20 @@ h1 {
 
 .item-note[data-empty="true"] {
   visibility: hidden;
+}
+
+/* TKT-0215: 背景写真があるカードでは、文字ラベルに背景プレートを敷いて可読性を確保する。
+   色・不透明度は設定（CSS変数）で変更可。文字色は背景色の明度から自動で濃紺/白を選ぶ。 */
+.stock-item[data-has-bg] .item-main h4,
+.stock-item[data-has-bg] .item-main p,
+.stock-item[data-has-bg] .item-note,
+.stock-item[data-has-bg] .quantity-stepper > span {
+  width: fit-content;
+  max-width: 100%;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: rgb(var(--stock-label-bg-rgb, 255 255 255) / var(--stock-label-bg-alpha, 0.82));
+  color: var(--stock-label-fg, #0f172a);
 }
 
 .expiry-chip,
@@ -6457,6 +6629,18 @@ h1 {
     padding: 14px;
   }
 
+  /* TKT-0215: Canvas幅（白背景）でも登録写真を背景に。オーバーレイは白寄りで合わせる。 */
+  .canvas-inventory-list .stock-item[data-has-bg] {
+    background-image: linear-gradient(
+        rgb(255 255 255 / var(--stock-bg-overlay, 0.74)),
+        rgb(255 255 255 / var(--stock-bg-overlay, 0.74))
+      ),
+      var(--bg-image);
+    background-position: center;
+    background-size: cover;
+    background-repeat: no-repeat;
+  }
+
   .canvas-inventory-list .stock-item-icon {
     --ingredient-icon-size: 44px;
     grid-area: icon;
@@ -6927,6 +7111,88 @@ h1 {
   line-height: 1.5;
 }
 
+/* 複数写真がある記録は「左1枚 ＋ 本文 ＋ 右サムネ格子」の3カラムにする（TKT-0214）。 */
+.cooking-history-workspace .history-item.has-photo-grid {
+  grid-template-columns: 80px minmax(0, 1fr) minmax(120px, 0.9fr);
+}
+
+/* カード全体を覆う透明ヒットエリア。行クリック＝写真モーダル。実 button なのでキーボードでも開ける。 */
+.cooking-history-workspace .history-item-hitarea {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+}
+
+.cooking-history-workspace .history-item-hitarea:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgb(245 158 11 / 28%);
+}
+
+/* インタラクティブ要素はヒットエリアより前面に出す（編集・写真・サムネ格子は個別ハンドラを優先）。 */
+.cooking-history-workspace .history-edit-button {
+  z-index: 2;
+}
+
+.cooking-history-workspace .history-photo-button {
+  z-index: 1;
+}
+
+/* 右サムネ格子。auto-fill で幅に応じ列数可変。padding-top で右上の編集ピルを避ける。 */
+.cooking-history-workspace .history-photo-grid {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(54px, 1fr));
+  align-content: start;
+  gap: 6px;
+  padding-top: 34px;
+  /* 余白部分のクリックは下のヒットエリアへ通す。サムネ自体は pointer-events を戻す。 */
+  pointer-events: none;
+}
+
+.cooking-history-workspace .history-photo-grid-item {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+  border: 1px solid var(--cream-line);
+  border-radius: 8px;
+  background: #fff9e8;
+  padding: 0;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.cooking-history-workspace .history-photo-grid-item:hover,
+.cooking-history-workspace .history-photo-grid-item:focus-visible {
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 3px rgb(245 158 11 / 16%);
+  outline: none;
+}
+
+.cooking-history-workspace .history-photo-grid-item img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.history-photo-grid-more {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgb(15 23 42 / 58%);
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
 @media (max-width: 640px) {
   .cooking-summary-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -6940,9 +7206,15 @@ h1 {
     grid-column: 1 / -1;
   }
 
-  .cooking-history-workspace .history-item {
+  .cooking-history-workspace .history-item,
+  .cooking-history-workspace .history-item.has-photo-grid {
     grid-template-columns: 68px minmax(0, 1fr);
     padding: 12px;
+  }
+
+  /* スマホでは右サムネ格子を畳み、従来同等の「左1枚＋縦積み」に縮退する（枚数は左の📷バッジで把握）。 */
+  .cooking-history-workspace .history-photo-grid {
+    display: none;
   }
 
   .cooking-history-workspace .history-edit-button {
@@ -7086,7 +7358,8 @@ h1 {
   font-weight: 900;
 }
 
-.cooking-record-view-actions button:first-child {
+.cooking-record-view-actions button:first-child,
+.cooking-record-view-actions button[data-primary="true"] {
   background: #009f73;
   color: #fff;
 }

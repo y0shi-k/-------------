@@ -1,6 +1,6 @@
 "use client";
 
-import { ChangeEvent, FormEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { ChangeEvent, type CSSProperties, FormEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { DeleteConfirmPanel } from "@/components/delete-confirm-panel";
 import { ShoppingListSection } from "@/components/shopping-list-section";
@@ -42,6 +42,13 @@ import { useImageFileDrop } from "@/lib/photos/use-image-file-drop";
 import { PHOTOS_BUCKET } from "@/lib/photos/user-image";
 import { invalidateUserImageSignedUrl, useCachedSignedUrls } from "@/lib/photos/signed-url-cache";
 import { normalizeIngredientImageName, resolveUserIngredientImage, type UserIngredientImage } from "@/lib/ui/ingredient-image";
+import {
+  applyStockCardBgIntensity,
+  applyStockLabelBg,
+  getStockCardBgIntensity,
+  getStockLabelBgAlpha,
+  getStockLabelBgColor,
+} from "@/lib/ui/stock-card-background";
 
 type InventoryBoardProps = {
   userId: string;
@@ -294,6 +301,12 @@ export function InventoryBoard({
 
   useEffect(() => {
     setGeminiApiKey(loadUserGeminiApiKey());
+  }, []);
+
+  // 食材カードの背景写真の濃さ・文字背景（設定）を localStorage から読み、CSS変数に反映する。
+  useEffect(() => {
+    applyStockCardBgIntensity(getStockCardBgIntensity());
+    applyStockLabelBg(getStockLabelBgColor(), getStockLabelBgAlpha());
   }, []);
 
   // マウント後に、現在の在庫アイテムの表示形式と分数候補を localStorage から読み込む。
@@ -1738,9 +1751,16 @@ function ItemList({ disabled, emptyText, imageUrls, items, list, notations, cust
   return (
     <div className="stock-list">
       {toolbar}
-      {items.map((item) => (
-        <article className="stock-item" key={item.id}>
-          <IngredientIcon category={item.category} className="stock-item-icon" imageUrl={resolveItemImageUrl(item, userIngredientImages, imageUrls)} name={item.name} size="md" />
+      {items.map((item) => {
+        const itemImageUrl = resolveItemImageUrl(item, userIngredientImages, imageUrls);
+        return (
+        <article
+          className="stock-item"
+          key={item.id}
+          data-has-bg={itemImageUrl ? "true" : undefined}
+          style={itemImageUrl ? ({ "--bg-image": `url(${itemImageUrl})` } as CSSProperties) : undefined}
+        >
+          <IngredientIcon category={item.category} className="stock-item-icon" imageUrl={itemImageUrl} name={item.name} size="md" />
           <label className="select-row">
             <input
               checked={selectedIds.includes(item.id)}
@@ -1788,7 +1808,8 @@ function ItemList({ disabled, emptyText, imageUrls, items, list, notations, cust
             </button>
           </div>
         </article>
-      ))}
+        );
+      })}
     </div>
   );
 }
