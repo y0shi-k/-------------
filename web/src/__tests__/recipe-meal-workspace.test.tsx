@@ -1419,7 +1419,9 @@ describe("RecipeMealWorkspace", () => {
     fireEvent.click(within(viewer).getByRole("button", { name: /^調理工程/ }));
     const stepChips = within(viewer).getAllByRole("button", { name: "玉ねぎ" });
     expect(stepChips.length).toBeGreaterThan(0);
-    expect(within(viewer).getAllByText("大さじ1").length).toBeGreaterThan(0);
+    expect(viewer.querySelector('[aria-label="大さじ1"]')).toBeTruthy();
+    expect(within(viewer).getAllByText("大さじ").length).toBeGreaterThan(0);
+    expect(within(viewer).getAllByText("1").length).toBeGreaterThan(0);
     expect(within(viewer).queryByText("1大さじ")).toBeNull();
     fireEvent.click(stepChips[0]);
 

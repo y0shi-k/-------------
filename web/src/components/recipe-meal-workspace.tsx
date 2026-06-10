@@ -4004,6 +4004,18 @@ function hasExplicitAmountAfterName(value: string) {
 }
 
 function cookingAmountChip(text: string, unit: string, key: string) {
+  if (unit === "大さじ" || unit === "小さじ") {
+    const amount = text.replace(unit, "").trim();
+    return (
+      <span className="cooking-amount-chip" data-unit={unit} aria-label={text} key={key}>
+        <span className="cooking-measure-unit" aria-hidden="true">
+          <span className="cooking-measure-unit-label">{unit}</span>
+        </span>
+        <span className="cooking-measure-value" aria-hidden="true">{amount}</span>
+      </span>
+    );
+  }
+
   return (
     <span className="cooking-amount-chip" data-unit={unit} key={key}>
       {text}
