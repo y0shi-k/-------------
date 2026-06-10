@@ -9,6 +9,8 @@ acceptance:
   - 背景画像の上にオーバーレイ（半透明レイヤー）が乗り、食材名・期限バッジ・数量ステッパー等のテキスト/操作が従来どおり読める
   - 既存の左アイコン（`IngredientIcon`）表示は残り、背景と二重表示になっても破綻しない
   - 期限切れ（`data-tone="expired"`）/期限近（`data-tone="soon"`）の赤・オレンジ系トーンが背景画像と併存しても識別できる
+  - 追加修正: 背景画像ありカードの上部操作（選択ラベル、編集/削除アイコンボタン）にも文字ラベルと同じ背景プレートが入り、写真に埋もれない
+  - 追加修正: 数量表示（例: `3パック`）がスマホ幅の画像ありカードでも1行に収まり、文字単位で折り返されない
   - Canvas幅レイアウト（`.canvas-inventory-list .stock-item`）でも背景画像が崩れない
   - 背景は装飾扱いで、スクリーンリーダー向けの情報が増えない（既存 `IngredientIcon` の aria-label を維持）
   - スクロール時のパフォーマンス劣化やモバイル幅崩れが起きない（`background-attachment: fixed` は使わない）
@@ -55,6 +57,10 @@ owner_notes:
   - 期限切れ/期限近の条件付き背景（既存 `:has(.expiry-chip[data-tone="expired"])` = `#fff1f2` / `[data-tone="soon"]` = `#fff7ed`）について、`[data-has-bg]` と併用時のオーバーレイ色を赤/オレンジ寄りにして識別を維持する。
   - Canvas幅（`.canvas-inventory-list .stock-item`、白背景 `#fff`）でも `[data-has-bg]` のオーバーレイ色を白寄りで合わせる。
   - `background-attachment: fixed` は使わない（モバイル崩れ・スクロール負荷回避）。
+- 追加修正:
+  - 背景写真があるカードのみ、`.select-row` と `.item-actions .icon-button` に文字ラベルと同じ `--stock-label-bg-*` 系の背景プレートを付ける。
+  - 数量表示に `white-space: nowrap` を付け、背景プレートの左右余白を少し詰めて短い単位名が2行にならないようにする。
+  - 写真なしカード、保存処理、画像URL解決、Storage権限には触れない。
 - 既存パターン/再利用:
   - 画像出所・優先順位は `resolveItemImageUrl` / `IngredientIcon`（`web/src/components/ui/ingredient-icon.tsx`）の既存ロジックをそのまま使う。
   - 期限トーンは既存 `expiryBadge(item)` と `.expiry-chip[data-tone]` の仕組みに乗る。

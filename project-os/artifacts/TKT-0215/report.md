@@ -19,6 +19,13 @@ status: ready
 - `background-attachment: fixed` は不使用（モバイル崩れ・スクロール負荷回避）。
 - 背景は装飾扱いで `alt`/`aria` を追加せず、既存 `IngredientIcon` の aria-label を維持（スクリーンリーダー向け情報は増えない）。
 
+## 追加修正
+
+- 背景写真がある在庫カードで、上部の `選択` ラベルと編集/削除アイコンボタンが写真に埋もれる問題を修正。
+- 文字ラベルと同じ CSS変数（`--stock-label-bg-rgb`, `--stock-label-bg-alpha`, `--stock-label-fg`）を使い、設定済みの文字背景色・濃さと揃うようにした。
+- スマホ幅の画像ありカードで数量表示（例: `3パック`）が2行に割れる問題を修正。数量ラベルは1行固定にし、背景プレートの左右余白を少し詰めた。
+- 変更は `web/src/app/globals.css` の表示CSSのみ。画像保存、署名URL、Supabase Storage、DB更新処理は変更していない。
+
 ## 実施した確認
 
 - `/verify TKT-0215`（`harness/bin/verify_web.sh`）: lint / typecheck / test / build すべて pass。policy（no_gas_dependency / no_hardcoded_secret / supabase_rls_present / backlog_focus_lean）すべて pass。結果は `verify.json`。

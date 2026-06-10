@@ -6054,10 +6054,25 @@ h1 {
 .stock-item[data-has-bg] .quantity-stepper > span {
   width: fit-content;
   max-width: 100%;
-  padding: 1px 6px;
+  padding: 1px 5px;
   border-radius: 6px;
   background: rgb(var(--stock-label-bg-rgb, 255 255 255) / var(--stock-label-bg-alpha, 0.82));
   color: var(--stock-label-fg, #0f172a);
+}
+
+.stock-item[data-has-bg] > .select-row,
+.stock-item[data-has-bg] > .item-actions .icon-button {
+  border-radius: 8px;
+  background: rgb(var(--stock-label-bg-rgb, 255 255 255) / var(--stock-label-bg-alpha, 0.82));
+  color: var(--stock-label-fg, #0f172a);
+}
+
+.stock-item[data-has-bg] > .select-row {
+  padding: 4px 7px;
+}
+
+.stock-item[data-has-bg] > .item-actions .icon-button {
+  box-shadow: 0 1px 2px rgb(15 23 42 / 8%);
 }
 
 .expiry-chip,
@@ -6140,6 +6155,7 @@ h1 {
   font-size: 0.86rem;
   font-weight: 800;
   text-align: center;
+  white-space: nowrap;
 }
 
 .quantity-stepper small {
