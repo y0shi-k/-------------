@@ -72,7 +72,8 @@ describe("WebModeShell", () => {
     expect(screen.getAllByRole("status")[0].textContent).toContain("食材管理");
     expect(screen.getAllByText("在庫 5件").length).toBeGreaterThan(0);
     expect(screen.getByText("食材管理の中身")).toBeTruthy();
-    expect(screen.queryByText("献立レシピの中身")).toBeNull();
+    // 非アクティブモードはマウントされたまま hidden で隠す（state保持のため）
+    expect(screen.getByText("献立レシピの中身").closest("section")?.hidden).toBe(true);
   });
 
   it("switches between the three Canvas-style modes", async () => {
@@ -138,8 +139,8 @@ describe("WebModeShell", () => {
     expect(screen.getByRole("region", { name: "アカウント" })).toBeTruthy();
     expect(screen.getByLabelText("ユーザー自身のAPIキー")).toBeTruthy();
     expect(screen.getAllByRole("button", { name: "ログアウト" }).length).toBeGreaterThan(0);
-    // ボードはアンマウントされ設定だけが描画される
-    expect(screen.queryByText("食材管理の中身")).toBeNull();
+    // ボードはマウントされたまま hidden になり、設定だけが見える
+    expect(screen.getByText("食材管理の中身").closest("section")?.hidden).toBe(true);
   });
 
   it("lands on the home dashboard on desktop width (>=1024px)", async () => {
@@ -165,8 +166,8 @@ describe("WebModeShell", () => {
       expect(screen.getByText("ホームの中身")).toBeTruthy();
     });
     expect(screen.getAllByRole("status")[0].textContent).toContain("ホーム");
-    // ホーム表示中はモードボードを描画しない
-    expect(screen.queryByText("食材管理の中身")).toBeNull();
+    // ホーム表示中もモードボードはマウントされたまま hidden
+    expect(screen.getByText("食材管理の中身").closest("section")?.hidden).toBe(true);
   });
 
   it("shows the home content when the home nav button is clicked", async () => {
@@ -179,7 +180,7 @@ describe("WebModeShell", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /ホーム/ }));
     expect(screen.getByText("ホームの中身")).toBeTruthy();
-    expect(screen.queryByText("食材管理の中身")).toBeNull();
+    expect(screen.getByText("食材管理の中身").closest("section")?.hidden).toBe(true);
   });
 
   it("opens settings from the mobile status-bar account entry", async () => {

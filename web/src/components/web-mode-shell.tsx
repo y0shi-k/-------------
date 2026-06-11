@@ -204,7 +204,6 @@ export function WebModeShell({
     [historyCount, inventoryCount, mealCount, recipeCount]
   );
   const active = modes.find((mode) => mode.id === activeMode) ?? modes[0];
-  const activeChildren = childrenByMode[active.id];
   const isSettingsActive = activeDesktopTarget.kind === "settings";
   const isHomeActive = activeDesktopTarget.kind === "home" && Boolean(home);
   const selectShellLeaf = useCallback((group: ModeId, leaf: ShellLeafId) => {
@@ -432,31 +431,43 @@ export function WebModeShell({
             <h1 className="sr-only">料理レシピ・食材管理</h1>
             <p className="sr-only">{active.status}</p>
 
-            {isHomeActive ? (
-              <section className="mode-panel" aria-label="ホーム">
+            {home ? (
+              <section className="mode-panel" aria-label="ホーム" hidden={!isHomeActive}>
                 {home}
               </section>
-            ) : isSettingsActive ? (
+            ) : null}
+            {isSettingsActive ? (
               <section className="mode-panel" aria-label="設定">
                 <SettingsPanel userEmail={userEmail} isAdmin={isAdmin} onClose={() => returnToMode(activeMode)} />
               </section>
-            ) : (
-              <section className="mode-panel" aria-labelledby={`mode-title-${active.id}`}>
-                {active.id === "ingredients" ? (
-                  <h2 className="sr-only" id={`mode-title-${active.id}`}>
-                    {active.label}
-                  </h2>
-                ) : (
-                  <div className="mode-heading">
-                    <div>
-                      <h2 id={`mode-title-${active.id}`}>{active.label}</h2>
-                      <p className="eyebrow">{active.eyebrow}</p>
+            ) : null}
+            {/* 3モードは常時マウントし hidden で切替える（アンマウントで各ボードの編集中stateが初期propsへ巻き戻るのを防ぐ） */}
+            {modes.map((mode) => {
+              const isModeVisible = !isHomeActive && !isSettingsActive && mode.id === active.id;
+
+              return (
+                <section
+                  className="mode-panel"
+                  aria-labelledby={`mode-title-${mode.id}`}
+                  hidden={!isModeVisible}
+                  key={mode.id}
+                >
+                  {mode.id === "ingredients" ? (
+                    <h2 className="sr-only" id={`mode-title-${mode.id}`}>
+                      {mode.label}
+                    </h2>
+                  ) : (
+                    <div className="mode-heading">
+                      <div>
+                        <h2 id={`mode-title-${mode.id}`}>{mode.label}</h2>
+                        <p className="eyebrow">{mode.eyebrow}</p>
+                      </div>
                     </div>
-                  </div>
-                )}
-                {activeChildren}
-              </section>
-            )}
+                  )}
+                  {childrenByMode[mode.id]}
+                </section>
+              );
+            })}
           </div>
         </div>
 
