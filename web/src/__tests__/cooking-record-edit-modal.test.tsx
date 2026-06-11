@@ -1,7 +1,7 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CookingRecordEditModal } from "@/components/cooking-record-edit-modal";
-import type { CookingHistoryItem, CookingHistoryPhoto } from "@/lib/cooking-history/types";
+import type { CookingConsumptionEvent, CookingHistoryItem, CookingHistoryPhoto } from "@/lib/cooking-history/types";
 import type { StockItem } from "@/lib/inventory/types";
 
 // jsdom は objectURL を実装しないため、新規写真サムネ用にスタブする。
@@ -10,11 +10,11 @@ URL.createObjectURL = vi.fn(() => `blob:mock-${++objectUrlSeq}`);
 URL.revokeObjectURL = vi.fn();
 
 // 消費明細・レシピ材料の読み込みは空で解決させ、写真ドロップのUI挙動だけを検証する。
-function makeQueryChain() {
+function makeQueryChain(data: unknown[] = []) {
   const chain = {
     select: vi.fn(() => chain),
     eq: vi.fn(() => chain),
-    order: vi.fn(() => Promise.resolve({ data: [], error: null }))
+    order: vi.fn(() => Promise.resolve({ data, error: null }))
   };
   return chain;
 }
@@ -206,5 +206,111 @@ describe("CookingRecordEditModal の既存写真削除UI", () => {
 
     expect(screen.getAllByRole("button", { name: "この写真を削除" })).toHaveLength(2);
     expect(screen.queryByText(/削除予定/)).toBeNull();
+  });
+});
+
+const baseConsumptionEvent: CookingConsumptionEvent = {
+  id: "event-1",
+  user_id: "user-1",
+  cooking_history_id: "history-1",
+  meal_schedule_id: null,
+  recipe_id: "recipe-1",
+  ingredient_name: "卵",
+  requested_amount: 2,
+  requested_unit: "個",
+  consumed_amount: 2,
+  consumed_unit: "個",
+  stock_item_id: "stock-egg",
+  stock_item_name: "卵",
+  substitute_for: "",
+  created_at: "2026-06-01T00:00:00.000Z"
+};
+
+const baseConsumptionStock: StockItem = {
+  id: "stock-egg",
+  user_id: "user-1",
+  category: "食材",
+  name: "卵",
+  quantity: 5,
+  unit: "個",
+  unit_conversion: null,
+  display_expires_on: null,
+  effective_expires_on: null,
+  storage_location: "冷蔵庫",
+  status_note: "",
+  source: "manual",
+  image_storage_path: null,
+  created_at: "2026-06-01T00:00:00.000Z",
+  updated_at: "2026-06-01T00:00:00.000Z"
+};
+
+describe("ConsumptionEditList の在庫セレクト optgroup", () => {
+  beforeEach(() => {
+    from.mockClear();
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("消費明細がある場合、在庫セレクトに「おすすめ（同分類・同単位）」optgroup が表示される", async () => {
+    // cooking_consumption_events に1件、recipe_ingredients は空で返す。
+    const otherStock: StockItem = { ...baseConsumptionStock, id: "stock-other", name: "醤油", category: "調味料", unit: "ml" };
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (from as any).mockImplementation((table: string) => {
+      if (table === "cooking_consumption_events") return makeQueryChain([baseConsumptionEvent]);
+      return makeQueryChain([]);
+    });
+
+    render(
+      <CookingRecordEditModal
+        inventoryItems={[baseConsumptionStock, otherStock]}
+        item={{ ...baseItem, recipe_id: "recipe-1" }}
+        onClose={vi.fn()}
+        onSaved={vi.fn()}
+        userId="user-1"
+      />
+    );
+
+    // 消費量リストの表示を待つ。
+    await waitFor(() => {
+      expect(screen.queryByText("消費量を読み込んでいます...")).toBeNull();
+    });
+
+    const select = screen.getByLabelText("減らす在庫");
+    const recommendedGroup = within(select).getByRole("group", { name: "おすすめ（同分類・同単位）" });
+    expect(recommendedGroup).toBeTruthy();
+    // 同分類・同単位の「卵」がおすすめに入っている。
+    expect(within(recommendedGroup).getByRole("option", { name: /卵/ })).toBeTruthy();
+  });
+
+  it("同分類・同単位以外の在庫は「その他の在庫（代替材料）」に分類される", async () => {
+    const otherStock: StockItem = { ...baseConsumptionStock, id: "stock-other", name: "醤油", category: "調味料", unit: "ml" };
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (from as any).mockImplementation((table: string) => {
+      if (table === "cooking_consumption_events") return makeQueryChain([baseConsumptionEvent]);
+      return makeQueryChain([]);
+    });
+
+    render(
+      <CookingRecordEditModal
+        inventoryItems={[baseConsumptionStock, otherStock]}
+        item={{ ...baseItem, recipe_id: "recipe-1" }}
+        onClose={vi.fn()}
+        onSaved={vi.fn()}
+        userId="user-1"
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.queryByText("消費量を読み込んでいます...")).toBeNull();
+    });
+
+    const select = screen.getByLabelText("減らす在庫");
+    const othersGroup = within(select).getByRole("group", { name: "その他の在庫（代替材料）" });
+    expect(othersGroup).toBeTruthy();
+    expect(within(othersGroup).getByRole("option", { name: /醤油/ })).toBeTruthy();
   });
 });

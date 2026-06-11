@@ -233,13 +233,13 @@ export function CookingHistoryBoard({ initialHistory, initialInventoryItems, ini
       </div>
 
       <div className="cooking-view-tabs" role="tablist" aria-label="料理履歴表示">
-        <button aria-selected={historyView === "calendar"} data-active={historyView === "calendar"} onClick={() => switchHistoryView("calendar")} role="tab" type="button">
+        <button aria-selected={historyView === "calendar"} data-active={historyView === "calendar"} onClick={() => switchHistoryView("calendar")} role="tab" type="button" data-tooltip="カレンダー形式で表示">
           カレンダー
         </button>
-        <button aria-selected={historyView === "timeline"} data-active={historyView === "timeline"} onClick={() => switchHistoryView("timeline")} role="tab" type="button">
+        <button aria-selected={historyView === "timeline"} data-active={historyView === "timeline"} onClick={() => switchHistoryView("timeline")} role="tab" type="button" data-tooltip="タイムライン形式で表示">
           タイムライン
         </button>
-        <button aria-selected={historyView === "insights"} data-active={historyView === "insights"} onClick={() => switchHistoryView("insights")} role="tab" type="button">
+        <button aria-selected={historyView === "insights"} data-active={historyView === "insights"} onClick={() => switchHistoryView("insights")} role="tab" type="button" data-tooltip="料理傾向の振り返りを表示">
           振り返り
         </button>
       </div>
@@ -284,12 +284,12 @@ export function CookingHistoryBoard({ initialHistory, initialInventoryItems, ini
         ) : historyView === "calendar" ? (
           <div className="cooking-calendar-view" aria-label="料理履歴カレンダー">
             <div className="calendar-month-bar">
-              <button aria-label="前の月" onClick={() => shiftCalendarMonth(-1)} type="button">‹</button>
+              <button aria-label="前の月" onClick={() => shiftCalendarMonth(-1)} type="button" data-tooltip="前の月へ">‹</button>
               <div>
                 <strong>{calendarBase.getFullYear()}年{calendarBase.getMonth() + 1}月</strong>
                 <span>日付を選ぶと記録を確認できます</span>
               </div>
-              <button aria-label="次の月" onClick={() => shiftCalendarMonth(1)} type="button">›</button>
+              <button aria-label="次の月" onClick={() => shiftCalendarMonth(1)} type="button" data-tooltip="次の月へ">›</button>
             </div>
             <div className="calendar-week-row">
               {WEEKDAYS.map((weekday) => <span key={weekday}>{weekday}</span>)}
@@ -313,6 +313,7 @@ export function CookingHistoryBoard({ initialHistory, initialInventoryItems, ini
                     key={key}
                     onClick={() => setSelectedDate(key)}
                     type="button"
+                    title={`${cell.getMonth() + 1}/${cell.getDate()}の記録を表示`}
                   >
                     <span>{cell.getDate()}</span>
                     <div className="calendar-dots">
@@ -465,6 +466,7 @@ function HistoryDateGroup({
                   className="history-schedule-link"
                   onClick={() => onViewRecipe(schedule.recipe_id!, "cooking")}
                   type="button"
+                  data-tooltip="このレシピの調理ビューを開く"
                 >
                   レシピを見る
                 </button>
@@ -488,6 +490,7 @@ function HistoryDateGroup({
                   aria-label={`${recipeName}の記録を開く`}
                   onClick={() => onView(item)}
                   type="button"
+                  data-tooltip={`${recipeName}の記録を表示`}
                 />
                 <button
                   className="history-edit-button"
@@ -497,6 +500,7 @@ function HistoryDateGroup({
                     onEdit(item);
                   }}
                   type="button"
+                  data-tooltip={`${recipeName}の記録を編集`}
                 >
                   編集
                 </button>
@@ -571,7 +575,7 @@ function CookingRecordViewModal({
   return (
     <div className="modal-backdrop cooking-record-view-backdrop" role="dialog" aria-modal="true" aria-labelledby="cooking-record-view-heading" onClick={onClose}>
       <section className="canvas-modal cooking-record-view-modal" onClick={(event) => event.stopPropagation()}>
-        <button className="modal-close-button" aria-label="閉じる" onClick={onClose} type="button">
+        <button className="modal-close-button" aria-label="閉じる" onClick={onClose} type="button" data-tooltip="料理記録を閉じる" data-tooltip-pos="bottom-left">
           ×
         </button>
         <div className="cooking-record-view-header">
@@ -614,14 +618,14 @@ function CookingRecordViewModal({
 
         <div className="cooking-record-view-actions">
           {item.recipe_id ? (
-            <button type="button" data-primary="true" onClick={onViewRecipe}>
+            <button type="button" data-primary="true" onClick={onViewRecipe} data-tooltip="このレシピの調理ビューを開く">
               レシピを見る
             </button>
           ) : null}
-          <button type="button" onClick={onEdit}>
+          <button type="button" onClick={onEdit} data-tooltip="料理記録を編集">
             編集
           </button>
-          <button type="button" onClick={onClose}>
+          <button type="button" onClick={onClose} data-tooltip="料理記録を閉じる">
             閉じる
           </button>
         </div>
@@ -656,7 +660,7 @@ function HistoryPhoto({
   }
 
   return (
-    <button className="history-photo history-photo-button" aria-label={`${recipeName}の写真を表示`} onClick={onView} type="button">
+    <button className="history-photo history-photo-button" aria-label={`${recipeName}の写真を表示`} onClick={onView} type="button" data-tooltip={`${recipeName}の写真を拡大表示`}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={photoUrl} alt={`${recipeName}の完成写真`} />
       {photosWithPath.length >= 2 ? <span className="history-photo-count-badge">📷{photosWithPath.length}</span> : null}
@@ -701,6 +705,7 @@ function HistoryPhotoGrid({
               onView();
             }}
             type="button"
+            data-tooltip={label}
           >
             {photoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element

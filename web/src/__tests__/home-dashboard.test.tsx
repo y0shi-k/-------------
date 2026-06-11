@@ -4,9 +4,11 @@ import { HomeDashboard } from "@/components/home-dashboard";
 import type { Recipe } from "@/lib/recipes/types";
 
 const selectShellLeaf = vi.fn();
+const requestViewRecipe = vi.fn();
 
 vi.mock("@/components/web-mode-shell", () => ({
-  useShellSubView: () => ({ selectShellLeaf })
+  useShellSubView: () => ({ selectShellLeaf }),
+  useShellNavigation: () => ({ requestViewRecipe })
 }));
 
 // 署名付きURL発行に使う Storage クライアントだけスタブ化する（環境変数なしでも動かす）。
@@ -79,8 +81,8 @@ describe("HomeDashboard", () => {
     expect(screen.queryByText("お気に入りレシピ")).toBeNull();
   });
 
-  it("highlights recently cooked recipes as photo cards and navigates to recipes", () => {
-    selectShellLeaf.mockClear();
+  it("highlights recently cooked recipes as photo cards and opens the cooking viewer", () => {
+    requestViewRecipe.mockClear();
     const recipes = [
       makeRecipe({ id: "old", name: "肉じゃが", cooked_on_history: ["2026-05-01"] }),
       makeRecipe({ id: "new", name: "鶏もも炒め", cooked_on_history: ["2026-06-01"] })
@@ -90,7 +92,7 @@ describe("HomeDashboard", () => {
     expect(screen.getByRole("heading", { name: "最近作ったレシピ" })).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: /鶏もも炒め/ }));
-    expect(selectShellLeaf).toHaveBeenCalledWith("recipes", "recipes");
+    expect(requestViewRecipe).toHaveBeenCalledWith("new");
   });
 
   it("falls back to favorites when nothing has been cooked yet", () => {

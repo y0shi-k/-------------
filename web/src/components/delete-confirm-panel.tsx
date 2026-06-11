@@ -30,10 +30,10 @@ export function DeleteConfirmPanel({
           <p>{message}</p>
         </div>
         <div className="delete-confirm-actions">
-          <button className="secondary-button compact-button" type="button" disabled={disabled} onClick={onCancel}>
+          <button className="secondary-button compact-button" type="button" disabled={disabled} onClick={onCancel} data-tooltip="操作をキャンセルして戻る">
             やめる
           </button>
-          <button className={tone === "danger" ? "danger-button compact-button" : "primary-button compact-button"} type="button" disabled={disabled} onClick={onConfirm}>
+          <button className={tone === "danger" ? "danger-button compact-button" : "primary-button compact-button"} type="button" disabled={disabled} onClick={onConfirm} data-tooltip="操作を確認して実行">
             {confirmLabel}
           </button>
         </div>

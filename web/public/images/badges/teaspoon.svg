@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title-teaspoon">
+  <title id="title-teaspoon">小さじ</title>
+  <!-- スプーン（小）：小さな楕円ボウル＋細い柄 -->
+  <ellipse cx="32" cy="26" rx="10" ry="8" fill="#1d4ed8" opacity="0.12"/>
+  <rect x="31" y="34" width="2" height="22" rx="1" fill="#1d4ed8" opacity="0.12"/>
+  <!-- 「小」文字 -->
+  <text
+    x="32" y="28"
+    text-anchor="middle"
+    dominant-baseline="middle"
+    font-family="sans-serif"
+    font-size="18"
+    font-weight="700"
+    fill="#1d4ed8"
+    opacity="0.20"
+  >小</text>
+</svg>

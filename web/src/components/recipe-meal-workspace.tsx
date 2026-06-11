@@ -51,6 +51,8 @@ import { useCookingPhotoCandidates, type CookingPhotoCandidate, type CookingPhot
 import { useRecipeImageUrls } from "@/lib/photos/use-recipe-image-urls";
 import { invalidateUserImageSignedUrl } from "@/lib/photos/signed-url-cache";
 import { PHOTOS_BUCKET } from "@/lib/photos/user-image";
+import { findMatchingStock, ingredientNameMatchScore, matchesIngredientName } from "@/lib/ingredients/name-match";
+import { findFirstYoutubeVideoId } from "@/lib/youtube";
 
 type RecipeMealWorkspaceProps = {
   initialCookCandidates: CookCandidate[];
@@ -103,6 +105,7 @@ type CookingStepTab = "all" | "prep" | "steps";
 type CookingStepKind = "prep_steps" | "steps";
 type ShortageSelectionTab = "all" | "ingredients" | "seasonings";
 type CookingViewerOrigin = "recipes" | "cooking";
+type CookingMediaTab = "video" | "photo";
 type ConsumptionTab = "all" | "食材" | "調味料";
 type PhotoCandidatePickerTarget = "recipe-image" | "cooking-photo";
 
@@ -398,7 +401,7 @@ function scheduleDeleteMessage(schedule: MealSchedule) {
 
 function inventoryAmountByNameAndUnit(items: StockItem[], name: string, unit: string) {
   return items
-    .filter((item) => item.name === name && item.unit === unit)
+    .filter((item) => matchesIngredientName(item.name, name) && item.unit === unit)
     .reduce((total, item) => total + Number(item.quantity || 0), 0);
 }
 
@@ -546,6 +549,11 @@ export function RecipeMealWorkspace({
   const [scheduleAddSelectedDate, setScheduleAddSelectedDate] = useState<string | null>(null);
   const [cookingScheduleId, setCookingScheduleId] = useState<string | null>(null);
   const [cookingViewerOrigin, setCookingViewerOrigin] = useState<CookingViewerOrigin>("recipes");
+  // 調理ビューのヘッダー写真ブロックの開閉状態（初期: 開）。
+  const [isCookingPhotoOpen, setIsCookingPhotoOpen] = useState(true);
+  // 調理ビューの写真エリアで写真/動画どちらを表示するか。
+  // YouTube URL があるレシピは動画を初期表示（openCookingViewer で都度リセット）。
+  const [cookingMediaTab, setCookingMediaTab] = useState<CookingMediaTab>("video");
   const [slotMenuId, setSlotMenuId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; tone: "info" | "success" | "error" } | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1035,6 +1043,9 @@ export function RecipeMealWorkspace({
     setSelectedRecipeId(recipe.id);
     setHighlightedIngredientName("");
     setCookingViewerOrigin(origin);
+    setIsCookingPhotoOpen(true);
+    // YouTube URL があるレシピは動画を初期表示、無ければ写真へフォールバック。
+    setCookingMediaTab(findFirstYoutubeVideoId(recipe.source ?? "") ? "video" : "photo");
   }, []);
 
   useEffect(() => {
@@ -1204,7 +1215,7 @@ export function RecipeMealWorkspace({
     if (!recipe) return [];
 
     return recipe.ingredients.map((ingredient) => {
-      const exactStock = stockOptionsForIngredient(ingredient).find((item) => item.name === ingredient.name);
+      const exactStock = findMatchingStock(ingredient.name, ingredient.item_type, ingredient.unit, inventoryItemsForMeals);
       return {
         ingredientName: ingredient.name,
         requestedAmount: ingredient.amount,
@@ -2542,6 +2553,8 @@ export function RecipeMealWorkspace({
             type="button"
             aria-label={`${ingredient.name || label}を選択`}
             aria-pressed={isSelected}
+            data-tooltip={`${ingredient.name || label}を選択`}
+            data-tooltip-pos="right"
             onClick={(event) => {
               event.stopPropagation();
               toggleRecipeIngredientSelection(index, ingredient, event.metaKey || event.ctrlKey);
@@ -2577,6 +2590,8 @@ export function RecipeMealWorkspace({
               removeIngredientRow(index);
             }}
             aria-label={`${label}を削除`}
+            data-tooltip={`${ingredient.name || label}を削除`}
+            data-tooltip-pos="left"
           >
             ×
           </button>
@@ -2599,17 +2614,17 @@ export function RecipeMealWorkspace({
           <div className="ingredient-editor-title-actions">
             <span>{label}</span>
             {canGroup ? (
-              <button className="cooking-group-action" type="button" onClick={() => groupSelectedRecipeIngredients(tone)}>
+              <button className="cooking-group-action" type="button" onClick={() => groupSelectedRecipeIngredients(tone)} data-tooltip="選択行をグループ化">
                 グルーピング
               </button>
             ) : null}
             {canUngroup ? (
-              <button className="cooking-group-action" data-variant="ungroup" type="button" onClick={() => ungroupSelectedRecipeIngredients(tone)}>
+              <button className="cooking-group-action" data-variant="ungroup" type="button" onClick={() => ungroupSelectedRecipeIngredients(tone)} data-tooltip="選択グループを解除">
                 グループ解除
               </button>
             ) : null}
           </div>
-          <button className={`secondary-button compact-button${addButtonClassName}`} type="button" onClick={() => addIngredientRow(tone)}>
+          <button className={`secondary-button compact-button${addButtonClassName}`} type="button" onClick={() => addIngredientRow(tone)} data-tooltip={`${label}を1行追加`}>
             ＋ {label}を追加
           </button>
         </div>
@@ -2632,7 +2647,7 @@ export function RecipeMealWorkspace({
                 <span className="cooking-ing-subgroup-label" data-tone={tone}>
                   {subgroupLabel(tone, rankMap.get(run.groupIndex) ?? 0)}
                 </span>
-                <button className="cooking-group-action" data-variant="ungroup" type="button" onClick={() => ungroupRecipeSubgroup(tone, run.groupIndex)}>
+                <button className="cooking-group-action" data-variant="ungroup" type="button" onClick={() => ungroupRecipeSubgroup(tone, run.groupIndex)} data-tooltip="このサブグループを解除">
                   解除
                 </button>
               </div>
@@ -2670,7 +2685,7 @@ export function RecipeMealWorkspace({
       {activeCookingRecipe ? (
         <div className="cooking-overlay" role="dialog" aria-modal="true" aria-label="調理ビューア全画面">
           <header className="cooking-overlay-header">
-            <button className="cooking-overlay-back" type="button" onClick={closeCookingViewer} aria-label="戻る">←</button>
+            <button className="cooking-overlay-back" type="button" onClick={closeCookingViewer} aria-label="戻る" data-tooltip="調理ビューを閉じる" data-tooltip-pos="bottom-right">←</button>
             <div className="cooking-overlay-title">
               <h2>{activeCookingRecipe.name}</h2>
               <RecipeSourceLinks source={activeCookingRecipe.source} />
@@ -2681,10 +2696,12 @@ export function RecipeMealWorkspace({
                 type="button"
                 onClick={() => openScheduleAddModal(activeCookingRecipe.id)}
                 aria-label="スケジュールに追加"
+                data-tooltip="献立スケジュールに追加"
+                data-tooltip-pos="bottom-left"
               >
                 スケジュール追加
               </button>
-              <button className="cooking-overlay-edit" type="button" onClick={() => editActiveCookingRecipe(activeCookingRecipe)} aria-label="このレシピを編集">
+              <button className="cooking-overlay-edit" type="button" onClick={() => editActiveCookingRecipe(activeCookingRecipe)} aria-label="このレシピを編集" data-tooltip="このレシピを編集" data-tooltip-pos="bottom-left">
                 編集
               </button>
             </div>
@@ -2693,10 +2710,14 @@ export function RecipeMealWorkspace({
           <div className="cooking-overlay-body">
             <CookingViewer
               highlightedIngredientName={highlightedIngredientName}
+              imageUrl={recipeImageUrls.get(activeCookingRecipe.id) ?? null}
               ingredientTab={cookingIngredientTab}
               ingredientDrafts={cookingIngredientDrafts}
               inventoryItems={inventoryItemsForMeals}
+              isPhotoOpen={isCookingPhotoOpen}
               isReorderDirty={hasCookingReorderChanges}
+              mediaTab={cookingMediaTab}
+              onChangeMediaTab={setCookingMediaTab}
               onGroupSelected={groupSelectedCookingIngredients}
               onHighlightIngredient={setHighlightedIngredientName}
               onIngredientTabChange={setCookingIngredientTab}
@@ -2704,6 +2725,7 @@ export function RecipeMealWorkspace({
               onMoveStep={moveCookingStep}
               onStepTabChange={setCookingStepTab}
               onToggleIngredientSelection={toggleCookingIngredientSelection}
+              onTogglePhoto={() => setIsCookingPhotoOpen((prev) => !prev)}
               onToggleStockCheck={() => setCookingStockCheck((value) => !value)}
               onUngroupSelected={ungroupSelectedCookingIngredients}
               onUngroupSubgroup={ungroupCookingSubgroup}
@@ -2717,10 +2739,10 @@ export function RecipeMealWorkspace({
 
           <footer className="cooking-overlay-footer">
             <div className="cooking-reorder-history-actions" aria-label="並び替え履歴操作">
-              <button className="secondary-button" type="button" disabled={!canUndoCookingReorder || isSaving} onClick={undoCookingReorder}>
+              <button className="secondary-button" type="button" disabled={!canUndoCookingReorder || isSaving} onClick={undoCookingReorder} data-tooltip="並び替えを1つ戻す">
                 Undo
               </button>
-              <button className="secondary-button" type="button" disabled={!canRedoCookingReorder || isSaving} onClick={redoCookingReorder}>
+              <button className="secondary-button" type="button" disabled={!canRedoCookingReorder || isSaving} onClick={redoCookingReorder} data-tooltip="並び替えをやり直す">
                 Redo
               </button>
             </div>
@@ -2729,6 +2751,7 @@ export function RecipeMealWorkspace({
               type="button"
               disabled={isSaving || !hasCookingReorderChanges}
               onClick={() => requestSaveCookingReorder(activeCookingRecipe)}
+              data-tooltip="材料・手順の並び替えを保存"
             >
               {hasCookingReorderChanges ? "並び替えを確定" : "並び替え保存済み"}
             </button>
@@ -2738,6 +2761,7 @@ export function RecipeMealWorkspace({
                 type="button"
                 disabled={isSaving || cookingSchedule.status === "完了"}
                 onClick={() => requestCompleteSchedule(cookingSchedule, activeCookingRecipe)}
+                data-tooltip={cookingSchedule.status === "完了" ? "調理は完了済みです" : "料理を完了して在庫を消費する"}
               >
                 {cookingSchedule.status === "完了" ? "調理完了済み" : "料理を完了する"}
               </button>
@@ -2754,6 +2778,8 @@ export function RecipeMealWorkspace({
               type="button"
               onClick={closeConsumptionModal}
               aria-label="閉じる"
+              data-tooltip="消費量モーダルを閉じる"
+              data-tooltip-pos="bottom-left"
             >
               ×
             </button>
@@ -2801,6 +2827,7 @@ export function RecipeMealWorkspace({
                   type="button"
                   disabled={isSaving}
                   onClick={() => setPhotoCandidatePickerTarget("cooking-photo")}
+                  data-tooltip="過去の完成写真から選ぶ"
                 >
                   過去の完成写真から選ぶ
                 </button>
@@ -2813,7 +2840,7 @@ export function RecipeMealWorkspace({
                   <p className="photo-empty">写真なしでも完了できます。</p>
                 )}
                 {selectedCookingPhoto || selectedCookingPhotoCandidate ? (
-                  <button className="secondary-button compact-button" type="button" onClick={resetCookingPhoto} disabled={isSaving}>
+                  <button className="secondary-button compact-button" type="button" onClick={resetCookingPhoto} disabled={isSaving} data-tooltip="選択した写真を外す">
                     写真を外す
                   </button>
                 ) : null}
@@ -2827,6 +2854,7 @@ export function RecipeMealWorkspace({
                     key={value}
                     onClick={() => setCookingRating(cookingRating === String(value) ? "" : String(value))}
                     type="button"
+                    data-tooltip={`評価 ${value}`}
                   >
                     ★
                   </button>
@@ -2844,10 +2872,10 @@ export function RecipeMealWorkspace({
               </label>
             </section>
             <div className="consumption-modal-actions">
-              <button className="secondary-button" type="button" onClick={closeConsumptionModal}>
+              <button className="secondary-button" type="button" onClick={closeConsumptionModal} data-tooltip="消費を確定せずに閉じる">
                 キャンセル
               </button>
-              <button className="primary-button consumption-confirm" type="button" disabled={isSaving} onClick={() => completeSchedule(cookingSchedule)}>
+              <button className="primary-button consumption-confirm" type="button" disabled={isSaving} onClick={() => completeSchedule(cookingSchedule)} data-tooltip="消費量を確定して料理完了にする">
                 確定
               </button>
             </div>
@@ -2862,22 +2890,22 @@ export function RecipeMealWorkspace({
       </div>
 
       <div className="canvas-mode-control recipe-subnav" aria-label="献立とレシピの表示切替">
-        <button className="secondary-button compact-button" data-tab="recipes" data-active={activeView === "recipes"} type="button" onClick={() => switchRecipeView("recipes")}>
+        <button className="secondary-button compact-button" data-tab="recipes" data-active={activeView === "recipes"} type="button" onClick={() => switchRecipeView("recipes")} data-tooltip="レシピ一覧を表示">
           レシピ集
         </button>
-        <button className="secondary-button compact-button" data-tab="schedule" data-active={activeView === "schedule"} type="button" onClick={() => switchRecipeView("schedule")}>
+        <button className="secondary-button compact-button" data-tab="schedule" data-active={activeView === "schedule"} type="button" onClick={() => switchRecipeView("schedule")} data-tooltip="献立スケジュールを表示">
           スケジュール
         </button>
       </div>
 
       {activeView === "recipes" ? (
         <div className="recipe-primary-actions" aria-label="レシピ追加">
-          <button className="primary-button" type="button" onClick={openNewRecipeEditor}>+ 新規レシピ</button>
+          <button className="primary-button" type="button" onClick={openNewRecipeEditor} data-tooltip="新しいレシピを作成">+ 新規レシピ</button>
           <button className="secondary-button recipe-text-button" type="button" onClick={() => {
             setAiSourceText("");
             setIsTextImportOpen(true);
-          }}>テキストから追加</button>
-          <button className="secondary-button recipe-ai-button" type="button" onClick={() => setIsAiMenuOpen(true)}>AI考案</button>
+          }} data-tooltip="テキストからAIでレシピを構造化">テキストから追加</button>
+          <button className="secondary-button recipe-ai-button" type="button" onClick={() => setIsAiMenuOpen(true)} data-tooltip="AIにレシピを考案してもらう">AI考案</button>
         </div>
       ) : null}
 
@@ -2910,14 +2938,14 @@ export function RecipeMealWorkspace({
             <button className="modal-close-button" type="button" onClick={() => {
               setAiSourceText("");
               setIsTextImportOpen(false);
-            }} aria-label="閉じる">×</button>
+            }} aria-label="閉じる" data-tooltip="テキストインポートを閉じる" data-tooltip-pos="bottom-left">×</button>
             <p className="eyebrow">ADD RECIPE FROM TEXT</p>
             <h3 id="recipe-text-modal-heading">テキストからレシピを追加</h3>
             <label>
               レシピテキスト
               <textarea rows={8} value={aiSourceText} onChange={(event) => setAiSourceText(event.target.value)} placeholder="Webやメモからコピーしたレシピテキストをここに貼り付けてください..." />
             </label>
-            <button className="primary-button" type="button" disabled={isAiRunning || recipeLimitReached} onClick={structureRecipeText}>
+            <button className="primary-button" type="button" disabled={isAiRunning || recipeLimitReached} onClick={structureRecipeText} data-tooltip="テキストをAIでレシピ形式に構造化">
               {isAiRunning ? "AIで構造化中" : "AIで構造化"}
             </button>
           </section>
@@ -2927,15 +2955,15 @@ export function RecipeMealWorkspace({
       {isAiMenuOpen ? (
         <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="ai-menu-modal-heading">
           <section className="canvas-modal ai-add-modal">
-            <button className="modal-close-button" type="button" onClick={() => setIsAiMenuOpen(false)} aria-label="閉じる">×</button>
+            <button className="modal-close-button" type="button" onClick={() => setIsAiMenuOpen(false)} aria-label="閉じる" data-tooltip="AIメニューを閉じる" data-tooltip-pos="bottom-left">×</button>
             <p className="eyebrow">ADD RECIPE WITH AI</p>
             <h3 id="ai-menu-modal-heading">AI考案で追加</h3>
             <div className="ai-choice-grid">
-              <button className="ai-choice-card danger-choice" type="button" disabled={isAiRunning || recipeLimitReached} onClick={generatePriorityRecipe}>
+              <button className="ai-choice-card danger-choice" type="button" disabled={isAiRunning || recipeLimitReached} onClick={generatePriorityRecipe} data-tooltip="期限が近い食材を使うレシピをAIが考案">
                 <span>優先消費レシピ</span>
                 <small>期限が近い食材から考案</small>
               </button>
-              <button className="ai-choice-card purple-choice" type="button" onClick={() => setAiMode("generate")}>
+              <button className="ai-choice-card purple-choice" type="button" onClick={() => setAiMode("generate")} data-tooltip="使いたい食材を指定してAIが考案">
                 <span>指定食材から</span>
                 <small>使いたい食材を選んで考案</small>
               </button>
@@ -2948,7 +2976,7 @@ export function RecipeMealWorkspace({
               任意食材
               <textarea rows={2} value={aiOptional} onChange={(event) => setAiOptional(event.target.value)} placeholder="例: にんじん, しょうが" />
             </label>
-            <button className="primary-button" type="button" disabled={isAiRunning || recipeLimitReached} onClick={generateFromIngredients}>
+            <button className="primary-button" type="button" disabled={isAiRunning || recipeLimitReached} onClick={generateFromIngredients} data-tooltip="指定した食材からAIがレシピを考案">
               {isAiRunning ? "考案中" : "指定食材で考案"}
             </button>
           </section>
@@ -2958,7 +2986,7 @@ export function RecipeMealWorkspace({
       {isRecipeEditorOpen ? (
         <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="recipe-editor-heading">
           <section className="canvas-modal recipe-editor-modal">
-            <button className="modal-close-button" type="button" onClick={closeRecipeEditor} aria-label="閉じる">×</button>
+            <button className="modal-close-button" type="button" onClick={closeRecipeEditor} aria-label="閉じる" data-tooltip="レシピエディタを閉じる" data-tooltip-pos="bottom-left">×</button>
             <h3 id="recipe-editor-heading">{editingRecipeId ? "レシピを編集" : "新規レシピ"}</h3>
             <form className="stock-form recipe-editor-form" onSubmit={saveRecipe}>
               <label>
@@ -3012,7 +3040,7 @@ export function RecipeMealWorkspace({
                 <div className="recipe-step-editor" aria-label="下ごしらえ入力">
                   <div className="ingredient-editor-heading">
                     <span>下ごしらえ</span>
-                    <button className="secondary-button compact-button prep-add-button" type="button" onClick={() => addRecipeStep("prep_steps")}>
+                    <button className="secondary-button compact-button prep-add-button" type="button" onClick={() => addRecipeStep("prep_steps")} data-tooltip="下ごしらえの手順を1件追加">
                       ＋ 下ごしらえを追加
                     </button>
                   </div>
@@ -3025,7 +3053,7 @@ export function RecipeMealWorkspace({
                         onChange={(event) => updateRecipeStep("prep_steps", index, event.target.value)}
                         placeholder="下ごしらえを入力"
                       />
-                      <button className="danger-button compact-button" type="button" onClick={() => removeRecipeStep("prep_steps", index)} aria-label="下ごしらえを削除">
+                      <button className="danger-button compact-button" type="button" onClick={() => removeRecipeStep("prep_steps", index)} aria-label="下ごしらえを削除" data-tooltip="この下ごしらえを削除">
                         ×
                       </button>
                     </div>
@@ -3041,7 +3069,7 @@ export function RecipeMealWorkspace({
                 <div className="recipe-step-editor" aria-label="調理工程入力">
                   <div className="ingredient-editor-heading">
                     <span>調理工程</span>
-                    <button className="secondary-button compact-button cook-add-button" type="button" onClick={() => addRecipeStep("steps")}>
+                    <button className="secondary-button compact-button cook-add-button" type="button" onClick={() => addRecipeStep("steps")} data-tooltip="調理工程を1件追加">
                       ＋ 工程を追加
                     </button>
                   </div>
@@ -3054,7 +3082,7 @@ export function RecipeMealWorkspace({
                         onChange={(event) => updateRecipeStep("steps", index, event.target.value)}
                         placeholder="工程を入力"
                       />
-                      <button className="danger-button compact-button" type="button" onClick={() => removeRecipeStep("steps", index)} aria-label="工程を削除">
+                      <button className="danger-button compact-button" type="button" onClick={() => removeRecipeStep("steps", index)} aria-label="工程を削除" data-tooltip="この工程を削除">
                         ×
                       </button>
                     </div>
@@ -3068,13 +3096,13 @@ export function RecipeMealWorkspace({
                 </div>
               </div>
               <div className="form-actions">
-                <button className="secondary-button" type="button" onClick={closeRecipeEditor}>
+                <button className="secondary-button" type="button" onClick={closeRecipeEditor} data-tooltip="変更を破棄してエディタを閉じる">
                   キャンセル
                 </button>
-                <button className="secondary-button recipe-shopping-button" type="button" disabled={isSaving} onClick={addCurrentRecipeToShopping}>
+                <button className="secondary-button recipe-shopping-button" type="button" disabled={isSaving} onClick={addCurrentRecipeToShopping} data-tooltip="このレシピの不足食材を買い物リストへ追加">
                   買い物へ
                 </button>
-                <button className="primary-button" type="submit" disabled={isSaving} aria-label={editingRecipeId ? "レシピを更新" : "レシピを保存"}>
+                <button className="primary-button" type="submit" disabled={isSaving} aria-label={editingRecipeId ? "レシピを更新" : "レシピを保存"} data-tooltip={editingRecipeId ? "レシピを更新して保存" : "レシピを保存"}>
                   {editingRecipeId ? "更新" : "保存"}
                 </button>
               </div>
@@ -3086,7 +3114,7 @@ export function RecipeMealWorkspace({
       {shortageSelectionItems.length > 0 ? (
         <div className="modal-backdrop shortage-select-backdrop" role="dialog" aria-modal="true" aria-labelledby="shopping-shortage-heading">
           <section className="canvas-modal shopping-shortage-modal">
-            <button className="modal-close-button" type="button" onClick={closeShortageSelectionModal} aria-label="閉じる">×</button>
+            <button className="modal-close-button" type="button" onClick={closeShortageSelectionModal} aria-label="閉じる" data-tooltip="不足選択モーダルを閉じる" data-tooltip-pos="bottom-left">×</button>
             <h3 id="shopping-shortage-heading">買い物に追加するもの</h3>
             <p className="shopping-shortage-meta">{shortageSelectionRecipeName || "不足分を確認してください"}</p>
             <div className="shopping-shortage-tabs" aria-label="不足材料の表示切替">
@@ -3095,7 +3123,7 @@ export function RecipeMealWorkspace({
                 { count: shortageSelectionItems.filter((item) => item.type !== "調味料").length, label: "食材", value: "ingredients" as const },
                 { count: shortageSelectionItems.filter((item) => item.type === "調味料").length, label: "調味料", value: "seasonings" as const }
               ].map((tab) => (
-                <button data-active={shortageSelectionTab === tab.value} key={tab.value} onClick={() => setShortageSelectionTab(tab.value)} type="button">
+                <button data-active={shortageSelectionTab === tab.value} key={tab.value} onClick={() => setShortageSelectionTab(tab.value)} type="button" data-tooltip={`${tab.label}の不足材料を表示`}>
                   {tab.label} <span>{tab.count}</span>
                 </button>
               ))}
@@ -3125,10 +3153,10 @@ export function RecipeMealWorkspace({
               )}
             </div>
             <div className="shopping-shortage-actions">
-              <button className="secondary-button" type="button" onClick={closeShortageSelectionModal}>
+              <button className="secondary-button" type="button" onClick={closeShortageSelectionModal} data-tooltip="あとで追加する">
                 あとで
               </button>
-              <button className="primary-button" type="button" disabled={isSaving} onClick={confirmRecipeShortageSelection}>
+              <button className="primary-button" type="button" disabled={isSaving} onClick={confirmRecipeShortageSelection} data-tooltip="選択した不足食材を買い物リストへ追加">
                 選択したものを追加
                 <span>{selectedShortageSelectionCount}</span>
               </button>
@@ -3145,6 +3173,8 @@ export function RecipeMealWorkspace({
               type="button"
               onClick={() => setPickerSlot(null)}
               aria-label="閉じる"
+              data-tooltip="レシピ選択を閉じる"
+              data-tooltip-pos="bottom-left"
             >
               ×
             </button>
@@ -3186,6 +3216,7 @@ export function RecipeMealWorkspace({
                           ? replaceScheduleRecipe(pickerSlot.replaceId, recipe.id)
                           : addScheduleFromPicker(pickerSlot.date, pickerSlot.meal, recipe.id)
                       }
+                      title={pickerSlot.replaceId ? `${recipe.name} に変更` : `${recipe.name} を献立に追加`}
                     >
                       <strong>{recipe.name}</strong>
                       {recipe.genre.length > 0 ? <small>{recipe.genre.join("・")}</small> : null}
@@ -3201,7 +3232,7 @@ export function RecipeMealWorkspace({
       {slotMenuSchedule ? (
         <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="schedule-slot-menu-heading">
           <section className="canvas-modal schedule-slot-menu-modal">
-            <button className="modal-close-button" type="button" onClick={() => setSlotMenuId(null)} aria-label="閉じる">
+            <button className="modal-close-button" type="button" onClick={() => setSlotMenuId(null)} aria-label="閉じる" data-tooltip="献立メニューを閉じる" data-tooltip-pos="bottom-left">
               ×
             </button>
             <h3 id="schedule-slot-menu-heading" className="schedule-slot-menu-title">
@@ -3213,6 +3244,7 @@ export function RecipeMealWorkspace({
                 type="button"
                 disabled={isSaving}
                 onClick={() => startSlotCooking(slotMenuSchedule)}
+                data-tooltip="調理ビューを開いて調理を開始"
               >
                 調理を開始
               </button>
@@ -3221,6 +3253,7 @@ export function RecipeMealWorkspace({
                 type="button"
                 disabled={isSaving || recipes.length === 0}
                 onClick={() => startSlotRecipeChange(slotMenuSchedule)}
+                data-tooltip="この献立のレシピを別のレシピに変更"
               >
                 別のレシピに変更
               </button>
@@ -3239,6 +3272,7 @@ export function RecipeMealWorkspace({
                       { confirmLabel: "完了を外す", title: "完了解除確認", tone: "default" }
                     );
                   }}
+                  data-tooltip="完了を取り消して未完了に戻す"
                 >
                   完了を外す
                 </button>
@@ -3252,6 +3286,7 @@ export function RecipeMealWorkspace({
                   setSlotMenuId(null);
                   requestDelete(target.recipe_name || "献立", scheduleDeleteMessage(target), () => deleteSchedule(target));
                 }}
+                data-tooltip="この献立を削除"
               >
                 削除する
               </button>
@@ -3263,7 +3298,7 @@ export function RecipeMealWorkspace({
       {scheduleAddRecipe ? (
         <div className="modal-backdrop schedule-add-backdrop" role="dialog" aria-modal="true" aria-labelledby="schedule-add-heading">
           <section className="canvas-modal schedule-add-modal">
-            <button className="modal-close-button" type="button" onClick={closeScheduleAddModal} aria-label="閉じる">
+            <button className="modal-close-button" type="button" onClick={closeScheduleAddModal} aria-label="閉じる" data-tooltip="スケジュール追加を閉じる" data-tooltip-pos="bottom-left">
               ×
             </button>
             <h3 id="schedule-add-heading">スケジュールに追加</h3>
@@ -3283,6 +3318,7 @@ export function RecipeMealWorkspace({
                     data-today={day === todayValue()}
                     data-selected={day === scheduleAddSelectedDate}
                     onClick={() => setScheduleAddSelectedDate(day)}
+                    title={`${formatScheduleDayLabel(day)} に追加`}
                   >
                     <span className="schedule-add-day-label">{formatScheduleDayLabel(day)}</span>
                     <span className="schedule-add-day-count" data-empty={count === 0}>
@@ -3301,6 +3337,7 @@ export function RecipeMealWorkspace({
                     key={meal}
                     disabled={isSaving}
                     onClick={() => assignScheduleFromRecipe(meal)}
+                    data-tooltip={`${meal}の献立として追加`}
                   >
                     {meal}
                   </button>
@@ -3322,10 +3359,10 @@ export function RecipeMealWorkspace({
               </div>
             </div>
             <div className="ai-mode-row">
-              <button className="secondary-button compact-button" data-active={aiMode === "generate"} type="button" onClick={() => setAiMode("generate")}>
+              <button className="secondary-button compact-button" data-active={aiMode === "generate"} type="button" onClick={() => setAiMode("generate")} data-tooltip="食材を指定してAIがレシピを考案">
                 食材から考案
               </button>
-              <button className="secondary-button compact-button" data-active={aiMode === "structure"} type="button" onClick={() => setAiMode("structure")}>
+              <button className="secondary-button compact-button" data-active={aiMode === "structure"} type="button" onClick={() => setAiMode("structure")} data-tooltip="テキストをAIでレシピ形式に構造化">
                 本文を構造化
               </button>
             </div>
@@ -3341,7 +3378,7 @@ export function RecipeMealWorkspace({
               レシピ本文・補足
               <textarea rows={4} value={aiSourceText} onChange={(event) => setAiSourceText(event.target.value)} placeholder="貼り付けたレシピ本文や希望を書く" />
             </label>
-            <button className="primary-button" type="button" disabled={isAiRunning || recipeLimitReached} onClick={runInlineAiRecipe}>
+            <button className="primary-button" type="button" disabled={isAiRunning || recipeLimitReached} onClick={runInlineAiRecipe} data-tooltip="AIでレシピを生成してエディタで開く">
               {isAiRunning ? "AI実行中" : "AIレシピを編集モーダルで開く"}
             </button>
           </section>
@@ -3382,7 +3419,7 @@ export function RecipeMealWorkspace({
             </div>
           </div>
           <RecipeDetail imageUrl={recipeImageUrls.get(selectedRecipe.id) ?? null} onEdit={startEditRecipe} recipe={selectedRecipe} />
-          <button className="primary-button" type="button" disabled={!selectedRecipe} onClick={() => selectedRecipe && openCookingViewer(selectedRecipe)}>
+          <button className="primary-button" type="button" disabled={!selectedRecipe} onClick={() => selectedRecipe && openCookingViewer(selectedRecipe)} data-tooltip="このレシピの調理ビューを全画面で開く">
             調理ビューを開く
           </button>
 
@@ -3414,7 +3451,7 @@ export function RecipeMealWorkspace({
                 ))}
               </select>
             </label>
-            <button className="primary-button" type="submit" disabled={isSaving || recipes.length === 0}>
+            <button className="primary-button" type="submit" disabled={isSaving || recipes.length === 0} data-tooltip="選択した日付・食事に献立を追加">
               献立に追加
             </button>
           </form>
@@ -3432,7 +3469,7 @@ export function RecipeMealWorkspace({
                 候補理由
                 <input value={candidateReasons} onChange={(event) => setCandidateReasons(event.target.value)} placeholder="期限が近い, 家族リクエスト" />
               </label>
-              <button className="primary-button compact-button" type="submit" disabled={isSaving || !selectedRecipe}>
+              <button className="primary-button compact-button" type="submit" disabled={isSaving || !selectedRecipe} data-tooltip="選択中のレシピを作りたい候補に追加">
                 選択レシピを候補へ
               </button>
             </form>
@@ -3461,7 +3498,7 @@ export function RecipeMealWorkspace({
                       </div>
                     </div>
                     <div className="candidate-actions">
-                      <button className="secondary-button compact-button" type="button" disabled={isSaving} onClick={() => assignCandidateToSchedule(candidate)}>
+                      <button className="secondary-button compact-button" type="button" disabled={isSaving} onClick={() => assignCandidateToSchedule(candidate)} data-tooltip={`${candidate.recipe_name || "このレシピ"} を献立に追加`}>
                         献立へ追加
                       </button>
                       <button
@@ -3469,6 +3506,7 @@ export function RecipeMealWorkspace({
                         type="button"
                         disabled={isSaving}
                         onClick={() => requestDelete(candidate.recipe_name || "候補", "この作りたい候補を解除します。レシピ本体は削除されません。", () => deleteCookCandidate(candidate))}
+                        data-tooltip="作りたい候補から解除"
                       >
                         解除
                       </button>
@@ -3485,7 +3523,7 @@ export function RecipeMealWorkspace({
         {activeView === "schedule" ? (
         <section className="stock-panel schedule-board-panel" aria-label="7日スケジュール">
           <div className="schedule-toolbar">
-            <button className="schedule-nav-button" type="button" onClick={() => setScheduleWindowStart(addDays(scheduleWindowStart, -7))}>
+            <button className="schedule-nav-button" type="button" onClick={() => setScheduleWindowStart(addDays(scheduleWindowStart, -7))} data-tooltip="前の週を表示">
               ← 前の週
             </button>
             <button
@@ -3495,10 +3533,11 @@ export function RecipeMealWorkspace({
                 setScheduleWindowStart(addDays(todayValue(), -3));
                 setScheduleDate(todayValue());
               }}
+              data-tooltip="今週を表示"
             >
               今週
             </button>
-            <button className="schedule-nav-button" type="button" onClick={() => setScheduleWindowStart(addDays(scheduleWindowStart, 7))}>
+            <button className="schedule-nav-button" type="button" onClick={() => setScheduleWindowStart(addDays(scheduleWindowStart, 7))} data-tooltip="次の週を表示">
               次の週 →
             </button>
           </div>
@@ -3509,7 +3548,7 @@ export function RecipeMealWorkspace({
               type="button"
               onClick={() => setScheduleWindowStart(addDays(scheduleWindowStart, -1))}
               aria-label="スケジュールを1日前へ移動"
-              title="1日前へ移動"
+              data-tooltip="1日前へ移動"
             >
               ↑
             </button>
@@ -3557,6 +3596,7 @@ export function RecipeMealWorkspace({
                                 type="button"
                                 onClick={() => openPicker({ date: day, meal: mealType })}
                                 aria-label={`${formatScheduleDayLabel(day)} ${mealType}に追加`}
+                                data-tooltip={`${formatScheduleDayLabel(day)} ${mealType}に献立を追加`}
                               >
                                 ＋
                               </button>
@@ -3588,7 +3628,7 @@ export function RecipeMealWorkspace({
                                     requestDelete(schedule.recipe_name || "献立", scheduleDeleteMessage(schedule), () => deleteSchedule(schedule));
                                   }}
                                   aria-label={`${schedule.recipe_name || "献立"} を削除`}
-                                  title="削除"
+                                  data-tooltip={`${schedule.recipe_name || "献立"} を削除`}
                                 >
                                   ×
                                 </button>
@@ -3600,6 +3640,7 @@ export function RecipeMealWorkspace({
                                     setSlotMenuId(schedule.id);
                                   }}
                                   aria-label={`${schedule.recipe_name || "レシピ名なし"} の操作`}
+                                  data-tooltip={`${schedule.recipe_name || "献立"} の操作メニューを開く`}
                                 >
                                   <span className="schedule-meal-handle" aria-hidden="true">≡</span>
                                   <span className="schedule-meal-body">
@@ -3623,7 +3664,7 @@ export function RecipeMealWorkspace({
               type="button"
               onClick={() => setScheduleWindowStart(addDays(scheduleWindowStart, 1))}
               aria-label="スケジュールを1日後へ移動"
-              title="1日後へ移動"
+              data-tooltip="1日後へ移動"
             >
               ↓
             </button>
@@ -3752,6 +3793,7 @@ function GenreTagPicker({ value, onChange, recipes }: { value: string; onChange:
                     remove(genre);
                   }}
                   aria-label={`${genre} を外す`}
+                  data-tooltip={`${genre} を外す`}
                 >
                   ×
                 </button>
@@ -3791,6 +3833,7 @@ function GenreTagPicker({ value, onChange, recipes }: { value: string; onChange:
             else setOpen(false);
           }}
           aria-label="検索をクリア"
+          data-tooltip="検索テキストをクリア"
         >
           ×
         </button>
@@ -3803,6 +3846,7 @@ function GenreTagPicker({ value, onChange, recipes }: { value: string; onChange:
             else setOpen(true);
           }}
           aria-label="ジャンルを追加"
+          data-tooltip="入力したジャンルを追加"
         >
           ＋
         </button>
@@ -3820,7 +3864,7 @@ function GenreTagPicker({ value, onChange, recipes }: { value: string; onChange:
             {filtered.map((genre) => {
               const isSelected = selected.includes(genre);
               return (
-                <button className="genre-option" data-selected={isSelected} type="button" key={genre} onClick={() => toggle(genre)}>
+                <button className="genre-option" data-selected={isSelected} type="button" key={genre} onClick={() => toggle(genre)} title={isSelected ? `${genre} を外す` : `${genre} を選択`}>
                   <span className="genre-option-check" data-on={isSelected} aria-hidden="true">
                     ✓
                   </span>
@@ -3829,7 +3873,7 @@ function GenreTagPicker({ value, onChange, recipes }: { value: string; onChange:
               );
             })}
             {canCreate ? (
-              <button className="genre-option genre-option-create" type="button" onClick={() => addNew(normalizedQuery)}>
+              <button className="genre-option genre-option-create" type="button" onClick={() => addNew(normalizedQuery)} title={`新しいジャンル「${normalizedQuery}」を作成`}>
                 <span className="genre-option-check genre-option-create-icon" aria-hidden="true">
                   ＋
                 </span>
@@ -3871,8 +3915,16 @@ function ConsumptionEditor({
       const stockItem = inventoryItems.find((item) => item.id === draft.stockItemId);
       const amount = quantityToNumber(draft.amount);
       // おすすめ = 同分類・同単位・在庫あり。それ以外は代替材料として選べるよう「その他の在庫」に出す。
-      const options = ingredient
+      // おすすめ内はスコア降順（ingredientNameMatchScore 高い方が先頭）に並べる。
+      const rawOptions = ingredient
         ? inventoryItems.filter((item) => item.category === ingredient.item_type && item.unit === ingredient.unit && item.quantity > 0)
+        : [];
+      const options = ingredient
+        ? [...rawOptions].sort(
+            (a, b) =>
+              ingredientNameMatchScore(b.name, ingredient.name) -
+              ingredientNameMatchScore(a.name, ingredient.name)
+          )
         : [];
       const recommendedIds = new Set(options.map((item) => item.id));
       const otherOptions = inventoryItems.filter((item) => item.quantity > 0 && !recommendedIds.has(item.id));
@@ -3907,16 +3959,17 @@ function ConsumptionEditor({
               onClick={() => onTabChange(value)}
               role="tab"
               type="button"
+              data-tooltip={value === "all" ? "全材料を表示" : `${value}のみ表示`}
             >
               {value === "all" ? "全" : value}
             </button>
           ))}
         </div>
         <div className="consumption-bulk-actions">
-          <button className="secondary-button compact-button" type="button" onClick={() => onBulkSet("default")}>
+          <button className="secondary-button compact-button" type="button" onClick={() => onBulkSet("default")} data-tooltip="全材料の消費量をレシピ既定量にリセット">
             全部 既定量
           </button>
-          <button className="secondary-button compact-button" type="button" onClick={() => onBulkSet("zero")}>
+          <button className="secondary-button compact-button" type="button" onClick={() => onBulkSet("zero")} data-tooltip="全材料の消費量を0にリセット">
             全部 0
           </button>
         </div>
@@ -4084,10 +4137,14 @@ function chipifyStep(text: string, ingredients: RecipeIngredient[], onHighlight:
 
 function CookingViewer({
   highlightedIngredientName,
+  imageUrl,
   ingredientTab,
   ingredientDrafts,
   inventoryItems,
+  isPhotoOpen,
   isReorderDirty,
+  mediaTab,
+  onChangeMediaTab,
   onGroupSelected,
   onHighlightIngredient,
   onIngredientTabChange,
@@ -4095,6 +4152,7 @@ function CookingViewer({
   onMoveStep,
   onStepTabChange,
   onToggleIngredientSelection,
+  onTogglePhoto,
   onToggleStockCheck,
   onUngroupSelected,
   onUngroupSubgroup,
@@ -4105,10 +4163,14 @@ function CookingViewer({
   stockCheck
 }: {
   highlightedIngredientName: string;
+  imageUrl: string | null;
   ingredientTab: CookingIngredientTab;
   ingredientDrafts: CookingIngredientDraft[];
   inventoryItems: StockItem[];
+  isPhotoOpen: boolean;
   isReorderDirty: boolean;
+  mediaTab: CookingMediaTab;
+  onChangeMediaTab: (tab: CookingMediaTab) => void;
   onGroupSelected: (tone: "食材" | "調味料") => void;
   onHighlightIngredient: (name: string) => void;
   onIngredientTabChange: (tab: CookingIngredientTab) => void;
@@ -4116,6 +4178,7 @@ function CookingViewer({
   onMoveStep: (draggedId: string, targetKind: CookingStepKind, targetIndex: number) => void;
   onStepTabChange: (tab: CookingStepTab) => void;
   onToggleIngredientSelection: (ingredient: RecipeIngredient, additive: boolean) => void;
+  onTogglePhoto: () => void;
   onToggleStockCheck: () => void;
   onUngroupSelected: (tone: "食材" | "調味料") => void;
   onUngroupSubgroup: (tone: "食材" | "調味料", groupIndex: number) => void;
@@ -4125,6 +4188,12 @@ function CookingViewer({
   stepTab: CookingStepTab;
   stockCheck: boolean;
 }) {
+  // recipe.source（改行区切り）から最初に取れた YouTube videoId。無ければ null。
+  const youtubeVideoId = useMemo(
+    () => findFirstYoutubeVideoId(recipe?.source ?? ""),
+    [recipe?.source]
+  );
+
   if (!recipe) {
     return <p className="empty-list">レシピを選ぶと調理ビューを確認できます。</p>;
   }
@@ -4255,12 +4324,12 @@ function CookingViewer({
         <div className="cooking-ing-group-head">
           <p className="cooking-ing-group-label" data-tone={tone}>{label}</p>
           {canGroup ? (
-            <button className="cooking-group-action" type="button" onClick={() => onGroupSelected(tone)}>
+            <button className="cooking-group-action" type="button" onClick={() => onGroupSelected(tone)} data-tooltip="選択行をグループ化">
               グルーピング
             </button>
           ) : null}
           {canUngroup ? (
-            <button className="cooking-group-action" data-variant="ungroup" type="button" onClick={() => onUngroupSelected(tone)}>
+            <button className="cooking-group-action" data-variant="ungroup" type="button" onClick={() => onUngroupSelected(tone)} data-tooltip="選択グループを解除">
               グループ解除
             </button>
           ) : null}
@@ -4289,6 +4358,7 @@ function CookingViewer({
                   data-variant="ungroup"
                   type="button"
                   onClick={() => onUngroupSubgroup(tone, run.groupIndex)}
+                  data-tooltip="このサブグループを解除"
                 >
                   解除
                 </button>
@@ -4370,11 +4440,79 @@ function CookingViewer({
   return (
     <section className="cooking-viewer" aria-label="調理ビューア">
       <section className="cooking-pane cooking-pane-ing" aria-label="材料と在庫">
+        {(() => {
+          const hasVideo = youtubeVideoId !== null;
+          const showVideo = hasVideo && mediaTab === "video";
+          const toggleHideLabel = hasVideo ? "写真・動画を隠す" : "レシピ写真を隠す";
+          const toggleShowLabel = hasVideo ? "写真・動画を表示" : "レシピ写真を表示";
+          return (
+            <div className="cooking-pane-photo" data-open={isPhotoOpen} data-has-video={hasVideo}>
+              {isPhotoOpen && hasVideo && (
+                <div className="cooking-pane-media-tabs" role="group" aria-label="写真と動画の切替">
+                  <button
+                    className="cooking-pane-media-tab"
+                    type="button"
+                    data-active={showVideo}
+                    aria-pressed={showVideo}
+                    aria-label="動画を表示"
+                    data-tooltip="動画を表示"
+                    data-tooltip-pos="bottom"
+                    onClick={() => onChangeMediaTab("video")}
+                  >
+                    動画
+                  </button>
+                  <button
+                    className="cooking-pane-media-tab"
+                    type="button"
+                    data-active={!showVideo}
+                    aria-pressed={!showVideo}
+                    aria-label="写真を表示"
+                    data-tooltip="写真を表示"
+                    data-tooltip-pos="bottom"
+                    onClick={() => onChangeMediaTab("photo")}
+                  >
+                    写真
+                  </button>
+                </div>
+              )}
+              {isPhotoOpen &&
+                (showVideo ? (
+                  <div className="cooking-pane-photo-video">
+                    <iframe
+                      className="cooking-pane-photo-iframe"
+                      src={`https://www.youtube-nocookie.com/embed/${youtubeVideoId}`}
+                      title={`${recipe.name} の参考動画`}
+                      allow="encrypted-media; picture-in-picture"
+                      allowFullScreen
+                    />
+                  </div>
+                ) : (
+                  <RecipeThumb
+                    className="cooking-pane-photo-thumb"
+                    imageUrl={imageUrl}
+                    recipe={recipe}
+                    size="hero"
+                  />
+                ))}
+              <button
+                className="cooking-pane-photo-toggle"
+                type="button"
+                aria-label={isPhotoOpen ? toggleHideLabel : toggleShowLabel}
+                aria-expanded={isPhotoOpen}
+                data-tooltip={isPhotoOpen ? toggleHideLabel : toggleShowLabel}
+                data-tooltip-pos="bottom"
+                onClick={onTogglePhoto}
+              >
+                {isPhotoOpen ? `▲ ${toggleHideLabel}` : `▼ ${toggleShowLabel}`}
+              </button>
+            </div>
+          );
+        })()}
         <div className="cooking-pane-head">
           <span className="cooking-pane-eyebrow" data-tone="ing">材料</span>
           <div className="cooking-pane-head-right">
             <span className="cooking-pane-count">{foods.length + seasonings.length} 件</span>
-            <button className="cooking-stock-toggle" data-on={stockCheck} type="button" onClick={onToggleStockCheck} aria-pressed={stockCheck}>
+            <button className="cooking-stock-toggle" data-on={stockCheck} type="button" onClick={onToggleStockCheck} aria-pressed={stockCheck} data-tooltip={stockCheck ? "在庫チェックをオフ" : "在庫チェックをオン"} data-tooltip-pos="bottom-left">
               <span className="cooking-stock-toggle-track"><span className="cooking-stock-toggle-knob" /></span>
               在庫
             </button>
@@ -4389,6 +4527,7 @@ function CookingViewer({
               key={tab.value}
               type="button"
               onClick={() => onIngredientTabChange(tab.value)}
+              data-tooltip={`${tab.label}を表示`}
             >
               {tab.label}
               <span className="cooking-tab-count">{tab.count}</span>
@@ -4424,6 +4563,7 @@ function CookingViewer({
               key={tab.value}
               type="button"
               onClick={() => onStepTabChange(tab.value)}
+              data-tooltip={`${tab.label}を表示`}
             >
               {tab.label}
               <span className="cooking-tab-count">{tab.count}</span>
@@ -4520,27 +4660,36 @@ function RecipeList({
         <div className="recipe-list">
           {recipes.map((recipe) => (
             <article className="recipe-card" data-active={selectedRecipeId === recipe.id} key={recipe.id} onClick={() => onSelect(recipe.id)}>
-              <RecipeThumb imageUrl={imageUrls.get(recipe.id) ?? null} recipe={recipe} />
+              <button
+                className="recipe-thumb-button"
+                type="button"
+                disabled={disabled}
+                onClick={(event) => { event.stopPropagation(); onCook(recipe); }}
+                aria-label={`${recipe.name} の調理ビューを開く`}
+                data-tooltip={`${recipe.name} の調理ビューを開く`}
+              >
+                <RecipeThumb imageUrl={imageUrls.get(recipe.id) ?? null} recipe={recipe} />
+              </button>
               <div className="recipe-card-main">
                 <div className="recipe-card-heading">
-                  <button className="recipe-select-button" type="button" onClick={(event) => { event.stopPropagation(); onSelect(recipe.id); }}>
+                  <button className="recipe-select-button" type="button" onClick={(event) => { event.stopPropagation(); onSelect(recipe.id); }} data-tooltip={`${recipe.name} の詳細を表示`}>
                     <strong>{recipe.name}</strong>
                   </button>
                   <div className="recipe-card-actions">
-                    <button className="recipe-icon-button cook-button" type="button" disabled={disabled} onClick={(event) => { event.stopPropagation(); onCook(recipe); }} aria-label="料理する">
+                    <button className="recipe-icon-button cook-button" type="button" disabled={disabled} onClick={(event) => { event.stopPropagation(); onCook(recipe); }} aria-label="料理する" data-tooltip="調理ビューを開く">
                       <span aria-hidden="true">III</span>
                     </button>
-                    <button className="recipe-icon-button schedule-icon-button" type="button" disabled={disabled} onClick={(event) => { event.stopPropagation(); onSchedule(recipe); }} aria-label="スケジュールに追加">
+                    <button className="recipe-icon-button schedule-icon-button" type="button" disabled={disabled} onClick={(event) => { event.stopPropagation(); onSchedule(recipe); }} aria-label="スケジュールに追加" data-tooltip="献立スケジュールに追加">
                       <svg aria-hidden="true" viewBox="0 0 24 24">
                         <path d="M7 3v3M17 3v3M4 8h16M5 6h14a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1ZM12 12v4M10 14h4" />
                       </svg>
                     </button>
-                    <button className="recipe-icon-button" type="button" disabled={disabled} onClick={(event) => { event.stopPropagation(); onEdit(recipe); }} aria-label="編集">
+                    <button className="recipe-icon-button" type="button" disabled={disabled} onClick={(event) => { event.stopPropagation(); onEdit(recipe); }} aria-label="編集" data-tooltip="このレシピを編集">
                       <svg aria-hidden="true" viewBox="0 0 24 24">
                         <path d="m16.9 4.1 3 3L8 19H5v-3L16.9 4.1Z" />
                       </svg>
                     </button>
-                    <button className="recipe-icon-button" type="button" disabled={disabled} onClick={(event) => { event.stopPropagation(); onDelete(recipe); }} aria-label={pendingDeleteRecipeId === recipe.id ? "削除する" : "削除"}>
+                    <button className="recipe-icon-button" type="button" disabled={disabled} onClick={(event) => { event.stopPropagation(); onDelete(recipe); }} aria-label={pendingDeleteRecipeId === recipe.id ? "削除する" : "削除"} data-tooltip="このレシピを削除" data-tooltip-pos="left">
                       <svg aria-hidden="true" viewBox="0 0 24 24">
                         <path d="M3 6h18M8 6V4h8v2m-9 0 1 14h8l1-14M10 10v6M14 10v6" />
                       </svg>
@@ -4559,6 +4708,7 @@ function RecipeList({
                     aria-pressed={recipe.is_favorite}
                     aria-label={recipe.is_favorite ? "お気に入りを解除" : "お気に入りに追加"}
                     onClick={(event) => { event.stopPropagation(); onToggleFavorite(recipe); }}
+                    data-tooltip={recipe.is_favorite ? "お気に入りを解除" : "お気に入りに追加"}
                   >
                     <svg aria-hidden="true" viewBox="0 0 24 24">
                       <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
@@ -4666,16 +4816,16 @@ function RecipeImagePicker({
           {selectLabel}
           <input accept="image/*" disabled={disabled} onChange={onSelect} ref={inputRef} type="file" />
         </label>
-        <button className="secondary-button compact-button" disabled={disabled} onClick={onOpenCandidatePicker} type="button">
+        <button className="secondary-button compact-button" disabled={disabled} onClick={onOpenCandidatePicker} type="button" data-tooltip="過去の料理写真からレシピ画像を選ぶ">
           過去の完成写真から選ぶ
         </button>
         {hasPreview ? (
-          <button className="danger-button compact-button" disabled={disabled} onClick={onRemove} type="button">
+          <button className="danger-button compact-button" disabled={disabled} onClick={onRemove} type="button" data-tooltip="設定したレシピ画像を削除">
             画像を削除
           </button>
         ) : null}
         {showCancel ? (
-          <button className="secondary-button compact-button" disabled={disabled} onClick={onCancel} type="button">
+          <button className="secondary-button compact-button" disabled={disabled} onClick={onCancel} type="button" data-tooltip="画像の変更をキャンセル">
             変更を取り消す
           </button>
         ) : null}
@@ -4706,7 +4856,7 @@ function RecipeDetail({ imageUrl, onEdit, recipe }: { imageUrl?: string | null; 
           {recipe.source ? (
             <p className="item-note">参考元: <RecipeSourceLinks source={recipe.source} inline /></p>
           ) : null}
-          <button aria-label="レシピ詳細を編集" className="secondary-button recipe-detail-edit-button" type="button" onClick={() => onEdit(recipe)}>
+          <button aria-label="レシピ詳細を編集" className="secondary-button recipe-detail-edit-button" type="button" onClick={() => onEdit(recipe)} data-tooltip="このレシピを編集">
             編集
           </button>
         </div>

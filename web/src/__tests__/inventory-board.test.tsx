@@ -1097,4 +1097,50 @@ describe("InventoryBoard", () => {
     });
     expect(await screen.findByText("買い物を2件削除しました。")).toBeTruthy();
   });
+
+  it("bulk deletes selected inventory items", async () => {
+    const deleteRows = deleteInQuery();
+    from.mockReturnValue({ delete: deleteRows.deleteRows });
+
+    renderBoard({
+      initialInventoryItems: [
+        { ...baseItem, id: "item-1", name: "牛乳" },
+        { ...baseItem, id: "item-2", name: "卵" }
+      ]
+    });
+
+    fireEvent.click(screen.getAllByLabelText("選択")[0]);
+    fireEvent.click(screen.getAllByLabelText("選択")[1]);
+    fireEvent.click(screen.getByRole("button", { name: "選択削除" }));
+    expect(await screen.findByLabelText("削除確認")).toBeTruthy();
+    fireEvent.click(within(screen.getByLabelText("削除確認")).getByRole("button", { name: "削除する" }));
+
+    await waitFor(() => {
+      expect(from).toHaveBeenCalledWith("inventory_items");
+      expect(deleteRows.inIds).toHaveBeenCalledWith("id", ["item-1", "item-2"]);
+    });
+    expect(await screen.findByText("食材を2件削除しました。")).toBeTruthy();
+  });
+
+  it("does not delete inventory items when cancel is pressed in confirm panel", async () => {
+    const deleteRows = deleteInQuery();
+    from.mockReturnValue({ delete: deleteRows.deleteRows });
+
+    renderBoard({
+      initialInventoryItems: [
+        { ...baseItem, id: "item-1", name: "牛乳" },
+        { ...baseItem, id: "item-2", name: "卵" }
+      ]
+    });
+
+    fireEvent.click(screen.getAllByLabelText("選択")[0]);
+    fireEvent.click(screen.getAllByLabelText("選択")[1]);
+    fireEvent.click(screen.getByRole("button", { name: "選択削除" }));
+    expect(await screen.findByLabelText("削除確認")).toBeTruthy();
+    fireEvent.click(within(screen.getByLabelText("削除確認")).getByRole("button", { name: "やめる" }));
+
+    expect(deleteRows.deleteRows).not.toHaveBeenCalled();
+    expect(screen.getByText("牛乳")).toBeTruthy();
+    expect(screen.getByText("卵")).toBeTruthy();
+  });
 });

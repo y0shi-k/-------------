@@ -29,8 +29,7 @@
       "Read(./**/.env)",
       "Read(./**/.env.*)",
       "Edit(./app.html)",
-      "Write(./app.html)",
-      "MultiEdit(./app.html)"
+      "Write(./app.html)"
     ]
   },
   "hooks": {

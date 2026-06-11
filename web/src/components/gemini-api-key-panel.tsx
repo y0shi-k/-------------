@@ -41,7 +41,7 @@ export function GeminiApiKeyPanel({ apiKey, disabled = false, id, onChange }: Ge
           <span>Gemini APIキー</span>
           <strong>{apiKey.trim() ? "入力済み" : "未入力"}</strong>
         </div>
-        <button className="secondary-button compact-button" type="button" disabled={disabled || !apiKey.trim()} onClick={deleteKey}>
+        <button className="secondary-button compact-button" type="button" disabled={disabled || !apiKey.trim()} onClick={deleteKey} data-tooltip="端末に保存したAPIキーを削除">
           削除
         </button>
       </div>
@@ -62,7 +62,7 @@ export function GeminiApiKeyPanel({ apiKey, disabled = false, id, onChange }: Ge
         />
       </label>
       <div className="gemini-key-actions">
-        <button className="secondary-button compact-button" type="button" disabled={disabled || !apiKey.trim()} onClick={saveKey}>
+        <button className="secondary-button compact-button" type="button" disabled={disabled || !apiKey.trim()} onClick={saveKey} data-tooltip="Gemini APIキーをこの端末のみに保存">
           この端末に保存
         </button>
         <small>DBには保存しません。AI実行時だけサーバーへ送ります。</small>

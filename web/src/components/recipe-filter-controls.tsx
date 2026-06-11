@@ -46,18 +46,18 @@ export function RecipeFilterControls({
       <div className="recipe-search-controls">
         <div className="recipe-search-mode-tabs" aria-label="レシピ検索対象">
           {searchTabs.map((tab) => (
-            <button data-active={searchMode === tab.value} key={tab.value} onClick={() => onSearchModeChange(tab.value)} type="button">
+            <button data-active={searchMode === tab.value} key={tab.value} onClick={() => onSearchModeChange(tab.value)} type="button" data-tooltip={`${tab.label}で検索`}>
               {tab.label}
             </button>
           ))}
         </div>
         <div className="recipe-search-logic" aria-label="検索条件">
-          <button data-active={searchLogic === "and"} onClick={() => onSearchLogicChange("and")} type="button">AND</button>
-          <button data-active={searchLogic === "or"} onClick={() => onSearchLogicChange("or")} type="button">OR</button>
+          <button data-active={searchLogic === "and"} onClick={() => onSearchLogicChange("and")} type="button" data-tooltip="すべての条件に一致するレシピを検索">AND</button>
+          <button data-active={searchLogic === "or"} onClick={() => onSearchLogicChange("or")} type="button" data-tooltip="いずれかの条件に一致するレシピを検索">OR</button>
         </div>
         <div className="recipe-search-field">
           <input aria-label="レシピ検索" value={search} onChange={(event) => onSearchChange(event.target.value)} placeholder="検索..." />
-          {search ? <button aria-label="検索をクリア" onClick={() => onSearchChange("")} type="button">×</button> : null}
+          {search ? <button aria-label="検索をクリア" onClick={() => onSearchChange("")} type="button" data-tooltip="検索テキストをクリア">×</button> : null}
         </div>
         <select className="canvas-hidden-compat" aria-label="レシピの並び順" value={sort} onChange={(event) => onSortChange(event.target.value as RecipeSort)}>
           <option value="created_desc">登録が新しい順</option>
@@ -70,16 +70,16 @@ export function RecipeFilterControls({
       <div className="recipe-sort-row">
         <span>並び</span>
         {sortTabs.map((tab) => (
-          <button data-active={sort === tab.value} key={tab.value} onClick={() => onSortChange(tab.value)} type="button">
+          <button data-active={sort === tab.value} key={tab.value} onClick={() => onSortChange(tab.value)} type="button" data-tooltip={`${tab.label}で並び替え`}>
             {tab.label}{sort === tab.value ? "▼" : ""}
           </button>
         ))}
       </div>
       <div className="recipe-filter-chips" aria-label="レシピの絞り込み">
-        <button className="recipe-filter-chip" data-active={!favoriteOnly} type="button" onClick={() => onFavoriteFilterChange(false)}>
+        <button className="recipe-filter-chip" data-active={!favoriteOnly} type="button" onClick={() => onFavoriteFilterChange(false)} data-tooltip="全レシピを表示">
           すべて
         </button>
-        <button className="recipe-filter-chip" data-active={favoriteOnly} type="button" onClick={() => onFavoriteFilterChange(true)}>
+        <button className="recipe-filter-chip" data-active={favoriteOnly} type="button" onClick={() => onFavoriteFilterChange(true)} data-tooltip="お気に入りのみ表示">
           お気に入り
         </button>
       </div>

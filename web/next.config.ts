@@ -21,7 +21,8 @@ const cspDirectives = [
     "ws://localhost:*"
   ].join(" "),
   "media-src 'self' blob: https:",
-  "worker-src 'self' blob:"
+  "worker-src 'self' blob:",
+  "frame-src https://www.youtube-nocookie.com"
 ];
 
 const securityHeaders = [

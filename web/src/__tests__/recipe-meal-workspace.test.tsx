@@ -608,6 +608,17 @@ describe("RecipeMealWorkspace", () => {
     expect(moreChip.getAttribute("data-tooltip")).toBe("韓国\nイタリアン");
   });
 
+  it("opens the cooking viewer when a recipe card thumbnail is clicked", () => {
+    renderWorkspace({ initialRecipes: [baseRecipe] });
+
+    const recipeList = screen.getByLabelText("レシピ一覧");
+    const thumbButton = within(recipeList).getByRole("button", { name: "カレー の調理ビューを開く" });
+
+    fireEvent.click(thumbButton);
+
+    expect(screen.getByRole("dialog", { name: "調理ビューア全画面" })).toBeTruthy();
+  });
+
   it("searches, sorts, and deletes recipes safely", async () => {
     const secondRecipe: Recipe = {
       ...baseRecipe,
@@ -1003,6 +1014,161 @@ describe("RecipeMealWorkspace", () => {
       expect(scheduleInsert.insert).toHaveBeenCalled();
     });
     expect(screen.queryByRole("dialog", { name: "買い物に追加するもの" })).toBeNull();
+  });
+
+  // -----------------------------------------------------------------------
+  // TKT-0224: 表記ゆれマッチング（inventoryAmountByNameAndUnit）
+  // -----------------------------------------------------------------------
+
+  it("does not open the shortage modal when inventory name is a synonym (卵 covers たまご)", async () => {
+    // 在庫「卵 3個」× レシピ「たまご 2個」→ 在庫が十分なので不足モーダルが開かない。
+    const tamagoRecipe: Recipe = {
+      ...baseRecipe,
+      id: "recipe-tamagodon",
+      name: "卵丼",
+      ingredients: [
+        { ...baseIngredient, id: "ingredient-tamago", recipe_id: "recipe-tamagodon", name: "たまご", amount: 2, unit: "個" }
+      ]
+    };
+    const tamagoStock: StockItem = { ...baseInventory, id: "stock-tamago", name: "卵", quantity: 3, unit: "個" };
+    const scheduleForTamago: MealSchedule = { ...baseSchedule, id: "schedule-tamago", recipe_id: "recipe-tamagodon", recipe_name: "卵丼" };
+    const scheduleInsert = insertSingleQuery(scheduleForTamago);
+    from.mockReturnValue({ insert: scheduleInsert.insert });
+
+    renderWorkspace({
+      initialRecipes: [tamagoRecipe],
+      initialMealSchedules: [scheduleForTamago],
+      initialInventoryItems: [tamagoStock]
+    });
+
+    fireEvent.click(screen.getAllByRole("button", { name: "スケジュールに追加" })[0]);
+    const dialog = screen.getByRole("dialog");
+    fireEvent.click(within(dialog).getAllByRole("button", { name: /を選ぶ$/ })[0]);
+    fireEvent.click(within(dialog).getByRole("button", { name: "朝" }));
+
+    await waitFor(() => {
+      expect(scheduleInsert.insert).toHaveBeenCalled();
+    });
+    // 不足モーダルが開かない（買い物候補に「たまご」が出ない）。
+    expect(screen.queryByRole("dialog", { name: "買い物に追加するもの" })).toBeNull();
+  });
+
+  it("opens the shortage modal with correct shortage when synonym stock is partial (卵 1個 vs たまご 3個)", async () => {
+    // 在庫「卵 1個」× レシピ「たまご 3個」→ 不足 2個。
+    const tamagoRecipe: Recipe = {
+      ...baseRecipe,
+      id: "recipe-tamagodon",
+      name: "卵丼",
+      ingredients: [
+        { ...baseIngredient, id: "ingredient-tamago", recipe_id: "recipe-tamagodon", name: "たまご", amount: 3, unit: "個" }
+      ]
+    };
+    const tamagoStock: StockItem = { ...baseInventory, id: "stock-tamago", name: "卵", quantity: 1, unit: "個" };
+    const scheduleForTamago: MealSchedule = { ...baseSchedule, id: "schedule-tamago", recipe_id: "recipe-tamagodon", recipe_name: "卵丼" };
+    const scheduleInsert = insertSingleQuery(scheduleForTamago);
+    const shoppingInsert = insertListQuery([{ id: "shop-tamago" }]);
+    from.mockImplementation((table: string) => {
+      if (table === "meal_schedules") return { insert: scheduleInsert.insert };
+      if (table === "shopping_items") return { insert: shoppingInsert.insert };
+      return { insert: vi.fn() };
+    });
+
+    renderWorkspace({
+      initialRecipes: [tamagoRecipe],
+      initialMealSchedules: [scheduleForTamago],
+      initialInventoryItems: [tamagoStock]
+    });
+
+    fireEvent.click(screen.getAllByRole("button", { name: "スケジュールに追加" })[0]);
+    const dialog = screen.getByRole("dialog");
+    fireEvent.click(within(dialog).getAllByRole("button", { name: /を選ぶ$/ })[0]);
+    fireEvent.click(within(dialog).getByRole("button", { name: "朝" }));
+
+    // 不足モーダルが開き、「たまご」が不足候補に出る。
+    const shortageModal = await screen.findByRole("dialog", { name: "買い物に追加するもの" });
+    expect(within(shortageModal).getByText("たまご")).toBeTruthy();
+
+    fireEvent.click(within(shortageModal).getByLabelText("表示中をすべて選択"));
+    fireEvent.click(within(shortageModal).getByRole("button", { name: /選択したものを追加/ }));
+
+    await waitFor(() => {
+      // 不足量 2個（3 - 1）として INSERT される。
+      expect(shoppingInsert.insert).toHaveBeenCalledWith([
+        expect.objectContaining({ name: "たまご", required_quantity: 2, unit: "個" })
+      ]);
+    });
+  });
+
+  it("opens the shortage modal for partial-match-only names (豚こま切れ肉 does not cover 豚肉)", async () => {
+    // 在庫「豚こま切れ肉」× レシピ「豚肉」→ 部分一致のみ。同一とは見なさず不足として出る。
+    const butaRecipe: Recipe = {
+      ...baseRecipe,
+      id: "recipe-buta",
+      name: "生姜焼き",
+      ingredients: [
+        { ...baseIngredient, id: "ingredient-buta", recipe_id: "recipe-buta", name: "豚肉", amount: 200, unit: "g" }
+      ]
+    };
+    const butaStock: StockItem = { ...baseInventory, id: "stock-buta", name: "豚こま切れ肉", quantity: 300, unit: "g" };
+    const scheduleForButa: MealSchedule = { ...baseSchedule, id: "schedule-buta", recipe_id: "recipe-buta", recipe_name: "生姜焼き" };
+    const scheduleInsert = insertSingleQuery(scheduleForButa);
+    const shoppingInsert = insertListQuery([{ id: "shop-buta" }]);
+    from.mockImplementation((table: string) => {
+      if (table === "meal_schedules") return { insert: scheduleInsert.insert };
+      if (table === "shopping_items") return { insert: shoppingInsert.insert };
+      return { insert: vi.fn() };
+    });
+
+    renderWorkspace({
+      initialRecipes: [butaRecipe],
+      initialMealSchedules: [scheduleForButa],
+      initialInventoryItems: [butaStock]
+    });
+
+    fireEvent.click(screen.getAllByRole("button", { name: "スケジュールに追加" })[0]);
+    const dialog = screen.getByRole("dialog");
+    fireEvent.click(within(dialog).getAllByRole("button", { name: /を選ぶ$/ })[0]);
+    fireEvent.click(within(dialog).getByRole("button", { name: "朝" }));
+
+    // 部分一致は合算対象外なので不足として出る。
+    const shortageModal = await screen.findByRole("dialog", { name: "買い物に追加するもの" });
+    expect(within(shortageModal).getByText("豚肉")).toBeTruthy();
+  });
+
+  it("does not aggregate inventory when unit differs (卵 1個 does not cover たまご 1g)", async () => {
+    // 単位不一致（個 vs g）は従来どおり別物扱い。名前が類義語でも合算しない。
+    const tamagoGRecipe: Recipe = {
+      ...baseRecipe,
+      id: "recipe-tamago-g",
+      name: "ふわふわ卵",
+      ingredients: [
+        { ...baseIngredient, id: "ingredient-tamago-g", recipe_id: "recipe-tamago-g", name: "たまご", amount: 1, unit: "g" }
+      ]
+    };
+    const tamagoKoStock: StockItem = { ...baseInventory, id: "stock-tamago-ko", name: "卵", quantity: 10, unit: "個" };
+    const scheduleForTamagoG: MealSchedule = { ...baseSchedule, id: "schedule-tamago-g", recipe_id: "recipe-tamago-g", recipe_name: "ふわふわ卵" };
+    const scheduleInsert = insertSingleQuery(scheduleForTamagoG);
+    const shoppingInsert = insertListQuery([{ id: "shop-tamago-g" }]);
+    from.mockImplementation((table: string) => {
+      if (table === "meal_schedules") return { insert: scheduleInsert.insert };
+      if (table === "shopping_items") return { insert: shoppingInsert.insert };
+      return { insert: vi.fn() };
+    });
+
+    renderWorkspace({
+      initialRecipes: [tamagoGRecipe],
+      initialMealSchedules: [scheduleForTamagoG],
+      initialInventoryItems: [tamagoKoStock]
+    });
+
+    fireEvent.click(screen.getAllByRole("button", { name: "スケジュールに追加" })[0]);
+    const dialog = screen.getByRole("dialog");
+    fireEvent.click(within(dialog).getAllByRole("button", { name: /を選ぶ$/ })[0]);
+    fireEvent.click(within(dialog).getByRole("button", { name: "朝" }));
+
+    // 単位違いは合算対象外なので不足として出る。
+    const shortageModal = await screen.findByRole("dialog", { name: "買い物に追加するもの" });
+    expect(within(shortageModal).getByText("たまご")).toBeTruthy();
   });
 
   it("filters the schedule recipe picker with the shared search and favorite controls", () => {
@@ -1431,6 +1597,103 @@ describe("RecipeMealWorkspace", () => {
     fireEvent.click(within(overlay).getByRole("button", { name: "戻る" }));
     expect(screen.queryByLabelText("調理ビューア")).toBeNull();
     expect(shellMocks.returnToMode).not.toHaveBeenCalled();
+  });
+
+  it("shows recipe photo toggle in cooking overlay, toggling hides and restores the photo block", () => {
+    renderWorkspace({ initialRecipes: [baseRecipe] });
+
+    fireEvent.click(screen.getByRole("button", { name: "調理ビューを開く" }));
+
+    const overlay = screen.getByRole("dialog", { name: "調理ビューア全画面" });
+
+    // 初期状態: 開いている（aria-expanded="true"）
+    const toggleBtn = within(overlay).getByRole("button", { name: "レシピ写真を隠す" });
+    expect(toggleBtn.getAttribute("aria-expanded")).toBe("true");
+
+    // 写真ブロックがある（写真未登録なのでプレースホルダ）
+    expect(within(overlay).getByRole("img", { name: baseRecipe.name })).toBeTruthy();
+
+    // トグルで閉じる
+    fireEvent.click(toggleBtn);
+    const reopenBtn = within(overlay).getByRole("button", { name: "レシピ写真を表示" });
+    expect(reopenBtn.getAttribute("aria-expanded")).toBe("false");
+    // 写真サムネイルが消える
+    expect(within(overlay).queryByRole("img", { name: baseRecipe.name })).toBeNull();
+
+    // 再び開く
+    fireEvent.click(reopenBtn);
+    expect(within(overlay).getByRole("button", { name: "レシピ写真を隠す" }).getAttribute("aria-expanded")).toBe("true");
+    expect(within(overlay).getByRole("img", { name: baseRecipe.name })).toBeTruthy();
+  });
+
+  it("shows YouTube player initially and lets switching back to the photo when source has a video URL", () => {
+    const youtubeRecipe: Recipe = {
+      ...baseRecipe,
+      source: "家庭メモ\nhttps://www.youtube.com/watch?v=dQw4w9WgXcQ"
+    };
+    const { container } = renderWorkspace({ initialRecipes: [youtubeRecipe] });
+
+    fireEvent.click(screen.getByRole("button", { name: "調理ビューを開く" }));
+
+    const overlay = screen.getByRole("dialog", { name: "調理ビューア全画面" });
+
+    // 動画が初期表示される
+    const iframe = container.querySelector('iframe[src*="youtube-nocookie.com/embed/"]');
+    expect(iframe).not.toBeNull();
+    expect(iframe?.getAttribute("src")).toBe(
+      "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ"
+    );
+    expect(iframe?.getAttribute("title")).toContain("カレー");
+    expect(iframe?.hasAttribute("allowfullscreen")).toBe(true);
+    // 動画初期表示なので写真サムネイルは出ていない
+    expect(within(overlay).queryByRole("img", { name: youtubeRecipe.name })).toBeNull();
+
+    // 切替UIで写真へ戻す
+    fireEvent.click(within(overlay).getByRole("button", { name: "写真を表示" }));
+    expect(container.querySelector('iframe[src*="youtube-nocookie.com/embed/"]')).toBeNull();
+    expect(within(overlay).getByRole("img", { name: youtubeRecipe.name })).toBeTruthy();
+
+    // 動画へ戻せる
+    fireEvent.click(within(overlay).getByRole("button", { name: "動画を表示" }));
+    expect(container.querySelector('iframe[src*="youtube-nocookie.com/embed/"]')).not.toBeNull();
+  });
+
+  it("hides the media switch and renders no iframe when source has no YouTube URL", () => {
+    const { container } = renderWorkspace({ initialRecipes: [baseRecipe] });
+
+    fireEvent.click(screen.getByRole("button", { name: "調理ビューを開く" }));
+
+    const overlay = screen.getByRole("dialog", { name: "調理ビューア全画面" });
+
+    expect(container.querySelector('iframe[src*="youtube-nocookie.com/embed/"]')).toBeNull();
+    expect(within(overlay).queryByRole("button", { name: "動画を表示" })).toBeNull();
+    expect(within(overlay).queryByRole("button", { name: "写真を表示" })).toBeNull();
+    // 従来どおり写真（プレースホルダ）が出る
+    expect(within(overlay).getByRole("img", { name: baseRecipe.name })).toBeTruthy();
+  });
+
+  it("resets photo toggle to open when reopening cooking viewer", () => {
+    renderWorkspace({ initialRecipes: [baseRecipe] });
+
+    fireEvent.click(screen.getByRole("button", { name: "調理ビューを開く" }));
+
+    const overlay = screen.getByRole("dialog", { name: "調理ビューア全画面" });
+    const toggleBtn = within(overlay).getByRole("button", { name: "レシピ写真を隠す" });
+
+    // 閉じる
+    fireEvent.click(toggleBtn);
+    expect(within(overlay).getByRole("button", { name: "レシピ写真を表示" })).toBeTruthy();
+
+    // 調理ビューを戻る
+    fireEvent.click(within(overlay).getByRole("button", { name: "戻る" }));
+
+    // もう一度開く
+    fireEvent.click(screen.getByRole("button", { name: "調理ビューを開く" }));
+
+    const newOverlay = screen.getByRole("dialog", { name: "調理ビューア全画面" });
+    // 初期状態が「開いている」に戻っている
+    const reopenToggle = within(newOverlay).getByRole("button", { name: "レシピ写真を隠す" });
+    expect(reopenToggle.getAttribute("aria-expanded")).toBe("true");
   });
 
   it("saves cooking step reorder changes back to the recipe", async () => {

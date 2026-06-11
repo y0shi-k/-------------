@@ -21,7 +21,7 @@ export function PhotoCandidatePicker({ candidates, error, loading, onClose, onSe
   return (
     <div className="modal-backdrop photo-candidate-backdrop" role="dialog" aria-modal="true" aria-labelledby="photo-candidate-heading">
       <section className="canvas-modal photo-candidate-modal">
-        <button className="modal-close-button" type="button" onClick={onClose} aria-label="閉じる">
+        <button className="modal-close-button" type="button" onClick={onClose} aria-label="閉じる" data-tooltip="写真選択を閉じる" data-tooltip-pos="bottom-left">
           ×
         </button>
         <h3 id="photo-candidate-heading">{title}</h3>
@@ -33,7 +33,7 @@ export function PhotoCandidatePicker({ candidates, error, loading, onClose, onSe
         {!loading && !error && candidates.length > 0 ? (
           <div className="photo-candidate-grid" aria-label="過去の完成写真候補">
             {candidates.map((candidate) => (
-              <button className="photo-candidate-item" key={candidate.id} type="button" onClick={() => onSelect(candidate)}>
+              <button className="photo-candidate-item" key={candidate.id} type="button" onClick={() => onSelect(candidate)} data-tooltip={`${formatCandidateDate(candidate.createdAt)}の写真を選択`}>
                 {candidate.signedUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element -- 非公開Storageの署名付きURLを表示する。
                   <img alt={`${formatCandidateDate(candidate.createdAt)} の完成写真`} src={candidate.signedUrl} />

@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { TodayDashboard } from "@/components/today-dashboard";
 import { RecipeThumb } from "@/components/ui/recipe-thumb";
-import { useShellSubView, type ModeId, type ShellLeafId } from "@/components/web-mode-shell";
+import { useShellNavigation, useShellSubView, type ModeId, type ShellLeafId } from "@/components/web-mode-shell";
 import type { StockItem } from "@/lib/inventory/types";
 import type { CookCandidate, MealSchedule, Recipe, ShoppingItem } from "@/lib/recipes/types";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
@@ -87,6 +87,7 @@ export function HomeDashboard({
   recipes = []
 }: HomeDashboardProps) {
   const { selectShellLeaf } = useShellSubView();
+  const { requestViewRecipe } = useShellNavigation();
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
   const recipeImageUrls = useRecipeImageUrls(recipes, supabase);
 
@@ -114,8 +115,9 @@ export function HomeDashboard({
               <button
                 className="home-feature-card"
                 key={recipe.id}
-                onClick={() => selectShellLeaf("recipes", "recipes")}
+                onClick={() => requestViewRecipe(recipe.id)}
                 type="button"
+                title={`${recipe.name}の調理ビューを開く`}
               >
                 <RecipeThumb imageUrl={recipeImageUrls.get(recipe.id) ?? null} recipe={recipe} size="card" />
                 <div className="home-feature-meta">
@@ -136,6 +138,7 @@ export function HomeDashboard({
               key={card.key}
               onClick={() => selectShellLeaf(card.group, card.leaf)}
               type="button"
+              data-tooltip={card.hint}
             >
               <span className="home-summary-count">{card.count}</span>
               <strong className="home-summary-label">{card.label}</strong>

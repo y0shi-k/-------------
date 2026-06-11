@@ -68,6 +68,7 @@ export function FractionPicker({ onSelect, ariaLabel = "分数" }: FractionPicke
         aria-haspopup="dialog"
         aria-expanded={open}
         onClick={() => setOpen((current) => !current)}
+        data-tooltip="1/2・1/3などの端数を追加"
       >
         <span aria-hidden="true">＋</span> 端数
       </button>
@@ -97,12 +98,12 @@ export function FractionPicker({ onSelect, ariaLabel = "分数" }: FractionPicke
           />
           <div className="genre-popover-list">
             {filtered.map((fraction) => (
-              <button className="genre-option" type="button" key={fraction} onClick={() => select(fraction)}>
+              <button className="genre-option" type="button" key={fraction} onClick={() => select(fraction)} title={`${fraction} を選択`}>
                 <span className="genre-option-name">{fraction}</span>
               </button>
             ))}
             {canCreate ? (
-              <button className="genre-option genre-option-create" type="button" onClick={create}>
+              <button className="genre-option genre-option-create" type="button" onClick={create} title={`新しい端数「${normalizedQuery}」を追加`}>
                 <span className="genre-option-check genre-option-create-icon" aria-hidden="true">
                   ＋
                 </span>

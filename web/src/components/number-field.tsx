@@ -82,10 +82,10 @@ export function NumberField({
         />
         {showSteppers ? (
           <span className="number-field-steppers">
-            <button type="button" tabIndex={-1} className="number-field-step" aria-label="1増やす" onClick={() => applyStep(1)}>
+            <button type="button" tabIndex={-1} className="number-field-step" aria-label="1増やす" onClick={() => applyStep(1)} title="数量を1増やす">
               <span aria-hidden="true">▲</span>
             </button>
-            <button type="button" tabIndex={-1} className="number-field-step" aria-label="1減らす" onClick={() => applyStep(-1)}>
+            <button type="button" tabIndex={-1} className="number-field-step" aria-label="1減らす" onClick={() => applyStep(-1)} title="数量を1減らす">
               <span aria-hidden="true">▼</span>
             </button>
           </span>

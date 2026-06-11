@@ -167,4 +167,40 @@ describe("cooking history edit helpers", () => {
 
     expect(draft.item_type).toBe("調味料");
   });
+
+  it("auto-selects stock by normalized match (egg notation variants)", () => {
+    // 在庫「卵」× レシピ「たまご」: 辞書一致（score=2）で自動選択される。
+    const eggStock: StockItem = { ...baseStockItem, id: "stock-egg", name: "卵", unit: "個", category: "食材", quantity: 3 };
+    const eggIngredient: RecipeIngredient = { ...baseIngredient, id: "ingredient-egg", name: "たまご", unit: "個", item_type: "食材", amount: 2 };
+
+    const [draft] = buildDraftsFromRecipeIngredients([eggIngredient], [eggStock]);
+
+    expect(draft.stockItemId).toBe("stock-egg");
+    expect(draft.stockItemName).toBe("卵");
+    expect(draft.amount).toBe("2");
+    expect(draft.selected).toBe(true);
+  });
+
+  it("does not auto-select stock for partial match only (豚肉 vs 豚こま切れ肉)", () => {
+    // 部分一致のみ（score=1）は自動選択しない。
+    const porkStock: StockItem = { ...baseStockItem, id: "stock-pork", name: "豚こま切れ肉", unit: "g", category: "食材", quantity: 200 };
+    const porkIngredient: RecipeIngredient = { ...baseIngredient, id: "ingredient-pork", name: "豚肉", unit: "g", item_type: "食材", amount: 150 };
+
+    const [draft] = buildDraftsFromRecipeIngredients([porkIngredient], [porkStock]);
+
+    expect(draft.stockItemId).toBe("");
+    expect(draft.selected).toBe(false);
+  });
+
+  it("prefers higher-score match when multiple candidates are available", () => {
+    // 完全一致（score=4）は正規化一致（score=3）より優先される。
+    const exactStock: StockItem = { ...baseStockItem, id: "stock-exact", name: "卵", unit: "個", category: "食材", quantity: 5 };
+    const normalizedStock: StockItem = { ...baseStockItem, id: "stock-normalized", name: "タマゴ", unit: "個", category: "食材", quantity: 3 };
+    const eggIngredient: RecipeIngredient = { ...baseIngredient, id: "ingredient-egg2", name: "卵", unit: "個", item_type: "食材", amount: 2 };
+
+    const [draft] = buildDraftsFromRecipeIngredients([eggIngredient], [normalizedStock, exactStock]);
+
+    // 完全一致の stock-exact が選ばれる（score=4 > 3）。
+    expect(draft.stockItemId).toBe("stock-exact");
+  });
 });

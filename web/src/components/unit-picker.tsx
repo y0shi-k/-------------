@@ -56,6 +56,7 @@ export function UnitPicker({
                   onSelect("");
                 }}
                 aria-label={`${ariaLabel}を外す`}
+                data-tooltip={`選択した${ariaLabel}を外す`}
               >
                 ×
               </button>
@@ -92,6 +93,7 @@ export function UnitPicker({
             else setOpen(false);
           }}
           aria-label="検索をクリア"
+          data-tooltip="検索テキストをクリア"
         >
           ×
         </button>
@@ -104,6 +106,7 @@ export function UnitPicker({
             else setOpen(true);
           }}
           aria-label={`${ariaLabel}を追加`}
+          data-tooltip={`入力した${ariaLabel}を追加`}
         >
           ＋
         </button>
@@ -121,7 +124,7 @@ export function UnitPicker({
             {filtered.map((unit) => {
               const isSelected = value === unit;
               return (
-                <button className="genre-option" data-selected={isSelected} type="button" key={unit} onClick={() => select(unit)}>
+                <button className="genre-option" data-selected={isSelected} type="button" key={unit} onClick={() => select(unit)} title={isSelected ? `${unit} を外す` : `${unit} を選択`}>
                   <span className="genre-option-check" data-on={isSelected} aria-hidden="true">
                     ✓
                   </span>
@@ -130,7 +133,7 @@ export function UnitPicker({
               );
             })}
             {canCreate ? (
-              <button className="genre-option genre-option-create" type="button" onClick={() => select(normalizedQuery)}>
+              <button className="genre-option genre-option-create" type="button" onClick={() => select(normalizedQuery)} title={`新しい${ariaLabel}「${normalizedQuery}」を追加`}>
                 <span className="genre-option-check genre-option-create-icon" aria-hidden="true">
                   ＋
                 </span>

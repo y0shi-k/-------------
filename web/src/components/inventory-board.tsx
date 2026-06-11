@@ -461,6 +461,38 @@ export function InventoryBoard({
     setFeedback({ tone: "info", message: `買い物を${deletedCount}件削除しました。` });
     router.refresh();
   }
+
+  async function deleteSelectedInventoryItems() {
+    if (selectedInventoryIds.length === 0) return;
+
+    setIsSaving(true);
+    setFeedback(null);
+
+    const { error } = await supabase.from("inventory_items").delete().eq("user_id", userId).in("id", selectedInventoryIds);
+
+    setIsSaving(false);
+
+    if (error) {
+      setFeedback({ tone: "error", message: "原因: 食材を一括削除できませんでした。影響: 選択した食材が残ります。修正方法: ログイン状態を確認してください。" });
+      return;
+    }
+
+    const deletedIds = [...selectedInventoryIds];
+    const deletedCount = deletedIds.length;
+
+    deletedIds.forEach((id) => clearQuantityNotation(id));
+    setQuantityNotations((current) => {
+      const next = { ...current };
+      deletedIds.forEach((id) => delete next[id]);
+      return next;
+    });
+    setInventoryItems((items) => items.filter((item) => !deletedIds.includes(item.id)));
+    setSelectedInventoryIds([]);
+    if (editing && deletedIds.includes(editing.item.id)) resetForm();
+    setFeedback({ tone: "info", message: `食材を${deletedCount}件削除しました。` });
+    router.refresh();
+  }
+
   const storageLocationOptions = useMemo(
     () =>
       Array.from(
@@ -1186,13 +1218,13 @@ export function InventoryBoard({
         </div>
 
         <div className="canvas-mode-control inventory-view-control" aria-label="食材管理の表示切替">
-          <button className="secondary-button compact-button inventory-view-tab" data-active={activeView === "inventory"} type="button" onClick={() => switchInventoryView("inventory")}>
+          <button className="secondary-button compact-button inventory-view-tab" data-active={activeView === "inventory"} type="button" onClick={() => switchInventoryView("inventory")} data-tooltip="在庫リストを表示" data-tooltip-pos="bottom">
             食材管理
           </button>
-          <button className="secondary-button compact-button inventory-view-tab" data-active={activeView === "shopping"} type="button" onClick={() => switchInventoryView("shopping")}>
+          <button className="secondary-button compact-button inventory-view-tab" data-active={activeView === "shopping"} type="button" onClick={() => switchInventoryView("shopping")} data-tooltip="買い物リストを表示" data-tooltip-pos="bottom">
             買い物リスト
           </button>
-          <button className="primary-button compact-button icon-action" type="button" onClick={openAddChoice} aria-label="食材を追加">
+          <button className="primary-button compact-button icon-action" type="button" onClick={openAddChoice} aria-label="食材を追加" data-tooltip="食材を追加" data-tooltip-pos="bottom-left">
             +
           </button>
         </div>
@@ -1221,7 +1253,7 @@ export function InventoryBoard({
       {addFlow === "choice" ? (
         <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="add-choice-heading">
           <section className="stock-panel canvas-modal add-choice-modal" aria-labelledby="add-choice-heading">
-            <button className="modal-close-button" type="button" onClick={closeAddModal} aria-label="閉じる">×</button>
+            <button className="modal-close-button" type="button" onClick={closeAddModal} aria-label="閉じる" data-tooltip="追加モーダルを閉じる" data-tooltip-pos="bottom-left">×</button>
             <div className="panel-title">
               <div>
                 <span>ADD STOCK</span>
@@ -1229,11 +1261,11 @@ export function InventoryBoard({
               </div>
             </div>
             <div className="add-choice-grid">
-              <button className="add-choice-card scan-choice" type="button" onClick={openPhotoAdd} aria-label="画像スキャン">
+              <button className="add-choice-card scan-choice" type="button" onClick={openPhotoAdd} aria-label="画像スキャン" data-tooltip="写真をAIで解析して在庫に追加">
                 <span>画像スキャン</span>
                 <small>写真からAI候補を作り、確認してから在庫に追加します。</small>
               </button>
-              <button className="add-choice-card manual-choice" type="button" onClick={openManualAdd} aria-label="手動で追加">
+              <button className="add-choice-card manual-choice" type="button" onClick={openManualAdd} aria-label="手動で追加" data-tooltip="品名・数量を手入力して在庫に追加">
                 <span>手動で追加</span>
                 <small>品名や数量を入力して、在庫へ直接追加します。</small>
               </button>
@@ -1245,7 +1277,7 @@ export function InventoryBoard({
       {addFlow === "manual" ? (
         <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="inventory-editor-heading">
         <section className="stock-panel canvas-modal inventory-editor-modal" aria-labelledby="inventory-editor-heading">
-          <button className="modal-close-button" type="button" onClick={closeAddModal} aria-label="閉じる">×</button>
+          <button className="modal-close-button" type="button" onClick={closeAddModal} aria-label="閉じる" data-tooltip="編集モーダルを閉じる" data-tooltip-pos="bottom-left">×</button>
           <div className="panel-title">
             <div>
               <span>{editingScanCandidateId ? "EDIT AI CANDIDATE" : editing ? "EDIT STOCK" : "MANUAL ADD"}</span>
@@ -1316,6 +1348,7 @@ export function InventoryBoard({
                       type="button"
                       disabled={isSaving || (!selectedIngredientImage && !ingredientImagePreviewUrl)}
                       onClick={resetIngredientImageSelection}
+                      data-tooltip="選択した食材画像をリセット"
                     >
                       選択を取り消す
                     </button>
@@ -1328,6 +1361,7 @@ export function InventoryBoard({
                           resetIngredientImageSelection();
                           setRemoveInventoryImageOnSave(true);
                         }}
+                        data-tooltip="この食材のみの個別画像を削除"
                       >
                         個別画像を削除
                       </button>
@@ -1341,6 +1375,7 @@ export function InventoryBoard({
                           resetIngredientImageSelection();
                           setRemoveUserNameImageOnSave(true);
                         }}
+                        data-tooltip="同じ品名に設定した画像を削除"
                       >
                         同名画像を削除
                       </button>
@@ -1438,11 +1473,11 @@ export function InventoryBoard({
             ) : null}
             <div className="form-actions">
               {editingScanCandidateId ? (
-                <button className="secondary-button submit-large" type="button" disabled={isSaving} onClick={closeAddModal}>
+                <button className="secondary-button submit-large" type="button" disabled={isSaving} onClick={closeAddModal} data-tooltip="編集をキャンセルして閉じる">
                   キャンセル
                 </button>
               ) : null}
-              <button className="primary-button submit-large" type="submit" disabled={isSaving}>
+              <button className="primary-button submit-large" type="submit" disabled={isSaving} data-tooltip={editingScanCandidateId ? "AI候補の内容を更新" : editing ? "在庫の内容を更新して保存" : "入力した内容を在庫に追加"}>
                 {editingScanCandidateId ? "候補を更新" : editing ? "内容を更新する" : "在庫に追加"}
               </button>
             </div>
@@ -1454,7 +1489,7 @@ export function InventoryBoard({
       {addFlow === "photo" ? (
         <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="photo-capture-heading">
         <section className="stock-panel canvas-modal inventory-editor-modal photo-scan-modal" aria-labelledby="photo-capture-heading">
-          <button className="modal-close-button" type="button" onClick={closeAddModal} aria-label="閉じる">×</button>
+          <button className="modal-close-button" type="button" onClick={closeAddModal} aria-label="閉じる" data-tooltip="写真スキャンモーダルを閉じる" data-tooltip-pos="bottom-left">×</button>
           <section className="photo-capture-panel" aria-labelledby="photo-capture-heading">
               <div className="photo-capture-heading">
                 <div>
@@ -1496,10 +1531,10 @@ export function InventoryBoard({
               ) : null}
 
               <div className="photo-actions">
-                <button className="primary-button" type="button" disabled={selectedPhotos.length === 0 || isUploadingPhoto || isSaving || scanLimitReached} onClick={scanPhoto}>
+                <button className="primary-button" type="button" disabled={selectedPhotos.length === 0 || isUploadingPhoto || isSaving || scanLimitReached} onClick={scanPhoto} data-tooltip="選択した写真をAIで解析して候補を作成">
                   {isUploadingPhoto ? "解析中" : "AI解析する"}
                 </button>
-                <button className="secondary-button" type="button" disabled={selectedPhotos.length === 0 || isUploadingPhoto} onClick={resetPhoto}>
+                <button className="secondary-button" type="button" disabled={selectedPhotos.length === 0 || isUploadingPhoto} onClick={resetPhoto} data-tooltip="選択した写真をリセット">
                   別の写真にする
                 </button>
               </div>
@@ -1534,13 +1569,13 @@ export function InventoryBoard({
                         <small>期限 {candidate.item.effective_expires_on ?? candidate.item.display_expires_on}</small>
                       ) : null}
                     </div>
-                    <button className="secondary-button compact-button" type="button" disabled={isSaving} onClick={() => editScanCandidate(candidate)}>
+                    <button className="secondary-button compact-button" type="button" disabled={isSaving} onClick={() => editScanCandidate(candidate)} data-tooltip={`${candidate.item.name}の候補を編集`}>
                       編集
                     </button>
                   </article>
                 ))}
               </div>
-              <button className="primary-button submit-large" type="button" disabled={isSaving} onClick={saveSelectedScanCandidates}>
+              <button className="primary-button submit-large" type="button" disabled={isSaving} onClick={saveSelectedScanCandidates} data-tooltip="チェックした候補を在庫に追加">
                 選択した候補を在庫に追加
               </button>
             </section>
@@ -1560,6 +1595,7 @@ export function InventoryBoard({
               type="button"
               disabled={isSaving || selectedShoppingIds.length === 0}
               onClick={() => requestDelete(`${selectedShoppingIds.length}件の買い物`, "選択した買い物を削除します。元には戻せません。", deleteSelectedShoppingItems)}
+              data-tooltip="選択した買い物項目を削除"
             >
               選択削除
             </button>
@@ -1579,7 +1615,7 @@ export function InventoryBoard({
               onChange={(next) => updateShoppingValue("required_quantity", next)}
             />
             <UnitPicker value={shoppingValues.unit} onSelect={(unit) => updateShoppingValue("unit", unit)} ariaLabel="買い物の単位" />
-            <button className="primary-button compact-button" type="submit" disabled={isSaving}>
+            <button className="primary-button compact-button" type="submit" disabled={isSaving} data-tooltip="入力した品目を買い物リストに追加">
               手動追加
             </button>
           </form>
@@ -1616,6 +1652,7 @@ export function InventoryBoard({
                 key={option.value}
                 type="button"
                 onClick={() => updateInventoryFilter("category", option.value)}
+                data-tooltip={`${option.label}のみ表示`}
               >
                 {option.label}
                 <span>
@@ -1626,10 +1663,10 @@ export function InventoryBoard({
           </div>
 
           <div className="location-tab-row" aria-label="保存場所タブ">
-            <button className="location-tab" data-active={inventoryFilters.storageLocation === "all"} type="button" onClick={() => updateInventoryFilter("storageLocation", "all")}>
+            <button className="location-tab" data-active={inventoryFilters.storageLocation === "all"} type="button" onClick={() => updateInventoryFilter("storageLocation", "all")} data-tooltip="全保存場所を表示">
               すべて <span>{inventoryItems.length}</span>
             </button>
-            <button className="location-tab" data-active={inventoryFilters.expiry === "has_expiry"} type="button" onClick={() => updateInventoryFilter("expiry", inventoryFilters.expiry === "has_expiry" ? "all" : "has_expiry")}>
+            <button className="location-tab" data-active={inventoryFilters.expiry === "has_expiry"} type="button" onClick={() => updateInventoryFilter("expiry", inventoryFilters.expiry === "has_expiry" ? "all" : "has_expiry")} data-tooltip="数量0の食材を表示">
               使い切り <span>{inventoryItems.filter((item) => item.quantity === 0).length}</span>
             </button>
             {storageLocationOptions.map((location) => (
@@ -1639,6 +1676,7 @@ export function InventoryBoard({
                 key={location}
                 type="button"
                 onClick={() => updateInventoryFilter("storageLocation", location)}
+                data-tooltip={`${location}の食材を表示`}
               >
                 {location} <span>{inventoryItems.filter((item) => item.storage_location === location).length}</span>
               </button>
@@ -1647,13 +1685,13 @@ export function InventoryBoard({
 
           <div className="canvas-sort-row" aria-label="在庫の並び替え">
             <span>並び</span>
-            <button data-active={inventoryFilters.sort === "expiry_asc"} type="button" onClick={() => updateInventoryFilter("sort", "expiry_asc")}>
+            <button data-active={inventoryFilters.sort === "expiry_asc"} type="button" onClick={() => updateInventoryFilter("sort", "expiry_asc")} data-tooltip="賞味期限の近い順に並び替え">
               期限順 ▲
             </button>
-            <button data-active={inventoryFilters.sort === "name_asc"} type="button" onClick={() => updateInventoryFilter("sort", "name_asc")}>
+            <button data-active={inventoryFilters.sort === "name_asc"} type="button" onClick={() => updateInventoryFilter("sort", "name_asc")} data-tooltip="品名の五十音順に並び替え">
               名前順
             </button>
-            <button data-active={inventoryFilters.sort === "created_desc"} type="button" onClick={() => updateInventoryFilter("sort", "created_desc")}>
+            <button data-active={inventoryFilters.sort === "created_desc"} type="button" onClick={() => updateInventoryFilter("sort", "created_desc")} data-tooltip="登録日の新しい順に並び替え">
               購入日順
             </button>
           </div>
@@ -1675,8 +1713,10 @@ export function InventoryBoard({
                 disabled={isSaving}
                 itemIds={filteredInventoryItems.map((item) => item.id)}
                 onClear={() => clearSelected("inventory")}
+                onDeleteSelected={() => requestDelete(`${selectedInventoryIds.length}件の食材`, "選択した在庫を削除します。元には戻せません。", deleteSelectedInventoryItems)}
                 onSelectAll={(ids) => selectAllVisible("inventory", ids)}
                 selectedCount={selectedInventoryIds.length}
+                showDelete
               />
             }
             disabled={isSaving}
@@ -1711,7 +1751,7 @@ export function InventoryBoard({
                       value={restoreQuantities[item.id] ?? "1"}
                     />
                     <span className="restore-unit">{item.unit}</span>
-                    <button className="secondary-button compact-button" disabled={isSaving} type="button" onClick={() => restoreArchivedInventory(item)}>
+                    <button className="secondary-button compact-button" disabled={isSaving} type="button" onClick={() => restoreArchivedInventory(item)} data-tooltip={`${item.name}を在庫に復元`}>
                       戻す
                     </button>
                   </article>
@@ -1787,14 +1827,14 @@ function ItemList({ disabled, emptyText, imageUrls, items, list, notations, cust
             <div className="quantity-meta">
               {onQuantityChange ? (
                 <div className="quantity-stepper" aria-label={`${item.name}の数量`}>
-                  <button type="button" disabled={disabled || item.quantity <= 0} onClick={() => onQuantityChange(item, item.unit === "g" || item.unit === "ml" ? -50 : -1)}>
+                  <button type="button" disabled={disabled || item.quantity <= 0} onClick={() => onQuantityChange(item, item.unit === "g" || item.unit === "ml" ? -50 : -1)} data-tooltip={`${item.name}の数量を減らす`}>
                     -
                   </button>
                   <span>
                     {displayQuantity(item.quantity, isFractionalUnit(item.unit) ? notations[item.id] : "decimal", customFractions)}
                     <small>{item.unit}</small>
                   </span>
-                  <button type="button" disabled={disabled} onClick={() => onQuantityChange(item, item.unit === "g" || item.unit === "ml" ? 50 : 1)}>
+                  <button type="button" disabled={disabled} onClick={() => onQuantityChange(item, item.unit === "g" || item.unit === "ml" ? 50 : 1)} data-tooltip={`${item.name}の数量を増やす`}>
                     +
                   </button>
                 </div>
@@ -1805,12 +1845,12 @@ function ItemList({ disabled, emptyText, imageUrls, items, list, notations, cust
             </div>
           ) : null}
           <div className="item-actions">
-            <button className="secondary-button icon-button" type="button" disabled={disabled} onClick={() => onEdit(list, item)} aria-label={`${item.name}を編集`}>
+            <button className="secondary-button icon-button" type="button" disabled={disabled} onClick={() => onEdit(list, item)} aria-label={`${item.name}を編集`} data-tooltip={`${item.name}を編集`} data-tooltip-pos="left">
               <svg aria-hidden="true" viewBox="0 0 24 24">
                 <path d="m16.9 4.1 3 3L8 19H5v-3L16.9 4.1Z" />
               </svg>
             </button>
-            <button className="danger-button icon-button" type="button" disabled={disabled} onClick={() => onDelete(list, item)} aria-label={`${item.name}を削除`}>
+            <button className="danger-button icon-button" type="button" disabled={disabled} onClick={() => onDelete(list, item)} aria-label={`${item.name}を削除`} data-tooltip={`${item.name}を削除`} data-tooltip-pos="left">
               <svg aria-hidden="true" viewBox="0 0 24 24">
                 <path d="M3 6h18M8 6V4h8v2m-9 0 1 14h8l1-14M10 10v6M14 10v6" />
               </svg>
@@ -1851,14 +1891,14 @@ function ListToolbar({ disabled, itemIds, onClear, onDeleteSelected, onSelectAll
         />
         すべて選択
       </label>
-      <button className="secondary-button compact-button" type="button" disabled={disabled || itemIds.length === 0} onClick={() => onSelectAll(itemIds)}>
+      <button className="secondary-button compact-button" type="button" disabled={disabled || itemIds.length === 0} onClick={() => onSelectAll(itemIds)} data-tooltip="表示中の全項目を選択">
         すべて選択
       </button>
-      <button className="secondary-button compact-button" type="button" disabled={disabled || selectedCount === 0} onClick={onClear}>
+      <button className="secondary-button compact-button" type="button" disabled={disabled || selectedCount === 0} onClick={onClear} data-tooltip="選択をすべて解除">
         選択解除
       </button>
       {showDelete && onDeleteSelected ? (
-        <button className="danger-button compact-button" type="button" disabled={disabled || selectedCount === 0} onClick={onDeleteSelected}>
+        <button className="danger-button compact-button" type="button" disabled={disabled || selectedCount === 0} onClick={onDeleteSelected} data-tooltip="選択した項目を削除">
           選択削除
         </button>
       ) : null}
@@ -1929,6 +1969,7 @@ function LocationTagPicker({
                   onSelect("");
                 }}
                 aria-label="保存場所を外す"
+                data-tooltip="保存場所の選択を外す"
               >
                 ×
               </button>
@@ -1965,6 +2006,7 @@ function LocationTagPicker({
             else setOpen(false);
           }}
           aria-label="検索をクリア"
+          data-tooltip="検索テキストをクリア"
         >
           ×
         </button>
@@ -1977,6 +2019,7 @@ function LocationTagPicker({
             else setOpen(true);
           }}
           aria-label="保存場所を追加"
+          data-tooltip="入力した保存場所を追加"
         >
           ＋
         </button>
@@ -1994,7 +2037,7 @@ function LocationTagPicker({
             {filtered.map((name) => {
               const isSelected = value === name;
               return (
-                <button className="genre-option" data-selected={isSelected} type="button" key={name} onClick={() => select(name)}>
+                <button className="genre-option" data-selected={isSelected} type="button" key={name} onClick={() => select(name)} title={isSelected ? `${name} を外す` : `${name} を選択`}>
                   <span className="genre-option-check" data-on={isSelected} aria-hidden="true">
                     ✓
                   </span>
@@ -2003,7 +2046,7 @@ function LocationTagPicker({
               );
             })}
             {canCreate ? (
-              <button className="genre-option genre-option-create" type="button" onClick={() => create(normalizedQuery)}>
+              <button className="genre-option genre-option-create" type="button" onClick={() => create(normalizedQuery)} title={`新しい保存場所「${normalizedQuery}」を作成`}>
                 <span className="genre-option-check genre-option-create-icon" aria-hidden="true">
                   ＋
                 </span>

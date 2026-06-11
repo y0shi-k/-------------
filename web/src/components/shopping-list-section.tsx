@@ -50,7 +50,7 @@ export function ShoppingListSection({
                 <p>{item.required_quantity}{item.unit} / {item.status}</p>
               </div>
               {onMarkPurchased ? (
-                <button className="secondary-button compact-button" type="button" onClick={() => onMarkPurchased(item)}>
+                <button className="secondary-button compact-button" type="button" onClick={() => onMarkPurchased(item)} data-tooltip={`${item.name}を購入済みに設定`}>
                   購入済み
                 </button>
               ) : null}

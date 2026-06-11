@@ -1,6 +1,7 @@
 import type { ConsumptionEditDraft, CookingConsumptionEvent } from "@/lib/cooking-history/types";
 import type { StockItem } from "@/lib/inventory/types";
 import type { RecipeIngredient, RecipeIngredientType } from "@/lib/recipes/types";
+import { findMatchingStock } from "@/lib/ingredients/name-match";
 
 function ingredientTypeKey(name: string, unit: string) {
   return `${name}|${unit}`;
@@ -48,9 +49,7 @@ export function buildEditDrafts(events: CookingConsumptionEvent[], ingredients: 
 
 export function buildDraftsFromRecipeIngredients(ingredients: RecipeIngredient[], inventoryItems: StockItem[]): ConsumptionEditDraft[] {
   return ingredients.map((ingredient, index) => {
-    const exactStock = inventoryItems.find(
-      (item) => item.category === ingredient.item_type && item.unit === ingredient.unit && item.quantity > 0 && item.name === ingredient.name
-    );
+    const exactStock = findMatchingStock(ingredient.name, ingredient.item_type, ingredient.unit, inventoryItems);
     const amount = exactStock ? Math.min(Number(ingredient.amount || 0), Number(exactStock.quantity || 0)) : 0;
 
     return {

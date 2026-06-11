@@ -5,6 +5,7 @@ import { applyAdjustmentsToQuantities, buildDraftsFromRecipeIngredients, buildEd
 import type { ConsumptionEditDraft, CookingConsumptionEvent, CookingHistoryItem, CookingHistoryPhoto } from "@/lib/cooking-history/types";
 import type { StockItem } from "@/lib/inventory/types";
 import type { RecipeIngredient } from "@/lib/recipes/types";
+import { ingredientNameMatchScore } from "@/lib/ingredients/name-match";
 import { buildCookingHistoryPhotoStoragePath, compressImageFile } from "@/lib/photos/compress";
 import { useImageFileDrop } from "@/lib/photos/use-image-file-drop";
 import { useCachedSignedUrls } from "@/lib/photos/signed-url-cache";
@@ -337,6 +338,8 @@ export function CookingRecordEditModal({ inventoryItems, item, onClose, onSaved,
           onClick={onClose}
           aria-label="閉じる"
           disabled={isSaving}
+          data-tooltip="消費量編集を閉じる"
+          data-tooltip-pos="bottom-left"
         >
           ×
         </button>
@@ -418,6 +421,7 @@ export function CookingRecordEditModal({ inventoryItems, item, onClose, onSaved,
                     onClick={() => removeNewPhoto(index)}
                     type="button"
                     aria-label={`${photo.name} を取り消す`}
+                    title={`${photo.name} の追加を取り消す`}
                   >
                     ×
                   </button>
@@ -435,6 +439,7 @@ export function CookingRecordEditModal({ inventoryItems, item, onClose, onSaved,
                 key={value}
                 onClick={() => setRating(rating === String(value) ? "" : String(value))}
                 type="button"
+                data-tooltip={`評価 ${value}`}
               >
                 ★
               </button>
@@ -454,10 +459,10 @@ export function CookingRecordEditModal({ inventoryItems, item, onClose, onSaved,
         </section>
 
         <div className="consumption-modal-actions">
-          <button className="secondary-button" disabled={isSaving} onClick={onClose} type="button">
+          <button className="secondary-button" disabled={isSaving} onClick={onClose} type="button" data-tooltip="変更を取り消して閉じる">
             キャンセル
           </button>
-          <button className="primary-button consumption-confirm" disabled={isSaving || isLoading || Boolean(feedback?.tone === "error" && drafts.length === 0)} onClick={saveRecord} type="button">
+          <button className="primary-button consumption-confirm" disabled={isSaving || isLoading || Boolean(feedback?.tone === "error" && drafts.length === 0)} onClick={saveRecord} type="button" data-tooltip="消費量と料理記録を保存して確定">
             {isSaving ? "保存中..." : "確定"}
           </button>
         </div>
@@ -519,16 +524,17 @@ function ConsumptionEditList({
               onClick={() => onTabChange(value)}
               role="tab"
               type="button"
+              data-tooltip={value === "all" ? "全材料を表示" : `${value}のみ表示`}
             >
               {value === "all" ? "全" : value}
             </button>
           ))}
         </div>
         <div className="consumption-bulk-actions">
-          <button className="secondary-button compact-button" type="button" onClick={() => onSelectVisible(true)}>
+          <button className="secondary-button compact-button" type="button" onClick={() => onSelectVisible(true)} data-tooltip="表示中の全材料を選択">
             全選択
           </button>
-          <button className="secondary-button compact-button" type="button" onClick={() => onSelectVisible(false)}>
+          <button className="secondary-button compact-button" type="button" onClick={() => onSelectVisible(false)} data-tooltip="表示中の選択を全解除">
             全解除
           </button>
         </div>
@@ -559,11 +565,36 @@ function ConsumptionEditList({
                   減らす在庫
                   <select value={draft.stockItemId} onChange={(event) => onChange(index, { stockItemId: event.target.value })}>
                     <option value="">減算しない</option>
-                    {inventoryItems.map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.name} / 現在 {item.quantity}{item.unit} / {item.storage_location}
-                      </option>
-                    ))}
+                    {(() => {
+                      // おすすめ = 同分類・同単位・在庫あり。スコア降順にソート。
+                      const recommended = [...inventoryItems]
+                        .filter((item) => item.category === draft.item_type && item.unit === draft.requestedUnit && item.quantity > 0)
+                        .sort((a, b) => ingredientNameMatchScore(b.name, draft.ingredientName) - ingredientNameMatchScore(a.name, draft.ingredientName));
+                      const recommendedIds = new Set(recommended.map((item) => item.id));
+                      const others = inventoryItems.filter((item) => item.quantity > 0 && !recommendedIds.has(item.id));
+                      return (
+                        <>
+                          {recommended.length > 0 ? (
+                            <optgroup label="おすすめ（同分類・同単位）">
+                              {recommended.map((item) => (
+                                <option key={item.id} value={item.id}>
+                                  {item.name} / 現在 {item.quantity}{item.unit} / {item.storage_location}
+                                </option>
+                              ))}
+                            </optgroup>
+                          ) : null}
+                          {others.length > 0 ? (
+                            <optgroup label="その他の在庫（代替材料）">
+                              {others.map((item) => (
+                                <option key={item.id} value={item.id}>
+                                  {item.name} / 現在 {item.quantity}{item.unit} / {item.storage_location}
+                                </option>
+                              ))}
+                            </optgroup>
+                          ) : null}
+                        </>
+                      );
+                    })()}
                   </select>
                 </label>
                 <label>
@@ -632,6 +663,7 @@ function ExistingPhotoList({
                   onClick={() => onToggleDeleted(photo.id)}
                   type="button"
                   aria-label="この写真を削除"
+                  title="この写真を削除対象に設定"
                 >
                   ×
                 </button>
@@ -645,7 +677,7 @@ function ExistingPhotoList({
       {deletedCount > 0 ? (
         <p className="photo-deleted-note" aria-live="polite">
           削除予定 {deletedCount}件（確定で削除）
-          <button className="photo-restore-button" disabled={disabled} onClick={onRestoreDeleted} type="button">
+          <button className="photo-restore-button" disabled={disabled} onClick={onRestoreDeleted} type="button" data-tooltip="削除予定をすべて取り消す">
             元に戻す
           </button>
         </p>
