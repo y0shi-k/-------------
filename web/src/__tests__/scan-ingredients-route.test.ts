@@ -7,6 +7,22 @@ const getUser = vi.fn();
 const from = vi.fn();
 const storageFrom = vi.fn();
 const rpc = vi.fn();
+const profileMaybeSingle = vi.fn();
+
+// 承認チェック（profiles）と写真取得（photos）の両方が from を通る。
+// テスト側は引き続き setPhotoQuery(...) で photos クエリだけ差し替える。
+let photoQueryBuilder: ReturnType<typeof photoQuery> = photoQuery(null, new Error("not configured"));
+
+function setPhotoQuery(builder: ReturnType<typeof photoQuery>) {
+  photoQueryBuilder = builder;
+}
+
+function fromDispatch(table: string) {
+  if (table === "profiles") {
+    return { select: () => ({ eq: () => ({ maybeSingle: profileMaybeSingle }) }) };
+  }
+  return photoQueryBuilder;
+}
 
 vi.mock("@/lib/supabase/server", () => ({
   createServerSupabaseClient: async () => ({
@@ -87,8 +103,13 @@ describe("POST /api/ai/scan-ingredients", () => {
   beforeEach(() => {
     getUser.mockReset();
     from.mockReset();
+    from.mockImplementation(fromDispatch);
     storageFrom.mockReset();
     rpc.mockReset();
+    profileMaybeSingle.mockReset();
+    // 既定は承認済み（承認チェックは多層防御。各既存テストの前提）。
+    profileMaybeSingle.mockResolvedValue({ data: { status: "approved" }, error: null });
+    photoQueryBuilder = photoQuery(null, new Error("not configured"));
     global.fetch = vi.fn();
   });
 
@@ -102,6 +123,21 @@ describe("POST /api/ai/scan-ingredients", () => {
       error: expect.stringContaining("原因: ログイン状態を確認できませんでした。")
     });
     expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("returns 403 when the account is not approved", async () => {
+    getUser.mockResolvedValue({ data: { user: { id: "user-1" } } });
+    profileMaybeSingle.mockResolvedValue({ data: { status: "pending" }, error: null });
+
+    const response = await POST(request({ photoId: "photo-1", geminiApiKey: "user-owned-test-key" }));
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({
+      error: expect.stringContaining("承認")
+    });
+    expect(storageFrom).not.toHaveBeenCalled();
+    expect(rpc).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
   });
 
   it("returns 400 when the user-owned Gemini API key is missing", async () => {
@@ -118,7 +154,7 @@ describe("POST /api/ai/scan-ingredients", () => {
 
   it("does not reserve a slot for another user's missing photo", async () => {
     getUser.mockResolvedValue({ data: { user: { id: "user-1" } } });
-    from.mockReturnValue(photoQuery(null, new Error("not found")));
+    setPhotoQuery(photoQuery(null, new Error("not found")));
 
     const response = await POST(request({ photoId: "other-photo", geminiApiKey: "user-owned-test-key" }));
 
@@ -129,7 +165,7 @@ describe("POST /api/ai/scan-ingredients", () => {
 
   it("returns a 429 feature-limit error and does not download the photo when the cap is reached", async () => {
     getUser.mockResolvedValue({ data: { user: { id: "user-1" } } });
-    from.mockReturnValue(photoQuery(samplePhoto));
+    setPhotoQuery(photoQuery(samplePhoto));
     rpc.mockResolvedValue({ data: { ok: false, reason: "feature_limit" }, error: null });
 
     const response = await POST(request({ photoId: "photo-1", geminiApiKey: "user-owned-test-key" }));
@@ -144,7 +180,7 @@ describe("POST /api/ai/scan-ingredients", () => {
 
   it("returns a 429 total-limit error distinct from the feature-limit message", async () => {
     getUser.mockResolvedValue({ data: { user: { id: "user-1" } } });
-    from.mockReturnValue(photoQuery(samplePhoto));
+    setPhotoQuery(photoQuery(samplePhoto));
     rpc.mockResolvedValue({ data: { ok: false, reason: "total_limit" }, error: null });
 
     const response = await POST(request({ photoId: "photo-1", geminiApiKey: "user-owned-test-key" }));
@@ -158,7 +194,7 @@ describe("POST /api/ai/scan-ingredients", () => {
 
   it("refunds the reservation when the photo download fails", async () => {
     getUser.mockResolvedValue({ data: { user: { id: "user-1" } } });
-    from.mockReturnValue(photoQuery(samplePhoto));
+    setPhotoQuery(photoQuery(samplePhoto));
     reservationOk();
     storageFrom.mockReturnValue({
       download: vi.fn().mockResolvedValue({ data: null, error: new Error("download failed") })
@@ -173,7 +209,7 @@ describe("POST /api/ai/scan-ingredients", () => {
 
   it("refunds the reservation when Gemini fails", async () => {
     getUser.mockResolvedValue({ data: { user: { id: "user-1" } } });
-    from.mockReturnValue(photoQuery(samplePhoto));
+    setPhotoQuery(photoQuery(samplePhoto));
     reservationOk();
     storageFrom.mockReturnValue({
       download: vi.fn().mockResolvedValue({ data: imageBlob(), error: null })
@@ -204,7 +240,7 @@ describe("POST /api/ai/scan-ingredients", () => {
     getUser.mockResolvedValue({ data: { user: { id: "user-1" } } });
     from.mockImplementation((table: string) => {
       if (table === "photos") return photoQuery(samplePhoto);
-      return {};
+      return fromDispatch(table);
     });
     reservationOk();
     storageFrom.mockReturnValue({
@@ -241,6 +277,7 @@ describe("POST /api/ai/scan-ingredients", () => {
   it("scans multiple photos and merges candidates", async () => {
     getUser.mockResolvedValue({ data: { user: { id: "user-1" } } });
     from
+      .mockReturnValueOnce(fromDispatch("profiles"))
       .mockReturnValueOnce(photoQuery(samplePhoto))
       .mockReturnValueOnce(photoQuery(samplePhoto2));
     reservationOk();
@@ -268,6 +305,7 @@ describe("POST /api/ai/scan-ingredients", () => {
   it("returns successful candidates with a failed count when one of multiple photos fails", async () => {
     getUser.mockResolvedValue({ data: { user: { id: "user-1" } } });
     from
+      .mockReturnValueOnce(fromDispatch("profiles"))
       .mockReturnValueOnce(photoQuery(samplePhoto))
       .mockReturnValueOnce(photoQuery(samplePhoto2));
     reservationOk();
@@ -293,6 +331,7 @@ describe("POST /api/ai/scan-ingredients", () => {
   it("returns an error when all selected photos fail", async () => {
     getUser.mockResolvedValue({ data: { user: { id: "user-1" } } });
     from
+      .mockReturnValueOnce(fromDispatch("profiles"))
       .mockReturnValueOnce(photoQuery(samplePhoto))
       .mockReturnValueOnce(photoQuery(samplePhoto2));
     reservationOk();

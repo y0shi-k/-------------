@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { AiUsageMeter } from "@/components/ai-usage-meter";
 import { GeminiApiKeyPanel } from "@/components/gemini-api-key-panel";
@@ -20,17 +21,26 @@ import {
   setStockLabelBgAlpha,
   setStockLabelBgColor,
 } from "@/lib/ui/stock-card-background";
+import {
+  formatUserSynonymGroups,
+  loadUserSynonymGroups,
+  parseUserSynonymGroups,
+  saveUserSynonymGroups,
+} from "@/lib/ingredients/user-synonyms";
 
 type SettingsPanelProps = {
   userEmail: string;
+  isAdmin?: boolean;
   onClose: () => void;
 };
 
-export function SettingsPanel({ userEmail, onClose }: SettingsPanelProps) {
+export function SettingsPanel({ userEmail, isAdmin = false, onClose }: SettingsPanelProps) {
   const [geminiApiKey, setGeminiApiKey] = useState("");
   const [bgIntensity, setBgIntensity] = useState(DEFAULT_INTENSITY);
   const [labelColor, setLabelColor] = useState(DEFAULT_LABEL_BG_COLOR);
   const [labelAlpha, setLabelAlpha] = useState(DEFAULT_LABEL_BG_ALPHA);
+  const [synonymText, setSynonymText] = useState("");
+  const [synonymFeedback, setSynonymFeedback] = useState<string | null>(null);
   const { aiUsageSummary } = useShellAiUsage();
 
   // 端末に記憶された「食材カード背景の濃さ・文字背景」を読み込む。
@@ -38,6 +48,7 @@ export function SettingsPanel({ userEmail, onClose }: SettingsPanelProps) {
     setBgIntensity(getStockCardBgIntensity());
     setLabelColor(getStockLabelBgColor());
     setLabelAlpha(getStockLabelBgAlpha());
+    setSynonymText(formatUserSynonymGroups(loadUserSynonymGroups()));
   }, []);
 
   // スライダー操作で即時にプレビュー（CSS変数）と保存を反映する。
@@ -59,6 +70,14 @@ export function SettingsPanel({ userEmail, onClose }: SettingsPanelProps) {
     applyStockLabelBg(labelColor, next);
   };
 
+  const handleSaveSynonyms = () => {
+    const groups = parseUserSynonymGroups(synonymText);
+    saveUserSynonymGroups(groups);
+    // textarea を正規化済みテキストで更新する（余分な空行・空語を除去した状態）
+    setSynonymText(formatUserSynonymGroups(groups));
+    setSynonymFeedback(`${groups.length} グループを保存しました（無効な行は無視）`);
+  };
+
   return (
     <section className="settings-panel" aria-label="設定・連携">
       <header className="settings-panel-header">
@@ -67,7 +86,7 @@ export function SettingsPanel({ userEmail, onClose }: SettingsPanelProps) {
           <h2>設定・連携</h2>
           <p>Gemini APIキー・AI残り回数・アカウントをここでまとめて管理します。</p>
         </div>
-        <button className="secondary-button compact-button settings-close-button" type="button" onClick={onClose}>
+        <button className="secondary-button compact-button settings-close-button" type="button" onClick={onClose} data-tooltip="設定を閉じて戻る">
           戻る
         </button>
       </header>
@@ -143,6 +162,44 @@ export function SettingsPanel({ userEmail, onClose }: SettingsPanelProps) {
         </div>
       </section>
 
+      <section className="settings-section" aria-label="食材名の同義語辞書">
+        <div className="settings-section-heading">
+          <h3>食材名の同義語辞書</h3>
+          <p>
+            静的辞書にない表記ゆれ（家庭ごとの呼び方）を登録できます。
+            1行に1グループ、語は「＝」「=」「、」「,」のいずれかで区切ってください。
+            この端末にのみ保存されます。
+          </p>
+        </div>
+        <div className="settings-synonym-editor">
+          <textarea
+            aria-label="ユーザー同義語辞書"
+            rows={6}
+            value={synonymText}
+            onChange={(event) => {
+              setSynonymText(event.target.value);
+              setSynonymFeedback(null);
+            }}
+            placeholder={"かしわ＝鶏肉\n万願寺とうがらし、万願寺\nチキン＝鶏肉"}
+          />
+          <div className="settings-synonym-actions">
+            <button
+              className="primary-button compact-button"
+              type="button"
+              onClick={handleSaveSynonyms}
+              data-tooltip="入力内容を保存してマッチングに即時反映"
+            >
+              保存
+            </button>
+            {synonymFeedback !== null && (
+              <span className="settings-synonym-feedback" role="status" aria-live="polite">
+                {synonymFeedback}
+              </span>
+            )}
+          </div>
+        </div>
+      </section>
+
       <section className="settings-section" aria-label="本日のAI残り回数">
         <div className="settings-section-heading">
           <h3>本日のAI残り回数</h3>
@@ -150,6 +207,20 @@ export function SettingsPanel({ userEmail, onClose }: SettingsPanelProps) {
         </div>
         <AiUsageMeter summary={aiUsageSummary} variant="panel" />
       </section>
+
+      {isAdmin && (
+        <section className="settings-section" aria-label="ユーザー管理">
+          <div className="settings-section-heading">
+            <h3>ユーザー管理</h3>
+            <p>新規申請の承認・拒否や、利用ユーザーの有効化／無効化を行います。</p>
+          </div>
+          <div className="settings-account">
+            <Link className="primary-button compact-button" href="/admin" data-tooltip="ユーザー管理画面を開く">
+              管理画面を開く
+            </Link>
+          </div>
+        </section>
+      )}
 
       <section className="settings-section" aria-label="アカウント">
         <div className="settings-section-heading">

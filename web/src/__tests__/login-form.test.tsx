@@ -30,6 +30,13 @@ describe("LoginForm", () => {
     expect(screen.getByRole("button", { name: "ログイン" })).toBeTruthy();
   });
 
+  it("links to the forgot-password page", () => {
+    render(<LoginForm />);
+
+    const link = screen.getByRole("link", { name: "パスワードを忘れた方" });
+    expect(link.getAttribute("href")).toBe("/forgot-password");
+  });
+
   it("signs in with email and password", async () => {
     signInWithPassword.mockResolvedValueOnce({ error: null });
     render(<LoginForm />);

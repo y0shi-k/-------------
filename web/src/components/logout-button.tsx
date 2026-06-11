@@ -34,7 +34,7 @@ export function LogoutButton() {
           {errorMessage}
         </p>
       ) : null}
-      <button className="secondary-button" disabled={isSubmitting} onClick={handleLogout} type="button">
+      <button className="secondary-button" disabled={isSubmitting} onClick={handleLogout} type="button" data-tooltip="アカウントからログアウト">
         {isSubmitting ? "ログアウト中" : "ログアウト"}
       </button>
     </div>

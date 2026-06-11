@@ -5,6 +5,7 @@ import {
   parseGeminiRecipeResponse
 } from "@/lib/ai/recipe-generation";
 import { consumeAiUsage, refundAiUsage } from "@/lib/ai/usage";
+import { fetchAccountStatus } from "@/lib/auth/account-status";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 type RecipeAiRequest = {
@@ -18,6 +19,8 @@ type RecipeAiRequest = {
 const ERROR_MESSAGES = {
   unauthorized:
     "原因: ログイン状態を確認できませんでした。影響: AIレシピを実行できません。修正方法: 再ログインしてから再度お試しください。",
+  forbidden:
+    "原因: このアカウントはまだ利用が承認されていません。影響: AIレシピを実行できません。修正方法: 管理者の承認をお待ちください。",
   missingApiKey:
     "原因: ユーザー自身のGemini APIキーが未入力です。影響: AIレシピを実行できません。修正方法: Gemini APIキーを入力してから再度お試しください。",
   invalidRequest:
@@ -57,6 +60,11 @@ export async function POST(request: Request) {
 
   if (!user) {
     return errorResponse(ERROR_MESSAGES.unauthorized, 401);
+  }
+
+  // middleware に加えた多層防御。承認済み以外は AI route を実行させない。
+  if ((await fetchAccountStatus(supabase, user.id)) !== "approved") {
+    return errorResponse(ERROR_MESSAGES.forbidden, 403);
   }
 
   // Gemini送信前に原子的に1回分を予約する。上限超過時はGeminiへ送らない。

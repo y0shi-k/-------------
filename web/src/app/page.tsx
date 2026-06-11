@@ -4,6 +4,7 @@ import { HomeDashboard } from "@/components/home-dashboard";
 import { InventoryBoard } from "@/components/inventory-board";
 import { RecipeMealWorkspace } from "@/components/recipe-meal-workspace";
 import { WebModeShell } from "@/components/web-mode-shell";
+import { fetchAccountRole } from "@/lib/auth/account-status";
 import type { CookingHistoryItem, CookingHistoryPhoto } from "@/lib/cooking-history/types";
 import type { StockItem, StorageLocation } from "@/lib/inventory/types";
 import type { CookCandidate, MealSchedule, Recipe, RecipeIngredient, ShoppingItem } from "@/lib/recipes/types";
@@ -19,6 +20,9 @@ export default async function Home() {
   if (!user) {
     redirect("/login");
   }
+
+  // 管理導線（ナビ/設定リンク）の表示判定。実際の /admin アクセス制御はサーバー側 page で再判定する。
+  const role = await fetchAccountRole(supabase, user.id);
 
   const [
     { data: inventoryItems },
@@ -176,6 +180,7 @@ export default async function Home() {
         inventoryCount={(inventoryItems ?? []).length}
         mealCount={(mealSchedules ?? []).length}
         recipeCount={recipesWithIngredients.length}
+        isAdmin={role === "admin"}
         userEmail={user.email ?? "ログイン中のユーザー"}
       />
     </main>

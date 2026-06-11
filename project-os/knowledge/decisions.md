@@ -330,3 +330,48 @@ Claude Code のネイティブ機能で「動く」形にするため。
 ### 次に確認すること
 - 実機スモークでクロスユーザー read/write 拒否（Supabase storage policy / RLS の実動作）と、ブラウザでのWebP圧縮品質・スマホUI重なりを確認する。
 - 同方式を食材画像（TKT-0176）へ展開する際、`recipe-image-upload.ts` の共通化余地を検討する。
+
+---
+
+## 2026-06-11
+
+### 決定（SPEC-0228 / ログイン本番化イニシアチブの認証設計）
+新規ユーザー受け入れを「申請＋管理者承認」方式で確定（ユーザー確認済み）。コア設計:
+- `public.profiles`（status: pending/approved/disabled、role: member/admin）を auth.users トリガーで自動作成。既存ユーザーは backfill で approved。
+- **service role key は web/ に持ち込まない**。管理操作（承認/拒否/無効化）は admin RLS ポリシー（`is_admin()` security definer）経由のクライアント直 update。
+- 承認状態の判定は middleware で `getUser()` 後に profiles.status を1クエリ参照（4状態: 未ログイン/pending/disabled/approved）。JWT claim 化・キャッシュは少人数運用では不採用。
+- 拒否=`status='disabled'`（auth.users の削除はスコープ外。必要時は Dashboard）。
+- メールは当面 Supabase 標準（SMTP 移行手順のみ TKT-0233 runbook に残す）。
+
+### 理由
+service role の漏えい面を増やさず、既存の RLS 中心設計（全テーブル `auth.uid() = user_id`）と同じ防御モデルで承認制を実現できるため。middleware は既に毎リクエスト `getUser()` を呼んでおり、+1クエリは許容範囲。
+
+### 却下した案
+- 招待制のみ → 申請の受け口が欲しいというユーザー要望に不一致。
+- service role を使う admin API route → 鍵管理・漏えい面が増える。RLS で十分なため却下。
+- JWT app_metadata に status/role を埋める → 承認直後に再ログインが必要になる UX と実装複雑度から、少人数運用では DB 参照を採用。
+
+### 次に確認すること
+- TKT-0231（管理画面）の review で「admin update ポリシーの列単位制御不可」を UI ガードで担保できているか確認。
+- hosted 適用（TKT-0233 ゲート）で manual-smokes の skipped_checks を実機消化。
+
+---
+
+## 2026-06-11
+
+### 決定（SPEC-0226 / 調理ビューアYouTube再生）
+- 写真と YouTube URL の両方があるレシピは、写真エリアに「写真⇔動画」切替タブを置き、**動画を初期表示**にする（ユーザー確定）。
+- 埋め込みは privacy-enhanced の `youtube-nocookie.com/embed/` のみ。CSP `frame-src` も同ドメイン1つだけ許可（youtube.com 本体は許可しない）。autoplay なし・`sandbox` 不使用。
+- videoId は `[A-Za-z0-9_-]{11}` 検証を通った値のみ embed URL に連結する（`web/src/lib/youtube.ts` が唯一の判定箇所）。
+
+### 理由
+調理中に別タブへ往復しない動線が目的。切替式なら写真派/動画派の両方の使い方を壊さない。nocookie 限定はトラッキング低減と CSP 攻撃面の最小化のため。
+
+### 却下した案
+- 動画優先（写真非表示） → 写真を見たいケースを潰すため却下。
+- サムネクリックで動画化 → 「動画をすぐ見たい」という要望に対しワンタップ余計なため却下（初期表示=動画を採用）。
+- `recipes.source` の構造化（YouTube 専用カラム） → 改行区切りテキスト＋抽出関数で足り、schema 変更リスクに見合わないため却下。
+
+### 次に確認すること
+- 実機スモークで CSP violation が出ないこと（出る場合は frame-src の記述を確認）。
+- YouTube 新 URL 形式（/live/ 等）対応の要否はユーザーの実利用で判断。

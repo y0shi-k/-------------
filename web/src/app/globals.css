@@ -411,6 +411,212 @@ h1 {
   word-break: break-all;
 }
 
+/* ---- 食材名の同義語辞書セクション ---- */
+
+.settings-synonym-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.settings-synonym-editor textarea {
+  width: 100%;
+  min-height: 120px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 0.9rem;
+  resize: vertical;
+  line-height: 1.6;
+}
+
+.settings-synonym-editor textarea:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.settings-synonym-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.settings-synonym-feedback {
+  color: var(--green);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+/* ---- 管理画面（/admin ユーザー管理） ---- */
+
+.admin-shell {
+  display: block;
+  max-width: 920px;
+  margin: 0 auto;
+  padding: 24px 18px 48px;
+}
+
+.admin-board {
+  display: grid;
+  gap: 18px;
+}
+
+.admin-board-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.admin-board-header h2 {
+  margin: 2px 0 4px;
+  color: var(--ink);
+  font-size: 1.5rem;
+}
+
+.admin-board-header p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.admin-feedback {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.admin-feedback[data-tone="success"] {
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.admin-feedback[data-tone="error"] {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.admin-section {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid #e3e8f0;
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+}
+
+.admin-section-heading h3 {
+  margin: 0 0 2px;
+  color: var(--ink);
+  font-size: 1rem;
+}
+
+.admin-section-heading p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.admin-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.admin-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--bg, #f8fafc);
+}
+
+.admin-row-main {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.admin-row-email {
+  color: var(--ink);
+  font-size: 0.92rem;
+  font-weight: 700;
+  word-break: break-all;
+}
+
+.admin-row-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.admin-status-badge,
+.admin-role-badge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  font-weight: 800;
+}
+
+.admin-status-badge[data-status="pending"] {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.admin-status-badge[data-status="approved"] {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.admin-status-badge[data-status="disabled"] {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.admin-role-badge[data-role="admin"] {
+  background: #e0e7ff;
+  color: #4338ca;
+}
+
+.admin-role-badge[data-role="member"] {
+  background: #e2e8f0;
+  color: #475569;
+}
+
+.admin-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-self-note {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
 .desktop-app-frame,
 .desktop-workspace {
   display: contents;
@@ -573,6 +779,34 @@ h1 {
   color: #7b3d0c;
   padding: 12px;
   line-height: 1.55;
+}
+
+.form-success {
+  margin: 0;
+  border: 1px solid #8cc7af;
+  border-radius: 8px;
+  background: #eef8f2;
+  color: #1f5a45;
+  padding: 12px;
+  font-weight: 700;
+  line-height: 1.55;
+}
+
+.auth-links {
+  margin: 0;
+  color: var(--muted, #5a675f);
+  font-size: 0.95rem;
+}
+
+.auth-links a {
+  color: var(--accent-strong);
+  font-weight: 700;
+}
+
+.auth-confirmation {
+  display: grid;
+  gap: 16px;
+  margin-top: 24px;
 }
 
 .primary-button,
@@ -3035,13 +3269,14 @@ h1 {
 }
 
 .schedule-meal-select {
+  /* overflow:hidden は付けない。テキスト省略は内側 .schedule-meal-body strong が
+     担うため不要で、ボタン側に付くと data-tooltip 吹き出しが消える（TKT-0221）。 */
   display: flex;
   align-items: center;
   gap: 8px;
   width: 100%;
   min-width: 0;
   min-height: 48px;
-  overflow: hidden;
   border: 1px solid #e0f2fe;
   border-radius: 8px;
   background: #f0f9ff;
@@ -3360,6 +3595,133 @@ h1 {
   .cooking-overlay-footer > button:only-child {
     grid-column: 1 / -1;
   }
+}
+
+/* 調理ビュー 左ペイン写真ブロック（TKT-0219 FB） */
+.cooking-pane-photo {
+  position: relative;
+  margin-bottom: 12px;
+}
+
+/* 写真サムネイル: ペイン幅いっぱい・16:9 */
+.cooking-pane-photo-thumb {
+  display: block;
+  width: 100%;
+  object-fit: cover;
+  border-radius: 10px;
+  background: var(--accent-soft);
+}
+
+/* recipe-thumb--hero の aspect-ratio / border-radius を上書きして角丸をペイン合わせに */
+.cooking-pane-photo .recipe-thumb--hero {
+  border-radius: 10px;
+}
+
+/* プレースホルダ（div）の場合も同様に幅いっぱいへ */
+.cooking-pane-photo-thumb.recipe-thumb--placeholder {
+  min-height: 120px;
+}
+
+/* トグルボタン: 写真が開いているとき → 右上オーバーレイ */
+.cooking-pane-photo[data-open="true"] .cooking-pane-photo-toggle {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  height: 28px;
+  border: 0;
+  border-radius: 6px;
+  background: rgb(0 0 0 / 48%);
+  color: #fff;
+  padding: 0 10px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1;
+  backdrop-filter: blur(4px);
+}
+
+/* トグルボタン: 写真が閉じているとき → 細いバー */
+.cooking-pane-photo[data-open="false"] .cooking-pane-photo-toggle {
+  display: flex;
+  width: 100%;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f8fafc;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.cooking-pane-photo[data-open="true"] .cooking-pane-photo-toggle:hover {
+  background: rgb(0 0 0 / 62%);
+}
+
+.cooking-pane-photo[data-open="false"] .cooking-pane-photo-toggle:hover {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+/* 写真⇔動画 切替タブ（TKT-0235・YouTube あり時のみ表示） */
+.cooking-pane-media-tabs {
+  display: inline-flex;
+  gap: 4px;
+  margin-bottom: 8px;
+  padding: 3px;
+  border-radius: 999px;
+  background: #f1f5f9;
+}
+
+.cooking-pane-media-tab {
+  min-height: 28px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.cooking-pane-media-tab[data-active="true"] {
+  background: #fff;
+  color: var(--accent);
+  box-shadow: 0 1px 3px rgb(15 23 42 / 12%);
+}
+
+.cooking-pane-media-tab:hover:not([data-active="true"]) {
+  color: var(--accent);
+}
+
+/* 動画埋め込み: 写真 hero 枠と同じ幅・16:9 で収める */
+.cooking-pane-photo-video {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #000;
+}
+
+.cooking-pane-photo-iframe {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+/* 動画表示時はトグルを動画の上にオーバーレイせず、下に通常配置する。
+   （写真表示時のオーバーレイ配置は data-open=true ルールで維持） */
+.cooking-pane-photo[data-has-video="true"] .cooking-pane-photo-video + .cooking-pane-photo-toggle {
+  position: static;
+  display: inline-flex;
+  align-items: center;
+  margin-top: 8px;
+  background: rgb(0 0 0 / 48%);
 }
 
 /* Canvas版 調理ビューア本体（材料カード＋手順カード） */
@@ -4711,11 +5073,43 @@ h1 {
   cursor: pointer;
 }
 
-.recipe-card > .recipe-thumb {
+.recipe-card > .recipe-thumb-button {
+  /* overflow:hidden はボタン側に置かず内側 .recipe-thumb の角丸クリップに任せる。
+     ボタン側に置くと自身の箱で data-tooltip 吹き出しが消えるため（TKT-0221）。 */
   width: 48px;
   min-height: 48px;
   aspect-ratio: 1;
+  padding: 0;
+  border: 0;
   border-radius: 12px;
+  background: none;
+  cursor: pointer;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.recipe-card > .recipe-thumb-button > .recipe-thumb {
+  width: 100%;
+  min-height: 100%;
+  height: 100%;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: 12px;
+}
+
+.recipe-card > .recipe-thumb-button:hover {
+  transform: scale(1.04);
+  box-shadow: 0 0 0 2px #c7d2fe;
+}
+
+.recipe-card > .recipe-thumb-button:focus-visible {
+  outline: 2px solid #4f46e5;
+  outline-offset: 2px;
+}
+
+.recipe-card > .recipe-thumb-button:disabled {
+  cursor: default;
+  transform: none;
+  box-shadow: none;
 }
 
 .recipe-card-main {
@@ -4818,6 +5212,123 @@ h1 {
   white-space: nowrap;
 }
 
+/* ============================================================
+   汎用ツールチップ: [data-tooltip] 属性を持つ要素に hover /
+   :focus-visible で吹き出しを表示する。
+   配置バリアント:
+     デフォルト             → 上中央
+     data-tooltip-pos="bottom" → 下中央
+     data-tooltip-pos="left"   → 左上
+     data-tooltip-pos="right"  → 右上
+   z-index はモーダル最前面(100)より上の 110 に設定する。
+   ============================================================ */
+
+[data-tooltip] {
+  position: relative;
+}
+
+[data-tooltip]::after {
+  position: absolute;
+  z-index: 110;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  display: none;
+  width: max-content;
+  max-width: min(280px, 80vw);
+  transform: translateX(-50%);
+  border-radius: 8px;
+  background: #0f172a;
+  color: #fff;
+  padding: 6px 10px;
+  box-shadow: 0 8px 20px rgb(15 23 42 / 20%);
+  content: attr(data-tooltip);
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 1.45;
+  text-align: left;
+  white-space: normal;
+  word-break: keep-all;
+  pointer-events: none;
+}
+
+[data-tooltip]:hover::after,
+[data-tooltip]:focus-visible::after {
+  display: block;
+}
+
+/* 汎用の安全装置: hover/focus 中はその要素自身を一段持ち上げ、
+   同一スタッキングコンテキスト内の後続 positioned 兄弟に塗り潰されないようにする。 */
+[data-tooltip]:hover,
+[data-tooltip]:focus-visible {
+  z-index: 111;
+}
+
+/* 下向き配置 */
+[data-tooltip][data-tooltip-pos="bottom"]::after {
+  bottom: auto;
+  top: calc(100% + 8px);
+}
+
+/* 左寄せ配置（右端ボタン向け）*/
+[data-tooltip][data-tooltip-pos="left"]::after {
+  left: auto;
+  right: 0;
+  transform: none;
+}
+
+/* 右寄せ配置（左端ボタン向け）*/
+[data-tooltip][data-tooltip-pos="right"]::after {
+  left: 0;
+  transform: none;
+}
+
+/* 下向き・右端揃え（モーダル右上の閉じるボタン向け） */
+[data-tooltip][data-tooltip-pos="bottom-left"]::after {
+  top: calc(100% + 8px);
+  bottom: auto;
+  left: auto;
+  right: 0;
+  transform: none;
+}
+
+/* 下向き・左端揃え（画面/オーバーレイ左上のボタン向け） */
+[data-tooltip][data-tooltip-pos="bottom-right"]::after {
+  top: calc(100% + 8px);
+  bottom: auto;
+  left: 0;
+  right: auto;
+  transform: none;
+}
+
+/* ============================================================
+   ツールチップのクリップ対策（TKT-0221 フィードバック）
+   横スクロール行は overflow-x:auto が overflow-y も auto に強制し、
+   行の箱で上向きツールチップが切られる。PC幅では内容が収まるため
+   overflow:visible + flex-wrap:wrap に切り替える（見た目変化はほぼなし）。
+   モバイル(<720px)は横スクロールを維持（タッチは hover が無く実害なし）。
+   ============================================================ */
+@media (min-width: 720px) {
+  .location-tab-row,
+  .inventory-category-row,
+  .canvas-sort-row,
+  .recipe-sort-row {
+    overflow-x: visible;
+    flex-wrap: wrap;
+  }
+}
+
+/* sticky 行はツールチップ表示中だけ z-index を一時的に持ち上げ、
+   上下の sticky/fixed バーへの裏回りを防ぐ。:has は対象ブラウザで利用可。 */
+.mode-tabs:has([data-tooltip]:hover),
+.mode-tabs:has([data-tooltip]:focus-visible) {
+  z-index: 30;
+}
+
+.inventory-canvas-header:has([data-tooltip]:hover),
+.inventory-canvas-header:has([data-tooltip]:focus-visible) {
+  z-index: 70;
+}
+
 .recipe-genre-more {
   position: relative;
   display: inline-flex;
@@ -4833,32 +5344,11 @@ h1 {
   letter-spacing: 0;
 }
 
+/* .recipe-genre-more のツールチップは汎用定義を上書きして従来の挙動（pre改行）を維持する */
 .recipe-genre-more::after {
-  position: absolute;
-  z-index: 90;
-  left: 50%;
-  bottom: calc(100% + 8px);
-  display: none;
-  width: max-content;
   min-width: 120px;
   max-width: min(360px, 80vw);
-  transform: translateX(-50%);
-  border-radius: 8px;
-  background: #0f172a;
-  color: #fff;
-  padding: 9px 12px;
-  box-shadow: 0 12px 24px rgb(15 23 42 / 18%);
-  content: attr(data-tooltip);
-  font-size: 0.72rem;
-  font-weight: 800;
-  line-height: 1.45;
-  text-align: left;
   white-space: pre;
-}
-
-.recipe-genre-more:hover::after,
-.recipe-genre-more:focus-visible::after {
-  display: block;
 }
 
 .recipe-card-meta-row {
@@ -6429,6 +6919,13 @@ h1 {
     box-shadow: 16px 0 40px rgb(15 23 42 / 4%);
   }
 
+  /* サイドバーのツールチップが右側のワークスペース上部 sticky/fixed
+     （canvas-status-bar=z60 等）に裏回りしないよう、表示中だけ前面へ。 */
+  .desktop-mode-nav:has([data-tooltip]:hover),
+  .desktop-mode-nav:has([data-tooltip]:focus-visible) {
+    z-index: 65;
+  }
+
   .desktop-nav-brand {
     display: grid;
     grid-template-columns: 38px minmax(0, 1fr);
@@ -6475,6 +6972,7 @@ h1 {
 
   .desktop-nav-home,
   .desktop-nav-settings,
+  .desktop-nav-admin,
   .desktop-nav-group-button,
   .desktop-nav-leaves button {
     width: 100%;
@@ -6487,6 +6985,7 @@ h1 {
 
   .desktop-nav-home,
   .desktop-nav-settings,
+  .desktop-nav-admin,
   .desktop-nav-group-button {
     display: grid;
     grid-template-columns: 34px minmax(0, 1fr);
@@ -6498,8 +6997,19 @@ h1 {
     font-weight: 800;
   }
 
+  .desktop-nav-admin {
+    text-decoration: none;
+  }
+
+  .desktop-nav-admin:hover {
+    border-color: #e5e7ff;
+    background: #eef0ff;
+    color: #4f46e5;
+  }
+
   .desktop-nav-home span,
   .desktop-nav-settings span,
+  .desktop-nav-admin span,
   .desktop-nav-group-button span {
     color: #94a3b8;
     font-size: 0.68rem;
@@ -6591,6 +7101,13 @@ h1 {
     background: rgb(255 255 255 / 94%);
     padding: 12px 14px;
     box-shadow: 0 18px 45px rgb(15 23 42 / 5%);
+  }
+
+  /* topbar は sticky top:0。内部ボタン（ログアウト等）の上向きツールチップは
+     ビューポート上端で切れるため、強制的に下向きへ寄せる（TKT-0221）。 */
+  .desktop-topbar [data-tooltip]::after {
+    top: calc(100% + 8px);
+    bottom: auto;
   }
 
   .desktop-topbar-title {
@@ -6974,7 +7491,8 @@ h1 {
 
   /* 上部ビジュアル。画像が無い場合は RecipeThumb 側で頭文字プレースホルダへ戻す。 */
   .recipe-card .recipe-card-icon,
-  .recipe-card > .recipe-thumb {
+  .recipe-card > .recipe-thumb-button,
+  .recipe-card > .recipe-thumb-button > .recipe-thumb {
     width: 100%;
     aspect-ratio: 4 / 3;
     min-height: 0;
@@ -7109,6 +7627,60 @@ h1 {
   .schedule-days-grid {
     grid-template-columns: minmax(0, 1fr);
   }
+
+  /* ============================================================
+   * TKT-0225: 消費量調整モーダル PC ワイドレイアウト
+   * 調理完了時モーダル（consumption-modal）と
+   * 履歴編集モーダル（consumption-modal cooking-record-edit-modal）
+   * の両方に効く。スマホ（<1024px）は変更なし。
+   * ============================================================ */
+
+  /* モーダル幅を 960px まで広げる */
+  .consumption-modal {
+    width: min(960px, 94vw);
+    max-height: calc(100vh - 96px);
+  }
+
+  /* 材料行リストを2カラムグリッドに。
+     minmax(0, 1fr) ではみ出し防止。 */
+  .consumption-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
+
+  /* 材料名が長い場合に折り返す（省略より視認性を優先） */
+  .consumption-row-label strong,
+  .consumption-check strong {
+    overflow-wrap: break-word;
+    word-break: break-all;
+  }
+
+  /* ============================================================
+   * TKT-0226: 買い物追加モーダル（shopping-shortage-modal）PC ワイドレイアウト
+   * スマホ（<1024px）は変更なし。
+   * ============================================================ */
+
+  /* モーダル幅を 880px まで広げる。height は候補数に応じて可変にする */
+  .shopping-shortage-modal {
+    width: min(880px, 94vw);
+    height: auto;
+    max-height: calc(100vh - 96px);
+  }
+
+  /* 候補リストを 2〜3 カラムのグリッドに。
+     auto-fill + minmax(240px, 1fr) で候補数に応じてカラム数が自動調整される。
+     minmax(0, 1fr) 相当のはみ出し防止は minmax(240px, 1fr) の 1fr 側で担保する。 */
+  .shopping-shortage-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  }
+
+  /* 食材名が長い場合に折り返す（省略より視認性を優先） */
+  .shopping-shortage-option strong {
+    overflow-wrap: break-word;
+    white-space: normal;
+    word-break: break-all;
+  }
 }
 
 @media (max-width: 640px) {
@@ -7145,7 +7717,7 @@ h1 {
   }
 
   .recipe-card-icon,
-  .recipe-card > .recipe-thumb,
+  .recipe-card > .recipe-thumb-button,
   .recipe-icon-button {
     width: 36px;
     min-height: 36px;

@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { SettingsPanel } from "@/components/settings-panel";
+import { setUserSynonymGroups } from "@/lib/ingredients/name-match";
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({
@@ -18,6 +19,12 @@ vi.mock("@/lib/supabase/browser", () => ({
 describe("SettingsPanel", () => {
   beforeEach(() => {
     localStorage.clear();
+  });
+
+  afterEach(() => {
+    localStorage.clear();
+    // name-match のモジュール状態を初期化して次のテストに漏らさない
+    setUserSynonymGroups([]);
   });
 
   function renderPanel(onClose = vi.fn()) {
@@ -54,5 +61,46 @@ describe("SettingsPanel", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "戻る" }));
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("renders the synonym dictionary section", () => {
+    renderPanel();
+
+    expect(
+      screen.getByRole("region", { name: "食材名の同義語辞書" })
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("textbox", { name: "ユーザー同義語辞書" })
+    ).toBeTruthy();
+    expect(screen.getByRole("button", { name: "保存" })).toBeTruthy();
+  });
+
+  it("入力して保存ボタンを押すと localStorage に JSON が保存される", () => {
+    renderPanel();
+
+    const textarea = screen.getByRole("textbox", {
+      name: "ユーザー同義語辞書",
+    }) as HTMLTextAreaElement;
+    fireEvent.change(textarea, { target: { value: "かしわ＝鶏肉" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存" }));
+
+    const raw = localStorage.getItem("stock-master:user-synonym-groups:v1");
+    expect(raw).not.toBeNull();
+    expect(JSON.parse(raw!)).toEqual([["かしわ", "鶏肉"]]);
+  });
+
+  it("保存後にフィードバックメッセージが表示される", () => {
+    renderPanel();
+
+    const textarea = screen.getByRole("textbox", {
+      name: "ユーザー同義語辞書",
+    }) as HTMLTextAreaElement;
+    fireEvent.change(textarea, { target: { value: "A＝B\n1語のみ" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存" }));
+
+    // 有効グループ1件（「1語のみ」は2語未満で無視）
+    expect(
+      screen.getByText("1 グループを保存しました（無効な行は無視）")
+    ).toBeTruthy();
   });
 });

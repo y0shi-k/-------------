@@ -2,6 +2,7 @@
 
 import { type FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 
 function getLoginErrorMessage(message: string): string {
@@ -71,9 +72,15 @@ export function LoginForm() {
           {errorMessage}
         </p>
       ) : null}
-      <button className="primary-button" disabled={isSubmitting} type="submit">
+      <button className="primary-button" disabled={isSubmitting} type="submit" data-tooltip="メールアドレスとパスワードでログイン">
         {isSubmitting ? "ログイン中" : "ログイン"}
       </button>
+      <p className="auth-links">
+        <Link href="/forgot-password">パスワードを忘れた方</Link>
+      </p>
+      <p className="auth-links">
+        アカウントをお持ちでない方は <Link href="/signup">新規登録</Link>
+      </p>
     </form>
   );
 }

@@ -5,11 +5,21 @@ vi.mock("server-only", () => ({}));
 
 const getUser = vi.fn();
 const rpc = vi.fn();
+const profileMaybeSingle = vi.fn();
+
+// profiles.status の承認チェック（select().eq().maybeSingle()）。
+function from(table: string) {
+  if (table === "profiles") {
+    return { select: () => ({ eq: () => ({ maybeSingle: profileMaybeSingle }) }) };
+  }
+  throw new Error(`unexpected table: ${table}`);
+}
 
 vi.mock("@/lib/supabase/server", () => ({
   createServerSupabaseClient: async () => ({
     auth: { getUser },
-    rpc
+    rpc,
+    from
   })
 }));
 
@@ -50,6 +60,9 @@ describe("POST /api/ai/recipes", () => {
   beforeEach(() => {
     getUser.mockReset();
     rpc.mockReset();
+    profileMaybeSingle.mockReset();
+    // 既定は承認済み。承認チェックは多層防御のため各テストの前提として approved を返す。
+    profileMaybeSingle.mockResolvedValue({ data: { status: "approved" }, error: null });
     global.fetch = vi.fn();
   });
 
@@ -61,6 +74,27 @@ describe("POST /api/ai/recipes", () => {
       error: expect.stringContaining("原因: ユーザー自身のGemini APIキーが未入力です。")
     });
     expect(getUser).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("returns 403 and does not reserve usage when the account is not approved", async () => {
+    getUser.mockResolvedValue({ data: { user: { id: "user-1" } } });
+    profileMaybeSingle.mockResolvedValue({ data: { status: "pending" }, error: null });
+
+    const response = await POST(
+      request({
+        geminiApiKey: "user-owned-test-key",
+        required: "豚肉",
+        optional: "",
+        sourceText: ""
+      })
+    );
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({
+      error: expect.stringContaining("承認")
+    });
+    expect(rpc).not.toHaveBeenCalled();
     expect(fetch).not.toHaveBeenCalled();
   });
 

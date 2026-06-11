@@ -1,11 +1,13 @@
 "use client";
 
+import Link from "next/link";
 import { createContext, type ReactNode, useCallback, useEffect, useMemo, useRef, useState, useContext } from "react";
 import { AiUsageMeter } from "@/components/ai-usage-meter";
 import { LogoutButton } from "@/components/logout-button";
 import { SettingsPanel } from "@/components/settings-panel";
 import { getAiUsageSummary, type AiUsageSummary } from "@/lib/ai/usage";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
+import { applyUserSynonymGroupsFromStorage } from "@/lib/ingredients/user-synonyms";
 
 export type ModeId = "ingredients" | "recipes" | "cooking";
 export type InventoryShellLeaf = "inventory" | "shopping";
@@ -28,6 +30,7 @@ type Mode = {
 
 type WebModeShellProps = {
   userEmail: string;
+  isAdmin?: boolean;
   inventoryCount: number;
   recipeCount: number;
   mealCount: number;
@@ -146,6 +149,7 @@ export function useShellSubView() {
 
 export function WebModeShell({
   userEmail,
+  isAdmin = false,
   inventoryCount,
   recipeCount,
   mealCount,
@@ -276,6 +280,12 @@ export function WebModeShell({
     void refreshAiUsage();
   }, [refreshAiUsage]);
 
+  // クライアントマウント時にユーザー同義語辞書を localStorage から読み込みマッチングに反映する。
+  // マッチングが走るのはモーダル操作時のため、このタイミングで間に合う。
+  useEffect(() => {
+    applyUserSynonymGroupsFromStorage();
+  }, []);
+
   // PC（≥1024px）の初回はホームを初期表示にする。スマホ（<1024px）は食材管理起点のまま。
   // 初期 state は ingredients に据え置き、マウント後に PC のみ昇格する（SSR/ハイドレーション不整合とスマホ初期表示を回避）。
   useEffect(() => {
@@ -310,6 +320,8 @@ export function WebModeShell({
               data-active={activeDesktopTarget.kind === "home"}
               onClick={() => setActiveDesktopTarget({ kind: "home" })}
               type="button"
+              data-tooltip="ホームダッシュボードを表示"
+              data-tooltip-pos="bottom-right"
             >
               <span aria-hidden="true">HOME</span>
               <strong>ホーム</strong>
@@ -328,6 +340,7 @@ export function WebModeShell({
                       data-active={isGroupActive}
                       onClick={() => selectShellLeaf(mode.id, group?.defaultLeaf ?? defaultLeafForMode(mode.id))}
                       type="button"
+                      data-tooltip={`${mode.label}に移動`}
                     >
                       <span aria-hidden="true">{mode.icon}</span>
                       <strong>{mode.label}</strong>
@@ -346,6 +359,7 @@ export function WebModeShell({
                             key={leaf.id}
                             onClick={() => selectShellLeaf(mode.id, leaf.id)}
                             type="button"
+                            data-tooltip={`${leaf.label}を表示`}
                           >
                             <span>{leaf.label}</span>
                             <small>{leaf.status}</small>
@@ -364,10 +378,18 @@ export function WebModeShell({
               data-active={activeDesktopTarget.kind === "settings"}
               onClick={() => setActiveDesktopTarget({ kind: "settings" })}
               type="button"
+              data-tooltip="アプリ設定を表示"
             >
               <span aria-hidden="true">SET</span>
               <strong>設定</strong>
             </button>
+
+            {isAdmin && (
+              <Link className="desktop-nav-admin" href="/admin" data-tooltip="ユーザー管理画面を開く">
+                <span aria-hidden="true">ADM</span>
+                <strong>ユーザー管理</strong>
+              </Link>
+            )}
           </aside>
 
           <div className="desktop-workspace">
@@ -401,6 +423,8 @@ export function WebModeShell({
                 data-active={isSettingsActive}
                 onClick={() => setActiveDesktopTarget({ kind: "settings" })}
                 type="button"
+                data-tooltip="アカウント設定を表示"
+                data-tooltip-pos="bottom-left"
               >
                 {userEmail}
               </button>
@@ -414,7 +438,7 @@ export function WebModeShell({
               </section>
             ) : isSettingsActive ? (
               <section className="mode-panel" aria-label="設定">
-                <SettingsPanel userEmail={userEmail} onClose={() => returnToMode(activeMode)} />
+                <SettingsPanel userEmail={userEmail} isAdmin={isAdmin} onClose={() => returnToMode(activeMode)} />
               </section>
             ) : (
               <section className="mode-panel" aria-labelledby={`mode-title-${active.id}`}>
@@ -444,6 +468,7 @@ export function WebModeShell({
             key={mode.id}
             onClick={() => selectShellLeaf(mode.id, selectedSubViews[mode.id] ?? defaultLeafForMode(mode.id))}
             type="button"
+            data-tooltip={`${mode.label}に移動`}
           >
             <span aria-hidden="true">{mode.icon}</span>
             <strong>{mode.label}</strong>

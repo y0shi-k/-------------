@@ -298,6 +298,64 @@ node scripts/seed-demo-recipes.mjs
 
 ---
 
+## 10b. 承認制ログインと「初代 admin」の作り方（TKT-0228）
+
+承認制ログインでは、ユーザーごとの状態を `public.profiles` テーブルで管理します。
+
+| 列 | 意味 |
+|---|---|
+| `status` | `pending`（承認待ち）/ `approved`（承認済み）/ `disabled`（無効） |
+| `role` | `member`（一般）/ `admin`（管理者。承認操作ができる） |
+
+仕組みのポイント:
+
+- **新規ユーザーは自動で `pending` / `member`** になります（`auth.users` への登録時にトリガーで `profiles` 行が自動作成されます）。承認されるまではアプリ本体に入れません。
+- **migration を流した時点で、既存ユーザーは全員 `approved` / `member`** に backfill されます（今ログインできている人を締め出さないため）。
+- **管理者（admin）は、migration には書きません。** 最初の1人だけ、あなたが手作業の SQL で昇格させます（個人のメールアドレスをコードに残さないため）。
+
+### 初代 admin への昇格手順（migration 適用後に1回だけ）
+
+1. まず `supabase db push` で `..._auth_profiles.sql` を反映します（手順は「5. 反映の手順」と同じ）。
+2. Supabase Studio の **SQL Editor** を開き、次の SQL を実行します。
+   `<管理者のメールアドレス>` は、admin にしたい**実在のログイン用メール**に置き換えてください
+   （このファイルや migration に実値を書き込まないこと）。
+
+   ```sql
+   update public.profiles
+   set role = 'admin',
+       status = 'approved'
+   where email = '<管理者のメールアドレス>';
+   ```
+
+3. 実行後、1行更新されたことを確認します（0行なら、そのメールのユーザーがまだ存在しないか、綴り違いです）。
+4. これで、その人だけがアプリ内の管理画面で他ユーザーを承認/拒否できるようになります（管理画面の実装は後続チケット）。
+
+> なぜ手作業なのか: 「誰が管理者か」を migration（Git に残るコード）に書くと、
+> 個人のメールアドレスがリポジトリに残り、環境ごとに変えにくくなります。
+> 初代 admin の指名だけは、運用者が SQL Editor で1回行う運用にしています。
+
+### 承認・無効化の SQL（緊急時の手動操作。通常は管理画面から）
+
+通常はアプリ内の管理画面で行いますが、画面がまだ無い／緊急時は SQL でも操作できます。
+
+```sql
+-- 申請を承認する
+update public.profiles
+set status = 'approved', approved_at = now()
+where email = '<対象のメールアドレス>';
+
+-- 利用を停止する（拒否・無効化）
+update public.profiles
+set status = 'disabled'
+where email = '<対象のメールアドレス>';
+```
+
+> RLS により、`profiles` の更新は admin（`role = 'admin'`）だけが可能です。
+> SQL Editor は service_role 相当で動くため RLS を越えて実行できますが、
+> アプリ（ブラウザ）からは admin 以外は他人の行を読めも書けもしません。
+
+---
+
 ## 11. これだけは、のチェックリスト（反映前）
 
 - [ ] 変更は `supabase/migrations/` に **新しいSQLファイル**として入っているか
@@ -318,6 +376,7 @@ node scripts/seed-demo-recipes.mjs
 - 過去の意思決定（hosted適用の経緯など）: `project-os/knowledge/decisions.md`
 - 踏んだ失敗と再発防止: `project-os/knowledge/learnings.md`
 - 実際のテーブル定義（最初の設計）: `supabase/migrations/20260523094705_schema_v1.sql`
+- 承認制ログイン（TKT-0228〜0232）の本番適用手順・E2E スモーク: `docs/runbook/認証本番化の適用手順.md`
 
 ---
 

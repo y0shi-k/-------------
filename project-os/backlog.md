@@ -16,6 +16,10 @@
 - 公開前セキュリティ整備（TKT-0149/0150/0151）が一段落。次は本番Supabase/Vercelへの適用・手動確認（→「次にやる候補」P1）。
 
 ## 次にやる候補（優先度つき・要ユーザー確認）
+0m. (ログイン本番化・2026-06-11 /plan-initiative→/breakdown 展開・SPEC-0228) **TKT-0228〜0233 全6チケット完了**（changelog 参照／申請＋管理者承認・アプリ内管理画面・PWリセット・service role不使用）。残るユーザー作業は**本番適用そのもの**: `docs/runbook/認証本番化の適用手順.md` に沿って ①migration `db push`（auth_profiles 含む3点・**未適用デプロイ=全員/pending化に注意**）→②Dashboard Auth設定→③Vercelデプロイ→④初代admin SQL→⑤E2EスモークA〜J（各TKTのmanual-smokes skipped_checks消化）。
+0l. (調理ビューアYouTube再生＋食材一括削除・2026-06-11 /plan-initiative→/breakdown 展開) **TKT-0234〜0236 全3チケット完了**（changelog 参照／SPEC-0226 完結）。残るユーザー作業は実機スモークのみ（0235=YouTube URL 入りレシピで動画初期表示・写真⇔動画切替・「写真・動画を隠す」・Console に CSP violation なし・375px/PC幅、0236=食材複数選択→選択削除→確認→消滅・キャンセル非削除）。※採番は並行 auth イニシアチブ（TKT-0228〜0233）との衝突回避で 0234〜0236 へ振り直し済み（learnings 参照）。
+0k. (食材名マッチング＋消費調整/買い物モーダルPCワイド化・2026-06-10 /plan-initiative→/breakdown 展開) **TKT-0222〜0226 全5チケット完了＋追補で肉系辞書13グループ（TKT-0222追補）と設定からのユーザー辞書登録（TKT-0227）も完了**（changelog 参照）。残るユーザー作業は実機スモークのみ（卵=たまご・豚こま肉=豚コマの自動紐付け、設定の同義語辞書UI、消費/買い物モーダルのPC 2カラム表示）。
+0j. (レシピ詳細導線＋UI強化・2026-06-10 /plan-initiative→/breakdown 展開) **TKT-0217〜0221 全5チケット完了**（changelog 参照）。残るユーザー作業は実機スモークのみ（0217/0218=写真カード/サムネ→調理ビュー導線、0219=ヘッダー写真トグルの非重なり、0220=分量バッジSVGの淡さ、0221=ツールチップ文言・端見切れ）。
 0i. (料理・記録カレンダー／画像表示まわり・2026-06-09 /breakdown 展開／依存順) ①カレンダーに献立予定が出ない ②料理記録カードが先頭1枚のみで横余白を活かせない＋導線をモーダルへ集約 ③食材カードの登録写真が小さい。全🟢非危険（表示のみ・既存取得値/署名URL再利用、schema/auth/RLS/Storage/AI/CSV無変更＝`pwa_mobile_ui`）。**TKT-0213/0214/0215 全完了**（changelog 参照）。残るユーザー作業は実機スモークのみ（0213=予定ドット/予定行の4パターン、0214=サムネ格子/モーダル導線、0215=登録写真の背景視認性と期限トーン併存・375px/Canvas幅の非崩れ）。
 0h. (画像署名URLの共有キャッシュ化・2026-06-07 /breakdown 展開／依存順) 画像のあるページへ遷移するたび画像読み込みが走る問題（モード切替でアンマウント→署名URL毎回新トークン→ブラウザ画像キャッシュミス）を、path単位の共有キャッシュで同一URL再利用して解消。SPEC-0203 新設。**TKT-0203/0204/0205/0206 全完了**（changelog 参照）。残るユーザー作業は実機スモーク（DevTools Network での `from cache` / `max-age=31536000` 確認・撮影→保存→表示の回帰確認）。
 0g. (レシピ並び替え拡張＋材料/調味料サブグルーピング・2026-06-07 /breakdown 展開／依存順) TKT-0197 の全画面ビュー並び替えを編集画面へ展開し、材料・調味料の中をサブグループ化（材料=A/B/C、調味料=あ/い/う 自動採番、行クリック＋Cmd/Ctrl複数選択→ラベル隣のグルーピング/解除ボタン）。グルーピングはDB永続保存。TKT-0198/0199/0200/0201 完了（changelog 参照）。残1 TKT:
@@ -42,7 +46,7 @@
    - 拡張: TKT-0161（設定: 案A=サイドバー下部ギア＋スマホ導線、主ナビ非昇格）=完了。/ TKT-0162（ホーム: 案A=新設・PCのみ初期表示、今日の献立をホームに集約）=次の候補。
    - 任意（P低）: TKT-0163（上部バー横断検索の機能化）。
    - 注意: 先行の TKT-0138「PCに広げない」方針は、≥1024px のデスクトップ表示について見直し済み（モバイル温存）。
-1. (P1) 公開前の本番適用ゲート — Supabase Dashboard Auth設定（TKT-0149）、`ai_usage_events` migration適用（TKT-0151 `supabase db push`）、**`shopping_items.meal_schedule_id` migration適用（TKT-0212 `20260609120000_shopping_items_meal_schedule_link.sql`・未適用だとスケジュール起点の買い物追加INSERTが失敗）**、実DB/実機での手動スモーク。
+1. (P1) 公開前の本番適用ゲート — **手順の正本は `docs/runbook/認証本番化の適用手順.md`（TKT-0233）に統合済み**。内容: 未適用 migration 3点（TKT-0151 `ai_usage_events` / TKT-0212 `shopping_items_meal_schedule_link`・未適用だとスケジュール起点の買い物追加INSERTが失敗 / TKT-0228 `auth_profiles`）の `db push`、Supabase Dashboard Auth設定（TKT-0149＋承認制）、初代admin昇格、実DB/実機E2Eスモーク。
 2. (P2) 横断リスク対応 — 緩いCSP（`unsafe-inline`/`unsafe-eval`）× localStorageのGeminiキー保存（XSS時の鍵流出）。CSP nonce化 or sessionStorageオプションを別チケットで検討。
 3. (P2) 画像スキャンからのAI一括登録（参照: phase-map「画像スキャン」, TKT-0003系）。
 4. (P3) `ai_usage_events` の古い行の定期削除（保全）。

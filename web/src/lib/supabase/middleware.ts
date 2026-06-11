@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { resolveAuthState } from "@/lib/auth/account-status";
 import { getAuthRedirectPath } from "@/lib/auth/routing";
 import { getPublicSupabaseEnv } from "@/lib/supabase/public-env";
 
@@ -28,7 +29,9 @@ export async function updateSession(request: NextRequest) {
   const {
     data: { user }
   } = await supabase.auth.getUser();
-  const redirectPath = getAuthRedirectPath(request.nextUrl.pathname, Boolean(user));
+  // ログイン済みなら承認状態を1クエリ参照（行なし・取得失敗は安全側で pending）。
+  const authState = await resolveAuthState(supabase, user?.id);
+  const redirectPath = getAuthRedirectPath(request.nextUrl.pathname, authState);
 
   if (!redirectPath) {
     return response;
