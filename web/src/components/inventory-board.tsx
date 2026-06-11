@@ -1898,7 +1898,7 @@ function ListToolbar({ disabled, itemIds, onClear, onDeleteSelected, onSelectAll
         選択解除
       </button>
       {showDelete && onDeleteSelected ? (
-        <button className="danger-button compact-button" type="button" disabled={disabled || selectedCount === 0} onClick={onDeleteSelected} data-tooltip="選択した項目を削除">
+        <button className="danger-button compact-button bulk-delete-button" type="button" disabled={disabled || selectedCount === 0} onClick={onDeleteSelected} data-tooltip="選択した項目を削除">
           選択削除
         </button>
       ) : null}

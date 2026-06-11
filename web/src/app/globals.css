@@ -2832,6 +2832,12 @@ h1 {
   display: none;
 }
 
+/* 「すべて選択/選択解除」ボタンは非表示（チェックボックスで代替）だが、選択削除は見せる */
+.bulk-toolbar > .bulk-delete-button {
+  display: inline-flex;
+  margin-left: auto;
+}
+
 .select-row {
   display: inline-flex;
   gap: 8px;

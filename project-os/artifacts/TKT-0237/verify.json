@@ -1,0 +1,42 @@
+{
+  "ticket": "TKT-0237-pwa-app-icon",
+  "status": "passed",
+  "executed_at": "2026-06-11",
+  "commands": [
+    {
+      "command": "npm run lint",
+      "cwd": "web",
+      "status": "passed",
+      "notes": "既存の未使用変数 warning が2件あり。今回変更範囲外。"
+    },
+    {
+      "command": "npm run typecheck",
+      "cwd": "web",
+      "status": "passed",
+      "notes": "TypeScriptエラーなし。"
+    },
+    {
+      "command": "npm run test",
+      "cwd": "web",
+      "status": "passed",
+      "notes": "47ファイル、522テスト成功。既存テストの stderr 警告あり。"
+    },
+    {
+      "command": "npm run build",
+      "cwd": "web",
+      "status": "passed",
+      "notes": "Next.js production build 成功。lint と同じ warning が2件あり。"
+    },
+    {
+      "command": "node -e JSON.parse(...)",
+      "cwd": ".",
+      "status": "passed",
+      "notes": "web/public/manifest.json のJSON構文確認済み。"
+    }
+  ],
+  "warnings": [
+    "web/src/components/recipe-meal-workspace.tsx の未使用変数 warning は既存差分で、今回のアイコン実装とは無関係。",
+    "web/src/lib/format/quantity-notation.ts の未使用変数 warning は既存差分で、今回のアイコン実装とは無関係。",
+    "テスト実行中の stderr は既存テストケース由来。テスト結果は全件成功。"
+  ]
+}

@@ -164,3 +164,20 @@ harness（`verify_web.sh`）が生成する正本とスキーマが異なり、`
 - オーケストレーターは finalize 前に必ず artifact の中身を確認する（ファイルの存在だけで gate を
   閉じない）。check_gates はファイル存在ベースのため、手書き verify.json でも通ってしまう。
 - verify.json の真贋は `generated_at`（ISO秒+TZ）・`status`・`policy` キーの有無で見分けられる。
+
+---
+
+## 2026-06-11 jsdom テストは CSS の display:none を検出できない（TKT-0236 追補）
+
+### 事象
+食材一覧の「選択削除」ボタンを `ListToolbar`（`.bulk-toolbar`）内に追加し、クリック動作のユニットテストも green・verify pass で完了としたが、実機では**ボタンが見えず操作不能**だった。原因は `globals.css` の既存ルール `.bulk-toolbar > button { display: none; }`（すべて選択/選択解除ボタンをチェックボックスで代替し隠す設計）に新ボタンも巻き込まれていたこと。
+
+### なぜテストで捕まらなかったか
+vitest + jsdom は CSS を適用しないため、`display: none` でも要素は取得でき、`fireEvent.click` も成功する。「テスト green ＝ ユーザーに見えている」ではない。
+
+### 対処
+ボタンに専用クラス `bulk-delete-button` を付け、`.bulk-toolbar > .bulk-delete-button { display: inline-flex; margin-left: auto; }` の例外を追加。
+
+### 再発防止 / 判断基準
+- **既存コンテナに操作UIを追加するときは、そのコンテナのクラス名で `globals.css` を grep** し、子要素を隠す/制約するルール（`display:none`・`visibility`・`overflow` クリップ等）が無いか実装前に確認する。
+- 「ボタンがあるのに反応しない」系の報告は、まずロジックではなく **CSS による非表示/クリック不能（display:none・z-index・pointer-events）** を疑う。jsdom テストの green はこの層を保証しない。

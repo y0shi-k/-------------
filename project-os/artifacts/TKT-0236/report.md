@@ -36,3 +36,11 @@ status: ready
 
 - **実機スモーク（ユーザー）**: 複数選択→「選択削除」→確認パネル→削除後にカード消滅・件数フィードバック表示、キャンセルで何も消えないこと。
 - `/check-gates` の危険 eval マッチは、diff の `inventory_items` トークンの過剰マッチ（TKT-0178 等と同じ）と、並行セッションの認証イニシアチブ（TKT-0228〜0233）の未コミット変更の同居によるもの。実 schema / RLS / Storage は無変更（manual-smokes.md / review.md に詳細）。
+
+## 追補（2026-06-11 ユーザーフィードバック反映）
+
+実機スモークで「チェック済み食材の削除アクションができない」と報告。原因は `globals.css` の既存ルール **`.bulk-toolbar > button { display: none; }`**（「すべて選択/選択解除」ボタンをチェックボックス代替で隠す設計）に、新設の「選択削除」ボタンも巻き込まれて非表示になっていたこと。jsdom テストは CSS を適用しないため green のまま検出できなかった。
+
+- 修正: ボタンに `bulk-delete-button` クラスを追加し、`globals.css` に `.bulk-toolbar > .bulk-delete-button { display: inline-flex; margin-left: auto; }` の例外を追加（ツールバー右端に表示）。ロジック・確認パネル経路は無変更。
+- 再 verify pass（lint/typecheck/test/build。verify.json は追補後に再生成済み）。
+- 再発防止は learnings.md（2026-06-11「jsdom テストは CSS の display:none を検出できない」）参照。
