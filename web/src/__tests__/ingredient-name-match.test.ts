@@ -1,8 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, afterEach } from "vitest";
 import {
   normalizeIngredientMatchName,
   matchesIngredientName,
   ingredientNameMatchScore,
+  setUserSynonymGroups,
 } from "@/lib/ingredients/name-match";
 
 // ---------------------------------------------------------------------------
@@ -313,5 +314,61 @@ describe("ingredientNameMatchScore: スコアの序列", () => {
     const b = "卵";
     expect(ingredientNameMatchScore(a, b)).toBe(2);
     expect(matchesIngredientName(a, b)).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// setUserSynonymGroups — 推移的グループ統合（TKT-0240）
+// ---------------------------------------------------------------------------
+
+describe("setUserSynonymGroups: 推移的グループ統合", () => {
+  afterEach(() => {
+    // テスト後にモジュール状態をリセット
+    setUserSynonymGroups([]);
+  });
+
+  it("A＝B / B＝C の2行で A↔C が一致する（推移的統合）", () => {
+    setUserSynonymGroups([["A", "B"], ["B", "C"]]);
+    expect(matchesIngredientName("A", "B")).toBe(true);
+    expect(matchesIngredientName("B", "C")).toBe(true);
+    expect(matchesIngredientName("A", "C")).toBe(true);
+  });
+
+  it("独立グループは混ざらない（A＝B / C＝D → A↔C は false）", () => {
+    setUserSynonymGroups([["A", "B"], ["C", "D"]]);
+    expect(matchesIngredientName("A", "B")).toBe(true);
+    expect(matchesIngredientName("C", "D")).toBe(true);
+    expect(matchesIngredientName("A", "C")).toBe(false);
+    expect(matchesIngredientName("A", "D")).toBe(false);
+    expect(matchesIngredientName("B", "C")).toBe(false);
+  });
+
+  it("豚コマ系4行の重複でも豚コマ↔豚こま肉が一致する（スクリーンショット相当）", () => {
+    // 「豚コマ肉＝豚コマ」「豚こま肉＝豚コマ」「豚こま＝豚こま肉」「豚コマ＝豚こま肉」の4行
+    // 正規化後: 豚こま肉=豚こま / 豚こま肉=豚こま / 豚こま=豚こま肉 / 豚こま=豚こま肉
+    // → 全て同一グループに統合されるべき
+    setUserSynonymGroups([
+      ["豚コマ肉", "豚コマ"],
+      ["豚こま肉", "豚コマ"],
+      ["豚こま", "豚こま肉"],
+      ["豚コマ", "豚こま肉"],
+    ]);
+    expect(matchesIngredientName("豚コマ", "豚こま肉")).toBe(true);
+    expect(matchesIngredientName("豚コマ肉", "豚こま")).toBe(true);
+    expect(matchesIngredientName("豚コマ", "豚こま")).toBe(true);
+  });
+
+  it("3語以上の連鎖: A＝B / B＝C / C＝D で全ペアが一致する", () => {
+    setUserSynonymGroups([["A", "B"], ["B", "C"], ["C", "D"]]);
+    expect(matchesIngredientName("A", "D")).toBe(true);
+    expect(matchesIngredientName("B", "D")).toBe(true);
+  });
+
+  it("空グループ・1語グループは無視する", () => {
+    // 1語グループを混ぜても他のグループに影響しない
+    setUserSynonymGroups([["A", "B"], ["X"], []]);
+    expect(matchesIngredientName("A", "B")).toBe(true);
+    // X は1語のみなので何とも同一視されない
+    expect(matchesIngredientName("X", "A")).toBe(false);
   });
 });

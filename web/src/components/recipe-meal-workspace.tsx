@@ -524,6 +524,8 @@ export function RecipeMealWorkspace({
   const [aiSourceText, setAiSourceText] = useState("");
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  // 消費ダイアログを開く際の在庫再取得中フラグ。二重タップ・取得中の再入を防ぐ。
+  const [isOpeningConsumption, setIsOpeningConsumption] = useState(false);
   const [isAiRunning, setIsAiRunning] = useState(false);
   const [activeView, setActiveView] = useState<RecipeWorkspaceView>("recipes");
   const [isTextImportOpen, setIsTextImportOpen] = useState(false);
@@ -1210,12 +1212,37 @@ export function RecipeMealWorkspace({
     return inventoryItemsForMeals.filter((item) => item.category === ingredient.item_type && item.unit === ingredient.unit && item.quantity > 0);
   }
 
-  function buildConsumptionDrafts(schedule: MealSchedule) {
+  // 消費ダイアログを開く瞬間に在庫を再取得する。献立ボードの在庫スナップショットは
+  // ページ初回ロード以降更新されないため、食材管理ボードでの追加・補充を反映するための最小リフェッチ。
+  // select 列・並び順は page.tsx の初回フェッチ（"*" / archived_at null / quantity>0 / created_at desc）と揃える。
+  // 失敗時は null を返し、呼び出し側で既存スナップショットへフォールバックする（操作はブロックしない）。
+  async function fetchFreshInventoryForMeals(): Promise<StockItem[] | null> {
+    try {
+      const { data, error } = await supabase
+        .from("inventory_items")
+        .select("*")
+        .eq("user_id", userId)
+        .is("archived_at", null)
+        .gt("quantity", 0)
+        .order("created_at", { ascending: false });
+
+      if (error || !data) return null;
+      return data as StockItem[];
+    } catch (error) {
+      // ネットワーク例外で throw されると呼び出し側の isOpeningConsumption が解除されないため、ここで握って null を返す
+      console.error("在庫の再取得に失敗しました:", error);
+      return null;
+    }
+  }
+
+  // 在庫リストは明示引数で受け取る。ダイアログを開く直前の再取得結果（fresh）を
+  // setState の反映待ちに依存せず即座に使うため（stale read 回避）。
+  function buildConsumptionDrafts(schedule: MealSchedule, inventoryItems: StockItem[] = inventoryItemsForMeals) {
     const recipe = recipes.find((item) => item.id === schedule.recipe_id);
     if (!recipe) return [];
 
     return recipe.ingredients.map((ingredient) => {
-      const exactStock = findMatchingStock(ingredient.name, ingredient.item_type, ingredient.unit, inventoryItemsForMeals);
+      const exactStock = findMatchingStock(ingredient.name, ingredient.item_type, ingredient.unit, inventoryItems);
       return {
         ingredientName: ingredient.name,
         requestedAmount: ingredient.amount,
@@ -2276,12 +2303,26 @@ export function RecipeMealWorkspace({
     }
 
     if (pendingConsumptionScheduleId !== schedule.id) {
+      // 取得中の再入を防ぐ（二重タップ対策）。
+      if (isOpeningConsumption) return;
+      setIsOpeningConsumption(true);
+
+      // ダイアログを開く瞬間に在庫を再取得し、食材管理での追加・補充を自動マッチングへ反映する。
+      // 取得結果（fresh）をローカル変数のまま buildConsumptionDrafts に渡す（setState の反映待ちに依存しない）。
+      // 取得失敗時は既存スナップショットでフォールバックし、操作はブロックしない。
+      const fresh = await fetchFreshInventoryForMeals();
+      const inventoryForDrafts = fresh ?? inventoryItemsForMeals;
+      if (fresh) {
+        setInventoryItemsForMeals(fresh);
+      }
+
       setPendingConsumptionScheduleId(schedule.id);
-      setConsumptionDrafts(buildConsumptionDrafts(schedule));
+      setConsumptionDrafts(buildConsumptionDrafts(schedule, inventoryForDrafts));
       setConsumptionTab("all");
       resetCookingRecordDraft();
       setSelectedScheduleId(schedule.id);
       setFeedback({ tone: "info", message: "消費量を確認してから「確定」を押してください。" });
+      setIsOpeningConsumption(false);
       return;
     }
 
@@ -2759,7 +2800,7 @@ export function RecipeMealWorkspace({
               <button
                 className="primary-button cooking-complete-cta"
                 type="button"
-                disabled={isSaving || cookingSchedule.status === "完了"}
+                disabled={isSaving || isOpeningConsumption || cookingSchedule.status === "完了"}
                 onClick={() => requestCompleteSchedule(cookingSchedule, activeCookingRecipe)}
                 data-tooltip={cookingSchedule.status === "完了" ? "調理は完了済みです" : "料理を完了して在庫を消費する"}
               >

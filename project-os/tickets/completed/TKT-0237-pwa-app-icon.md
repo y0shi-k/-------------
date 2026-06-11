@@ -1,7 +1,7 @@
 ---
 id: TKT-0237-pwa-app-icon
 title: ホーム追加時のPWAアプリアイコンを買い物かご案で設定する
-status: in_progress
+status: completed
 goal: スマホやタブレットでWeb版をホーム画面に追加したとき、Stock Master用の買い物かごアイコンが表示されるようにする。
 acceptance:
   - `web/public/icons/` に買い物かご + 食材のアイコン画像が保存されている

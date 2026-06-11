@@ -7,6 +7,9 @@
 
 ## 2026-06
 
+- TKT-0240 — ユーザー同義語辞書の複数行グループを Union-Find で推移的統合（「A＝B」「B＝C」で A↔C が切れる潜在バグ修正・実害発生前に対処）。verify pass。
+- TKT-0239 — 料理完了の消費ダイアログを開く時点で在庫を再取得（献立ボードの在庫スナップショットがページ初回ロードのまま古く、食材管理での追加・補充が自動マッチングに反映されない不具合の根本対応。豚こま肉↔豚コマ報告の本命）。schema/policy 無変更（eval過剰マッチは report 記録）。残: 実機スモーク（再読込なしで追加在庫が自動選択されるか・解消しなければ単位/分類切り分け）。
+- TKT-0238 — 在庫編集の保存場所/単位ピッカーを label ネストから div+span へ（タブレットのタッチで候補ボタンが反応せず「その他」へ化ける不具合。レシピのジャンル欄と同構造に統一）。残: タブレット実機スモーク。
 - TKT-0236 追補 — 実機で「選択削除」ボタンが見えない問題を修正（ユーザーフィードバック対応）。原因は既存 CSS `.bulk-toolbar > button { display:none }`（全選択/解除ボタンの意図的非表示）への巻き込まれ。`bulk-delete-button` クラス＋表示例外（`display:inline-flex; margin-left:auto`＝ツールバー右端）で解消。jsdom は CSS 非適用のためテスト green でも検出不能だった（learnings 記録）。再 verify pass。
 - TKT-0233 — 認証本番化の適用 runbook（SPEC-0228 ⑥/⑥・イニシアチブ完結）。`docs/runbook/認証本番化の適用手順.md` 新設: 適用順チェックリスト（①migration 3点=ai_usage_events/shopping_items_meal_schedule_link/auth_profiles の `db push`・**未適用デプロイ=全員/pending化の警告**→②Dashboard Auth設定（signup/Confirm email ON・Redirect URLs）→③Vercel→④初代admin SQL（§10b参照）→⑤E2EスモークA〜J=0228〜0232のskipped_checks統合）＋ロールバック（signup即OFF）＋SMTP移行概要。既存ガイド§12に参照1行のみ追記。verify pass。レビューでサブエージェントの verify.json 自作を検出・正規実行で是正（learnings 記録）。残: **本番適用の実作業＝ユーザーがこの手順書どおり実施**。
 - TKT-0232 — パスワードリセット（SPEC-0228 ⑤/⑥）。`/forgot-password`（`resetPasswordForEmail`・redirectTo=`/auth/confirm?next=/reset-password`＝0229サニタイズ経由・**未登録メールも成功と同一文言＝存在有無非露出**・レート制限のみ別文言）＋`/reset-password`（recovery セッション前提・確認入力・`updateUser`・日本語エラー変換・未ログインは/login）。routing は pending/disabled の例外に `/reset-password` のみ追加＝リセット後も未承認の /pending 固定不変をテスト固定。login に「忘れた方」リンク。verify pass・レビュー指摘なし。残: 実メールE2E（hosted適用時）・/login error クエリ文言（軽微UX・任意）。

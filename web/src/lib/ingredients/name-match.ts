@@ -137,18 +137,61 @@ let userSynonymMap: ReadonlyMap<string, string> = new Map();
 /**
  * ユーザー定義の同義グループを設定する。
  * 新しい Map を構築して参照を差し替える（既存 Map の mutate はしない）。
- * グループIDは `user:${idx}` 形式で静的辞書と名前空間を分ける。
+ *
+ * 同じ語が複数行に出現する場合（例: 行0「A＝B」 行1「B＝C」）、
+ * 後の行が前の行のグループIDを上書きして A↔B の同一視が切れる問題を防ぐため、
+ * Union-Find で推移的に統合してから Map を構築する。
+ *
+ * アルゴリズム:
+ * 1. 全行を走査し、正規化済み語を頂点として Union-Find を構築する。
+ * 2. 各行内の語を先頭語の根に unite する。
+ * 3. find(語) の根を安定したグループIDとして Map に登録する。
+ *    根の文字列自体をIDに使うことで、推移的統合後も一貫したIDが得られる。
  */
 export function setUserSynonymGroups(
   groups: readonly (readonly string[])[]
 ): void {
-  const map = new Map<string, string>();
-  groups.forEach((group, idx) => {
-    const groupId = `user:${idx}`;
-    group.forEach((word) => {
-      map.set(normalizeIngredientMatchName(word), groupId);
+  // --- Union-Find（path compression のみ。配列 mutate はデータ構造維持に必要な内部操作）---
+  const parent = new Map<string, string>();
+
+  function find(x: string): string {
+    const p = parent.get(x);
+    if (p === undefined || p === x) return x;
+    const root = find(p);
+    parent.set(x, root); // path compression（Map の内部更新）
+    return root;
+  }
+
+  function unite(a: string, b: string): void {
+    const ra = find(a);
+    const rb = find(b);
+    if (ra !== rb) {
+      parent.set(rb, ra); // ra を代表根とする
+    }
+  }
+
+  // 全語を正規化して Union-Find に登録
+  groups.forEach((group) => {
+    const normalized = group
+      .map((word) => normalizeIngredientMatchName(word))
+      .filter((w) => w.length > 0);
+    if (normalized.length < 2) return;
+    // 先頭語を代表として残り全語を unite
+    const [first, ...rest] = normalized;
+    if (!parent.has(first)) parent.set(first, first);
+    rest.forEach((word) => {
+      if (!parent.has(word)) parent.set(word, word);
+      unite(first, word);
     });
   });
+
+  // 根をグループIDとして新規 Map を構築（既存 Map の mutate ではなく新規生成）
+  const map = new Map<string, string>();
+  parent.forEach((_, word) => {
+    const root = find(word);
+    map.set(word, `user:${root}`);
+  });
+
   userSynonymMap = map;
 }
 

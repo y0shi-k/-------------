@@ -1402,19 +1402,19 @@ export function InventoryBoard({
                   <option value="調味料">調味料</option>
                 </select>
               </label>
-              <label className="genre-field-label">
-                保存場所
+              <div className="genre-field-label">
+                <span>保存場所</span>
                 <LocationTagPicker
                   value={values.storage_location}
                   candidates={storageLocationOptions}
                   onSelect={(name) => updateValue("storage_location", name)}
                   onCreate={addStorageLocation}
                 />
-              </label>
+              </div>
             </div>
             <div className="form-row two-columns">
-              <label>
-                数量・単位
+              <div className="genre-field-label">
+                <span>数量・単位</span>
                 <div className="qty-unit-wrap">
                   <NumberField
                     ariaLabel="数量"
@@ -1424,7 +1424,7 @@ export function InventoryBoard({
                   />
                   <UnitPicker value={values.unit} onSelect={(unit) => updateValue("unit", unit)} />
                 </div>
-              </label>
+              </div>
               <label>
                 表示期限
                 <input type="date" value={values.display_expires_on} onChange={(event) => updateValue("display_expires_on", event.target.value)} />

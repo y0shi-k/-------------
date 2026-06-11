@@ -173,6 +173,17 @@ function updateEqQuery(error: unknown = null) {
   return { update, eqId, eqUser };
 }
 
+// TKT-0239: 消費ダイアログを開く瞬間の在庫リフェッチ
+// （select("*").eq(user_id).is(archived_at,null).gt(quantity,0).order(created_at desc)）用モック。
+function inventorySelectQuery(data: unknown[] | null, error: unknown = null) {
+  const order = vi.fn().mockResolvedValue({ data, error });
+  const gt = vi.fn(() => ({ order }));
+  const is = vi.fn(() => ({ gt }));
+  const eq = vi.fn(() => ({ is }));
+  const select = vi.fn(() => ({ eq }));
+  return { select, eq, is, gt, order };
+}
+
 function updateTripleEqQuery(error: unknown = null) {
   const eqUser = vi.fn().mockResolvedValue({ error });
   const eqRecipe = vi.fn(() => ({ eq: eqUser }));
@@ -2023,12 +2034,14 @@ describe("RecipeMealWorkspace", () => {
     const completed = { ...baseSchedule, status: "完了", completed_at: "2026-05-24T10:00:00.000Z" };
     const scheduleUpdate = updateSingleQuery(completed);
     const inventoryUpdate = updateEqQuery();
+    // TKT-0239: ダイアログを開く瞬間の在庫リフェッチはスナップショットと同じ在庫を返す。
+    const inventorySelect = inventorySelectQuery([baseInventory]);
     const historyInsert = insertSingleQuery({ id: "history-1" });
     const consumptionInsert = vi.fn().mockResolvedValue({ error: null });
 
     from.mockImplementation((table: string) => {
       if (table === "meal_schedules") return { update: scheduleUpdate.update };
-      if (table === "inventory_items") return { update: inventoryUpdate.update };
+      if (table === "inventory_items") return { update: inventoryUpdate.update, select: inventorySelect.select };
       if (table === "cooking_history") return { insert: historyInsert.insert };
       if (table === "cooking_consumption_events") return { insert: consumptionInsert };
       return {};
@@ -2088,12 +2101,13 @@ describe("RecipeMealWorkspace", () => {
     const completed = { ...baseSchedule, status: "完了", completed_at: "2026-05-24T10:00:00.000Z" };
     const scheduleUpdate = updateSingleQuery(completed);
     const inventoryUpdate = updateEqQuery();
+    const inventorySelect = inventorySelectQuery([baseInventory]);
     const historyInsert = insertSingleQuery({ id: "history-1" });
     const consumptionInsert = vi.fn().mockResolvedValue({ error: null });
 
     from.mockImplementation((table: string) => {
       if (table === "meal_schedules") return { update: scheduleUpdate.update };
-      if (table === "inventory_items") return { update: inventoryUpdate.update };
+      if (table === "inventory_items") return { update: inventoryUpdate.update, select: inventorySelect.select };
       if (table === "cooking_history") return { insert: historyInsert.insert };
       if (table === "cooking_consumption_events") return { insert: consumptionInsert };
       return {};
@@ -2130,6 +2144,95 @@ describe("RecipeMealWorkspace", () => {
       );
       expect(consumptionInsert).not.toHaveBeenCalled();
     });
+  });
+
+  it("refetches inventory when opening the consumption dialog so newly stocked items auto-match (TKT-0239)", async () => {
+    // 初回スナップショットでは玉ねぎが在庫切れ（quantity 0）。食材管理での補充を想定し、
+    // ダイアログを開く瞬間のリフェッチで玉ねぎ5個を返す。リフェッチ結果でドラフトが組まれることを検証する。
+    const staleInventory: StockItem = { ...baseInventory, quantity: 0 };
+    const freshInventory: StockItem = { ...baseInventory, quantity: 5 };
+
+    const completed = { ...baseSchedule, status: "完了", completed_at: "2026-05-24T10:00:00.000Z" };
+    const scheduleUpdate = updateSingleQuery(completed);
+    const inventoryUpdate = updateEqQuery();
+    const inventorySelect = inventorySelectQuery([freshInventory]);
+    const historyInsert = insertSingleQuery({ id: "history-1" });
+    const consumptionInsert = vi.fn().mockResolvedValue({ error: null });
+
+    from.mockImplementation((table: string) => {
+      if (table === "meal_schedules") return { update: scheduleUpdate.update };
+      if (table === "inventory_items") return { update: inventoryUpdate.update, select: inventorySelect.select };
+      if (table === "cooking_history") return { insert: historyInsert.insert };
+      if (table === "cooking_consumption_events") return { insert: consumptionInsert };
+      return {};
+    });
+
+    renderWorkspace({ initialMealSchedules: [baseSchedule], initialInventoryItems: [staleInventory] });
+    openScheduleView();
+
+    fireEvent.click(within(screen.getByLabelText("7日献立")).getByRole("button", { name: "カレー の操作" }));
+    fireEvent.click(screen.getByRole("button", { name: "調理を開始" }));
+    const cookingViewer = screen.getByRole("dialog", { name: "調理ビューア全画面" });
+    fireEvent.click(within(cookingViewer).getByRole("button", { name: "料理を完了する" }));
+
+    const consumptionModal = await screen.findByRole("dialog", { name: "実際の消費量を調整" });
+
+    // page.tsx の初回フェッチと同じ select/絞り込みで再取得していること。
+    await waitFor(() => {
+      expect(inventorySelect.select).toHaveBeenCalledWith("*");
+      expect(inventorySelect.eq).toHaveBeenCalledWith("user_id", "user-1");
+      expect(inventorySelect.is).toHaveBeenCalledWith("archived_at", null);
+      expect(inventorySelect.gt).toHaveBeenCalledWith("quantity", 0);
+      expect(inventorySelect.order).toHaveBeenCalledWith("created_at", { ascending: false });
+    });
+
+    // リフェッチした玉ねぎ5個から、消費量＝min(レシピ2個, 在庫5個)=2 がドラフトに入る。
+    expect((within(consumptionModal).getByLabelText("消費量") as HTMLInputElement).value).toBe("2");
+
+    fireEvent.click(within(consumptionModal).getByRole("button", { name: "確定" }));
+
+    await waitFor(() => {
+      // 古いスナップショット（quantity 0）ではなくリフェッチ在庫に対して消費が記録される。
+      expect(consumptionInsert).toHaveBeenCalledWith([
+        expect.objectContaining({
+          ingredient_name: "玉ねぎ",
+          requested_amount: 2,
+          consumed_amount: 2,
+          stock_item_id: "stock-1"
+        })
+      ]);
+    });
+  });
+
+  it("falls back to the existing inventory snapshot when the consumption refetch fails (TKT-0239)", async () => {
+    // リフェッチが error を返してもダイアログは開き、既存スナップショット（玉ねぎ1個）でドラフトが組まれる。
+    const completed = { ...baseSchedule, status: "完了", completed_at: "2026-05-24T10:00:00.000Z" };
+    const scheduleUpdate = updateSingleQuery(completed);
+    const inventoryUpdate = updateEqQuery();
+    const inventorySelect = inventorySelectQuery(null, { message: "network" });
+    const historyInsert = insertSingleQuery({ id: "history-1" });
+    const consumptionInsert = vi.fn().mockResolvedValue({ error: null });
+
+    from.mockImplementation((table: string) => {
+      if (table === "meal_schedules") return { update: scheduleUpdate.update };
+      if (table === "inventory_items") return { update: inventoryUpdate.update, select: inventorySelect.select };
+      if (table === "cooking_history") return { insert: historyInsert.insert };
+      if (table === "cooking_consumption_events") return { insert: consumptionInsert };
+      return {};
+    });
+
+    renderWorkspace({ initialMealSchedules: [baseSchedule] });
+    openScheduleView();
+
+    fireEvent.click(within(screen.getByLabelText("7日献立")).getByRole("button", { name: "カレー の操作" }));
+    fireEvent.click(screen.getByRole("button", { name: "調理を開始" }));
+    const cookingViewer = screen.getByRole("dialog", { name: "調理ビューア全画面" });
+    fireEvent.click(within(cookingViewer).getByRole("button", { name: "料理を完了する" }));
+
+    // 失敗してもダイアログは開く（操作をブロックしない）。
+    const consumptionModal = await screen.findByRole("dialog", { name: "実際の消費量を調整" });
+    // 既存スナップショット 玉ねぎ1個 → 消費量＝min(2,1)=1。
+    expect((within(consumptionModal).getByLabelText("消費量") as HTMLInputElement).value).toBe("1");
   });
 
   it("does not save invalid recipe values", async () => {
