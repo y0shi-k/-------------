@@ -4,7 +4,9 @@ import {
   matchesIngredientName,
   ingredientNameMatchScore,
   setUserSynonymGroups,
+  findMatchingStock,
 } from "@/lib/ingredients/name-match";
+import type { UnitConversion } from "@/lib/inventory/types";
 
 // ---------------------------------------------------------------------------
 // normalizeIngredientMatchName
@@ -370,5 +372,47 @@ describe("setUserSynonymGroups: 推移的グループ統合", () => {
     expect(matchesIngredientName("A", "B")).toBe(true);
     // X は1語のみなので何とも同一視されない
     expect(matchesIngredientName("X", "A")).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// findMatchingStock: 単位換算マッチ（TKT-0241）
+// ---------------------------------------------------------------------------
+
+describe("findMatchingStock: 単位換算", () => {
+  type Stock = {
+    id: string;
+    category: string;
+    name: string;
+    unit: string;
+    quantity: number;
+    unit_conversion?: UnitConversion | null;
+  };
+
+  const porkConversion: UnitConversion = { fromQty: 1, fromUnit: "パック", toQty: 80, toUnit: "g" };
+
+  it("換算（1パック=80g）が登録された豚コマがレシピ単位 g に自動マッチする", () => {
+    const items: Stock[] = [
+      { id: "s1", category: "食材", name: "豚コマ", unit: "パック", quantity: 5, unit_conversion: porkConversion },
+    ];
+    const match = findMatchingStock("豚こま肉", "食材", "g", items);
+    expect(match?.id).toBe("s1");
+  });
+
+  it("同単位は従来どおりマッチする（換算不要・回帰なし）", () => {
+    const items: Stock[] = [{ id: "s1", category: "食材", name: "玉ねぎ", unit: "個", quantity: 3 }];
+    expect(findMatchingStock("玉ねぎ", "食材", "個", items)?.id).toBe("s1");
+  });
+
+  it("換算が登録されていない単位違いはマッチしない（従来どおり）", () => {
+    const items: Stock[] = [{ id: "s1", category: "食材", name: "豚コマ", unit: "パック", quantity: 5 }];
+    expect(findMatchingStock("豚こま肉", "食材", "g", items)).toBeUndefined();
+  });
+
+  it("分類が違えば換算が成立してもマッチしない", () => {
+    const items: Stock[] = [
+      { id: "s1", category: "調味料", name: "豚コマ", unit: "パック", quantity: 5, unit_conversion: porkConversion },
+    ];
+    expect(findMatchingStock("豚こま肉", "食材", "g", items)).toBeUndefined();
   });
 });

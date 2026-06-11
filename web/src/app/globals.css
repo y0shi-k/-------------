@@ -5782,8 +5782,20 @@ h1 {
   flex: 0 0 auto;
 }
 
+/* 換算マッチ行の単位セレクタ（g/パック）。
+ * .consumption-row-controls select の flex:1/padding をコンパクトに打ち消し、
+ * 在庫セレクト（材料名が見える方を優先）と数値入力の幅を奪わない。 */
+.consumption-row-controls .consumption-unit-select {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 0;
+  padding: 8px 4px;
+  font-size: 0.78rem;
+}
+
+/* 数値3桁＋分数（1 1/2）が収まる最小幅。残り幅は在庫セレクト（材料名）へ譲る */
 .consumption-amount .number-field {
-  width: 108px;
+  width: 92px;
 }
 
 .consumption-unit {

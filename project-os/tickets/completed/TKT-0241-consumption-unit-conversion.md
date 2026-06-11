@@ -1,7 +1,7 @@
 ---
 id: TKT-0241-consumption-unit-conversion
 title: 消費フローの単位換算対応（換算マッチ＋g/パック切替消費＋分数残量）
-status: ready
+status: completed
 goal: 在庫の単位（例 パック・1パック=80g）とレシピの必要単位（例 g）が違うとき、単位換算が登録済みなら自動マッチせず消費もできない問題を解消する（ユーザー実例: 豚コマ 5パック・1パック=80g vs レシピ 豚こま肉 300g）
 acceptance:
   - 在庫に unit_conversion（1 fromUnit = toQty toUnit, fromUnit=在庫単位）があり toUnit がレシピ材料の単位と一致する場合、料理完了の消費ダイアログで「おすすめ（同分類・同単位）」相当として扱われ、名前一致すれば自動選択される（豚コマ/パック/1パック=80g がレシピ 豚こま肉 300g に自動マッチ）

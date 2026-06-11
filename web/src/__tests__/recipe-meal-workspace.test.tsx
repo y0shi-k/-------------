@@ -2146,6 +2146,141 @@ describe("RecipeMealWorkspace", () => {
     });
   });
 
+  // TKT-0241: 単位換算消費（豚コマ実例。在庫パック・1パック=80g vs レシピ g）。
+  describe("unit-conversion consumption (TKT-0241)", () => {
+    const porkIngredient: RecipeIngredient = {
+      ...baseIngredient,
+      id: "ingredient-pork",
+      name: "豚こま肉",
+      amount: 300,
+      unit: "g"
+    };
+    const porkRecipe: Recipe = { ...baseRecipe, ingredients: [porkIngredient] };
+    const porkInventory: StockItem = {
+      ...baseInventory,
+      id: "stock-pork",
+      name: "豚コマ",
+      quantity: 5,
+      unit: "パック",
+      unit_conversion: { fromQty: 1, fromUnit: "パック", toQty: 80, toUnit: "g" }
+    };
+
+    function mockCompletionTables(consumptionInsert: ReturnType<typeof vi.fn>, inventory: StockItem[]) {
+      const completed = { ...baseSchedule, status: "完了", completed_at: "2026-05-24T10:00:00.000Z" };
+      const scheduleUpdate = updateSingleQuery(completed);
+      const inventoryUpdate = updateEqQuery();
+      const inventorySelect = inventorySelectQuery(inventory);
+      const historyInsert = insertSingleQuery({ id: "history-1" });
+      from.mockImplementation((table: string) => {
+        if (table === "meal_schedules") return { update: scheduleUpdate.update };
+        if (table === "inventory_items") return { update: inventoryUpdate.update, select: inventorySelect.select };
+        if (table === "cooking_history") return { insert: historyInsert.insert };
+        if (table === "cooking_consumption_events") return { insert: consumptionInsert };
+        return {};
+      });
+      return { inventoryUpdate };
+    }
+
+    async function openPorkConsumption() {
+      fireEvent.click(within(screen.getByLabelText("7日献立")).getByRole("button", { name: "カレー の操作" }));
+      fireEvent.click(screen.getByRole("button", { name: "調理を開始" }));
+      const cookingViewer = screen.getByRole("dialog", { name: "調理ビューア全画面" });
+      fireEvent.click(within(cookingViewer).getByRole("button", { name: "料理を完了する" }));
+      return screen.findByRole("dialog", { name: "実際の消費量を調整" });
+    }
+
+    it("auto-matches converted stock and defaults to min(必要量, 換算後総量) in recipe unit", async () => {
+      const consumptionInsert = vi.fn().mockResolvedValue({ error: null });
+      const { inventoryUpdate } = mockCompletionTables(consumptionInsert, [porkInventory]);
+
+      renderWorkspace({ initialMealSchedules: [baseSchedule], initialRecipes: [porkRecipe], initialInventoryItems: [porkInventory] });
+      openScheduleView();
+      const modal = await openPorkConsumption();
+
+      // 初期消費量 = min(必要300g, 5パック×80g=400g) = 300（レシピ単位 g）。
+      expect((within(modal).getByLabelText("消費量") as HTMLInputElement).value).toBe("300");
+
+      fireEvent.click(within(modal).getByRole("button", { name: "確定" }));
+
+      await waitFor(() => {
+        // 在庫減算: 5 - 300/80(=3.75) = 1.25 パック。
+        expect(inventoryUpdate.update).toHaveBeenCalledWith(
+          expect.objectContaining({ quantity: 1.25 })
+        );
+        // events は在庫単位で保存（consumed_amount=3.75 / consumed_unit=パック）。requested はレシピ単位のまま。
+        expect(consumptionInsert).toHaveBeenCalledWith([
+          expect.objectContaining({
+            ingredient_name: "豚こま肉",
+            requested_amount: 300,
+            requested_unit: "g",
+            consumed_amount: 3.75,
+            consumed_unit: "パック",
+            stock_item_id: "stock-pork"
+          })
+        ]);
+      });
+    });
+
+    it("subtracts in stock unit and stores fraction notation for 120g (残 3.5 → 「3 1/2」)", async () => {
+      const consumptionInsert = vi.fn().mockResolvedValue({ error: null });
+      const { inventoryUpdate } = mockCompletionTables(consumptionInsert, [porkInventory]);
+
+      renderWorkspace({ initialMealSchedules: [baseSchedule], initialRecipes: [porkRecipe], initialInventoryItems: [porkInventory] });
+      openScheduleView();
+      const modal = await openPorkConsumption();
+
+      fireEvent.change(within(modal).getByLabelText("消費量"), { target: { value: "120" } });
+      fireEvent.click(within(modal).getByRole("button", { name: "確定" }));
+
+      await waitFor(() => {
+        // 5 - 120/80(=1.5) = 3.5 パック。
+        expect(inventoryUpdate.update).toHaveBeenCalledWith(expect.objectContaining({ quantity: 3.5 }));
+        expect(consumptionInsert).toHaveBeenCalledWith([
+          expect.objectContaining({ consumed_amount: 1.5, consumed_unit: "パック" })
+        ]);
+      });
+      // 換算消費は在庫表示を分数優先（fraction）で記憶する。
+      const notationRaw = localStorage.getItem("stock-master:quantity-notation:v1");
+      expect(notationRaw && JSON.parse(notationRaw)["stock-pork"]).toBe("fraction");
+    });
+
+    it("lets the user switch the consume unit to the stock unit (パック)", async () => {
+      const consumptionInsert = vi.fn().mockResolvedValue({ error: null });
+      const { inventoryUpdate } = mockCompletionTables(consumptionInsert, [porkInventory]);
+
+      renderWorkspace({ initialMealSchedules: [baseSchedule], initialRecipes: [porkRecipe], initialInventoryItems: [porkInventory] });
+      openScheduleView();
+      const modal = await openPorkConsumption();
+
+      // 単位セレクタでパックへ切り替え（切替時に消費量は0へリセットされる）。
+      fireEvent.change(within(modal).getByLabelText("消費量の単位"), { target: { value: "パック" } });
+      fireEvent.change(within(modal).getByLabelText("消費量"), { target: { value: "2" } });
+      fireEvent.click(within(modal).getByRole("button", { name: "確定" }));
+
+      await waitFor(() => {
+        // 2パック消費 → 5-2=3。換算せず素通し。
+        expect(inventoryUpdate.update).toHaveBeenCalledWith(expect.objectContaining({ quantity: 3 }));
+        expect(consumptionInsert).toHaveBeenCalledWith([
+          expect.objectContaining({ consumed_amount: 2, consumed_unit: "パック" })
+        ]);
+      });
+    });
+
+    it("does not auto-match a unit-mismatched stock without conversion (現状維持)", async () => {
+      const noConvInventory: StockItem = { ...porkInventory, unit_conversion: null };
+      const consumptionInsert = vi.fn().mockResolvedValue({ error: null });
+      mockCompletionTables(consumptionInsert, [noConvInventory]);
+
+      renderWorkspace({ initialMealSchedules: [baseSchedule], initialRecipes: [porkRecipe], initialInventoryItems: [noConvInventory] });
+      openScheduleView();
+      const modal = await openPorkConsumption();
+
+      // 自動選択なし → 消費量0、単位セレクタも出ない。
+      expect((within(modal).getByLabelText("消費量") as HTMLInputElement).value).toBe("0");
+      expect(within(modal).queryByLabelText("消費量の単位")).toBeNull();
+    });
+  });
+
   it("refetches inventory when opening the consumption dialog so newly stocked items auto-match (TKT-0239)", async () => {
     // 初回スナップショットでは玉ねぎが在庫切れ（quantity 0）。食材管理での補充を想定し、
     // ダイアログを開く瞬間のリフェッチで玉ねぎ5個を返す。リフェッチ結果でドラフトが組まれることを検証する。

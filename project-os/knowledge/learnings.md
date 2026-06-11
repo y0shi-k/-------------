@@ -200,3 +200,16 @@ page.tsx が一度だけフェッチした在庫を InventoryBoard と RecipeMea
 - 「片方の画面で更新したデータがもう片方に出ない」報告は、名前マッチング等のロジックより先に**ボード間のstate複製と鮮度**を疑う（initialXxx を useState に入れている箇所を grep）。
 - 対処の既定は**使う瞬間の最小リフェッチ**（モーダル/ダイアログを開くタイミングで select し、取得結果はローカル変数で直接使う＝setState 反映待ちに依存しない）。共有state への持ち上げは影響範囲が大きく、必要になるまでやらない。
 - ただし同じ在庫リストを**書き込みの差分計算**にも使うコンポーネント（例: cooking-record-edit-modal の previousQuantity）に部分的に fresh を混ぜると誤更新リスクがあるため、参照を全て差し替えられる場合のみ適用する。
+
+## 2026-06-12 ローカルSupabase + Playwright でWeb版のブラウザE2Eスモークができる（TKT-0241）
+
+### 手順（再現レシピ）
+1. OrbStack（Docker）起動 → `supabase start` → 既存ボリュームが古い場合は `supabase migration up` で未適用分のみ追加適用（`supabase db reset` は使わない=deny設定）。
+2. テストユーザー: ローカル admin API（`http://127.0.0.1:54321/auth/v1/admin/users`・ローカルdemo service key）で email_confirm 済みユーザー作成 → `public.profiles` を `status='approved'` に UPDATE（承認制ゲート通過）。
+3. シードは `docker exec -i supabase_db_stock-master-web psql -U postgres` に heredoc で投入（**`-i` を忘れると無言で何も実行されない**。zsh では `UID` が読み取り専用変数なのでシェル変数名に使わない）。recipes の genre/steps/prep_steps は jsonb、meal_schedules.meal_type は 朝/昼/晩/その他、status は 未完了/完了 のCHECKあり。
+4. devサーバー: `NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321 NEXT_PUBLIC_SUPABASE_ANON_KEY=<demoキー> npx next dev -p 3100`。シェル環境変数が `.env.local` より優先されるので env ファイルに触れる必要がない。
+5. Playwright は `/tmp/pw-smoke` 等の一時ディレクトリに `npm i playwright` + `npx playwright install chromium`（リポジトリの package.json を汚さない）。ログイン→storageState 保存→各ステップをスクショで確認しながら進める。
+
+### 判断基準
+- 本番/hosted データでの消費系E2Eはやらない（実在庫を減らす）。ローカルスタック一択。
+- jsdom テストで担保できない「実DB・実ブラウザの一連フロー」（自動マッチ・減算・分数表示・完了状態）を確認したいときに使う。

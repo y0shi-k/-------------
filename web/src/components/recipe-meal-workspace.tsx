@@ -26,6 +26,7 @@ import {
 } from "@/components/recipe-filter-controls";
 import { useShellAiUsage, useShellNavigation, useShellStatusMessage, useShellSubView, type RecipeShellLeaf } from "@/components/web-mode-shell";
 import type { StockItem } from "@/lib/inventory/types";
+import { conversionFactorToUnit, convertToStockUnit, stockAmountInUnit } from "@/lib/inventory/unit-conversion";
 import {
   CookCandidate,
   emptyRecipeFormValues,
@@ -88,6 +89,9 @@ type RecipeShoppingShortage = {
 
 type ConsumptionDraft = {
   amount: string;
+  // 消費量の入力単位。既定はレシピ単位（requestedUnit）。換算マッチ在庫を選んだときだけ
+  // レシピ単位 / 在庫単位を切り替えられる。同単位なら常に requestedUnit と同じ。
+  consumeUnit: string;
   ingredientName: string;
   requestedAmount: number;
   requestedUnit: string;
@@ -400,9 +404,15 @@ function scheduleDeleteMessage(schedule: MealSchedule) {
 }
 
 function inventoryAmountByNameAndUnit(items: StockItem[], name: string, unit: string) {
+  // 名前が一致する在庫を unit へ換算（同単位は factor=1、unit_conversion があれば換算）して合算する。
+  // stockAmountInUnit が non-null の在庫だけを採用し、同一在庫を二重計上しない
+  // （同単位一致と換算一致は conversionFactorToUnit 内で排他的に評価される）。
   return items
-    .filter((item) => matchesIngredientName(item.name, name) && item.unit === unit)
-    .reduce((total, item) => total + Number(item.quantity || 0), 0);
+    .filter((item) => matchesIngredientName(item.name, name))
+    .reduce((total, item) => {
+      const amount = stockAmountInUnit(item, unit);
+      return amount === null ? total : total + amount;
+    }, 0);
 }
 
 function formatRecipeDate(value: string) {
@@ -1156,12 +1166,20 @@ export function RecipeMealWorkspace({
           return { ...draft, amount: "0" };
         }
         // default: 在庫を選んでいる行だけ既定量（min(必要量, 在庫量)）を入れる。在庫未選択の行は0のまま。
+        // 換算マッチ時は consumeUnit に合わせた在庫総量と比較する（既定は requestedUnit）。
         const stockItem = inventoryItemsForMeals.find((item) => item.id === draft.stockItemId);
         if (!stockItem) return draft;
+        const consumeUnit = draft.consumeUnit || draft.requestedUnit;
+        // requestedAmount はレシピ単位。consumeUnit が在庫単位なら必要量も在庫単位へ換算して比較する。
+        const requestedInConsumeUnit =
+          consumeUnit === draft.requestedUnit
+            ? draft.requestedAmount
+            : (convertToStockUnit(draft.requestedAmount, stockItem, draft.requestedUnit) ?? draft.requestedAmount);
+        const stockInConsumeUnit = stockAmountInUnit(stockItem, consumeUnit) ?? Number(stockItem.quantity || 0);
         return {
           ...draft,
-          amount: formatQuantityForInput(Math.min(draft.requestedAmount, Number(stockItem.quantity || 0)), {
-            allowFraction: isFractionalUnit(draft.requestedUnit)
+          amount: formatQuantityForInput(Math.min(requestedInConsumeUnit, stockInConsumeUnit), {
+            allowFraction: isFractionalUnit(consumeUnit)
           })
         };
       })
@@ -1209,7 +1227,12 @@ export function RecipeMealWorkspace({
   }, [clearPendingRecipe, openCookingViewer, pendingRecipeId, pendingRecipeOrigin, recipes, showStatusMessage]);
 
   function stockOptionsForIngredient(ingredient: RecipeIngredient) {
-    return inventoryItemsForMeals.filter((item) => item.category === ingredient.item_type && item.unit === ingredient.unit && item.quantity > 0);
+    return inventoryItemsForMeals.filter(
+      (item) =>
+        item.category === ingredient.item_type &&
+        conversionFactorToUnit(item, ingredient.unit) !== null &&
+        item.quantity > 0
+    );
   }
 
   // 消費ダイアログを開く瞬間に在庫を再取得する。献立ボードの在庫スナップショットは
@@ -1243,20 +1266,35 @@ export function RecipeMealWorkspace({
 
     return recipe.ingredients.map((ingredient) => {
       const exactStock = findMatchingStock(ingredient.name, ingredient.item_type, ingredient.unit, inventoryItems);
+      // 初期消費量はレシピ単位で min(必要量, 在庫の換算後総量)。
+      // 例: 必要 300g・在庫 5パック×80g=400g → min(300, 400)=300g。同単位は従来どおり quantity と一致。
+      const stockAmount = exactStock ? stockAmountInUnit(exactStock, ingredient.unit) : null;
       return {
         ingredientName: ingredient.name,
         requestedAmount: ingredient.amount,
         requestedUnit: ingredient.unit,
-        amount: exactStock
-          ? formatQuantityForInput(Math.min(ingredient.amount, exactStock.quantity), { allowFraction: isFractionalUnit(ingredient.unit) })
-          : "0",
+        consumeUnit: ingredient.unit,
+        amount:
+          exactStock && stockAmount !== null
+            ? formatQuantityForInput(Math.min(ingredient.amount, stockAmount), { allowFraction: isFractionalUnit(ingredient.unit) })
+            : "0",
         stockItemId: exactStock?.id ?? ""
       };
     });
   }
 
   function updateConsumptionDraft(index: number, values: Partial<ConsumptionDraft>) {
-    setConsumptionDrafts((items) => items.map((item, currentIndex) => (currentIndex === index ? { ...item, ...values } : item)));
+    setConsumptionDrafts((items) =>
+      items.map((item, currentIndex) => {
+        if (currentIndex !== index) return item;
+        const next = { ...item, ...values };
+        // 在庫を別在庫へ切り替えたら、換算不能な組合せを残さないため consumeUnit をレシピ単位へ戻す。
+        if (values.stockItemId !== undefined && values.stockItemId !== item.stockItemId && values.consumeUnit === undefined) {
+          next.consumeUnit = item.requestedUnit;
+        }
+        return next;
+      })
+    );
   }
 
   async function deleteRecipe(recipe: Recipe) {
@@ -2345,19 +2383,38 @@ export function RecipeMealWorkspace({
     setFeedback(null);
 
     const consumedRows: Array<{
+      // consumedStockAmount: 在庫単位へ換算した減算量（DB保存・在庫減算・rollback の基準）。
+      // converted: consumeUnit ≠ 在庫単位 で換算消費したか（残量の分数表示判定に使う）。
+      consumedStockAmount: number;
+      converted: boolean;
       draft: ConsumptionDraft & { consumedAmount: number };
       nextQuantity: number;
       stockItem: StockItem;
     }> = [];
+    let conversionErrorDraft: (typeof normalizedDrafts)[number] | undefined;
     for (const draft of normalizedDrafts) {
       if (!draft.stockItemId || draft.consumedAmount === 0) continue;
       const stockItem = inventoryItemsForMeals.find((item) => item.id === draft.stockItemId);
       if (!stockItem) continue;
+      const consumeUnit = draft.consumeUnit || draft.requestedUnit;
+      // consumeUnit（レシピ単位 or 在庫単位）の入力量を在庫単位の減算量へ換算する。同単位なら素通し。
+      const consumedStockAmount = convertToStockUnit(draft.consumedAmount, stockItem, consumeUnit);
+      if (consumedStockAmount === null) {
+        conversionErrorDraft = draft;
+        break;
+      }
       consumedRows.push({
+        consumedStockAmount,
+        converted: consumeUnit !== stockItem.unit,
         draft,
         stockItem,
-        nextQuantity: roundQuantity(Math.max(0, Number(stockItem.quantity || 0) - draft.consumedAmount))
+        nextQuantity: roundQuantity(Math.max(0, Number(stockItem.quantity || 0) - consumedStockAmount))
       });
+    }
+    if (conversionErrorDraft) {
+      setIsSaving(false);
+      setFeedback({ tone: "error", message: "原因: 在庫単位への換算に失敗しました。影響: 在庫を減算できません。修正方法: 在庫と単位の組合せを確認してください。" });
+      return;
     }
 
     for (const row of consumedRows) {
@@ -2377,9 +2434,15 @@ export function RecipeMealWorkspace({
       }
 
       // 減らすときに使った形式（分数 or 小数）を記憶し、在庫一覧の残量を同じ形式で表示する。
+      // 換算消費（consumeUnit ≠ 在庫単位）時は入力表記が在庫単位の残量と一致しないため、
+      // 在庫単位が分数許可なら fraction を優先する（例 残 3.5 → 「3 1/2」）。
       setQuantityNotation(
         row.stockItem.id,
-        isFractionalUnit(row.stockItem.unit) ? detectNotation(row.draft.amount) : "decimal"
+        isFractionalUnit(row.stockItem.unit)
+          ? row.converted
+            ? "fraction"
+            : detectNotation(row.draft.amount)
+          : "decimal"
       );
     }
 
@@ -2440,8 +2503,10 @@ export function RecipeMealWorkspace({
           ingredient_name: row.draft.ingredientName,
           requested_amount: Number.isFinite(row.draft.requestedAmount) ? Math.max(0, row.draft.requestedAmount) : 0,
           requested_unit: row.draft.requestedUnit,
-          consumed_amount: Math.max(0, row.draft.consumedAmount),
-          consumed_unit: row.draft.requestedUnit,
+          // consumed_* は在庫単位で保存する（rollback が quantity へ直接足し戻すため）。
+          // 同単位ケースは従来と同値（consumedStockAmount === consumedAmount, stockItem.unit === requestedUnit）。
+          consumed_amount: Math.max(0, row.consumedStockAmount),
+          consumed_unit: row.stockItem.unit,
           stock_item_id: row.stockItem.id,
           stock_item_name: row.stockItem.name,
           substitute_for: row.stockItem.name !== row.draft.ingredientName ? row.draft.ingredientName : ""
@@ -3954,11 +4019,17 @@ function ConsumptionEditor({
     .map((draft, index) => {
       const ingredient = recipe.ingredients.find((item) => item.name === draft.ingredientName && item.unit === draft.requestedUnit);
       const stockItem = inventoryItems.find((item) => item.id === draft.stockItemId);
+      const consumeUnit = draft.consumeUnit || draft.requestedUnit;
       const amount = quantityToNumber(draft.amount);
-      // おすすめ = 同分類・同単位・在庫あり。それ以外は代替材料として選べるよう「その他の在庫」に出す。
+      // おすすめ = 同分類・同単位（または単位換算成立）・在庫あり。それ以外は代替材料として「その他の在庫」に出す。
       // おすすめ内はスコア降順（ingredientNameMatchScore 高い方が先頭）に並べる。
       const rawOptions = ingredient
-        ? inventoryItems.filter((item) => item.category === ingredient.item_type && item.unit === ingredient.unit && item.quantity > 0)
+        ? inventoryItems.filter(
+            (item) =>
+              item.category === ingredient.item_type &&
+              conversionFactorToUnit(item, ingredient.unit) !== null &&
+              item.quantity > 0
+          )
         : [];
       const options = ingredient
         ? [...rawOptions].sort(
@@ -3969,11 +4040,20 @@ function ConsumptionEditor({
         : [];
       const recommendedIds = new Set(options.map((item) => item.id));
       const otherOptions = inventoryItems.filter((item) => item.quantity > 0 && !recommendedIds.has(item.id));
+      // 選択中在庫が換算マッチ（在庫単位 ≠ レシピ単位 だが factor あり）なら、単位セレクタを出す。
+      const canConvert = Boolean(
+        stockItem && stockItem.unit !== draft.requestedUnit && conversionFactorToUnit(stockItem, draft.requestedUnit) !== null
+      );
+      // 不足判定: 入力量(consumeUnit) と 在庫量(consumeUnit 換算) を同一単位で比較する。
+      const stockInConsumeUnit = stockItem ? stockAmountInUnit(stockItem, consumeUnit) : null;
+      const compareStock = stockInConsumeUnit ?? Number(stockItem?.quantity ?? 0);
       return {
+        canConvert,
+        consumeUnit,
         draft,
         index,
         ingredient,
-        isShortage: Boolean(stockItem && Number.isFinite(amount) && amount > 0 && amount > Number(stockItem.quantity || 0)),
+        isShortage: Boolean(stockItem && Number.isFinite(amount) && amount > 0 && amount > compareStock),
         options,
         otherOptions,
         stockItem
@@ -4026,7 +4106,7 @@ function ConsumptionEditor({
         <p className="empty-list">このカテゴリの材料はありません。</p>
       ) : (
         <div className="consumption-list">
-          {rows.map(({ draft, index, ingredient, isShortage, options, otherOptions, stockItem }) => {
+          {rows.map(({ canConvert, consumeUnit, draft, index, ingredient, isShortage, options, otherOptions, stockItem }) => {
             const hasAnyStock = options.length > 0 || otherOptions.length > 0;
             return (
               <article className="consumption-row" data-active={quantityToNumber(draft.amount) > 0} key={`${draft.ingredientName}-${draft.requestedUnit}-${index}`}>
@@ -4066,9 +4146,21 @@ function ConsumptionEditor({
                         ariaLabel="消費量"
                         value={draft.amount}
                         onChange={(next) => onChange(index, { amount: next })}
-                        allowFraction={isFractionalUnit(draft.requestedUnit)}
+                        allowFraction={isFractionalUnit(consumeUnit)}
                       />
-                      <span className="consumption-unit">{draft.requestedUnit}</span>
+                      {canConvert && stockItem ? (
+                        <select
+                          aria-label="消費量の単位"
+                          className="consumption-unit-select"
+                          value={consumeUnit}
+                          onChange={(event) => onChange(index, { consumeUnit: event.target.value, amount: "0" })}
+                        >
+                          <option value={draft.requestedUnit}>{draft.requestedUnit}</option>
+                          <option value={stockItem.unit}>{stockItem.unit}</option>
+                        </select>
+                      ) : (
+                        <span className="consumption-unit">{consumeUnit}</span>
+                      )}
                     </span>
                   </div>
                 </div>

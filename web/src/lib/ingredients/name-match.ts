@@ -5,6 +5,9 @@
  * 画像分類用の normalizeIngredientName (ingredient-image.ts) とは別物。流用・変更しない。
  */
 
+import { conversionFactorToUnit } from "@/lib/inventory/unit-conversion";
+import type { UnitConversion } from "@/lib/inventory/types";
+
 // ---------------------------------------------------------------------------
 // 正規化
 // ---------------------------------------------------------------------------
@@ -255,7 +258,8 @@ function isSubsequenceOf(shorter: string, longer: string): boolean {
  *
  * 条件:
  * - category（分類）一致
- * - unit 一致
+ * - unit 一致、または unit_conversion で在庫単位 → ingredientUnit へ正方向換算できる
+ *   （例 在庫「パック」・1パック=80g がレシピ単位「g」に一致）
  * - quantity > 0
  * - matchesIngredientName が true（score >= 2。部分一致のみは除外）
  *
@@ -263,7 +267,13 @@ function isSubsequenceOf(shorter: string, longer: string): boolean {
  * 一致なしの場合は undefined を返す。
  */
 export function findMatchingStock<
-  TStock extends { category: string; name: string; unit: string; quantity: number }
+  TStock extends {
+    category: string;
+    name: string;
+    unit: string;
+    quantity: number;
+    unit_conversion?: UnitConversion | null;
+  }
 >(
   ingredientName: string,
   ingredientType: string,
@@ -273,7 +283,7 @@ export function findMatchingStock<
   const candidates = items.filter(
     (item) =>
       item.category === ingredientType &&
-      item.unit === ingredientUnit &&
+      conversionFactorToUnit({ unit: item.unit, unit_conversion: item.unit_conversion ?? null }, ingredientUnit) !== null &&
       item.quantity > 0 &&
       matchesIngredientName(item.name, ingredientName)
   );

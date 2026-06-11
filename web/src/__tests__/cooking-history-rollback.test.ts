@@ -58,4 +58,13 @@ describe("cooking history rollback helpers", () => {
 
     expect(updates).toEqual([{ id: "deleted-stock", missing: true, previousQuantity: 0, nextQuantity: 0 }]);
   });
+
+  it("restores converted consumption in stock unit (TKT-0241: 3.75パックが足し戻る)", () => {
+    // consumed_amount は在庫単位（パック）で保存されるため、換算消費 3.75 がそのまま足し戻る。
+    // 完了時に 5 - 3.75 = 1.25 だった豚コマが、取り消しで 1.25 + 3.75 = 5 に復元される。
+    const porkAfterConsumption: StockItem = { ...baseStockItem, id: "stock-pork", name: "豚コマ", unit: "パック", quantity: 1.25 };
+    const updates = computeRollbackQuantityUpdates([{ stock_item_id: "stock-pork", consumed_amount: 3.75 }], [porkAfterConsumption]);
+
+    expect(updates).toEqual([{ id: "stock-pork", missing: false, previousQuantity: 1.25, nextQuantity: 5 }]);
+  });
 });
