@@ -12,7 +12,7 @@ tools: Read, Write, Edit, Bash, Grep, Glob
 - **Canvas版 `app.html` は凍結・参照専用。編集しない。** 編集対象は `web/` + `supabase/`（必要なら `scripts/`）。
 
 ## 進め方
-1. 指定された `project-os/tickets/<TKT>` と関連 `project-os/specs/<SPEC>` を読み、目的・acceptance・constraints・required_evals を把握する。
+1. 委譲プロンプトに acceptance 要約・constraints・対象ファイルパスが含まれていればそれを起点にする（既知情報の再探索をしない）。不足分のみ `project-os/tickets/<TKT>` と関連 `project-os/specs/<SPEC>` で補う。
 2. `implementation_ready` 前提で実装する。生成物（Vercel/本番DB/Storage）を直接いじらない。
 3. 危険変更の鉄則を守る:
    - APIキー・Supabase秘密鍵・DBパスワードを直書きしない（環境変数）
@@ -20,7 +20,9 @@ tools: Read, Write, Edit, Bash, Grep, Glob
    - 写真Storageは非公開バケット・推測不能URL
    - Gemini等のAIはサーバー側API経由（ブラウザにキーを出さない）
 4. 編集は最小限・既存パターンを再利用。immutableに書く（破壊的mutationを避ける）。
-5. 実装後、**触ったパス一覧と要点、残リスク**を簡潔に報告する。verify/gate判定はオーケストレーター側が `/verify` `/check-gates` で行うので、ここでは回さなくてよい（求められたら回す）。
+5. 実装後、`bash harness/bin/verify_web.sh <TKT>` を実行する。失敗したら根本原因を直してから再実行する。
+6. **触ったパス一覧と要点、verify結果（pass/fail と policy 判定）、残リスク**を簡潔に報告する。
+   コードや build ログの全文を報告に貼らない。gate判定（`/check-gates`）はオーケストレーター側が行う。
 
 ## 守ること
 - テストやチェックを通すために無効化・スキップしない。失敗は根本原因を直す。
