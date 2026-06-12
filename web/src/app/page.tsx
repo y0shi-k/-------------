@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { CookingHistoryBoard } from "@/components/cooking-history-board";
 import { HomeDashboard } from "@/components/home-dashboard";
 import { InventoryBoard } from "@/components/inventory-board";
+import { InventoryStoreProvider } from "@/components/inventory-store";
 import { RecipeMealWorkspace } from "@/components/recipe-meal-workspace";
 import { WebModeShell } from "@/components/web-mode-shell";
 import { fetchAccountRole } from "@/lib/auth/account-status";
@@ -129,6 +130,12 @@ export default async function Home() {
 
   return (
     <main className="app-shell web-app-shell">
+      <InventoryStoreProvider
+        initialInventoryItems={(inventoryItems ?? []) as StockItem[]}
+        initialArchivedInventoryItems={(archivedInventoryItems ?? []) as StockItem[]}
+        initialStorageLocations={(storageLocations ?? []) as StorageLocation[]}
+        initialShoppingItems={(shoppingItems ?? []) as ShoppingItem[]}
+      >
       <WebModeShell
         childrenByMode={{
           ingredients: (
@@ -144,7 +151,6 @@ export default async function Home() {
           ),
           recipes: (
             <RecipeMealWorkspace
-              initialInventoryItems={(inventoryItems ?? []) as StockItem[]}
               initialCookCandidates={(cookCandidates ?? []) as CookCandidate[]}
               initialMealSchedules={(mealSchedules ?? []) as MealSchedule[]}
               initialRecipes={recipesWithIngredients as Recipe[]}
@@ -183,6 +189,7 @@ export default async function Home() {
         isAdmin={role === "admin"}
         userEmail={user.email ?? "ログイン中のユーザー"}
       />
+      </InventoryStoreProvider>
     </main>
   );
 }

@@ -18,6 +18,7 @@ import {
 import { clearQuantityNotation, getQuantityNotation, setQuantityNotation } from "@/lib/format/quantity-notation";
 import { getCustomFractions } from "@/lib/format/fraction-candidates";
 import { UnitPicker } from "@/components/unit-picker";
+import { useInventoryStore } from "@/components/inventory-store";
 import { useShellAiUsage, useShellSubView, type InventoryShellLeaf } from "@/components/web-mode-shell";
 import { loadUserGeminiApiKey } from "@/lib/ai/user-gemini-api-key";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
@@ -54,8 +55,8 @@ type InventoryBoardProps = {
   userId: string;
   initialInventoryItems: StockItem[];
   initialArchivedInventoryItems?: StockItem[];
-  initialShoppingItems?: ShoppingItem[];
   initialStorageLocations?: StorageLocation[];
+  initialShoppingItems?: ShoppingItem[];
   initialUserIngredientImages?: UserIngredientImage[];
 };
 
@@ -234,21 +235,17 @@ export function InventoryBoard({
   userId,
   initialInventoryItems,
   initialArchivedInventoryItems = [],
-  initialShoppingItems = [],
   initialStorageLocations = [],
   initialUserIngredientImages = []
 }: InventoryBoardProps) {
-  const [inventoryItems, setInventoryItems] = useState(initialInventoryItems.filter((item) => !item.archived_at && item.quantity > 0));
-  const [archivedInventoryItems, setArchivedInventoryItems] = useState(initialArchivedInventoryItems);
+  const { inventoryItems, archivedInventoryItems, storageLocations, shoppingItems, setInventoryItems, setArchivedInventoryItems, setStorageLocations, setShoppingItems } = useInventoryStore();
   const [restoreQuantities, setRestoreQuantities] = useState<Record<string, string>>({});
   // 数量の表示形式（分数 or 小数）。SSRとの不一致を避けるため初期は空にし、マウント後に localStorage から読み込む。
   const [quantityNotations, setQuantityNotations] = useState<Record<string, QuantityNotation>>({});
   // ユーザーが追加した分数候補（例 "3/8"）。一覧で帯分数表示に使う。
   const [customFractions, setCustomFractions] = useState<string[]>([]);
-  const [shoppingItems, setShoppingItems] = useState(initialShoppingItems);
   const [selectedShoppingIds, setSelectedShoppingIds] = useState<string[]>([]);
   const [shoppingValues, setShoppingValues] = useState<ShoppingFormValues>({ name: "", required_quantity: "1", unit: "個" });
-  const [storageLocations, setStorageLocations] = useState(initialStorageLocations);
   const [userIngredientImages, setUserIngredientImages] = useState(initialUserIngredientImages);
   const [values, setValues] = useState<StockItemFormValues>(emptyStockItemFormValues);
   const [editing, setEditing] = useState<EditingTarget>(null);
@@ -406,7 +403,6 @@ export function InventoryBoard({
     setShoppingItems((items) => [data as ShoppingItem, ...items]);
     setShoppingValues({ name: "", required_quantity: "1", unit: "個" });
     setFeedback({ tone: "success", message: `${name} を買い物リストへ追加しました。` });
-    router.refresh();
   }
 
   async function markShoppingPurchased(item: ShoppingItem) {
@@ -437,7 +433,6 @@ export function InventoryBoard({
     setShoppingItems((items) => items.map((current) => (current.id === item.id ? (data as ShoppingItem) : current)));
     setSelectedShoppingIds((ids) => ids.filter((id) => id !== item.id));
     setFeedback({ tone: "success", message: `${item.name} を購入済みにしました。` });
-    router.refresh();
   }
 
   async function deleteSelectedShoppingItems() {
@@ -459,7 +454,6 @@ export function InventoryBoard({
     setShoppingItems((items) => items.filter((item) => !selectedShoppingIds.includes(item.id)));
     setSelectedShoppingIds([]);
     setFeedback({ tone: "info", message: `買い物を${deletedCount}件削除しました。` });
-    router.refresh();
   }
 
   async function deleteSelectedInventoryItems() {
@@ -490,7 +484,6 @@ export function InventoryBoard({
     setSelectedInventoryIds([]);
     if (editing && deletedIds.includes(editing.item.id)) resetForm();
     setFeedback({ tone: "info", message: `食材を${deletedCount}件削除しました。` });
-    router.refresh();
   }
 
   const storageLocationOptions = useMemo(

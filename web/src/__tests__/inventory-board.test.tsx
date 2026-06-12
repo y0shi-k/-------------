@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { InventoryBoard } from "@/components/inventory-board";
+import { InventoryStoreProvider } from "@/components/inventory-store";
 import type { StockItem } from "@/lib/inventory/types";
 import type { ShoppingItem } from "@/lib/recipes/types";
 import type { AiUsageSummary } from "@/lib/ai/usage";
@@ -118,14 +119,25 @@ function deleteInQuery(error: unknown = null) {
 }
 
 function renderBoard(props?: Partial<React.ComponentProps<typeof InventoryBoard>>) {
+  const initialInventoryItems = props?.initialInventoryItems ?? [];
+  const initialArchivedInventoryItems = props?.initialArchivedInventoryItems ?? [];
+  const initialStorageLocations = props?.initialStorageLocations ?? [];
+  const initialShoppingItems = props?.initialShoppingItems ?? [];
   return render(
-    <InventoryBoard
-      initialInventoryItems={props?.initialInventoryItems ?? []}
-      initialArchivedInventoryItems={props?.initialArchivedInventoryItems ?? []}
-      initialShoppingItems={props?.initialShoppingItems ?? []}
-      initialStorageLocations={props?.initialStorageLocations ?? []}
-      userId={props?.userId ?? "user-1"}
-    />
+    <InventoryStoreProvider
+      initialInventoryItems={initialInventoryItems}
+      initialArchivedInventoryItems={initialArchivedInventoryItems}
+      initialStorageLocations={initialStorageLocations}
+      initialShoppingItems={initialShoppingItems}
+    >
+      <InventoryBoard
+        initialInventoryItems={initialInventoryItems}
+        initialArchivedInventoryItems={initialArchivedInventoryItems}
+        initialShoppingItems={initialShoppingItems}
+        initialStorageLocations={initialStorageLocations}
+        userId={props?.userId ?? "user-1"}
+      />
+    </InventoryStoreProvider>
   );
 }
 

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CookingRecordEditModal } from "@/components/cooking-record-edit-modal";
+import { useInventoryStore } from "@/components/inventory-store";
 import { useShellNavigation, useShellSubView } from "@/components/web-mode-shell";
 import { CookingHistoryItem, CookingHistoryPhoto } from "@/lib/cooking-history/types";
 import type { StockItem } from "@/lib/inventory/types";
@@ -98,6 +99,7 @@ function renderStars(rating: number | null) {
 
 export function CookingHistoryBoard({ initialHistory, initialInventoryItems, initialMealSchedules, userId }: CookingHistoryBoardProps) {
   const router = useRouter();
+  const { refetch: refetchInventory } = useInventoryStore();
   const history = initialHistory;
   const mealSchedules = initialMealSchedules;
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
@@ -213,7 +215,8 @@ export function CookingHistoryBoard({ initialHistory, initialInventoryItems, ini
 
   function handleSaved() {
     setEditingItem(null);
-    router.refresh();
+    // 料理記録編集後に共有ストアへ在庫変更を反映する（在庫一覧タブ切替でリロードなしで最新化）。
+    void refetchInventory(userId);
   }
 
   function handleViewEdit(item: CookingHistoryItem) {

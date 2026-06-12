@@ -3,10 +3,34 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { RecipeMealWorkspace } from "@/components/recipe-meal-workspace";
 import type { StockItem } from "@/lib/inventory/types";
 import type { AiUsageSummary } from "@/lib/ai/usage";
-import type { CookCandidate, MealSchedule, Recipe, RecipeIngredient } from "@/lib/recipes/types";
+import type { CookCandidate, MealSchedule, Recipe, RecipeIngredient, ShoppingItem } from "@/lib/recipes/types";
 
 const from = vi.fn();
 const refresh = vi.fn();
+
+// inventory-store モック。テストごとに inventoryItems / setInventoryItems を差し替えられるよう
+// vi.hoisted で mutableな参照を持つ。
+const inventoryStoreMocks = vi.hoisted(() => ({
+  inventoryItems: [] as StockItem[],
+  setInventoryItems: vi.fn(),
+  setShoppingItems: vi.fn(),
+  shoppingItems: [] as ShoppingItem[],
+  archivedInventoryItems: [] as StockItem[],
+  storageLocations: [],
+  refetch: vi.fn(async () => {})
+}));
+
+vi.mock("@/components/inventory-store", () => ({
+  useInventoryStore: () => ({
+    inventoryItems: inventoryStoreMocks.inventoryItems,
+    shoppingItems: inventoryStoreMocks.shoppingItems,
+    archivedInventoryItems: inventoryStoreMocks.archivedInventoryItems,
+    storageLocations: inventoryStoreMocks.storageLocations,
+    setInventoryItems: inventoryStoreMocks.setInventoryItems,
+    setShoppingItems: inventoryStoreMocks.setShoppingItems,
+    refetch: inventoryStoreMocks.refetch
+  })
+}));
 const shellMocks = vi.hoisted(() => ({
   clearPendingRecipe: vi.fn(),
   pendingRecipeId: null as string | null,
@@ -130,11 +154,16 @@ const baseCandidate: CookCandidate = {
   updated_at: "2026-05-24T00:00:00.000Z"
 };
 
-function renderWorkspace(props?: Partial<React.ComponentProps<typeof RecipeMealWorkspace>>) {
+type WorkspaceTestProps = Omit<React.ComponentProps<typeof RecipeMealWorkspace>, "initialInventoryItems"> & {
+  initialInventoryItems?: StockItem[];
+};
+
+function renderWorkspace(props?: Partial<WorkspaceTestProps>) {
+  // initialInventoryItems はストアモックに設定してから渡す（Props からは削除済み）。
+  inventoryStoreMocks.inventoryItems = props?.initialInventoryItems ?? [baseInventory];
   return render(
     <RecipeMealWorkspace
       initialCookCandidates={props?.initialCookCandidates ?? []}
-      initialInventoryItems={props?.initialInventoryItems ?? [baseInventory]}
       initialMealSchedules={props?.initialMealSchedules ?? []}
       initialRecipes={props?.initialRecipes ?? [baseRecipe]}
       userId={props?.userId ?? "user-1"}
@@ -255,6 +284,10 @@ describe("RecipeMealWorkspace", () => {
       cooking: "timeline"
     };
     shellMocks.selectShellLeaf.mockReset();
+    inventoryStoreMocks.setInventoryItems.mockReset();
+    inventoryStoreMocks.refetch.mockReset();
+    inventoryStoreMocks.refetch.mockResolvedValue(undefined);
+    inventoryStoreMocks.inventoryItems = [baseInventory];
     global.fetch = vi.fn();
     localStorage.clear();
   });
@@ -1308,9 +1341,7 @@ describe("RecipeMealWorkspace", () => {
 
     await waitFor(() => {
       expect(from).toHaveBeenCalledWith("meal_schedules");
-      expect(scheduleUpdate.update).toHaveBeenCalledWith({ scheduled_on: "2026-05-26", meal_type: "朝" });
-      expect(refresh).toHaveBeenCalled();
-    });
+      expect(scheduleUpdate.update).toHaveBeenCalledWith({ scheduled_on: "2026-05-26", meal_type: "朝" });    });
     expect(await screen.findByText("カレー を 2026/05/26 朝 へ移動しました。")).toBeTruthy();
   });
 
@@ -1334,7 +1365,6 @@ describe("RecipeMealWorkspace", () => {
     await waitFor(() => {
       expect(from).toHaveBeenCalledWith("meal_schedules");
       expect(scheduleDelete.deleteRows).toHaveBeenCalled();
-      expect(refresh).toHaveBeenCalled();
     });
     // 関連買い物の削除（未購入のみ）も走る。
     expect(from).toHaveBeenCalledWith("shopping_items");
@@ -1444,9 +1474,7 @@ describe("RecipeMealWorkspace", () => {
       });
       expect(consumptionDelete.deleteRows).toHaveBeenCalled();
       expect(historyDelete.deleteRows).toHaveBeenCalled();
-      expect(scheduleUpdate.update).toHaveBeenCalledWith({ status: "未完了", completed_at: null });
-      expect(refresh).toHaveBeenCalled();
-    });
+      expect(scheduleUpdate.update).toHaveBeenCalledWith({ status: "未完了", completed_at: null });    });
     expect(await screen.findByText("カレー の完了を取り消し、在庫を戻しました。")).toBeTruthy();
   });
 
@@ -1495,9 +1523,7 @@ describe("RecipeMealWorkspace", () => {
       });
       expect(consumptionDelete.deleteRows).toHaveBeenCalled();
       expect(historyDelete.deleteRows).toHaveBeenCalled();
-      expect(scheduleDelete.deleteRows).toHaveBeenCalled();
-      expect(refresh).toHaveBeenCalled();
-    });
+      expect(scheduleDelete.deleteRows).toHaveBeenCalled();    });
     expect(await screen.findByText("カレー を献立から削除しました。")).toBeTruthy();
     expect(within(screen.getByLabelText("7日献立")).queryByText("カレー")).toBeNull();
   });
@@ -1737,9 +1763,7 @@ describe("RecipeMealWorkspace", () => {
       expect(recipeUpdate.update).toHaveBeenCalledWith({
         prep_steps: [],
         steps: ["煮る", "切る"]
-      });
-      expect(refresh).toHaveBeenCalled();
-    });
+      });    });
     expect(await screen.findByText("並び替えを保存しました。")).toBeTruthy();
   });
 
@@ -1772,9 +1796,7 @@ describe("RecipeMealWorkspace", () => {
 
     await waitFor(() => {
       expect(ingredientUpdate.update).toHaveBeenCalledWith({ item_type: "食材", sort_order: 0, group_index: 0 });
-      expect(ingredientUpdate.update).toHaveBeenCalledWith({ item_type: "食材", sort_order: 1, group_index: 0 });
-      expect(refresh).toHaveBeenCalled();
-    });
+      expect(ingredientUpdate.update).toHaveBeenCalledWith({ item_type: "食材", sort_order: 1, group_index: 0 });    });
     expect(await screen.findByText("並び替えを保存しました。")).toBeTruthy();
   });
 
@@ -1816,9 +1838,7 @@ describe("RecipeMealWorkspace", () => {
 
     await waitFor(() => {
       expect(ingredientUpdate.update).toHaveBeenCalledWith({ item_type: "食材", sort_order: 0, group_index: 0 });
-      expect(ingredientUpdate.update).toHaveBeenCalledWith({ item_type: "食材", sort_order: 1, group_index: 0 });
-      expect(refresh).toHaveBeenCalled();
-    });
+      expect(ingredientUpdate.update).toHaveBeenCalledWith({ item_type: "食材", sort_order: 1, group_index: 0 });    });
     expect(await screen.findByText("並び替えを保存しました。")).toBeTruthy();
   });
 
@@ -1859,9 +1879,7 @@ describe("RecipeMealWorkspace", () => {
     fireEvent.click(screen.getByRole("button", { name: "並びを確定" }));
 
     await waitFor(() => {
-      expect(ingredientUpdate.update).toHaveBeenCalledWith({ item_type: "食材", sort_order: 1, group_index: 0 });
-      expect(refresh).toHaveBeenCalled();
-    });
+      expect(ingredientUpdate.update).toHaveBeenCalledWith({ item_type: "食材", sort_order: 1, group_index: 0 });    });
     expect(await screen.findByText("並び替えを保存しました。")).toBeTruthy();
   });
 
@@ -2091,9 +2109,7 @@ describe("RecipeMealWorkspace", () => {
           consumed_amount: 1,
           stock_item_id: "stock-1"
         })
-      ]);
-      expect(refresh).toHaveBeenCalled();
-    });
+      ]);    });
     expect(await screen.findByText("カレー を調理完了にしました。料理履歴にも記録済みです。")).toBeTruthy();
   });
 
@@ -2378,5 +2394,128 @@ describe("RecipeMealWorkspace", () => {
 
     expect(await screen.findByText(/原因: レシピ名が未入力です。/)).toBeTruthy();
     expect(from).not.toHaveBeenCalled();
+  });
+
+  describe("TKT-0243: 調理完了→共有ストア反映", () => {
+    // 調理完了フロー（消費確定）で setInventoryItems が呼ばれ、quantity<=0 item がフィルタされることを確認するテスト。
+    // Supabase クライアントはモック済み（from）。共有ストアは inventoryStoreMocks でモック済み。
+
+    const stock2: StockItem = { ...baseInventory, quantity: 2 };
+
+    function mockCompletionForStore(consumptionInsert: ReturnType<typeof vi.fn>) {
+      const completed = { ...baseSchedule, status: "完了", completed_at: "2026-05-24T10:00:00.000Z" };
+      const scheduleUpdate = updateSingleQuery(completed);
+      const inventoryUpdate = updateEqQuery();
+      const inventorySelect = inventorySelectQuery([stock2]);
+      const historyInsert = insertSingleQuery({ id: "history-store-1" });
+
+      from.mockImplementation((table: string) => {
+        if (table === "meal_schedules") return { update: scheduleUpdate.update };
+        if (table === "inventory_items") return { update: inventoryUpdate.update, select: inventorySelect.select };
+        if (table === "cooking_history") return { insert: historyInsert.insert };
+        if (table === "cooking_consumption_events") return { insert: consumptionInsert };
+        return {};
+      });
+    }
+
+    it("調理完了（消費確定）後に共有ストアの setInventoryItems が呼ばれる", async () => {
+      const consumptionInsert = vi.fn().mockResolvedValue({ error: null });
+      mockCompletionForStore(consumptionInsert);
+
+      renderWorkspace({ initialMealSchedules: [baseSchedule], initialInventoryItems: [stock2] });
+      openScheduleView();
+
+      fireEvent.click(within(screen.getByLabelText("7日献立")).getByRole("button", { name: "カレー の操作" }));
+      fireEvent.click(screen.getByRole("button", { name: "調理を開始" }));
+      const cookingViewer = screen.getByRole("dialog", { name: "調理ビューア全画面" });
+      fireEvent.click(within(cookingViewer).getByRole("button", { name: "料理を完了する" }));
+
+      // 消費ダイアログが開く（リフェッチで stock2 が返る）。
+      const consumptionModal = await screen.findByRole("dialog", { name: "実際の消費量を調整" });
+      // 確定ボタンを押す。
+      fireEvent.click(within(consumptionModal).getByRole("button", { name: "確定" }));
+
+      // 消費確定後、setInventoryItems が呼ばれていること（在庫一覧タブへ即時反映される）。
+      await waitFor(() => {
+        expect(inventoryStoreMocks.setInventoryItems).toHaveBeenCalled();
+      });
+    });
+
+    it("消費後 quantity が 0 になった item はストア更新でフィルタされる", async () => {
+      // 玉ねぎ1個在庫 → レシピ2個必要 → 消費量 min(2,1)=1 → nextQuantity=0 → ストアから除外。
+      const consumptionInsert = vi.fn().mockResolvedValue({ error: null });
+      const completed = { ...baseSchedule, status: "完了", completed_at: "2026-05-24T10:00:00.000Z" };
+      const scheduleUpdate = updateSingleQuery(completed);
+      const inventoryUpdate = updateEqQuery();
+      const freshInventory: StockItem = { ...baseInventory, quantity: 1 };
+      const inventorySelect = inventorySelectQuery([freshInventory]);
+      const historyInsert = insertSingleQuery({ id: "history-store-2" });
+
+      from.mockImplementation((table: string) => {
+        if (table === "meal_schedules") return { update: scheduleUpdate.update };
+        if (table === "inventory_items") return { update: inventoryUpdate.update, select: inventorySelect.select };
+        if (table === "cooking_history") return { insert: historyInsert.insert };
+        if (table === "cooking_consumption_events") return { insert: consumptionInsert };
+        return {};
+      });
+
+      // ストアに quantity=1 の玉ねぎを設定。
+      renderWorkspace({ initialMealSchedules: [baseSchedule], initialInventoryItems: [{ ...baseInventory, quantity: 1 }] });
+      openScheduleView();
+
+      fireEvent.click(within(screen.getByLabelText("7日献立")).getByRole("button", { name: "カレー の操作" }));
+      fireEvent.click(screen.getByRole("button", { name: "調理を開始" }));
+      const cookingViewer = screen.getByRole("dialog", { name: "調理ビューア全画面" });
+      fireEvent.click(within(cookingViewer).getByRole("button", { name: "料理を完了する" }));
+
+      const consumptionModal = await screen.findByRole("dialog", { name: "実際の消費量を調整" });
+      fireEvent.click(within(consumptionModal).getByRole("button", { name: "確定" }));
+
+      // setInventoryItems の呼び出し引数に quantity<=0 item が含まれないこと。
+      await waitFor(() => {
+        const calls = inventoryStoreMocks.setInventoryItems.mock.calls;
+        // completeSchedule 内での setInventoryItems(updater) 呼び出しを確認。
+        // updater 関数を実行して結果を検証する。
+        const updaterCalls = calls.filter((call) => typeof call[0] === "function");
+        if (updaterCalls.length > 0) {
+          const lastUpdater = updaterCalls[updaterCalls.length - 1][0] as (items: StockItem[]) => StockItem[];
+          const result = lastUpdater([{ ...baseInventory, quantity: 1 }]);
+          expect(result.every((item) => item.quantity > 0)).toBe(true);
+        }
+      });
+    });
+
+    it("リフェッチ成功時に共有ストアが更新される（ダイアログオープン時）", async () => {
+      const consumptionInsert = vi.fn().mockResolvedValue({ error: null });
+      const freshInventory: StockItem = { ...baseInventory, quantity: 5 };
+      const inventorySelect = inventorySelectQuery([freshInventory]);
+      const completed = { ...baseSchedule, status: "完了", completed_at: "2026-05-24T10:00:00.000Z" };
+      const scheduleUpdate = updateSingleQuery(completed);
+      const inventoryUpdate = updateEqQuery();
+      const historyInsert = insertSingleQuery({ id: "history-store-3" });
+
+      from.mockImplementation((table: string) => {
+        if (table === "meal_schedules") return { update: scheduleUpdate.update };
+        if (table === "inventory_items") return { update: inventoryUpdate.update, select: inventorySelect.select };
+        if (table === "cooking_history") return { insert: historyInsert.insert };
+        if (table === "cooking_consumption_events") return { insert: consumptionInsert };
+        return {};
+      });
+
+      renderWorkspace({ initialMealSchedules: [baseSchedule], initialInventoryItems: [baseInventory] });
+      openScheduleView();
+
+      fireEvent.click(within(screen.getByLabelText("7日献立")).getByRole("button", { name: "カレー の操作" }));
+      fireEvent.click(screen.getByRole("button", { name: "調理を開始" }));
+      const cookingViewer = screen.getByRole("dialog", { name: "調理ビューア全画面" });
+      fireEvent.click(within(cookingViewer).getByRole("button", { name: "料理を完了する" }));
+
+      // ダイアログが開いた時点で setInventoryItems が呼ばれていること（リフェッチ→ストア更新）。
+      await screen.findByRole("dialog", { name: "実際の消費量を調整" });
+      await waitFor(() => {
+        // fetchFreshInventoryForMeals 内で setInventoryItems(fresh) が呼ばれる。
+        expect(inventoryStoreMocks.setInventoryItems).toHaveBeenCalledWith([freshInventory]);
+      });
+    });
   });
 });

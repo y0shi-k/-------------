@@ -24,6 +24,7 @@ import {
   type RecipeSearchMode,
   type RecipeSort
 } from "@/components/recipe-filter-controls";
+import { useInventoryStore } from "@/components/inventory-store";
 import { useShellAiUsage, useShellNavigation, useShellStatusMessage, useShellSubView, type RecipeShellLeaf } from "@/components/web-mode-shell";
 import type { StockItem } from "@/lib/inventory/types";
 import { conversionFactorToUnit, convertToStockUnit, stockAmountInUnit } from "@/lib/inventory/unit-conversion";
@@ -38,6 +39,7 @@ import {
   RecipeIngredient,
   RecipeIngredientFormValues,
   RecipeIngredientType,
+  ShoppingItem,
   splitCsv,
   splitLines,
   toRecipeFormValues
@@ -57,7 +59,6 @@ import { findFirstYoutubeVideoId } from "@/lib/youtube";
 
 type RecipeMealWorkspaceProps = {
   initialCookCandidates: CookCandidate[];
-  initialInventoryItems: StockItem[];
   initialMealSchedules: MealSchedule[];
   initialRecipes: Recipe[];
   userId: string;
@@ -469,14 +470,13 @@ function recipeForCandidate(candidate: CookCandidate, recipes: Recipe[]) {
 
 export function RecipeMealWorkspace({
   initialCookCandidates,
-  initialInventoryItems,
   initialMealSchedules,
   initialRecipes,
   userId
 }: RecipeMealWorkspaceProps) {
+  const { inventoryItems: inventoryItemsForMeals, setInventoryItems: setInventoryItemsForMeals, setShoppingItems, refetch } = useInventoryStore();
   const [recipes, setRecipes] = useState(initialRecipes);
   const [cookCandidates, setCookCandidates] = useState(initialCookCandidates);
-  const [inventoryItemsForMeals, setInventoryItemsForMeals] = useState(initialInventoryItems);
   const [mealSchedules, setMealSchedules] = useState(initialMealSchedules);
   const [recipeValues, setRecipeValues] = useState<RecipeFormValues>(emptyRecipeFormValues);
   const [editingRecipeId, setEditingRecipeId] = useState<string | null>(null);
@@ -1235,9 +1235,10 @@ export function RecipeMealWorkspace({
     );
   }
 
-  // 消費ダイアログを開く瞬間に在庫を再取得する。献立ボードの在庫スナップショットは
-  // ページ初回ロード以降更新されないため、食材管理ボードでの追加・補充を反映するための最小リフェッチ。
+  // 消費ダイアログを開く瞬間に在庫を再取得し、共有ストアも更新する。
+  // 食材管理ボードでの追加・補充を自動マッチングへ反映するための最小リフェッチ。
   // select 列・並び順は page.tsx の初回フェッチ（"*" / archived_at null / quantity>0 / created_at desc）と揃える。
+  // 取得したデータはローカル変数として返し、setState の反映待ちに依存しない（stale-read 回避）。
   // 失敗時は null を返し、呼び出し側で既存スナップショットへフォールバックする（操作はブロックしない）。
   async function fetchFreshInventoryForMeals(): Promise<StockItem[] | null> {
     try {
@@ -1250,7 +1251,10 @@ export function RecipeMealWorkspace({
         .order("created_at", { ascending: false });
 
       if (error || !data) return null;
-      return data as StockItem[];
+      const fresh = data as StockItem[];
+      // ストアも即時更新することで、在庫一覧タブへ切り替えた際にリロードなしで反映される。
+      setInventoryItemsForMeals(fresh);
+      return fresh;
     } catch (error) {
       // ネットワーク例外で throw されると呼び出し側の isOpeningConsumption が解除されないため、ここで握って null を返す
       console.error("在庫の再取得に失敗しました:", error);
@@ -1855,17 +1859,42 @@ export function RecipeMealWorkspace({
     }
 
     setMealSchedules((items) => items.filter((item) => item.id !== schedule.id));
-    setInventoryItemsForMeals((items) =>
-      items.map((item) => {
+    // ロールバックで在庫を戻す。戻した結果 quantity>0 になった item を追加するため refetch が必要だが、
+    // 現ストアに存在しない item（quantity=0 で除外済み）は map で更新できない。
+    // ロールバック対象は completeSchedule 時に除外された item のため、ここでは再追加のために rollbackUpdates から合成する。
+    setInventoryItemsForMeals((items) => {
+      const updated = items.map((item) => {
         const update = rollbackUpdates.find((entry) => entry.id === item.id);
         return update ? { ...item, quantity: update.nextQuantity, ...archiveFieldsForCookingQuantity(update.nextQuantity) } : item;
-      })
-    );
+      });
+      // ストアに存在しない item（消費で quantity=0 になりフィルタ済み）は rollbackUpdates の stockItem から補完できないため refetch で最新化。
+      // rollbackUpdates に id があっても items に存在しない場合は void refetch を非同期で発火する（UI を止めない）。
+      const missingIds = rollbackUpdates.filter((u) => !items.some((item) => item.id === u.id));
+      if (missingIds.length > 0) {
+        // ストアから欠けた item があれば refetch して最新データを取得する（非同期・エラーは無視）。
+        supabase
+          .from("inventory_items")
+          .select("*")
+          .eq("user_id", userId)
+          .is("archived_at", null)
+          .gt("quantity", 0)
+          .order("created_at", { ascending: false })
+          .then(({ data }) => {
+            if (data) setInventoryItemsForMeals(data as StockItem[]);
+          });
+      }
+      return updated.filter((item) => item.quantity > 0);
+    });
     if (selectedScheduleId === schedule.id) {
       const nextSchedule = mealSchedules.find((item) => item.id !== schedule.id);
       setSelectedScheduleId(nextSchedule?.id ?? "");
     }
-    router.refresh();
+    // 削除した買い物リスト項目を共有ストアから除去し、他ボードへリロードなしで反映する（TKT-0244）。
+    if (removedShoppingCount > 0) {
+      const removedIds = new Set(removedShopping?.map((item) => item.id) ?? []);
+      setShoppingItems((items) => items.filter((item) => !removedIds.has(item.id)));
+    }
+    void refetch(userId);
     const baseMessage = `${schedule.recipe_name || "献立"} を献立から削除しました。`;
     const shoppingMessage = removedShoppingCount > 0 ? ` 関連する未購入の買い物リスト ${removedShoppingCount}件も削除しました。` : "";
     setFeedback({ tone: "info", message: baseMessage + shoppingMessage });
@@ -1962,13 +1991,28 @@ export function RecipeMealWorkspace({
     }
 
     setMealSchedules((items) => items.map((item) => (item.id === schedule.id ? (data as MealSchedule) : item)));
-    setInventoryItemsForMeals((items) =>
-      items.map((item) => {
+    // ロールバックで在庫を戻す。quantity=0 でストアから除外済みの item は再追加が必要なため refetch 発火。
+    setInventoryItemsForMeals((items) => {
+      const updated = items.map((item) => {
         const update = rollbackResult.updates.find((entry) => entry.id === item.id);
         return update ? { ...item, quantity: update.nextQuantity, ...archiveFieldsForCookingQuantity(update.nextQuantity) } : item;
-      })
-    );
-    router.refresh();
+      });
+      const missingIds = rollbackResult.updates.filter((u) => !items.some((item) => item.id === u.id));
+      if (missingIds.length > 0) {
+        supabase
+          .from("inventory_items")
+          .select("*")
+          .eq("user_id", userId)
+          .is("archived_at", null)
+          .gt("quantity", 0)
+          .order("created_at", { ascending: false })
+          .then(({ data: freshData }) => {
+            if (freshData) setInventoryItemsForMeals(freshData as StockItem[]);
+          });
+      }
+      return updated.filter((item) => item.quantity > 0);
+    });
+    void refetch(userId);
     showToast(`${schedule.recipe_name || "献立"} の完了を取り消し、在庫を戻しました。`, "success");
   }
 
@@ -2043,7 +2087,10 @@ export function RecipeMealWorkspace({
 
     closeShortageSelectionModal();
     setFeedback({ tone: "success", message: `${data.length}件の不足材料を買い物リストへ追加しました。` });
-    router.refresh();
+    // 共有ストアへ買い物リストを反映させ、他ボード（在庫）へリロードなしで同期する（TKT-0244）。
+    setShoppingItems((items) => [...(data as ShoppingItem[]), ...items]);
+    // 必要に応じて他の mutation との整合性チェック用に非同期リフレッシュも開始（オプション）。
+    
   }
 
   function moveCookingStep(draggedId: string, targetKind: CookingStepKind, targetIndex: number) {
@@ -2345,14 +2392,12 @@ export function RecipeMealWorkspace({
       if (isOpeningConsumption) return;
       setIsOpeningConsumption(true);
 
-      // ダイアログを開く瞬間に在庫を再取得し、食材管理での追加・補充を自動マッチングへ反映する。
-      // 取得結果（fresh）をローカル変数のまま buildConsumptionDrafts に渡す（setState の反映待ちに依存しない）。
+      // ダイアログを開く瞬間に在庫を再取得し、共有ストアへ即時反映する（食材管理での追加・補充を自動マッチングへ反映）。
+      // 取得結果（fresh）をローカル変数のまま buildConsumptionDrafts に渡す（setState の反映待ちに依存しない stale-read 回避）。
+      // fetchFreshInventoryForMeals 内で setInventoryItemsForMeals(fresh) を呼ぶため、在庫一覧タブ切替でも即時反映される。
       // 取得失敗時は既存スナップショットでフォールバックし、操作はブロックしない。
       const fresh = await fetchFreshInventoryForMeals();
       const inventoryForDrafts = fresh ?? inventoryItemsForMeals;
-      if (fresh) {
-        setInventoryItemsForMeals(fresh);
-      }
 
       setPendingConsumptionScheduleId(schedule.id);
       setConsumptionDrafts(buildConsumptionDrafts(schedule, inventoryForDrafts));
@@ -2585,11 +2630,14 @@ export function RecipeMealWorkspace({
     }
 
     setMealSchedules((items) => items.map((item) => (item.id === schedule.id ? (updatedSchedule as MealSchedule) : item)));
+    // 在庫減算後に quantity<=0 になった item はストアから除外する（ストアは quantity>0 のみ保持の方針）。
     setInventoryItemsForMeals((items) =>
-      items.map((item) => {
-        const consumed = consumedRows.find((row) => row.stockItem.id === item.id);
-        return consumed ? { ...item, quantity: consumed.nextQuantity, ...archiveFieldsForCookingQuantity(consumed.nextQuantity) } : item;
-      })
+      items
+        .map((item) => {
+          const consumed = consumedRows.find((row) => row.stockItem.id === item.id);
+          return consumed ? { ...item, quantity: consumed.nextQuantity, ...archiveFieldsForCookingQuantity(consumed.nextQuantity) } : item;
+        })
+        .filter((item) => item.quantity > 0)
     );
     setIsSaving(false);
     setPendingConsumptionScheduleId(null);
@@ -2598,7 +2646,7 @@ export function RecipeMealWorkspace({
     resetCookingRecordDraft();
     setActiveCookingRecipeId("");
     setCookingScheduleId(null);
-    router.refresh();
+    void refetch(userId);
     showToast(photoWarning || `${schedule.recipe_name} を調理完了にしました。料理履歴にも記録済みです。`, photoWarning ? "error" : "success");
   }
 

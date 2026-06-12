@@ -29,6 +29,14 @@ vi.mock("@/components/web-mode-shell", () => ({
   })
 }));
 
+vi.mock("@/components/inventory-store", () => ({
+  useInventoryStore: () => ({
+    inventoryItems: [],
+    setInventoryItems: vi.fn(),
+    refetch: vi.fn(async () => {})
+  })
+}));
+
 vi.mock("@/components/cooking-record-edit-modal", () => ({
   CookingRecordEditModal: ({ item, onClose }: { item: CookingHistoryItem; onClose: () => void }) => (
     <div role="dialog" aria-label="料理記録を編集">

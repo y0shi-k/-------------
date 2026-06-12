@@ -213,3 +213,8 @@ page.tsx が一度だけフェッチした在庫を InventoryBoard と RecipeMea
 ### 判断基準
 - 本番/hosted データでの消費系E2Eはやらない（実在庫を減らす）。ローカルスタック一択。
 - jsdom テストで担保できない「実DB・実ブラウザの一連フロー」（自動マッチ・減算・分数表示・完了状態）を確認したいときに使う。
+
+## 2026-06-12 ticket_status.py の completed 移動は related_specs の SPEC を未完了チケットが残っていても specs/completed/ へ動かす（TKT-0243）
+
+- 事象: TKT-0243 を completed にしたら SPEC-0242 が specs/completed/ へ自動移動されたが、同 SPEC を related_specs に持つ TKT-0244/0245 はまだ未完了だった。手で specs/ へ戻した。
+- 再発防止: 複数チケットで共有する SPEC は、**最後の参照チケットの finalize 時のみ** completed 移動を受け入れる。途中のチケット完了時に動いたら specs/ へ戻す（ファイル名・id は不変なので mv で安全）。恒久対応するなら ticket_status.py に「他の未完了チケットが参照中なら SPEC を動かさない」ガードを足す（未実装）。

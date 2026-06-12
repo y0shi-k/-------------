@@ -7,6 +7,9 @@
 
 ## 2026-06
 
+- TKT-0244 — 残り mutation 経路の画面間反映統一（SPEC-0242 T3）。買い物リストを共有ストアへ拡張し inventory-board のローカル state 二重管理を撤廃、買い物追加/レシピ保存/献立削除/履歴編集の router.refresh 依存 9 箇所を削除（残 6 箇所は対応不要判定＝report の表）。schema/auth/RLS/Storage 無変更（危険evalは過剰マッチ＝report/review 記録）。verify pass。残: 実機スモーク（レシピ側で不足分追加→在庫ボードの買い物リストに即時表示）。
+- TKT-0243 — 献立側を共有在庫ストアへ移行（SPEC-0242 T2・発端不具合「調理完了→在庫一覧に戻っても減っていない」の解消点）。inventoryItemsForMeals の useState 複製を撤廃しストア参照化、消費確定/ロールバック/リフェッチをストア反映（quantity>0 フィルタ一貫適用）、料理記録編集後も refetch で反映。schema/auth/RLS/Storage 無変更（危険evalはトークン過剰マッチ＝report/review 記録）。verify pass（557件）。残: 実機スモーク（調理完了→タブ切替で即時反映）・記録モーダルの在庫鮮度は TKT-0244。
+- TKT-0242 — 共有在庫ストア Context 新設（inventory-store.tsx: state+楽観的setter+refetch、refetchはpage.tsx初回フェッチと一致）＋InventoryBoard の在庫系 useState 複製を撤廃しストア移行（SPEC-0242 T1/4）。schema/auth/RLS/Storage 無変更（eval過剰マッチはreport記録）。verify pass。残: 発端不具合の解消は TKT-0243（献立側移行）完了時。
 - TKT-0241 追補 — 消費行の単位セレクタ（g/パック）が大きすぎ在庫セレクト/数値が見切れる問題をCSSで修正（unit-selectコンパクト化＋数値欄108→92px。ブラウザE2Eで再計測・再verify pass）。
 - TKT-0241 — 消費フローの単位換算対応（在庫 パック・1パック=80g がレシピ g にマッチ／g⇔パック切替消費／在庫単位で減算・イベント記録／残量分数表示「3 1/2」）。ローカルSupabase+PlaywrightのブラウザE2Eでユーザー実例（120g→残3.5パック）を実証（learnings に手順）。残: ユーザー実機確認。
 - TKT-0240 — ユーザー同義語辞書の複数行グループを Union-Find で推移的統合（「A＝B」「B＝C」で A↔C が切れる潜在バグ修正・実害発生前に対処）。verify pass。
