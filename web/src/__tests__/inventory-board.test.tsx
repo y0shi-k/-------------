@@ -605,7 +605,7 @@ describe("InventoryBoard", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "AI解析する" }));
 
-    expect(await screen.findByText(/原因: ユーザー自身のGemini APIキーが未入力です。/)).toBeTruthy();
+    expect(await screen.findByText(/原因: 無料用Gemini APIキーが未入力です。/)).toBeTruthy();
     expect(storageFrom).not.toHaveBeenCalled();
     expect(fetch).not.toHaveBeenCalled();
   });
@@ -708,6 +708,80 @@ describe("InventoryBoard", () => {
       expect(inventoryInsert).toHaveBeenCalledWith([aiItem]);
     });
     expect(await screen.findByText("1件を在庫に追加しました。")).toBeTruthy();
+  });
+
+  it("reuses uploaded photoIds when continuing with the paid Gemini API key", async () => {
+    localStorage.setItem("stock-master:user-gemini-api-key:free", "free-test-key");
+    localStorage.setItem("stock-master:user-gemini-api-key:paid", "paid-test-key");
+    const upload = vi.fn().mockResolvedValue({ error: null });
+    const remove = vi.fn().mockResolvedValue({ error: null });
+    const photoSingle = vi.fn().mockResolvedValue({ data: { id: "photo-1" }, error: null });
+    const photoSelect = vi.fn(() => ({ single: photoSingle }));
+    const photoInsert = vi.fn(() => ({ select: photoSelect }));
+    const compressedBlob = new Blob(["compressed"], { type: "image/jpeg" });
+    const aiItem = {
+      user_id: "user-1",
+      category: "食材",
+      name: "ヨーグルト",
+      quantity: 1,
+      unit: "個",
+      unit_conversion: null,
+      display_expires_on: null,
+      effective_expires_on: null,
+      storage_location: "冷蔵庫",
+      status_note: "AI解析候補",
+      source: "ai_photo"
+    };
+
+    storageFrom.mockReturnValue({ upload, remove });
+    from.mockImplementation((table: string) => {
+      if (table === "photos") return { insert: photoInsert };
+      return {};
+    });
+    compressImageFile.mockResolvedValue({
+      blob: compressedBlob,
+      byteSize: compressedBlob.size,
+      contentType: "image/jpeg",
+      width: 1024,
+      height: 768
+    });
+    vi.mocked(fetch)
+      .mockResolvedValueOnce({
+        ok: false,
+        json: async () => ({
+          error: "原因: Gemini APIの解析に失敗しました。影響: 食材候補を作成できません。修正方法: 時間を置いて再度解析してください。"
+        })
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ items: [aiItem] })
+      } as Response);
+
+    renderBoard();
+    openPhotoScan();
+
+    fireEvent.change(screen.getByLabelText("写真を撮る"), {
+      target: {
+        files: [new File(["photo"], "ingredient.jpg", { type: "image/jpeg" })]
+      }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "AI解析する" }));
+
+    expect(await screen.findByRole("region", { name: "Gemini API再実行" })).toBeTruthy();
+    expect(upload).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole("button", { name: "有料APIで続行" }));
+
+    await waitFor(() => {
+      expect(fetch).toHaveBeenLastCalledWith("/api/ai/scan-ingredients", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ photoIds: ["photo-1"], geminiApiKey: "paid-test-key" })
+      });
+    });
+    expect(upload).toHaveBeenCalledTimes(1);
+    expect(await screen.findByText("1件の候補を見つけました。確認してから在庫に追加してください。")).toBeTruthy();
   });
 
   it("uploads multiple selected photos and merges AI candidates", async () => {

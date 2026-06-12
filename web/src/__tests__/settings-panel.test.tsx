@@ -41,17 +41,23 @@ describe("SettingsPanel", () => {
     expect(screen.getByText("user@example.com")).toBeTruthy();
   });
 
-  it("masks the API key input and persists it via the panel", () => {
+  it("masks the free and paid API key inputs and persists them via the panel", () => {
     renderPanel();
 
-    const input = screen.getByLabelText("ユーザー自身のAPIキー") as HTMLInputElement;
-    expect(input.type).toBe("password");
+    const freeInput = screen.getByLabelText("無料Gemini APIキー") as HTMLInputElement;
+    const paidInput = screen.getByLabelText("有料Gemini APIキー") as HTMLInputElement;
+    expect(freeInput.type).toBe("password");
+    expect(paidInput.type).toBe("password");
 
-    fireEvent.change(input, { target: { value: "user-owned-test-key" } });
-    fireEvent.click(screen.getByRole("button", { name: "この端末に保存" }));
+    fireEvent.change(freeInput, { target: { value: "free-test-key" } });
+    fireEvent.click(screen.getAllByRole("button", { name: "この端末に保存" })[0]);
+    fireEvent.change(paidInput, { target: { value: "paid-test-key" } });
+    fireEvent.click(screen.getAllByRole("button", { name: "この端末に保存" })[1]);
 
-    expect(localStorage.getItem("stock-master:user-gemini-api-key")).toBe("user-owned-test-key");
-    expect(input.value).toBe("user-owned-test-key");
+    expect(localStorage.getItem("stock-master:user-gemini-api-key:free")).toBe("free-test-key");
+    expect(localStorage.getItem("stock-master:user-gemini-api-key:paid")).toBe("paid-test-key");
+    expect(freeInput.value).toBe("free-test-key");
+    expect(paidInput.value).toBe("paid-test-key");
   });
 
   it("renders the logout button and calls onClose from the back button", () => {

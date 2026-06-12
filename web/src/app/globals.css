@@ -2296,6 +2296,17 @@ h1 {
   padding: 12px;
 }
 
+.gemini-key-field {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.gemini-key-field + .gemini-key-field {
+  border-top: 1px solid #bfdbfe;
+  padding-top: 10px;
+}
+
 .gemini-key-heading,
 .gemini-key-actions {
   display: flex;
@@ -2338,6 +2349,34 @@ h1 {
   font-size: 0.78rem;
   font-weight: 700;
   line-height: 1.5;
+}
+
+.ai-fallback-panel {
+  display: grid;
+  gap: 8px;
+  border: 1px solid #fed7aa;
+  border-radius: 8px;
+  background: #fff7ed;
+  padding: 12px;
+}
+
+.ai-fallback-panel p,
+.ai-fallback-panel small {
+  margin: 0;
+  color: #7c2d12;
+  font-weight: 800;
+  line-height: 1.5;
+}
+
+.ai-fallback-panel small {
+  color: #9a3412;
+  font-size: 0.78rem;
+}
+
+.ai-fallback-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .ai-usage-meter {
@@ -7710,6 +7749,14 @@ h1 {
 
   .gemini-key-heading .secondary-button,
   .gemini-key-actions .secondary-button {
+    width: 100%;
+  }
+
+  .ai-fallback-actions {
+    flex-direction: column;
+  }
+
+  .ai-fallback-actions button {
     width: 100%;
   }
 

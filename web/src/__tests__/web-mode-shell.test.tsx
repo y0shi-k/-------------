@@ -137,7 +137,8 @@ describe("WebModeShell", () => {
     expect(screen.getByRole("region", { name: "Gemini APIキー設定" })).toBeTruthy();
     expect(screen.getByRole("region", { name: "本日のAI残り回数" })).toBeTruthy();
     expect(screen.getByRole("region", { name: "アカウント" })).toBeTruthy();
-    expect(screen.getByLabelText("ユーザー自身のAPIキー")).toBeTruthy();
+    expect(screen.getByLabelText("無料Gemini APIキー")).toBeTruthy();
+    expect(screen.getByLabelText("有料Gemini APIキー")).toBeTruthy();
     expect(screen.getAllByRole("button", { name: "ログアウト" }).length).toBeGreaterThan(0);
     // ボードはマウントされたまま hidden になり、設定だけが見える
     expect(screen.getByText("食材管理の中身").closest("section")?.hidden).toBe(true);

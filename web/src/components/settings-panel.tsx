@@ -6,6 +6,7 @@ import { AiUsageMeter } from "@/components/ai-usage-meter";
 import { GeminiApiKeyPanel } from "@/components/gemini-api-key-panel";
 import { LogoutButton } from "@/components/logout-button";
 import { useShellAiUsage } from "@/components/web-mode-shell";
+import type { UserGeminiApiKeys } from "@/lib/ai/user-gemini-api-key";
 import {
   applyStockCardBgIntensity,
   applyStockLabelBg,
@@ -35,7 +36,7 @@ type SettingsPanelProps = {
 };
 
 export function SettingsPanel({ userEmail, isAdmin = false, onClose }: SettingsPanelProps) {
-  const [geminiApiKey, setGeminiApiKey] = useState("");
+  const [geminiApiKeys, setGeminiApiKeys] = useState<UserGeminiApiKeys>({ free: "", paid: "" });
   const [bgIntensity, setBgIntensity] = useState(DEFAULT_INTENSITY);
   const [labelColor, setLabelColor] = useState(DEFAULT_LABEL_BG_COLOR);
   const [labelAlpha, setLabelAlpha] = useState(DEFAULT_LABEL_BG_ALPHA);
@@ -96,7 +97,7 @@ export function SettingsPanel({ userEmail, isAdmin = false, onClose }: SettingsP
           <h3>Gemini APIキー</h3>
           <p>この端末のブラウザにのみ保存し、AI実行時だけサーバーへ送ります。</p>
         </div>
-        <GeminiApiKeyPanel apiKey={geminiApiKey} id="settings-gemini-api-key" onChange={setGeminiApiKey} />
+        <GeminiApiKeyPanel apiKeys={geminiApiKeys} id="settings-gemini-api-key" onChange={setGeminiApiKeys} />
       </section>
 
       <section className="settings-section" aria-label="食材カードの背景写真">

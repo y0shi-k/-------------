@@ -750,8 +750,59 @@ describe("RecipeMealWorkspace", () => {
     fireEvent.change(screen.getByLabelText("必須食材"), { target: { value: "豚肉" } });
     fireEvent.click(screen.getByRole("button", { name: "AIレシピを編集モーダルで開く" }));
 
-    expect(await screen.findByText(/原因: ユーザー自身のGemini APIキーが未入力です。/)).toBeTruthy();
+    expect(await screen.findByText(/原因: 無料用Gemini APIキーが未入力です。/)).toBeTruthy();
     expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("continues with the paid Gemini API key only after the user chooses it", async () => {
+    localStorage.setItem("stock-master:user-gemini-api-key:free", "free-test-key");
+    localStorage.setItem("stock-master:user-gemini-api-key:paid", "paid-test-key");
+    vi.mocked(fetch)
+      .mockResolvedValueOnce({
+        ok: false,
+        json: async () => ({
+          error: "原因: Gemini APIのレシピ生成に失敗しました。影響: レシピ案を表示できません。修正方法: 時間を置いて再度お試しください。"
+        })
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          recipe: {
+            name: "豚キャベツ炒め",
+            genre: "和食",
+            source: "AI提案",
+            prep_steps: "キャベツを切る",
+            steps: "豚肉を炒める",
+            ingredients: [{ item_type: "食材", name: "豚肉", amount: "200", unit: "g" }]
+          }
+        })
+      } as Response);
+
+    renderWorkspace();
+
+    fireEvent.change(screen.getByLabelText("必須食材"), { target: { value: "豚肉" } });
+    fireEvent.click(screen.getByRole("button", { name: "AIレシピを編集モーダルで開く" }));
+
+    expect(await screen.findByRole("region", { name: "Gemini API再実行" })).toBeTruthy();
+    expect(fetch).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole("button", { name: "有料APIで続行" }));
+
+    await waitFor(() => {
+      expect(fetch).toHaveBeenLastCalledWith(
+        "/api/ai/recipes",
+        expect.objectContaining({
+          body: JSON.stringify({
+            mode: "generate",
+            geminiApiKey: "paid-test-key",
+            required: "豚肉",
+            optional: "",
+            sourceText: ""
+          }),
+          method: "POST"
+        })
+      );
+    });
+    expect(await screen.findByRole("heading", { name: "新規レシピ" })).toBeTruthy();
   });
 
   it("disables the AI recipe button and shows remaining counts when the recipe limit is reached", async () => {

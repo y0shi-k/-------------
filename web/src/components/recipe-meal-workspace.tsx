@@ -44,7 +44,7 @@ import {
   splitLines,
   toRecipeFormValues
 } from "@/lib/recipes/types";
-import { loadUserGeminiApiKey } from "@/lib/ai/user-gemini-api-key";
+import { loadUserGeminiApiKeys, type UserGeminiApiKeys } from "@/lib/ai/user-gemini-api-key";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import { buildCookingHistoryPhotoStoragePath, compressImageFile, compressRecipeImageFile } from "@/lib/photos/compress";
 import { computeRollbackQuantityUpdates, type RollbackConsumptionEvent } from "@/lib/cooking-history/rollback";
@@ -103,6 +103,7 @@ type ConsumptionDraft = {
 type ConsumptionBulkMode = "default" | "zero";
 
 type AiRecipeMode = "generate" | "structure";
+type AiApiKeyKind = "free" | "paid";
 type RecipeWorkspaceView = "recipes" | "schedule";
 
 type CookingIngredientTab = "all" | "食材" | "調味料";
@@ -165,6 +166,13 @@ type NormalizedRecipeForm =
       };
     }
   | { error: string };
+
+type AiRecipeRequestInput = {
+  mode: AiRecipeMode;
+  required: string;
+  optional: string;
+  sourceText: string;
+};
 
 function todayValue() {
   const today = new Date();
@@ -528,7 +536,8 @@ export function RecipeMealWorkspace({
   const [cookingStockCheck, setCookingStockCheck] = useState(false);
   const [highlightedIngredientName, setHighlightedIngredientName] = useState("");
   const [aiMode, setAiMode] = useState<AiRecipeMode>("generate");
-  const [geminiApiKey, setGeminiApiKey] = useState("");
+  const [geminiApiKeys, setGeminiApiKeys] = useState<UserGeminiApiKeys>({ free: "", paid: "" });
+  const [pendingAiRecipeRetry, setPendingAiRecipeRetry] = useState<AiRecipeRequestInput | null>(null);
   const [aiRequired, setAiRequired] = useState("");
   const [aiOptional, setAiOptional] = useState("");
   const [aiSourceText, setAiSourceText] = useState("");
@@ -633,7 +642,7 @@ export function RecipeMealWorkspace({
   const allVisibleShortagesSelected = filteredShortageSelectionItems.length > 0 && filteredShortageSelectionItems.every((item) => item.selected);
 
   useEffect(() => {
-    setGeminiApiKey(loadUserGeminiApiKey());
+    setGeminiApiKeys(loadUserGeminiApiKeys());
   }, []);
 
   useEffect(() => {
@@ -913,11 +922,14 @@ export function RecipeMealWorkspace({
     );
   }
 
-  async function runAiRecipe(overrides?: Partial<{ mode: AiRecipeMode; required: string; optional: string; sourceText: string }>): Promise<RecipeFormValues | null> {
-    const mode = overrides?.mode ?? aiMode;
-    const required = overrides?.required ?? aiRequired;
-    const optional = overrides?.optional ?? aiOptional;
-    const sourceText = overrides?.sourceText ?? aiSourceText;
+  async function runAiRecipe(overrides?: Partial<AiRecipeRequestInput>, apiKeyKind: AiApiKeyKind = "free"): Promise<RecipeFormValues | null> {
+    const input: AiRecipeRequestInput = {
+      mode: overrides?.mode ?? aiMode,
+      required: overrides?.required ?? aiRequired,
+      optional: overrides?.optional ?? aiOptional,
+      sourceText: overrides?.sourceText ?? aiSourceText
+    };
+    const { mode, required, optional, sourceText } = input;
     if (!required.trim() && !optional.trim() && !sourceText.trim()) {
       setFeedback({
         tone: "error",
@@ -926,11 +938,14 @@ export function RecipeMealWorkspace({
       return null;
     }
 
-    const trimmedApiKey = geminiApiKey.trim();
+    const trimmedApiKey = geminiApiKeys[apiKeyKind].trim();
     if (!trimmedApiKey) {
       setFeedback({
         tone: "error",
-        message: "原因: ユーザー自身のGemini APIキーが未入力です。影響: AIレシピを実行できません。修正方法: 設定画面でGemini APIキーを登録してから再度お試しください。"
+        message:
+          apiKeyKind === "free"
+            ? "原因: 無料用Gemini APIキーが未入力です。影響: AIレシピを実行できません。修正方法: 設定画面で無料用Gemini APIキーを登録してから再度お試しください。"
+            : "原因: 有料Gemini APIキーが未入力です。影響: 有料APIで続行できません。修正方法: 設定画面で有料用Gemini APIキーを登録してから再度お試しください。"
       });
       return null;
     }
@@ -944,6 +959,7 @@ export function RecipeMealWorkspace({
     }
 
     setIsAiRunning(true);
+    setPendingAiRecipeRetry(null);
     setFeedback(null);
 
     try {
@@ -963,6 +979,9 @@ export function RecipeMealWorkspace({
       const result = (await response.json().catch(() => ({}))) as { recipe?: RecipeFormValues; error?: string };
 
       if (!response.ok || !result.recipe) {
+        if (apiKeyKind === "free") {
+          setPendingAiRecipeRetry(input);
+        }
         setFeedback({
           tone: "error",
           message: result.error || "原因: AIレシピの取得に失敗しました。影響: 編集モーダルを開けません。修正方法: 時間を置いて再度お試しください。"
@@ -972,6 +991,9 @@ export function RecipeMealWorkspace({
 
       return result.recipe;
     } catch {
+      if (apiKeyKind === "free") {
+        setPendingAiRecipeRetry(input);
+      }
       setFeedback({
         tone: "error",
         message: "原因: AIレシピ通信に失敗しました。影響: 編集モーダルを開けません。修正方法: 通信状態を確認してください。"
@@ -982,6 +1004,17 @@ export function RecipeMealWorkspace({
       // 成功・429いずれの場合も残り回数表示を更新する。
       void refreshAiUsage();
     }
+  }
+
+  async function retryAiRecipe(apiKeyKind: AiApiKeyKind) {
+    if (!pendingAiRecipeRetry) return;
+    const recipe = await runAiRecipe(pendingAiRecipeRetry, apiKeyKind);
+    if (recipe) applyRecipeToEditor(recipe);
+  }
+
+  function cancelAiRecipeRetry() {
+    setPendingAiRecipeRetry(null);
+    setFeedback({ tone: "info", message: "AIレシピの再実行をキャンセルしました。入力内容はそのまま残しています。" });
   }
 
   function applyRecipeToEditor(recipe: RecipeFormValues) {
@@ -3067,6 +3100,24 @@ export function RecipeMealWorkspace({
         <p className="sr-only" role="status">
           {feedback.message}
         </p>
+      ) : null}
+
+      {pendingAiRecipeRetry ? (
+        <section className="ai-fallback-panel" aria-label="Gemini API再実行">
+          <p>無料APIでエラーになりました。同じ内容で再実行できます。</p>
+          <small>有料APIキーを使用します。Google側で料金が発生する可能性があります。</small>
+          <div className="ai-fallback-actions">
+            <button className="secondary-button" type="button" disabled={isAiRunning || recipeLimitReached} onClick={() => retryAiRecipe("free")}>
+              無料APIで再試行
+            </button>
+            <button className="primary-button" type="button" disabled={isAiRunning || recipeLimitReached} onClick={() => retryAiRecipe("paid")}>
+              有料APIで続行
+            </button>
+            <button className="secondary-button" type="button" disabled={isAiRunning} onClick={cancelAiRecipeRetry}>
+              キャンセル
+            </button>
+          </div>
+        </section>
       ) : null}
 
       {pendingDelete ? (

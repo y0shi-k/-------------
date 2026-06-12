@@ -20,7 +20,7 @@ import { getCustomFractions } from "@/lib/format/fraction-candidates";
 import { UnitPicker } from "@/components/unit-picker";
 import { useInventoryStore } from "@/components/inventory-store";
 import { useShellAiUsage, useShellSubView, type InventoryShellLeaf } from "@/components/web-mode-shell";
-import { loadUserGeminiApiKey } from "@/lib/ai/user-gemini-api-key";
+import { loadUserGeminiApiKeys, type UserGeminiApiKeys } from "@/lib/ai/user-gemini-api-key";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import {
   emptyStockItemFormValues,
@@ -64,6 +64,8 @@ type Feedback = {
   tone: "success" | "error" | "info";
   message: string;
 };
+
+type AiApiKeyKind = "free" | "paid";
 
 const inventorySaveErrorMessage =
   "原因: 在庫をDBへ保存できませんでした。影響: 入力した食材は在庫一覧に追加されません。修正方法: ログイン状態と入力内容を確認してください。";
@@ -253,7 +255,8 @@ export function InventoryBoard({
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
   const [addFlow, setAddFlow] = useState<AddFlow>(null);
   const [photoFeedback, setPhotoFeedback] = useState<Feedback | null>(null);
-  const [geminiApiKey, setGeminiApiKey] = useState("");
+  const [geminiApiKeys, setGeminiApiKeys] = useState<UserGeminiApiKeys>({ free: "", paid: "" });
+  const [pendingScanRetryPhotoIds, setPendingScanRetryPhotoIds] = useState<string[] | null>(null);
   const [selectedPhotos, setSelectedPhotos] = useState<File[]>([]);
   const [photoPreviewUrls, setPhotoPreviewUrls] = useState<string[]>([]);
   const [selectedIngredientImage, setSelectedIngredientImage] = useState<File | null>(null);
@@ -297,7 +300,7 @@ export function InventoryBoard({
   });
 
   useEffect(() => {
-    setGeminiApiKey(loadUserGeminiApiKey());
+    setGeminiApiKeys(loadUserGeminiApiKeys());
   }, []);
 
   // 食材カードの背景写真の濃さ・文字背景（設定）を localStorage から読み、CSS変数に反映する。
@@ -676,6 +679,110 @@ export function InventoryBoard({
     return resolveUserIngredientImage(values.name, userIngredientImages);
   }
 
+  async function runIngredientScan(photoIds: string[], apiKeyKind: AiApiKeyKind, failedPhotoSaveCount = 0) {
+    const trimmedApiKey = geminiApiKeys[apiKeyKind].trim();
+    if (!trimmedApiKey) {
+      setPhotoFeedback({
+        tone: "error",
+        message:
+          apiKeyKind === "free"
+            ? "原因: 無料用Gemini APIキーが未入力です。影響: AI解析を実行できません。修正方法: 設定画面で無料用Gemini APIキーを登録してから再度お試しください。"
+            : "原因: 有料Gemini APIキーが未入力です。影響: 有料APIで続行できません。修正方法: 設定画面で有料用Gemini APIキーを登録してから再度お試しください。"
+      });
+      return;
+    }
+
+    if (scanLimitReached) {
+      setPhotoFeedback({
+        tone: "error",
+        message: "原因: 本日の食材写真解析の上限に達しました。影響: 今日は食材写真解析を実行できません。修正方法: 明日再度お試しください。"
+      });
+      return;
+    }
+
+    setPendingScanRetryPhotoIds(null);
+    setPhotoFeedback({ tone: "info", message: `${photoIds.length}枚の写真をAIで食材候補に解析しています。` });
+
+    let scanResponse: Response;
+    let scanResult: ScanIngredientsResponse;
+    try {
+      scanResponse = await fetch("/api/ai/scan-ingredients", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ photoIds, geminiApiKey: trimmedApiKey })
+      });
+      scanResult = (await scanResponse.json().catch(() => ({}))) as ScanIngredientsResponse;
+    } catch {
+      if (apiKeyKind === "free") {
+        setPendingScanRetryPhotoIds(photoIds);
+      }
+      setPhotoFeedback({
+        tone: "error",
+        message: "原因: AI解析通信に失敗しました。影響: 食材候補を作成できません。修正方法: 通信状態を確認してください。"
+      });
+      return;
+    }
+
+    // 成功・429いずれの場合も残り回数表示を更新する。
+    void refreshAiUsage();
+
+    if (!scanResponse.ok || scanResult.error || !scanResult.items) {
+      if (apiKeyKind === "free") {
+        setPendingScanRetryPhotoIds(photoIds);
+      }
+      setPhotoFeedback({
+        tone: "error",
+        message:
+          scanResult.error ||
+          "原因: AI解析結果を取得できませんでした。影響: 食材候補を作成できません。修正方法: 時間を置いて再度解析してください。"
+      });
+      return;
+    }
+
+    const hadExistingCandidates = scanCandidates.length > 0;
+    const candidateBatchId = `${Date.now()}-${photoIds.join("-")}`;
+    const candidates = (scanResult.items ?? []).map((item, index) => ({
+      clientId: `${candidateBatchId}-${index}`,
+      item
+    }));
+    setScanCandidates((current) => [...current, ...candidates]);
+    setSelectedScanCandidateIds((current) => [...new Set([...current, ...candidates.map((candidate) => candidate.clientId)])]);
+    resetPhoto();
+    const failedCount = failedPhotoSaveCount + (scanResult.failedCount ?? 0);
+    setPhotoFeedback({
+      tone: failedCount > 0 ? "info" : "success",
+      message:
+        failedCount > 0
+          ? `${candidates.length}件の候補を${hadExistingCandidates ? "追加しました" : "見つけました"}。${failedCount}枚は解析できませんでした。成功分を確認してから在庫に追加してください。`
+          : `${candidates.length}件の候補を${hadExistingCandidates ? "追加しました" : "見つけました"}。確認してから在庫に追加してください。`
+    });
+  }
+
+  async function retryIngredientScan(apiKeyKind: AiApiKeyKind) {
+    if (!pendingScanRetryPhotoIds) return;
+    setIsUploadingPhoto(true);
+    try {
+      await runIngredientScan(pendingScanRetryPhotoIds, apiKeyKind);
+    } catch {
+      if (apiKeyKind === "free") {
+        setPendingScanRetryPhotoIds(pendingScanRetryPhotoIds);
+      }
+      setPhotoFeedback({
+        tone: "error",
+        message: "原因: AI解析通信に失敗しました。影響: 食材候補を作成できません。修正方法: 通信状態を確認してください。"
+      });
+    } finally {
+      setIsUploadingPhoto(false);
+    }
+  }
+
+  function cancelIngredientScanRetry() {
+    setPendingScanRetryPhotoIds(null);
+    setPhotoFeedback({ tone: "info", message: "AI解析の再実行をキャンセルしました。保存済み写真は既存フローに合わせて保持します。" });
+  }
+
   async function scanPhoto() {
     if (selectedPhotos.length === 0) {
       setPhotoFeedback({
@@ -685,11 +792,10 @@ export function InventoryBoard({
       return;
     }
 
-    const trimmedApiKey = geminiApiKey.trim();
-    if (!trimmedApiKey) {
+    if (!geminiApiKeys.free.trim()) {
       setPhotoFeedback({
         tone: "error",
-        message: "原因: ユーザー自身のGemini APIキーが未入力です。影響: AI解析を実行できません。修正方法: 設定画面でGemini APIキーを登録してから再度お試しください。"
+        message: "原因: 無料用Gemini APIキーが未入力です。影響: AI解析を実行できません。修正方法: 設定画面で無料用Gemini APIキーを登録してから再度お試しください。"
       });
       return;
     }
@@ -703,6 +809,7 @@ export function InventoryBoard({
     }
 
     setIsUploadingPhoto(true);
+    setPendingScanRetryPhotoIds(null);
     setPhotoFeedback(null);
 
     try {
@@ -760,47 +867,9 @@ export function InventoryBoard({
       }
 
       setPhotoFeedback({ tone: "info", message: `${photoIds.length}枚の写真を保存しました。AIで食材候補を解析しています。` });
-
-      const scanResponse = await fetch("/api/ai/scan-ingredients", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ photoIds, geminiApiKey: trimmedApiKey })
-      });
-      const scanResult = (await scanResponse.json().catch(() => ({}))) as ScanIngredientsResponse;
-
-      // 成功・429いずれの場合も残り回数表示を更新する。
-      void refreshAiUsage();
-
-      if (!scanResponse.ok || scanResult.error || !scanResult.items) {
-        setPhotoFeedback({
-          tone: "error",
-          message:
-            scanResult.error ||
-            "原因: AI解析結果を取得できませんでした。影響: 食材候補を作成できません。修正方法: 時間を置いて再度解析してください。"
-        });
-        return;
-      }
-
-      const hadExistingCandidates = scanCandidates.length > 0;
-      const candidateBatchId = `${Date.now()}-${photoIds.join("-")}`;
-      const candidates = (scanResult.items ?? []).map((item, index) => ({
-        clientId: `${candidateBatchId}-${index}`,
-        item
-      }));
-      setScanCandidates((current) => [...current, ...candidates]);
-      setSelectedScanCandidateIds((current) => [...new Set([...current, ...candidates.map((candidate) => candidate.clientId)])]);
-      resetPhoto();
-      const failedCount = failedPhotoSaveCount + (scanResult.failedCount ?? 0);
-      setPhotoFeedback({
-        tone: failedCount > 0 ? "info" : "success",
-        message:
-          failedCount > 0
-            ? `${candidates.length}件の候補を${hadExistingCandidates ? "追加しました" : "見つけました"}。${failedCount}枚は解析できませんでした。成功分を確認してから在庫に追加してください。`
-            : `${candidates.length}件の候補を${hadExistingCandidates ? "追加しました" : "見つけました"}。確認してから在庫に追加してください。`
-      });
+      await runIngredientScan(photoIds, "free", failedPhotoSaveCount);
     } catch {
+      // 写真保存後の通信失敗ではphotoIdsがある場合だけrunIngredientScan側で再試行UIを出す。
       setPhotoFeedback({
         tone: "error",
         message: "原因: 写真の保存またはAI解析に失敗しました。影響: 食材候補を作成できません。修正方法: 別の写真で撮り直してください。"
@@ -1521,6 +1590,24 @@ export function InventoryBoard({
                 <p className="operation-message photo-message" data-tone={photoFeedback.tone} role={photoFeedback.tone === "error" ? "alert" : "status"}>
                   {photoFeedback.message}
                 </p>
+              ) : null}
+
+              {pendingScanRetryPhotoIds ? (
+                <section className="ai-fallback-panel" aria-label="Gemini API再実行">
+                  <p>無料APIでエラーになりました。保存済み写真を使ってAI解析だけ再実行できます。</p>
+                  <small>有料APIキーを使用します。Google側で料金が発生する可能性があります。</small>
+                  <div className="ai-fallback-actions">
+                    <button className="secondary-button" type="button" disabled={isUploadingPhoto || scanLimitReached} onClick={() => retryIngredientScan("free")}>
+                      無料APIで再試行
+                    </button>
+                    <button className="primary-button" type="button" disabled={isUploadingPhoto || scanLimitReached} onClick={() => retryIngredientScan("paid")}>
+                      有料APIで続行
+                    </button>
+                    <button className="secondary-button" type="button" disabled={isUploadingPhoto} onClick={cancelIngredientScanRetry}>
+                      キャンセル
+                    </button>
+                  </div>
+                </section>
               ) : null}
 
               <div className="photo-actions">
