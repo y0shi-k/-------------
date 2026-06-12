@@ -7,6 +7,7 @@
 
 ## 2026-06
 
+- TKT-0245 — クロスボード即時反映の回帰テスト追加（SPEC-0242 T4・イニシアチブ締め）。実物 RecipeMealWorkspace の消費確定フロー（調理開始→料理完了→消費モーダル確定）を jsdom で駆動し共有ストア減算→別Consumer反映を検証＋在庫追加→献立自動マッチ反映。production 無変更・verify pass。impl-fast 2回の疑似検証（setter直叩き）を差し戻し impl-deep で実フロー化。危険evalはモック内テーブル名/「写真」語の誤検知（report/review 記録）。残: なし（E2Eスモークは任意・未実施の理由を report 記録）。
 - TKT-0244 — 残り mutation 経路の画面間反映統一（SPEC-0242 T3）。買い物リストを共有ストアへ拡張し inventory-board のローカル state 二重管理を撤廃、買い物追加/レシピ保存/献立削除/履歴編集の router.refresh 依存 9 箇所を削除（残 6 箇所は対応不要判定＝report の表）。schema/auth/RLS/Storage 無変更（危険evalは過剰マッチ＝report/review 記録）。verify pass。残: 実機スモーク（レシピ側で不足分追加→在庫ボードの買い物リストに即時表示）。
 - TKT-0243 — 献立側を共有在庫ストアへ移行（SPEC-0242 T2・発端不具合「調理完了→在庫一覧に戻っても減っていない」の解消点）。inventoryItemsForMeals の useState 複製を撤廃しストア参照化、消費確定/ロールバック/リフェッチをストア反映（quantity>0 フィルタ一貫適用）、料理記録編集後も refetch で反映。schema/auth/RLS/Storage 無変更（危険evalはトークン過剰マッチ＝report/review 記録）。verify pass（557件）。残: 実機スモーク（調理完了→タブ切替で即時反映）・記録モーダルの在庫鮮度は TKT-0244。
 - TKT-0242 — 共有在庫ストア Context 新設（inventory-store.tsx: state+楽観的setter+refetch、refetchはpage.tsx初回フェッチと一致）＋InventoryBoard の在庫系 useState 複製を撤廃しストア移行（SPEC-0242 T1/4）。schema/auth/RLS/Storage 無変更（eval過剰マッチはreport記録）。verify pass。残: 発端不具合の解消は TKT-0243（献立側移行）完了時。

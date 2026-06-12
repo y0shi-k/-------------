@@ -1,7 +1,7 @@
 ---
 id: TKT-0245-cross-board-sync-regression-tests
 title: クロスボード即時反映の回帰テストを追加する
-status: draft
+status: completed
 goal: 「調理完了後に在庫一覧が古いまま」「在庫追加が献立の自動マッチに出ない」というクロスボード鮮度バグの再発を、自動テストで検出できない状態を防ぐ
 acceptance:
   - jsdom（vitest）テストで「調理完了（消費確定）→ 共有ストアの在庫が減算され、在庫一覧側の参照が更新される」ことを検証するテストを追加する
