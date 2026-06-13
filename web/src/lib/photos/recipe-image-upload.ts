@@ -10,6 +10,7 @@
 
 import { buildRecipeImageStoragePath, imageExtensionFromContentType, type CompressedPhoto } from "@/lib/photos/compress";
 import { PHOTOS_BUCKET } from "@/lib/photos/user-image";
+import { buildYoutubeThumbnailCandidateUrls } from "@/lib/youtube";
 
 type StorageBucketApi = {
   copy?: (fromPath: string, toPath: string) => Promise<{ error: { message: string } | null }>;
@@ -38,6 +39,7 @@ export type RecipeImageUploadResult =
   | { ok: false; error: string };
 
 export type RecipeImageDeleteResult = { ok: true; staleRemovalFailed: boolean } | { ok: false; error: string };
+export type YoutubeThumbnailFetchResult = { ok: true; blob: Blob; contentType: YoutubeThumbnailContentType } | { ok: false; error: string };
 
 const UPLOAD_ERROR =
   "原因: レシピ画像をStorageへ保存できませんでした。影響: 画像は登録されません。修正方法: 別の画像を選び直し、ログイン状態と通信を確認してください。";
@@ -47,10 +49,84 @@ const DB_CLEAR_ERROR =
   "原因: レシピ画像の削除をDBへ反映できませんでした。影響: 画像が残ったままになります。修正方法: 画面を再読み込みし、もう一度削除してください。";
 const COPY_ERROR =
   "原因: 過去の完成写真をコピーできませんでした。影響: レシピ画像は登録されません。修正方法: 通信状態を確認して、もう一度選び直してください。";
+const YOUTUBE_THUMBNAIL_FETCH_ERROR =
+  "原因: YouTubeサムネイル画像を取得できませんでした。影響: レシピ画像は自動登録されません。修正方法: YouTube URLを確認するか、手動で画像を登録してください。";
+const YOUTUBE_THUMBNAIL_TYPE_ERROR =
+  "原因: YouTubeサムネイルが許可された画像形式ではありません。影響: レシピ画像は自動登録されません。修正方法: 手動で画像を登録してください。";
+const YOUTUBE_THUMBNAIL_SIZE_ERROR =
+  "原因: YouTubeサムネイル画像のサイズが大きすぎます。影響: レシピ画像は自動登録されません。修正方法: 手動で画像を登録してください。";
+
+const YOUTUBE_THUMBNAIL_MAX_BYTES = 2 * 1024 * 1024;
+const YOUTUBE_THUMBNAIL_CONTENT_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
+
+type YoutubeThumbnailContentType = (typeof YOUTUBE_THUMBNAIL_CONTENT_TYPES)[number];
+type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
 
 function extensionFromStoragePath(storagePath: string) {
   const rawExtension = storagePath.split(".").pop()?.toLowerCase() ?? "";
   return ["jpg", "jpeg", "png", "webp"].includes(rawExtension) ? (rawExtension === "jpeg" ? "jpg" : rawExtension) : "webp";
+}
+
+function youtubeThumbnailExtensionFromContentType(contentType: YoutubeThumbnailContentType) {
+  if (contentType === "image/png") return "png";
+  if (contentType === "image/webp") return "webp";
+  return "jpg";
+}
+
+function normalizeYoutubeThumbnailContentType(contentType: string | null): YoutubeThumbnailContentType | null {
+  const normalized = contentType?.split(";")[0]?.trim().toLowerCase() ?? "";
+  return YOUTUBE_THUMBNAIL_CONTENT_TYPES.includes(normalized as YoutubeThumbnailContentType) ? (normalized as YoutubeThumbnailContentType) : null;
+}
+
+function contentLengthExceedsLimit(response: Response, maxBytes: number) {
+  const rawLength = response.headers.get("content-length");
+  if (!rawLength) return false;
+  const parsed = Number(rawLength);
+  return Number.isFinite(parsed) && parsed > maxBytes;
+}
+
+export async function fetchYoutubeThumbnailImage(
+  videoId: string,
+  options?: { fetcher?: FetchLike; maxBytes?: number }
+): Promise<YoutubeThumbnailFetchResult> {
+  const candidates = buildYoutubeThumbnailCandidateUrls(videoId);
+  if (candidates.length === 0) {
+    return { ok: false, error: YOUTUBE_THUMBNAIL_FETCH_ERROR };
+  }
+
+  const fetcher = options?.fetcher ?? globalThis.fetch.bind(globalThis);
+  const maxBytes = options?.maxBytes ?? YOUTUBE_THUMBNAIL_MAX_BYTES;
+
+  for (const url of candidates) {
+    let response: Response;
+    try {
+      response = await fetcher(url, { redirect: "error" });
+    } catch {
+      continue;
+    }
+
+    if (!response.ok) {
+      continue;
+    }
+
+    const contentType = normalizeYoutubeThumbnailContentType(response.headers.get("content-type"));
+    if (!contentType) {
+      return { ok: false, error: YOUTUBE_THUMBNAIL_TYPE_ERROR };
+    }
+
+    if (contentLengthExceedsLimit(response, maxBytes)) {
+      return { ok: false, error: YOUTUBE_THUMBNAIL_SIZE_ERROR };
+    }
+
+    const blob = await response.blob();
+    if (blob.size > maxBytes) {
+      return { ok: false, error: YOUTUBE_THUMBNAIL_SIZE_ERROR };
+    }
+
+    return { ok: true, blob, contentType };
+  }
+
+  return { ok: false, error: YOUTUBE_THUMBNAIL_FETCH_ERROR };
 }
 
 export async function copyPhotoStorageObject(
@@ -142,6 +218,54 @@ export async function setRecipeImageFromCandidate(
   });
   if (!copyResult.ok) {
     return { ok: false, error: copyResult.error };
+  }
+
+  const { error: updateError } = await client
+    .from("recipes")
+    .update({ image_storage_path: storagePath })
+    .eq("id", recipeId)
+    .eq("user_id", userId);
+  if (updateError) {
+    await client.storage.from(PHOTOS_BUCKET).remove([storagePath]);
+    return { ok: false, error: DB_UPDATE_ERROR };
+  }
+
+  let staleRemovalFailed = false;
+  if (previousPath && previousPath !== storagePath) {
+    const { error: removeError } = await client.storage.from(PHOTOS_BUCKET).remove([previousPath]);
+    staleRemovalFailed = Boolean(removeError);
+  }
+
+  return { ok: true, storagePath, staleRemovalFailed };
+}
+
+export async function setRecipeImageFromYoutubeThumbnail(
+  client: RecipeImageClient,
+  params: {
+    userId: string;
+    recipeId: string;
+    videoId: string;
+    previousPath?: string | null;
+    fetcher?: FetchLike;
+    maxBytes?: number;
+  }
+): Promise<RecipeImageUploadResult> {
+  const { userId, recipeId, videoId, previousPath, fetcher, maxBytes } = params;
+  const thumbnail = await fetchYoutubeThumbnailImage(videoId, { fetcher, maxBytes });
+  if (!thumbnail.ok) {
+    return { ok: false, error: thumbnail.error };
+  }
+
+  const extension = youtubeThumbnailExtensionFromContentType(thumbnail.contentType);
+  const storagePath = buildRecipeImageStoragePath(userId, recipeId, extension);
+
+  const { error: uploadError } = await client.storage.from(PHOTOS_BUCKET).upload(storagePath, thumbnail.blob, {
+    contentType: thumbnail.contentType,
+    cacheControl: "31536000",
+    upsert: false
+  });
+  if (uploadError) {
+    return { ok: false, error: UPLOAD_ERROR };
   }
 
   const { error: updateError } = await client

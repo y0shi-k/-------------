@@ -49,7 +49,7 @@ import { loadUserGeminiApiKeys, type UserGeminiApiKeys } from "@/lib/ai/user-gem
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import { buildCookingHistoryPhotoStoragePath, compressImageFile, compressRecipeImageFile } from "@/lib/photos/compress";
 import { computeRollbackQuantityUpdates, type RollbackConsumptionEvent } from "@/lib/cooking-history/rollback";
-import { copyPhotoStorageObject, deleteRecipeImage, setRecipeImageFromCandidate, uploadRecipeImage } from "@/lib/photos/recipe-image-upload";
+import { copyPhotoStorageObject, deleteRecipeImage, setRecipeImageFromCandidate, setRecipeImageFromYoutubeThumbnail, uploadRecipeImage } from "@/lib/photos/recipe-image-upload";
 import { useImageFileDrop } from "@/lib/photos/use-image-file-drop";
 import { useCookingPhotoCandidates, type CookingPhotoCandidate, type CookingPhotoCandidateClient } from "@/lib/photos/use-cooking-photo-candidates";
 import { useRecipeImageUrls } from "@/lib/photos/use-recipe-image-urls";
@@ -115,6 +115,11 @@ type CookingViewerOrigin = "recipes" | "cooking";
 type CookingMediaTab = "video" | "photo";
 type ConsumptionTab = "all" | "食材" | "調味料";
 type PhotoCandidatePickerTarget = "recipe-image" | "cooking-photo";
+type RecipeImagePreviewKind = "candidate" | "file" | "saved" | "youtube";
+type YoutubeThumbnailStatus =
+  | { status: "loading"; videoId: string }
+  | { status: "ready"; videoId: string }
+  | { error: string; status: "error"; videoId: string };
 
 type CookingStepDraft = {
   id: string;
@@ -500,6 +505,10 @@ export function RecipeMealWorkspace({
   const [recipeImagePreviewUrl, setRecipeImagePreviewUrl] = useState<string | null>(null);
   // 既存画像を削除する操作を選んだか（保存時に Storage/DB から消す）。
   const [recipeImageRemoved, setRecipeImageRemoved] = useState(false);
+  const [youtubeThumbnailStatus, setYoutubeThumbnailStatus] = useState<YoutubeThumbnailStatus | null>(null);
+  const [youtubeThumbnailDismissedVideoId, setYoutubeThumbnailDismissedVideoId] = useState<string | null>(null);
+  const [youtubeThumbnailReplacementVideoId, setYoutubeThumbnailReplacementVideoId] = useState<string | null>(null);
+  const [youtubeThumbnailRetryKey, setYoutubeThumbnailRetryKey] = useState(0);
   // 編集モーダルでサブグルーピング選択中の材料行index。同一 item_type 内だけ複数選択できる。
   const [recipeSelectedIngredientKeys, setRecipeSelectedIngredientKeys] = useState<string[]>([]);
   const [selectedRecipeId, setSelectedRecipeId] = useState(initialRecipes[0]?.id ?? "");
@@ -641,6 +650,18 @@ export function RecipeMealWorkspace({
   });
   const selectedShortageSelectionCount = shortageSelectionItems.filter((item) => item.selected).length;
   const allVisibleShortagesSelected = filteredShortageSelectionItems.length > 0 && filteredShortageSelectionItems.every((item) => item.selected);
+  const recipeYoutubeVideoId = useMemo(() => findFirstYoutubeVideoId(recipeValues.source), [recipeValues.source]);
+  const canUseYoutubeThumbnailPreview =
+    Boolean(recipeYoutubeVideoId) &&
+    !recipeImageFile &&
+    !recipeImageCandidate &&
+    !recipeImageRemoved &&
+    (!editingRecipeImagePath || youtubeThumbnailReplacementVideoId === recipeYoutubeVideoId);
+  const shouldLoadYoutubeThumbnail =
+    canUseYoutubeThumbnailPreview && recipeYoutubeVideoId !== null && youtubeThumbnailDismissedVideoId !== recipeYoutubeVideoId;
+  const youtubeThumbnailUrl = shouldLoadYoutubeThumbnail
+    ? `/api/youtube/thumbnail?videoId=${encodeURIComponent(recipeYoutubeVideoId)}&retry=${youtubeThumbnailRetryKey}`
+    : null;
 
   useEffect(() => {
     setGeminiApiKeys(loadUserGeminiApiKeys());
@@ -649,6 +670,14 @@ export function RecipeMealWorkspace({
   useEffect(() => {
     setActiveView(selectedSubViews.recipes);
   }, [selectedSubViews.recipes]);
+
+  useEffect(() => {
+    if (!shouldLoadYoutubeThumbnail || !recipeYoutubeVideoId) {
+      setYoutubeThumbnailStatus(null);
+      return;
+    }
+    setYoutubeThumbnailStatus({ status: "loading", videoId: recipeYoutubeVideoId });
+  }, [recipeYoutubeVideoId, shouldLoadYoutubeThumbnail, youtubeThumbnailRetryKey]);
 
   function switchRecipeView(view: RecipeShellLeaf) {
     setActiveView(view);
@@ -672,6 +701,8 @@ export function RecipeMealWorkspace({
     setRecipeImageFile(null);
     setRecipeImageCandidate(null);
     setRecipeImageRemoved(false);
+    setYoutubeThumbnailDismissedVideoId(null);
+    setYoutubeThumbnailReplacementVideoId(null);
     if (recipeImageInputRef.current) {
       recipeImageInputRef.current.value = "";
     }
@@ -702,6 +733,10 @@ export function RecipeMealWorkspace({
     setRecipeImageFile(file);
     setRecipeImageCandidate(null);
     setRecipeImageRemoved(false);
+    setYoutubeThumbnailReplacementVideoId(null);
+    if (recipeYoutubeVideoId) {
+      setYoutubeThumbnailDismissedVideoId(recipeYoutubeVideoId);
+    }
   }
 
   function selectRecipeImage(event: ChangeEvent<HTMLInputElement>) {
@@ -719,6 +754,10 @@ export function RecipeMealWorkspace({
       setRecipeImageFile(null);
       setRecipeImageRemoved(false);
       setRecipeImageCandidate(candidate);
+      setYoutubeThumbnailReplacementVideoId(null);
+      if (recipeYoutubeVideoId) {
+        setYoutubeThumbnailDismissedVideoId(recipeYoutubeVideoId);
+      }
       if (recipeImageInputRef.current) {
         recipeImageInputRef.current.value = "";
       }
@@ -739,6 +778,11 @@ export function RecipeMealWorkspace({
   }
 
   function removeRecipeImage() {
+    if (recipeYoutubeVideoId && canUseYoutubeThumbnailPreview && youtubeThumbnailDismissedVideoId !== recipeYoutubeVideoId) {
+      setYoutubeThumbnailDismissedVideoId(recipeYoutubeVideoId);
+      setYoutubeThumbnailStatus(null);
+      return;
+    }
     // 新規選択中ならその下書きだけ取り消す。保存済み画像があれば「削除」を予約する。
     clearRecipeImageDraft();
     if (editingRecipeImagePath) {
@@ -748,6 +792,35 @@ export function RecipeMealWorkspace({
 
   function cancelRecipeImageChange() {
     clearRecipeImageDraft();
+  }
+
+  function retryYoutubeThumbnailPreview() {
+    setYoutubeThumbnailDismissedVideoId(null);
+    if (recipeYoutubeVideoId) {
+      setYoutubeThumbnailReplacementVideoId(recipeYoutubeVideoId);
+      setYoutubeThumbnailStatus({ status: "loading", videoId: recipeYoutubeVideoId });
+      showToast("YouTubeサムネイルを再取得しています。画像欄で結果を確認できます。", "success");
+    } else {
+      setYoutubeThumbnailStatus(null);
+    }
+    setYoutubeThumbnailRetryKey((current) => current + 1);
+  }
+
+  function markYoutubeThumbnailReady(videoId: string) {
+    setYoutubeThumbnailStatus((current) => (current?.videoId === videoId ? { status: "ready", videoId } : current));
+  }
+
+  function markYoutubeThumbnailError(videoId: string) {
+    setYoutubeThumbnailStatus((current) =>
+      current?.videoId === videoId
+        ? {
+            status: "error",
+            videoId,
+            error:
+              "原因: YouTubeサムネイルを取得できませんでした。影響: 画像は自動登録されません。修正方法: URLを確認するか、画像を手動で選んでください。"
+          }
+        : current
+    );
   }
 
   function updateRecipeValue<K extends keyof RecipeFormValues>(key: K, value: RecipeFormValues[K]) {
@@ -1457,7 +1530,7 @@ export function RecipeMealWorkspace({
 
     // 画像（任意）の保存。本文・材料の保存後に行う。失敗してもレシピ本文は保存済みなので、
     // 画像だけ未反映であることを明示してフィードバックする。
-    const imageResult = await persistRecipeImageChange(recipeId, (savedRecipe as { image_storage_path: string | null }).image_storage_path ?? null);
+    const imageResult = await persistRecipeImageChange(recipeId, (savedRecipe as { image_storage_path: string | null }).image_storage_path ?? null, normalized.data.source);
     if (!imageResult.ok) {
       setIsSaving(false);
       setFeedback({ tone: "error", message: imageResult.error });
@@ -1483,10 +1556,12 @@ export function RecipeMealWorkspace({
     setIsRecipeEditorOpen(false);
     const successMessage = editingRecipeId ? "レシピを更新しました。" : "レシピを追加しました。";
     setFeedback({
-      tone: "success",
-      message: imageResult.staleRemovalFailed
-        ? `${successMessage} ただし古い画像ファイルの削除に失敗しました。表示には影響しませんが、不要ファイルが残る場合があります。`
-        : successMessage
+      tone: imageResult.warning ? "info" : "success",
+      message: imageResult.warning
+        ? `${successMessage} ${imageResult.warning}`
+        : imageResult.staleRemovalFailed
+          ? `${successMessage} ただし古い画像ファイルの削除に失敗しました。表示には影響しませんが、不要ファイルが残る場合があります。`
+          : successMessage
     });
   }
 
@@ -1496,8 +1571,9 @@ export function RecipeMealWorkspace({
    */
   async function persistRecipeImageChange(
     recipeId: string,
-    currentImagePath: string | null
-  ): Promise<{ ok: true; imagePath: string | null; staleRemovalFailed: boolean } | { ok: false; error: string }> {
+    currentImagePath: string | null,
+    source: string
+  ): Promise<{ ok: true; imagePath: string | null; staleRemovalFailed: boolean; warning?: string } | { ok: false; error: string }> {
     if (recipeImageCandidate) {
       const result = await setRecipeImageFromCandidate(supabase, {
         userId,
@@ -1547,6 +1623,33 @@ export function RecipeMealWorkspace({
       }
       invalidateUserImageSignedUrl(currentImagePath);
       return { ok: true, imagePath: null, staleRemovalFailed: result.staleRemovalFailed };
+    }
+
+    const sourceYoutubeVideoId = findFirstYoutubeVideoId(source);
+    const shouldReplaceWithYoutubeThumbnail =
+      Boolean(sourceYoutubeVideoId) && (!currentImagePath || youtubeThumbnailReplacementVideoId === sourceYoutubeVideoId);
+    const youtubeVideoId = !recipeImageRemoved && shouldReplaceWithYoutubeThumbnail ? sourceYoutubeVideoId : null;
+    const youtubeThumbnailReady = youtubeThumbnailStatus?.status === "ready" && youtubeThumbnailStatus.videoId === youtubeVideoId;
+    if (youtubeVideoId) {
+      if (youtubeThumbnailDismissedVideoId === youtubeVideoId || !youtubeThumbnailReady) {
+        return { ok: true, imagePath: currentImagePath, staleRemovalFailed: false };
+      }
+      const result = await setRecipeImageFromYoutubeThumbnail(supabase, {
+        userId,
+        recipeId,
+        videoId: youtubeVideoId,
+        previousPath: currentImagePath,
+        fetcher: (_url, init) => fetch(`/api/youtube/thumbnail?videoId=${encodeURIComponent(youtubeVideoId)}`, init)
+      });
+      if (!result.ok) {
+        return {
+          ok: true,
+          imagePath: currentImagePath,
+          staleRemovalFailed: false,
+          warning: `${result.error} レシピ本文と材料は保存済みです。`
+        };
+      }
+      return { ok: true, imagePath: result.storagePath, staleRemovalFailed: result.staleRemovalFailed };
     }
 
     // 画像に変更なし。
@@ -3218,8 +3321,19 @@ export function RecipeMealWorkspace({
                 <span>ジャンル</span>
                 <GenreTagPicker value={recipeValues.genre} recipes={recipes} onChange={(csv) => updateRecipeValue("genre", csv)} />
               </div>
-              <label>
-                出典
+              <div className="recipe-source-field">
+                <div className="recipe-source-field-heading">
+                  <span>出典</span>
+                  <button
+                    className="secondary-button compact-button"
+                    disabled={isSaving || !recipeYoutubeVideoId}
+                    onClick={retryYoutubeThumbnailPreview}
+                    type="button"
+                    data-tooltip="出典URLからYouTubeサムネイルをもう一度取得"
+                  >
+                    サムネ再取得
+                  </button>
+                </div>
                 <textarea
                   aria-label="参考元"
                   rows={2}
@@ -3227,32 +3341,53 @@ export function RecipeMealWorkspace({
                   onChange={(event) => updateRecipeValue("source", event.target.value)}
                   placeholder="例: https://... または本の名前"
                 />
-              </label>
+              </div>
 
-              <RecipeImagePicker
+              {(() => {
+                const savedPreviewUrl =
+                  !recipeImageRemoved
+                    ? // 署名付きURLは非同期に揃うため、最新の Map を優先しつつ開始時スナップショットへフォールバック。
+                      (editingRecipeId ? recipeImageUrls.get(editingRecipeId) ?? null : null) ?? editingRecipeImageUrl
+                    : null;
+                const youtubePreviewUrl = youtubeThumbnailStatus?.status !== "error" ? youtubeThumbnailUrl : null;
+                const previewUrl = recipeImageCandidate?.signedUrl ?? recipeImagePreviewUrl ?? youtubePreviewUrl ?? savedPreviewUrl;
+                const previewKind: RecipeImagePreviewKind | null = recipeImageCandidate?.signedUrl
+                  ? "candidate"
+                  : recipeImagePreviewUrl
+                    ? "file"
+                    : youtubePreviewUrl
+                      ? "youtube"
+                      : savedPreviewUrl
+                        ? "saved"
+                        : null;
+                const youtubeThumbnailDismissed = Boolean(
+                  recipeYoutubeVideoId && canUseYoutubeThumbnailPreview && youtubeThumbnailDismissedVideoId === recipeYoutubeVideoId
+                );
+
+                return (
+                  <RecipeImagePicker
                 disabled={isSaving}
                 inputRef={recipeImageInputRef}
-                previewUrl={
-                  recipeImageCandidate?.signedUrl
-                    ? recipeImageCandidate.signedUrl
-                    : recipeImagePreviewUrl
-                    ? recipeImagePreviewUrl
-                    : !recipeImageRemoved
-                      ? // 署名付きURLは非同期に揃うため、最新の Map を優先しつつ開始時スナップショットへフォールバック。
-                        (editingRecipeId ? recipeImageUrls.get(editingRecipeId) ?? null : null) ?? editingRecipeImageUrl
-                      : null
-                }
+                previewKind={previewKind}
+                previewUrl={previewUrl}
                 recipeName={recipeValues.name}
                 removalPending={recipeImageRemoved && Boolean(editingRecipeImagePath)}
                 selectedCandidate={Boolean(recipeImageCandidate)}
                 selectedFileName={recipeImageFile?.name ?? null}
+                youtubeThumbnailDismissed={youtubeThumbnailDismissed}
+                youtubeThumbnailStatus={youtubeThumbnailStatus}
                 showCancel={Boolean(recipeImageFile || recipeImageRemoved || recipeImageCandidate)}
                 onCancel={cancelRecipeImageChange}
+                onYoutubeThumbnailError={markYoutubeThumbnailError}
+                onYoutubeThumbnailLoad={markYoutubeThumbnailReady}
+                onYoutubeThumbnailRetry={retryYoutubeThumbnailPreview}
                 onOpenCandidatePicker={() => setPhotoCandidatePickerTarget("recipe-image")}
                 onRemove={removeRecipeImage}
                 onDropFiles={(files) => setRecipeImageDraftFromFile(files[0] ?? null)}
                 onSelect={selectRecipeImage}
               />
+                );
+              })()}
 
               {renderRecipeIngredientEditor("材料", "食材", foodIngredientEntries)}
               {renderRecipeIngredientEditor("調味料", "調味料", seasoningIngredientEntries, " seasoning-add-button")}
@@ -4999,13 +5134,19 @@ function RecipeListGenreSummary({ genres }: { genres: string[] }) {
 function RecipeImagePicker({
   disabled,
   inputRef,
+  previewKind,
   previewUrl,
   recipeName,
   removalPending,
   selectedCandidate,
   selectedFileName,
   showCancel,
+  youtubeThumbnailDismissed,
+  youtubeThumbnailStatus,
   onCancel,
+  onYoutubeThumbnailError,
+  onYoutubeThumbnailLoad,
+  onYoutubeThumbnailRetry,
   onOpenCandidatePicker,
   onDropFiles,
   onRemove,
@@ -5013,13 +5154,19 @@ function RecipeImagePicker({
 }: {
   disabled: boolean;
   inputRef: React.RefObject<HTMLInputElement | null>;
+  previewKind: RecipeImagePreviewKind | null;
   previewUrl: string | null;
   recipeName: string;
   removalPending: boolean;
   selectedCandidate: boolean;
   selectedFileName: string | null;
   showCancel: boolean;
+  youtubeThumbnailDismissed: boolean;
+  youtubeThumbnailStatus: YoutubeThumbnailStatus | null;
   onCancel: () => void;
+  onYoutubeThumbnailError: (videoId: string) => void;
+  onYoutubeThumbnailLoad: (videoId: string) => void;
+  onYoutubeThumbnailRetry: () => void;
   onOpenCandidatePicker: () => void;
   onDropFiles: (files: File[]) => void;
   onRemove: () => void;
@@ -5051,7 +5198,12 @@ function RecipeImagePicker({
       <div className="recipe-image-preview">
         {hasPreview && previewUrl ? (
           // eslint-disable-next-line @next/next/no-img-element -- 署名付きURL/プレビュー。next/image は使わない。
-          <img alt={recipeName ? `${recipeName} の画像プレビュー` : "レシピ画像プレビュー"} src={previewUrl} />
+          <img
+            alt={recipeName ? `${recipeName} の画像プレビュー` : "レシピ画像プレビュー"}
+            onError={previewKind === "youtube" && youtubeThumbnailStatus ? () => onYoutubeThumbnailError(youtubeThumbnailStatus.videoId) : undefined}
+            onLoad={previewKind === "youtube" && youtubeThumbnailStatus ? () => onYoutubeThumbnailLoad(youtubeThumbnailStatus.videoId) : undefined}
+            src={previewUrl}
+          />
         ) : (
           <span className="recipe-image-preview-empty" aria-hidden="true">
             画像なし
@@ -5080,6 +5232,31 @@ function RecipeImagePicker({
       {selectedFileName ? <p className="recipe-image-hint">選択中: {selectedFileName}（保存時に圧縮して登録します）</p> : null}
       {selectedCandidate ? <p className="recipe-image-hint">過去の完成写真を選択中です。保存時にコピーして登録します。</p> : null}
       {removalPending ? <p className="recipe-image-hint">現在の画像を削除します。保存すると反映されます。</p> : null}
+      {previewKind === "youtube" && youtubeThumbnailStatus?.status === "loading" ? (
+        <p className="recipe-image-hint recipe-image-hint-loading">
+          <span className="recipe-image-spinner" aria-hidden="true" />
+          YouTubeサムネイルを確認中です。
+        </p>
+      ) : null}
+      {previewKind === "youtube" && youtubeThumbnailStatus?.status === "ready" ? (
+        <p className="recipe-image-hint">YouTubeサムネイルを使用します。画像を削除すると手動画像に差し替えできます。</p>
+      ) : null}
+      {youtubeThumbnailStatus?.status === "error" ? (
+        <div className="recipe-image-inline-alert" data-tone="error">
+          <p>{youtubeThumbnailStatus.error}</p>
+          <button className="secondary-button compact-button" disabled={disabled} onClick={onYoutubeThumbnailRetry} type="button" data-tooltip="YouTubeサムネイルをもう一度取得">
+            再取得
+          </button>
+        </div>
+      ) : null}
+      {youtubeThumbnailDismissed ? (
+        <div className="recipe-image-inline-alert" data-tone="info">
+          <p>このYouTubeサムネイルは使いません。画像を選ぶか、必要なら再取得してください。</p>
+          <button className="secondary-button compact-button" disabled={disabled} onClick={onYoutubeThumbnailRetry} type="button" data-tooltip="YouTubeサムネイルをもう一度取得">
+            再取得
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }

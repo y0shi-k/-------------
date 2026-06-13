@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildYoutubeThumbnailCandidateUrls,
   extractYoutubeVideoId,
   findFirstYoutubeVideoId,
 } from "@/lib/youtube";
@@ -169,5 +170,24 @@ describe("findFirstYoutubeVideoId: 複数行テキスト", () => {
 
   it("空行のみのテキストは null を返す", () => {
     expect(findFirstYoutubeVideoId("\n\n\n")).toBeNull();
+  });
+});
+
+describe("buildYoutubeThumbnailCandidateUrls", () => {
+  it("有効な videoId から固定ホスト・固定パスの候補URLを返す", () => {
+    const candidates = buildYoutubeThumbnailCandidateUrls("dQw4w9WgXcQ");
+
+    expect(candidates.length).toBeGreaterThan(0);
+    expect(candidates[0]).toBe("https://img.youtube.com/vi/dQw4w9WgXcQ/maxresdefault.jpg");
+    for (const candidate of candidates) {
+      const url = new URL(candidate);
+      expect(url.hostname).toBe("img.youtube.com");
+      expect(url.pathname).toMatch(/^\/vi\/dQw4w9WgXcQ\/(?:maxresdefault|sddefault|hqdefault|mqdefault)\.jpg$/);
+    }
+  });
+
+  it("無効な videoId は候補URLを返さない", () => {
+    expect(buildYoutubeThumbnailCandidateUrls("https://example.com/image.jpg")).toEqual([]);
+    expect(buildYoutubeThumbnailCandidateUrls("short")).toEqual([]);
   });
 });

@@ -17,6 +17,9 @@ const ALLOWED_HOSTS = new Set([
 /** videoId として有効なパターン（11文字の英数字・アンダースコア・ハイフン） */
 const VIDEO_ID_RE = /^[A-Za-z0-9_-]{11}$/;
 
+const YOUTUBE_THUMBNAIL_HOST = "img.youtube.com";
+const YOUTUBE_THUMBNAIL_NAMES = ["maxresdefault", "sddefault", "hqdefault", "mqdefault"] as const;
+
 /**
  * 文字列から videoId 候補を取り出すヘルパー。
  * 候補が VIDEO_ID_RE を満たさない場合は null を返す。
@@ -82,4 +85,17 @@ export function findFirstYoutubeVideoId(text: string): string | null {
     if (id !== null) return id;
   }
   return null;
+}
+
+/**
+ * YouTube videoId からサムネイル候補URLを作る。
+ *
+ * ユーザー入力URLは使わず、固定ホスト・固定パスだけを返す。
+ * 無効な videoId の場合は候補を返さない。
+ */
+export function buildYoutubeThumbnailCandidateUrls(videoId: string): string[] {
+  const safeVideoId = validateId(videoId);
+  if (!safeVideoId) return [];
+
+  return YOUTUBE_THUMBNAIL_NAMES.map((name) => `https://${YOUTUBE_THUMBNAIL_HOST}/vi/${safeVideoId}/${name}.jpg`);
 }

@@ -1,5 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
-import { deleteRecipeImage, setRecipeImageFromCandidate, uploadRecipeImage, type RecipeImageClient } from "@/lib/photos/recipe-image-upload";
+import {
+  deleteRecipeImage,
+  fetchYoutubeThumbnailImage,
+  setRecipeImageFromCandidate,
+  setRecipeImageFromYoutubeThumbnail,
+  uploadRecipeImage,
+  type RecipeImageClient
+} from "@/lib/photos/recipe-image-upload";
 import type { CompressedPhoto } from "@/lib/photos/compress";
 
 const USER_ID = "11111111-1111-1111-1111-111111111111";
@@ -161,6 +168,119 @@ describe("setRecipeImageFromCandidate", () => {
 
     expect(result.ok).toBe(false);
     expect(remove).toHaveBeenCalledWith([copy.mock.calls[0][1]]);
+  });
+});
+
+describe("fetchYoutubeThumbnailImage", () => {
+  it("固定候補URLから画像content-typeのBlobを取得する", async () => {
+    const fetcher = vi.fn(async () => new Response(new Blob(["jpeg"], { type: "image/jpeg" }), {
+      headers: { "content-type": "image/jpeg", "content-length": "4" },
+      status: 200
+    }));
+
+    const result = await fetchYoutubeThumbnailImage("dQw4w9WgXcQ", { fetcher });
+
+    expect(result.ok).toBe(true);
+    expect(fetcher).toHaveBeenCalledWith("https://img.youtube.com/vi/dQw4w9WgXcQ/maxresdefault.jpg", { redirect: "error" });
+    if (result.ok) {
+      expect(result.contentType).toBe("image/jpeg");
+      expect(result.blob.size).toBeGreaterThan(0);
+    }
+  });
+
+  it("非画像content-typeは失敗にする", async () => {
+    const fetcher = vi.fn(async () => new Response("<html></html>", {
+      headers: { "content-type": "text/html" },
+      status: 200
+    }));
+
+    const result = await fetchYoutubeThumbnailImage("dQw4w9WgXcQ", { fetcher });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toContain("許可された画像形式");
+  });
+
+  it("content-length が上限を超える画像は保存対象にしない", async () => {
+    const fetcher = vi.fn(async () => new Response(new Blob(["x"], { type: "image/jpeg" }), {
+      headers: { "content-type": "image/jpeg", "content-length": "9" },
+      status: 200
+    }));
+
+    const result = await fetchYoutubeThumbnailImage("dQw4w9WgXcQ", { fetcher, maxBytes: 8 });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toContain("大きすぎます");
+  });
+
+  it("無効なvideoIdではfetchしない", async () => {
+    const fetcher = vi.fn(async () => new Response(new Blob(["x"], { type: "image/jpeg" })));
+
+    const result = await fetchYoutubeThumbnailImage("https://example.com/image.jpg", { fetcher });
+
+    expect(result.ok).toBe(false);
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+});
+
+describe("setRecipeImageFromYoutubeThumbnail", () => {
+  it("サムネイル取得、Storage upload、recipes更新に成功するとStorage pathを返す", async () => {
+    const { client, upload, update, storageFrom } = makeClient();
+    const fetcher = vi.fn(async () => new Response(new Blob(["png"], { type: "image/png" }), {
+      headers: { "content-type": "image/png", "content-length": "3" },
+      status: 200
+    }));
+
+    const result = await setRecipeImageFromYoutubeThumbnail(client, {
+      userId: USER_ID,
+      recipeId: RECIPE_ID,
+      videoId: "dQw4w9WgXcQ",
+      fetcher
+    });
+
+    expect(result.ok).toBe(true);
+    expect(storageFrom).toHaveBeenCalledWith("photos");
+    const uploadedPath = upload.mock.calls[0][0] as string;
+    expect(uploadedPath.startsWith(`${USER_ID}/recipe-images/${RECIPE_ID}/`)).toBe(true);
+    expect(uploadedPath.endsWith(".png")).toBe(true);
+    expect(upload.mock.calls[0][2]).toMatchObject({ contentType: "image/png", cacheControl: "31536000", upsert: false });
+    expect(update).toHaveBeenCalledWith({ image_storage_path: uploadedPath });
+    if (result.ok) expect(result.storagePath).toBe(uploadedPath);
+  });
+
+  it("Storage upload失敗時はDB更新しない", async () => {
+    const { client, update } = makeClient({ uploadError: { message: "boom" } });
+    const fetcher = vi.fn(async () => new Response(new Blob(["webp"], { type: "image/webp" }), {
+      headers: { "content-type": "image/webp" },
+      status: 200
+    }));
+
+    const result = await setRecipeImageFromYoutubeThumbnail(client, {
+      userId: USER_ID,
+      recipeId: RECIPE_ID,
+      videoId: "dQw4w9WgXcQ",
+      fetcher
+    });
+
+    expect(result.ok).toBe(false);
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it("DB更新失敗時はアップロード済みobjectを削除する", async () => {
+    const { client, upload, remove } = makeClient({ updateError: { message: "boom" } });
+    const fetcher = vi.fn(async () => new Response(new Blob(["jpeg"], { type: "image/jpeg" }), {
+      headers: { "content-type": "image/jpeg" },
+      status: 200
+    }));
+
+    const result = await setRecipeImageFromYoutubeThumbnail(client, {
+      userId: USER_ID,
+      recipeId: RECIPE_ID,
+      videoId: "dQw4w9WgXcQ",
+      fetcher
+    });
+
+    expect(result.ok).toBe(false);
+    expect(remove).toHaveBeenCalledWith([upload.mock.calls[0][0]]);
   });
 });
 

@@ -7,6 +7,12 @@ import type { CookCandidate, MealSchedule, Recipe, RecipeIngredient, ShoppingIte
 
 const from = vi.fn();
 const refresh = vi.fn();
+const storageUpload = vi.fn();
+const storageRemove = vi.fn();
+const storageFrom = vi.fn(() => ({
+  upload: storageUpload,
+  remove: storageRemove
+}));
 
 // inventory-store モック。テストごとに inventoryItems / setInventoryItems を差し替えられるよう
 // vi.hoisted で mutableな参照を持つ。
@@ -49,7 +55,10 @@ const shellMocks = vi.hoisted(() => ({
 
 vi.mock("@/lib/supabase/browser", () => ({
   createBrowserSupabaseClient: () => ({
-    from
+    from,
+    storage: {
+      from: storageFrom
+    }
   })
 }));
 
@@ -277,6 +286,11 @@ describe("RecipeMealWorkspace", () => {
     vi.setSystemTime(new Date("2026-05-28T12:00:00"));
     from.mockReset();
     refresh.mockReset();
+    storageFrom.mockClear();
+    storageUpload.mockReset();
+    storageUpload.mockResolvedValue({ error: null });
+    storageRemove.mockReset();
+    storageRemove.mockResolvedValue({ error: null });
     shellMocks.clearPendingRecipe.mockReset();
     shellMocks.pendingRecipeId = null;
     shellMocks.pendingRecipeOrigin = "recipes";
@@ -417,6 +431,180 @@ describe("RecipeMealWorkspace", () => {
     expect(await screen.findByText("レシピを追加しました。")).toBeTruthy();
   });
 
+  it("auto-registers a YouTube thumbnail when a new recipe has no selected image", async () => {
+    const savedRecipe = {
+      ...baseRecipe,
+      id: "recipe-youtube",
+      name: "動画レシピ",
+      source: "参考\nhttps://www.youtube.com/watch?v=dQw4w9WgXcQ",
+      image_storage_path: null,
+      ingredients: undefined
+    };
+    const savedIngredient = { ...baseIngredient, id: "ingredient-youtube", recipe_id: "recipe-youtube", name: "卵" };
+    const recipeInsert = insertSingleQuery(savedRecipe);
+    const ingredientInsert = insertListQuery([savedIngredient]);
+    const imageUpdate = updateEqQuery();
+
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+      new Response(new Blob(["thumbnail"], { type: "image/jpeg" }), {
+        headers: { "content-type": "image/jpeg", "content-length": "9" },
+        status: 200
+      })
+    );
+
+    from.mockImplementation((table: string) => {
+      if (table === "recipes") return { insert: recipeInsert.insert, update: imageUpdate.update };
+      if (table === "recipe_ingredients") return { insert: ingredientInsert.insert };
+      return {};
+    });
+
+    renderWorkspace({ initialRecipes: [] });
+    openRecipeEditor();
+
+    fireEvent.change(screen.getByLabelText("レシピ名"), { target: { value: "動画レシピ" } });
+    fireEvent.change(screen.getByLabelText("参考元"), { target: { value: "参考\nhttps://www.youtube.com/watch?v=dQw4w9WgXcQ" } });
+    const youtubePreview = await screen.findByRole("img", { name: "動画レシピ の画像プレビュー" });
+    expect(youtubePreview.getAttribute("src")).toContain("/api/youtube/thumbnail?videoId=dQw4w9WgXcQ");
+    fireEvent.load(youtubePreview);
+    expect(await screen.findByText("YouTubeサムネイルを使用します。画像を削除すると手動画像に差し替えできます。")).toBeTruthy();
+    const ingredientEditor = screen.getByLabelText("材料入力");
+    fireEvent.change(within(ingredientEditor).getByLabelText("品名"), { target: { value: "卵" } });
+    fireEvent.change(within(ingredientEditor).getByLabelText("数量"), { target: { value: "2" } });
+    fireEvent.change(within(ingredientEditor).getByLabelText("単位を検索・追加"), { target: { value: "個" } });
+    fireEvent.keyDown(within(ingredientEditor).getByLabelText("単位を検索・追加"), { key: "Enter" });
+    fireEvent.change(screen.getByLabelText("調理手順"), { target: { value: "焼く" } });
+    fireEvent.click(screen.getByRole("button", { name: "レシピを保存" }));
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith("/api/youtube/thumbnail?videoId=dQw4w9WgXcQ", { redirect: "error" });
+      expect(storageFrom).toHaveBeenCalledWith("photos");
+      expect(storageUpload).toHaveBeenCalled();
+      expect(imageUpdate.update).toHaveBeenCalledWith({
+        image_storage_path: expect.stringMatching(/^user-1\/recipe-images\/recipe-youtube\/.+\.jpg$/)
+      });
+    });
+    expect(await screen.findByText("レシピを追加しました。")).toBeTruthy();
+  });
+
+  it("does not auto-register a thumbnail when the source has no YouTube URL", async () => {
+    const savedRecipe = { ...baseRecipe, id: "recipe-no-youtube", name: "メモレシピ", source: "母のメモ", ingredients: undefined };
+    const recipeInsert = insertSingleQuery(savedRecipe);
+    const ingredientInsert = insertListQuery([{ ...baseIngredient, recipe_id: "recipe-no-youtube" }]);
+
+    from.mockImplementation((table: string) => {
+      if (table === "recipes") return { insert: recipeInsert.insert };
+      if (table === "recipe_ingredients") return { insert: ingredientInsert.insert };
+      return {};
+    });
+
+    renderWorkspace({ initialRecipes: [] });
+    openRecipeEditor();
+
+    fireEvent.change(screen.getByLabelText("レシピ名"), { target: { value: "メモレシピ" } });
+    fireEvent.change(screen.getByLabelText("参考元"), { target: { value: "母のメモ" } });
+    const ingredientEditor = screen.getByLabelText("材料入力");
+    fireEvent.change(within(ingredientEditor).getByLabelText("品名"), { target: { value: "卵" } });
+    fireEvent.change(within(ingredientEditor).getByLabelText("数量"), { target: { value: "2" } });
+    fireEvent.change(within(ingredientEditor).getByLabelText("単位を検索・追加"), { target: { value: "個" } });
+    fireEvent.keyDown(within(ingredientEditor).getByLabelText("単位を検索・追加"), { key: "Enter" });
+    fireEvent.change(screen.getByLabelText("調理手順"), { target: { value: "焼く" } });
+    fireEvent.click(screen.getByRole("button", { name: "レシピを保存" }));
+
+    await screen.findByText("レシピを追加しました。");
+    expect(global.fetch).not.toHaveBeenCalled();
+    expect(storageUpload).not.toHaveBeenCalled();
+  });
+
+  it("keeps the saved recipe body and reports image-only failure when YouTube thumbnail registration fails", async () => {
+    const savedRecipe = {
+      ...baseRecipe,
+      id: "recipe-youtube-fail",
+      name: "動画レシピ失敗",
+      source: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+      image_storage_path: null,
+      ingredients: undefined
+    };
+    const recipeInsert = insertSingleQuery(savedRecipe);
+    const ingredientInsert = insertListQuery([{ ...baseIngredient, recipe_id: "recipe-youtube-fail" }]);
+
+    from.mockImplementation((table: string) => {
+      if (table === "recipes") return { insert: recipeInsert.insert };
+      if (table === "recipe_ingredients") return { insert: ingredientInsert.insert };
+      return {};
+    });
+
+    renderWorkspace({ initialRecipes: [] });
+    openRecipeEditor();
+
+    fireEvent.change(screen.getByLabelText("レシピ名"), { target: { value: "動画レシピ失敗" } });
+    fireEvent.change(screen.getByLabelText("参考元"), { target: { value: "https://www.youtube.com/watch?v=dQw4w9WgXcQ" } });
+    const youtubePreview = await screen.findByRole("img", { name: "動画レシピ失敗 の画像プレビュー" });
+    fireEvent.error(youtubePreview);
+    expect(await screen.findByText(/原因: YouTubeサムネイルを取得できませんでした。/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "再取得" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "サムネ再取得" }));
+    expect(await screen.findByText("YouTubeサムネイルを再取得しています。画像欄で結果を確認できます。")).toBeTruthy();
+    expect(screen.getByText("YouTubeサムネイルを確認中です。")).toBeTruthy();
+    const retriedPreview = await screen.findByRole("img", { name: "動画レシピ失敗 の画像プレビュー" });
+    expect(retriedPreview.getAttribute("src")).toContain("/api/youtube/thumbnail?videoId=dQw4w9WgXcQ&retry=1");
+    fireEvent.error(retriedPreview);
+    const ingredientEditor = screen.getByLabelText("材料入力");
+    fireEvent.change(within(ingredientEditor).getByLabelText("品名"), { target: { value: "卵" } });
+    fireEvent.change(within(ingredientEditor).getByLabelText("数量"), { target: { value: "2" } });
+    fireEvent.change(within(ingredientEditor).getByLabelText("単位を検索・追加"), { target: { value: "個" } });
+    fireEvent.keyDown(within(ingredientEditor).getByLabelText("単位を検索・追加"), { key: "Enter" });
+    fireEvent.change(screen.getByLabelText("調理手順"), { target: { value: "焼く" } });
+    fireEvent.click(screen.getByRole("button", { name: "レシピを保存" }));
+
+    expect(await screen.findByText("レシピを追加しました。")).toBeTruthy();
+    expect(recipeInsert.insert).toHaveBeenCalled();
+    expect(ingredientInsert.insert).toHaveBeenCalled();
+    expect(global.fetch).not.toHaveBeenCalled();
+    expect(storageUpload).not.toHaveBeenCalled();
+  });
+
+  it("lets the user remove the YouTube thumbnail preview and save without auto image registration", async () => {
+    const savedRecipe = {
+      ...baseRecipe,
+      id: "recipe-youtube-removed",
+      name: "動画サムネ削除",
+      source: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+      image_storage_path: null,
+      ingredients: undefined
+    };
+    const recipeInsert = insertSingleQuery(savedRecipe);
+    const ingredientInsert = insertListQuery([{ ...baseIngredient, recipe_id: "recipe-youtube-removed" }]);
+
+    from.mockImplementation((table: string) => {
+      if (table === "recipes") return { insert: recipeInsert.insert };
+      if (table === "recipe_ingredients") return { insert: ingredientInsert.insert };
+      return {};
+    });
+
+    renderWorkspace({ initialRecipes: [] });
+    openRecipeEditor();
+
+    fireEvent.change(screen.getByLabelText("レシピ名"), { target: { value: "動画サムネ削除" } });
+    fireEvent.change(screen.getByLabelText("参考元"), { target: { value: "https://www.youtube.com/watch?v=dQw4w9WgXcQ" } });
+    const youtubePreview = await screen.findByRole("img", { name: "動画サムネ削除 の画像プレビュー" });
+    fireEvent.load(youtubePreview);
+    fireEvent.click(screen.getByRole("button", { name: "画像を削除" }));
+
+    expect(await screen.findByText("このYouTubeサムネイルは使いません。画像を選ぶか、必要なら再取得してください。")).toBeTruthy();
+
+    const ingredientEditor = screen.getByLabelText("材料入力");
+    fireEvent.change(within(ingredientEditor).getByLabelText("品名"), { target: { value: "卵" } });
+    fireEvent.change(within(ingredientEditor).getByLabelText("数量"), { target: { value: "2" } });
+    fireEvent.change(within(ingredientEditor).getByLabelText("単位を検索・追加"), { target: { value: "個" } });
+    fireEvent.keyDown(within(ingredientEditor).getByLabelText("単位を検索・追加"), { key: "Enter" });
+    fireEvent.change(screen.getByLabelText("調理手順"), { target: { value: "焼く" } });
+    fireEvent.click(screen.getByRole("button", { name: "レシピを保存" }));
+
+    expect(await screen.findByText("レシピを追加しました。")).toBeTruthy();
+    expect(global.fetch).not.toHaveBeenCalled();
+    expect(storageUpload).not.toHaveBeenCalled();
+  });
+
   it("edits a recipe and replaces its ingredients", async () => {
     const recipeUpdate = updateSingleQuery({ ...baseRecipe, name: "カレー改", ingredients: undefined });
     const ingredientDelete = deleteQuery();
@@ -438,6 +626,82 @@ describe("RecipeMealWorkspace", () => {
       expect(recipeUpdate.update).toHaveBeenCalledWith(expect.objectContaining({ name: "カレー改", user_id: "user-1" }));
       expect(ingredientDelete.deleteRows).toHaveBeenCalled();
       expect(ingredientInsert.insert).toHaveBeenCalled();
+    });
+    expect(await screen.findByText("レシピを更新しました。")).toBeTruthy();
+  });
+
+  it("does not overwrite an existing recipe image with a YouTube thumbnail on edit", async () => {
+    const recipeWithImage: Recipe = {
+      ...baseRecipe,
+      source: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+      image_storage_path: "user-1/recipe-images/recipe-1/existing.webp"
+    };
+    const recipeUpdate = updateSingleQuery({ ...recipeWithImage, ingredients: undefined });
+    const ingredientDelete = deleteQuery();
+    const ingredientInsert = insertListQuery([{ ...baseIngredient }]);
+
+    from.mockImplementation((table: string) => {
+      if (table === "recipes") return { update: recipeUpdate.update };
+      if (table === "recipe_ingredients") return { delete: ingredientDelete.deleteRows, insert: ingredientInsert.insert };
+      return {};
+    });
+
+    renderWorkspace({ initialRecipes: [recipeWithImage] });
+
+    fireEvent.click(screen.getByRole("button", { name: "編集" }));
+    fireEvent.click(screen.getByRole("button", { name: "レシピを更新" }));
+
+    await screen.findByText("レシピを更新しました。");
+    expect(global.fetch).not.toHaveBeenCalled();
+    expect(storageUpload).not.toHaveBeenCalled();
+  });
+
+  it("lets the user retry and replace an existing image with a YouTube thumbnail", async () => {
+    const recipeWithImage: Recipe = {
+      ...baseRecipe,
+      source: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+      image_storage_path: "user-1/recipe-images/recipe-1/existing.webp"
+    };
+    const recipeUpdate = updateSingleQuery({ ...recipeWithImage, ingredients: undefined });
+    const imageUpdate = updateEqQuery();
+    const ingredientDelete = deleteQuery();
+    const ingredientInsert = insertListQuery([{ ...baseIngredient }]);
+    const updateRecipeValues = recipeUpdate.update as unknown as (values: unknown) => unknown;
+    const updateImageValues = imageUpdate.update as unknown as (values: unknown) => unknown;
+    const update = vi.fn((values: { image_storage_path?: string | null }) =>
+      Object.prototype.hasOwnProperty.call(values, "image_storage_path") ? updateImageValues(values) : updateRecipeValues(values)
+    );
+
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+      new Response(new Blob(["thumbnail"], { type: "image/jpeg" }), {
+        headers: { "content-type": "image/jpeg", "content-length": "9" },
+        status: 200
+      })
+    );
+
+    from.mockImplementation((table: string) => {
+      if (table === "recipes") return { update };
+      if (table === "recipe_ingredients") return { delete: ingredientDelete.deleteRows, insert: ingredientInsert.insert };
+      return {};
+    });
+
+    renderWorkspace({ initialRecipes: [recipeWithImage] });
+
+    fireEvent.click(screen.getByRole("button", { name: "編集" }));
+    fireEvent.click(screen.getByRole("button", { name: "サムネ再取得" }));
+    expect(await screen.findByText("YouTubeサムネイルを再取得しています。画像欄で結果を確認できます。")).toBeTruthy();
+    const youtubePreview = await screen.findByRole("img", { name: "カレー の画像プレビュー" });
+    expect(youtubePreview.getAttribute("src")).toContain("/api/youtube/thumbnail?videoId=dQw4w9WgXcQ&retry=1");
+    fireEvent.load(youtubePreview);
+    fireEvent.click(screen.getByRole("button", { name: "レシピを更新" }));
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith("/api/youtube/thumbnail?videoId=dQw4w9WgXcQ", { redirect: "error" });
+      expect(storageUpload).toHaveBeenCalled();
+      expect(imageUpdate.update).toHaveBeenCalledWith({
+        image_storage_path: expect.stringMatching(/^user-1\/recipe-images\/recipe-1\/.+\.jpg$/)
+      });
+      expect(storageRemove).toHaveBeenCalledWith(["user-1/recipe-images/recipe-1/existing.webp"]);
     });
     expect(await screen.findByText("レシピを更新しました。")).toBeTruthy();
   });

@@ -8626,6 +8626,31 @@ h1 {
   letter-spacing: 0;
 }
 
+.recipe-source-field {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.recipe-source-field-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+.recipe-source-field-heading span {
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.recipe-source-field-heading .compact-button {
+  flex: 0 0 auto;
+}
+
 /* レシピ画像 UI（編集フォーム内）。スマホ幅でボタン・文字が重ならないよう wrap させる。 */
 .recipe-image-field {
   display: flex;
@@ -8733,6 +8758,64 @@ h1 {
   font-size: 11px;
   line-height: 1.5;
   overflow-wrap: anywhere;
+}
+
+.recipe-image-hint-loading {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.recipe-image-spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid #bae6fd;
+  border-top-color: #0284c7;
+  border-radius: 999px;
+  animation: recipe-image-spinner 0.7s linear infinite;
+  flex: 0 0 auto;
+}
+
+@keyframes recipe-image-spinner {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.recipe-image-inline-alert {
+  display: grid;
+  gap: 8px;
+  max-width: 320px;
+  padding: 9px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.recipe-image-inline-alert p {
+  margin: 0;
+  color: #475569;
+  font-size: 11px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.recipe-image-inline-alert[data-tone="error"] {
+  border-color: #fecdd3;
+  background: #fff1f2;
+}
+
+.recipe-image-inline-alert[data-tone="error"] p {
+  color: #9f1239;
+}
+
+.recipe-image-inline-alert[data-tone="info"] {
+  border-color: #bae6fd;
+  background: #f0f9ff;
+}
+
+.recipe-image-inline-alert[data-tone="info"] p {
+  color: #0369a1;
 }
 
 .photo-candidate-modal {
