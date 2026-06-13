@@ -3296,12 +3296,14 @@ h1 {
 }
 
 .schedule-meal-card {
-  display: grid;
-  gap: 6px;
+  display: block;
   min-width: 0;
   position: relative;
+  border: 1px solid #e0f2fe;
+  border-radius: 8px;
+  background: #f0f9ff;
   cursor: grab;
-  transition: opacity 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+  transition: opacity 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease, background 0.18s ease;
 }
 
 .schedule-meal-card:active {
@@ -3322,18 +3324,18 @@ h1 {
   width: 100%;
   min-width: 0;
   min-height: 48px;
-  border: 1px solid #e0f2fe;
+  border: 0;
   border-radius: 8px;
-  background: #f0f9ff;
+  background: transparent;
   padding: 0 34px 0 8px;
   text-align: left;
   cursor: pointer;
 }
 
-.schedule-meal-delete-button {
+.schedule-meal-card .schedule-meal-delete-button {
   position: absolute;
-  top: 6px;
-  right: 6px;
+  top: 4px;
+  right: 4px;
   z-index: 1;
   display: grid;
   place-items: center;
@@ -3350,17 +3352,17 @@ h1 {
   cursor: pointer;
 }
 
-.schedule-meal-delete-button:disabled {
+.schedule-meal-card .schedule-meal-delete-button:disabled {
   cursor: not-allowed;
   opacity: 0.55;
 }
 
-.schedule-meal-card[data-done="true"] .schedule-meal-select {
+.schedule-meal-card[data-done="true"] {
   border-color: #a7f3d0;
   background: #ecfdf5;
 }
 
-.schedule-meal-card[data-active="true"] .schedule-meal-select {
+.schedule-meal-card[data-active="true"] {
   border-color: #0ea5e9;
   box-shadow: 0 0 0 1px #0ea5e9;
 }
@@ -3402,6 +3404,23 @@ h1 {
   font-size: 0.58rem;
   font-style: normal;
   font-weight: 700;
+}
+
+@media (max-width: 480px) {
+  .schedule-day {
+    display: grid;
+    gap: 10px;
+  }
+
+  .schedule-day-badge {
+    width: 100%;
+    min-height: 40px;
+    flex-direction: row;
+  }
+
+  .schedule-day-slots {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .schedule-slot-menu-modal {

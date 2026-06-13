@@ -7,6 +7,8 @@
 
 ## 2026-06
 
+- TKT-0249 — 消費ダイアログで換算不可の単位不一致在庫（じゃがいも個 vs レシピg）を救済。在庫選択時に換算不能なら consumeUnit を在庫単位へ自動切替＆入力リセット（誤初期値防止）、単位セレクタを換算可否に関わらず単位不一致で表示、レシピ単位のまま確定は専用エラーで単位切替を促しブロック、在庫単位入力は同単位素通しで正減算。判定は純粋関数 `web/src/lib/recipes/consumption-units.ts`（resolveConsumeUnitForStock / resolveConsumedStockAmount）へ切り出し10件テスト。consumed_* の在庫単位保存・TKT-0241 rollback 不変条件は維持（insert 無変更）。schema/RLS/Storage 無変更（supabase_schema_change はテーブル名トークンの過剰マッチ＝report/review 記録）。verify pass（111件）。残: 実機スモーク（自動切替・在庫単位減算・レシピ単位ブロック）。
+- TKT-0248 — 単位換算の逆方向対応（TKT-0241 残課題）。`conversionFactorToUnit` に逆方向分岐（在庫単位=toUnit・レシピ単位=fromUnit → 係数 fromQty/toQty）を追加し、正方向優先・既存挙動不変。0除算/非有限ガードと逆方向ユニットテスト8件追加。stockAmountInUnit/convertToStockUnit/findMatchingStock/不足計算は係数経由で自動対応。pure function のみ・schema 無変更（危険evalは過剰マッチ）。verify pass（574件）。残: なし。
 - TKT-0245 — クロスボード即時反映の回帰テスト追加（SPEC-0242 T4・イニシアチブ締め）。実物 RecipeMealWorkspace の消費確定フロー（調理開始→料理完了→消費モーダル確定）を jsdom で駆動し共有ストア減算→別Consumer反映を検証＋在庫追加→献立自動マッチ反映。production 無変更・verify pass。impl-fast 2回の疑似検証（setter直叩き）を差し戻し impl-deep で実フロー化。危険evalはモック内テーブル名/「写真」語の誤検知（report/review 記録）。残: なし（E2Eスモークは任意・未実施の理由を report 記録）。
 - TKT-0244 — 残り mutation 経路の画面間反映統一（SPEC-0242 T3）。買い物リストを共有ストアへ拡張し inventory-board のローカル state 二重管理を撤廃、買い物追加/レシピ保存/献立削除/履歴編集の router.refresh 依存 9 箇所を削除（残 6 箇所は対応不要判定＝report の表）。schema/auth/RLS/Storage 無変更（危険evalは過剰マッチ＝report/review 記録）。verify pass。残: 実機スモーク（レシピ側で不足分追加→在庫ボードの買い物リストに即時表示）。
 - TKT-0243 — 献立側を共有在庫ストアへ移行（SPEC-0242 T2・発端不具合「調理完了→在庫一覧に戻っても減っていない」の解消点）。inventoryItemsForMeals の useState 複製を撤廃しストア参照化、消費確定/ロールバック/リフェッチをストア反映（quantity>0 フィルタ一貫適用）、料理記録編集後も refetch で反映。schema/auth/RLS/Storage 無変更（危険evalはトークン過剰マッチ＝report/review 記録）。verify pass（557件）。残: 実機スモーク（調理完了→タブ切替で即時反映）・記録モーダルの在庫鮮度は TKT-0244。

@@ -1,7 +1,7 @@
 ---
 id: TKT-0248-unit-conversion-bidirectional
 title: 単位換算の逆方向対応（レシピ単位=在庫のfromUnit側でも換算成立させる）
-status: draft
+status: completed
 goal: unit_conversion が「在庫単位→レシピ単位」の正方向にしか効かず、レシピ=個・在庫=g（換算が逆向きに登録されている）ケースで自動マッチ・換算消費・不足計算が効かない問題を解消する（TKT-0241 の残課題）
 acceptance:
   - conversionFactorToUnit が逆方向も解決する。在庫単位=conversion.toUnit かつ targetUnit=conversion.fromUnit のとき、係数 fromQty/toQty を返す（例 在庫 g・{1個=200g} で targetUnit="個" → 1/200）

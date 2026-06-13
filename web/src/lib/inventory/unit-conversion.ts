@@ -4,8 +4,10 @@
  * 在庫アイテムは unit_conversion に「1 fromUnit = toQty toUnit」（fromUnit=在庫単位）を持つことがある。
  * 例: 豚コマ 在庫単位「パック」・unit_conversion {fromQty:1, fromUnit:"パック", toQty:80, toUnit:"g"}。
  *
- * 対応するのは「在庫単位 → toUnit（レシピ単位）」の正方向のみ。
- * 逆方向換算（レシピ=パック・在庫=g）・連鎖換算はスコープ外（null を返す）。
+ * 対応するのは以下の2方向:
+ * 1. 正方向: 「在庫単位 → toUnit（レシピ単位）」（例: パック → g）
+ * 2. 逆方向: 「toUnit → fromUnit（在庫単位）」（例: g → パック）
+ * 連鎖換算はスコープ外（null を返す）。
  */
 
 import { roundQuantity } from "@/lib/format/numeric";
@@ -31,18 +33,39 @@ function validForwardConversion(item: ConvertibleStock, conversion: UnitConversi
   );
 }
 
+// unit_conversion が逆方向換算（toUnit → 在庫単位 fromUnit）として有効かを返す。
+function validReverseConversion(item: ConvertibleStock, conversion: UnitConversion | null): conversion is UnitConversion {
+  if (!conversion) return false;
+  return (
+    sameUnit(conversion.toUnit, item.unit) &&
+    Number.isFinite(conversion.fromQty) &&
+    Number.isFinite(conversion.toQty) &&
+    conversion.fromQty > 0 &&
+    conversion.toQty > 0
+  );
+}
+
 /**
  * 在庫単位 1 あたりの targetUnit 換算量を返す。
  * - item.unit === targetUnit → 1（換算不要）
  * - unit_conversion が正方向有効で toUnit === targetUnit → toQty / fromQty（例 80）
+ * - unit_conversion が逆方向有効で fromUnit === targetUnit → fromQty / toQty（例 1/200 = 0.005）
  * - それ以外 → null（換算不能）
  */
 export function conversionFactorToUnit(item: ConvertibleStock, targetUnit: string): number | null {
   if (sameUnit(item.unit, targetUnit)) return 1;
 
   const conversion = item.unit_conversion;
+
+  // 正方向を優先評価
   if (validForwardConversion(item, conversion) && sameUnit(conversion.toUnit, targetUnit)) {
     const factor = conversion.toQty / conversion.fromQty;
+    return Number.isFinite(factor) && factor > 0 ? factor : null;
+  }
+
+  // 逆方向を試す
+  if (validReverseConversion(item, conversion) && sameUnit(conversion.fromUnit, targetUnit)) {
+    const factor = conversion.fromQty / conversion.toQty;
     return Number.isFinite(factor) && factor > 0 ? factor : null;
   }
 

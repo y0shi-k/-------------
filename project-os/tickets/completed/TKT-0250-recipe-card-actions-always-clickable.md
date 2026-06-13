@@ -1,7 +1,7 @@
 ---
 id: TKT-0250-recipe-card-actions-always-clickable
 title: PCレシピカード上部の操作ボタンが一瞬で消えて押せない問題を直す
-status: implementation_ready
+status: completed
 goal: 献立レシピ画面のPCレシピカードで、写真エリア右上の料理・スケジュール・編集・削除ボタンを常時クリック可能にする
 acceptance:
   - PC幅のレシピカードで、写真エリア右上の操作ボタンがすぐ消えずクリックできる
