@@ -7538,7 +7538,6 @@ h1 {
   .recipe-card:hover {
     border-color: #dbe1f0;
     box-shadow: 0 14px 32px rgb(15 23 42 / 10%);
-    transform: translateY(-2px);
   }
 
   .recipe-card[data-active="true"] {
@@ -7584,9 +7583,10 @@ h1 {
     -webkit-line-clamp: 2;
   }
 
-  /* 操作ボタンは名前行に入れず、ホバー/フォーカス時にサムネ右上へオーバーレイ。 */
+  /* 操作ボタンは名前行に入れず、カードhover/focus中だけサムネ右上へ表示する。 */
   .recipe-card .recipe-card-actions {
     position: absolute;
+    z-index: 120;
     top: 8px;
     right: 8px;
     gap: 6px;

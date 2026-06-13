@@ -2706,7 +2706,7 @@ export function RecipeMealWorkspace({
           className="ingredient-row canvas-recipe-item-row"
           data-selected={isSelected}
           draggable
-          key={`${tone}-${index}-${ingredient.name}`}
+          key={`${tone}-${index}`}
           onClick={(event) => toggleRecipeIngredientSelection(index, ingredient, event.metaKey || event.ctrlKey)}
           onDragStart={(event) => {
             event.dataTransfer.effectAllowed = "move";

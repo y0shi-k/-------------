@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { RecipeMealWorkspace } from "@/components/recipe-meal-workspace";
 import type { StockItem } from "@/lib/inventory/types";
@@ -153,6 +153,13 @@ const baseCandidate: CookCandidate = {
   created_at: "2026-05-24T00:00:00.000Z",
   updated_at: "2026-05-24T00:00:00.000Z"
 };
+
+function focusElement(element: HTMLElement) {
+  act(() => {
+    element.focus();
+  });
+  expect(document.activeElement).toBe(element);
+}
 
 type WorkspaceTestProps = Omit<React.ComponentProps<typeof RecipeMealWorkspace>, "initialInventoryItems"> & {
   initialInventoryItems?: StockItem[];
@@ -610,6 +617,56 @@ describe("RecipeMealWorkspace", () => {
         expect.objectContaining({ name: "みりん", item_type: "調味料", sort_order: 2, group_index: 0 })
       ]);
     });
+  });
+
+  it("keeps focus while editing recipe ingredient and seasoning rows", () => {
+    renderWorkspace();
+    openRecipeEditor();
+
+    const ingredientEditor = screen.getByLabelText("材料入力");
+    const foodNameInput = within(ingredientEditor).getByLabelText("品名");
+    focusElement(foodNameInput);
+    fireEvent.change(foodNameInput, { target: { value: "玉ねぎA" } });
+    expect(document.activeElement).toBe(foodNameInput);
+    fireEvent.change(foodNameInput, { target: { value: "玉ねぎ" } });
+    expect(document.activeElement).toBe(foodNameInput);
+
+    const foodAmountInput = within(ingredientEditor).getByLabelText("数量");
+    focusElement(foodAmountInput);
+    fireEvent.change(foodAmountInput, { target: { value: "12" } });
+    expect(document.activeElement).toBe(foodAmountInput);
+    fireEvent.change(foodAmountInput, { target: { value: "1" } });
+    expect(document.activeElement).toBe(foodAmountInput);
+
+    const foodUnitInput = within(ingredientEditor).getByLabelText("単位を検索・追加");
+    focusElement(foodUnitInput);
+    fireEvent.change(foodUnitInput, { target: { value: "g" } });
+    expect(document.activeElement).toBe(foodUnitInput);
+    fireEvent.change(foodUnitInput, { target: { value: "" } });
+    expect(document.activeElement).toBe(foodUnitInput);
+
+    fireEvent.click(screen.getByRole("button", { name: "＋ 調味料を追加" }));
+    const seasoningEditor = screen.getByLabelText("調味料入力");
+    const seasoningNameInput = within(seasoningEditor).getByLabelText("品名");
+    focusElement(seasoningNameInput);
+    fireEvent.change(seasoningNameInput, { target: { value: "塩" } });
+    expect(document.activeElement).toBe(seasoningNameInput);
+    fireEvent.change(seasoningNameInput, { target: { value: "" } });
+    expect(document.activeElement).toBe(seasoningNameInput);
+
+    const seasoningAmountInput = within(seasoningEditor).getByLabelText("数量");
+    focusElement(seasoningAmountInput);
+    fireEvent.change(seasoningAmountInput, { target: { value: "2" } });
+    expect(document.activeElement).toBe(seasoningAmountInput);
+    fireEvent.change(seasoningAmountInput, { target: { value: "" } });
+    expect(document.activeElement).toBe(seasoningAmountInput);
+
+    const seasoningUnitInput = within(seasoningEditor).getByLabelText("単位を検索・追加");
+    focusElement(seasoningUnitInput);
+    fireEvent.change(seasoningUnitInput, { target: { value: "小" } });
+    expect(document.activeElement).toBe(seasoningUnitInput);
+    fireEvent.change(seasoningUnitInput, { target: { value: "" } });
+    expect(document.activeElement).toBe(seasoningUnitInput);
   });
 
   it("toggles selected genres from the whole option row", () => {

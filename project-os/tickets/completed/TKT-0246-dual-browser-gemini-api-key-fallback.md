@@ -1,7 +1,7 @@
 ---
 id: TKT-0246-dual-browser-gemini-api-key-fallback
 title: Gemini APIキーを無料用・有料用の2本ブラウザ保存にし、無料エラー時だけ選択式で有料キー実行できるようにする
-status: implementation_ready
+status: compleated
 goal: 現状ブラウザに1本だけ保存しているユーザーGemini APIキーを「無料用」「有料用」の2本に分け、AI実行は無料用を先に使い、エラー時にユーザー確認を挟んで有料用で再実行できるようにする
 acceptance:
   - 設定UIで無料用Gemini APIキーと有料用Gemini APIキーを別々に入力・保存・削除できる
